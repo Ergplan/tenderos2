@@ -63,6 +63,11 @@ def changes() -> list[dict]:
     return out
 
 
+# the amendments whose schedules these tests parse (the pack's Amendment-03 changes are checked
+# against their pages by tests/test_seci_pack.py)
+PARSED = ("amd1", "amd2")
+
+
 @pytest.fixture(scope="module")
 def rfs_pages():
     return _pages("rfs")
@@ -103,7 +108,7 @@ def test_clause_labels_and_keys():
 def test_docling_changes_cover_the_pack_and_every_quote_is_located(changes):
     assert len([c for c in changes if c["doc"] == "amd1"]) == 30  # 17 RfS + 11 PPA + 2 PSA
     assert len([c for c in changes if c["doc"] == "amd2"]) == 21  # 14 RfS + 6 PPA + 1 PSA
-    for gold in PACK["changes"]:
+    for gold in [g for g in PACK["changes"] if g["doc"] in PARSED]:
         key = clause_key(gold["clause"])
         hits = [c for c in changes if c["doc"] == gold["doc"] and c["document"] == gold["document"] and same_clause(key, tuple(c["clause_key"]))]
         assert hits, f"{gold['id']} ({gold['doc']} {gold['document']} {gold['clause']}) not found"
@@ -130,7 +135,7 @@ def test_pymupdf_fallback_reads_the_same_schedules():
     found = []
     for doc in ("amd1", "amd2"):
         found += read_changes(doc, tables_from_pymupdf(_bytes(doc)), _pages(doc))
-    gold = PACK["changes"]
+    gold = [g for g in PACK["changes"] if g["doc"] in PARSED]
     hits = [g for g in gold if any(c["doc"] == g["doc"] and c["document"] == g["document"] and same_clause(clause_key(g["clause"]), tuple(c["clause_key"])) for c in found)]
     assert len(hits) == len(gold)
     assert sum(1 for c in found if c["doc"] == "amd2") == 21
