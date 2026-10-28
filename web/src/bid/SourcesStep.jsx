@@ -1,5 +1,5 @@
-import React, { useMemo } from "react";
-import { ArrowRight, BatteryCharging, CheckCircle2, Droplets, Factory, Flame, Sparkles, Sun, TriangleAlert, Wind, Zap } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { ArrowRight, BatteryCharging, CheckCircle2, Droplets, Factory, Flame, LayoutGrid, Sparkles, Sun, TriangleAlert, Wind, Zap } from "lucide-react";
 import ProfileLibrary from "../rtc/ProfileLibrary";
 import { LiveChart } from "../rtc/charts";
 import { DATA_COLORS } from "../chartTheme";
@@ -10,6 +10,10 @@ import { SourceChip } from "./RequirementsStep";
 import BidLosses from "./BidLosses";
 import AssignButton from "../team/AssignButton";
 import { POINTS } from "../rtc/LossChain";
+import SolarStudio from "../plant/SolarStudio";
+import WindStudio from "../plant/WindStudio";
+import ProfileView from "../plant/ProfileView";
+import { resourceProfiles } from "./model";
 
 export const SOURCE_COLORS = { solar: DATA_COLORS.solar, wind: DATA_COLORS.wind, hydro: HYDRO_COLOR, biomass: BIOMASS_COLOR, thermal: THERMAL_COLOR, bess: DATA_COLORS.bess };
 const ICONS = { solar: Sun, wind: Wind, hydro: Droplets, biomass: Flame, thermal: Factory, bess: BatteryCharging };
@@ -94,6 +98,28 @@ function SourceCard({ id, state, setState, terms, set, lockProps, isLocked, user
   const capLabel = id === "bess" ? "Battery power" : "Capacity";
   const groups = [...new Set(SOURCE_FIELDS[id].map((f) => f.group))];
   const shim = { ...state, inputs: { solarCuf: state.src.solar.cuf || 0, windCuf: state.src.wind.cuf || 0 } };
+  const [studioOpen, setStudioOpen] = useState(false);
+  const studio = state.studio?.[id] || null;
+  const upload = id === "solar" ? state.solarUpload : id === "wind" ? state.windUpload : null;
+  const profile = useMemo(() => {
+    if (!on || (id !== "solar" && id !== "wind") || !isNum(s.cuf)) return null;
+    const p = resourceProfiles(state);
+    return id === "solar" ? p.solarCf : p.windCf;
+    // the profile follows the CUF, DC:AC, upload and monthly scaling of this source
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, id, s.cuf, s.dcAc, upload, state.solarMonthScale, state.windMonthScale]);
+  const saveStudio = (v) => setState((st) => ({ ...st, studio: { ...(st.studio || {}), [id]: { ...v, applied: st.studio?.[id]?.applied || null } } }));
+  const applyStudio = ({ capex, dcAc, cuf, studio: v, summary }) => {
+    const values = { capex, ...(dcAc ? { dcAc } : {}), ...(cuf ? { cuf } : {}) };
+    setState((st) => ({
+      ...st,
+      studio: { ...(st.studio || {}), [id]: { ...v, applied: { ...values, summary, at: new Date().toISOString() } } },
+      src: { ...st.src, [id]: { ...st.src[id], ...values } },
+      filled: unmark(st.filled, Object.keys(values).map((k) => `${id}.${k}`)),
+      lp: null,
+    }));
+    setStudioOpen(false);
+  };
   return (
     <div className={`bid-source ${on ? "" : "off"} ${issues.length ? "incomplete" : ""}`} style={{ "--chapter": SOURCE_COLORS[id] }} data-testid={`source-${id}`}>
       <header>
@@ -130,6 +156,26 @@ function SourceCard({ id, state, setState, terms, set, lockProps, isLocked, user
               </div>
             </div>
           ))}
+          {(id === "solar" || id === "wind") && (
+            <div className="bid-studio-row">
+              <button type="button" className="secondary" onClick={() => setStudioOpen(true)} data-testid={`studio-${id}`}>
+                <LayoutGrid size={14} /> {id === "solar" ? "Solar plant studio: layout, inverters, ₹/Wp build-up" : "Wind farm studio: turbines by make, CUF, cost build-up"}
+              </button>
+              {studio?.applied && <span className="rtc-note" data-testid={`studio-applied-${id}`}>From the studio: ₹{nf(studio.applied.capex, 3)} cr/{id === "solar" ? "MWac" : "MW"}{studio.applied.cuf ? `, CUF ${nf(studio.applied.cuf * 100, 1)}%` : ""} · {studio.applied.summary}</span>}
+            </div>
+          )}
+          {studioOpen && id === "solar" && (
+            <SolarStudio studio={studio} acMw={s.capacity.mw || null} fixedCuf={isNum(s.cuf) ? s.cuf : null} onChange={saveStudio} onApply={applyStudio} onClose={() => setStudioOpen(false)} />
+          )}
+          {studioOpen && id === "wind" && (
+            <WindStudio studio={studio} farmMw={s.capacity.mw || null} onChange={saveStudio} onApply={applyStudio} onClose={() => setStudioOpen(false)} />
+          )}
+          {profile && (
+            <details className="bid-profile" open={Boolean(upload)}>
+              <summary>Profile on screen: CUF {nf(s.cuf * 100, 2)}%{upload ? ` · ${upload.name}` : " · typical shape"}</summary>
+              <ProfileView cf={profile} raw={upload?.values || null} color={SOURCE_COLORS[id]} label={id === "solar" ? "Solar" : "Wind"} />
+            </details>
+          )}
           {(id === "solar" || id === "wind") && (
             <details className="bid-profile">
               <summary>Hourly profile: {(id === "solar" ? state.solarUpload : state.windUpload)?.name || "a typical Indian profile shape"}, scaled to your CUF</summary>

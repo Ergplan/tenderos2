@@ -2,6 +2,7 @@
 // The traceable financial model on screen: the Live model sheet as a grid where every number is a
 // button. Selecting one shows its formula with each reference named and valued, the numbers it
 // reads, the numbers that read it, and every input it finally rests on; any of those is a click away.
+import { createPortal } from "react-dom";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calculator, Search, Sigma, X } from "lucide-react";
 import { cellName, colName, formulaParts, inputsOf, traceModel } from "./trace";
@@ -213,6 +214,7 @@ export default function ModelExplorer({ getLive, target, onClose }) {
   }, [model, q]);
 
   return (
+    createPortal(
     <div className="trace-overlay" role="dialog" aria-modal="true" aria-label="Traceable financial model" data-testid="trace-explorer">
       <div className="trace-shell">
         <header className="trace-head">
@@ -268,6 +270,8 @@ export default function ModelExplorer({ getLive, target, onClose }) {
           <span className="is-read">Read by the selected number</span><span className="is-user">Uses the selected number</span>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
+    )
   );
 }
