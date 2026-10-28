@@ -4,11 +4,13 @@
 // dates that follow the PPA's Effective Date. Plain JavaScript (no JSX), checked in Node by
 // tools/check_seci.mjs.
 import PACK from "./seci-rtc-tm-v.json" with { type: "json" };
+import { costliestHours } from "./peakPrices.js";
 
 export { PACK };
 
 /** How the Peak Hours are planned for: the Buying Entity picks 6 of the 16 window hours each day. */
 export const PEAK_PLANS = {
+  price: { label: "The 6 costliest hours each day", detail: "Each day, the 6 hours from 18:00 to 10:00 with the highest IEX Day-Ahead prices: the hours a buyer would most likely pick", start: 18, hours: 16, byPrice: true },
   any: { label: "Any 6 of the 16 hours", detail: "Every hour from 18:00 to 10:00 held to the peak floor: safe whichever 6 hours are chosen", start: 18, hours: 16 },
   evening: { label: "Evening 18:00–24:00", detail: "Plan on the evening peak only; a morning pick would be short", start: 18, hours: 6 },
 };
@@ -19,7 +21,7 @@ export const SHORTFALL_MODES = {
   hard: { label: "Meet every block", detail: "No shortfall in any hour of any modelled year" },
 };
 
-export const DEFAULT_SETTINGS = { peakPlan: "any", shortfall: "penalty", ppaDate: null };
+export const DEFAULT_SETTINGS = { peakPlan: "price", shortfall: "penalty", ppaDate: null };
 
 const byId = Object.fromEntries(PACK.conditions.map((c) => [c.id, c]));
 
@@ -66,10 +68,15 @@ export function moneyAtStake(sizes) {
   return { S, W, E, emdRs: f("emdRs"), pbgRs: f("pbgRs"), netWorthRs: f("netWorthRs") };
 }
 
-/** The tender's terms for the bid steps, under the bidder's planning choices. */
-export function seciTerms(settings = DEFAULT_SETTINGS) {
+/**
+ * The tender's terms for the bid steps, under the bidder's planning choices. prices (the IEX hourly
+ * prices, loadMarketPrices) pick the Peak Hours of the "costliest hours" plan; until they are
+ * there, that plan holds every hour of the window, as "Any 6 of the 16 hours" does.
+ */
+export function seciTerms(settings = DEFAULT_SETTINGS, prices = null) {
   const m = PACK.model;
   const plan = PEAK_PLANS[settings.peakPlan] || PEAK_PLANS.any;
+  const picked = plan.byPrice ? costliestHours(prices) : null;
   const penalty = settings.shortfall === "hard" ? null : m.penaltyMultiple;
   const dates = keyDates(settings.ppaDate);
   return {
@@ -84,7 +91,8 @@ export function seciTerms(settings = DEFAULT_SETTINGS) {
       { id: "peak", label: "Peak Hours floor (every block)", basis: "block", hours: "peak", target: m.peakFloor, penaltyMultiple: penalty },
       { id: "offpeak", label: "Off-peak floor (every block)", basis: "block", hours: "offpeak", target: m.offpeakFloor, penaltyMultiple: penalty },
     ],
-    peak: { start: plan.start, hours: plan.hours, setBy: "procurer", windows: [{ start: "18:00", end: "10:00" }] },
+    peak: { start: plan.start, hours: plan.hours, setBy: "procurer", windows: [{ start: "18:00", end: "10:00" }],
+      ...(picked ? { mask: picked.mask, picked } : {}), ...(plan.byPrice && !picked ? { pricesPending: true } : {}) },
     peakAny: false,
     peakPlan: settings.peakPlan in PEAK_PLANS ? settings.peakPlan : "any",
     shortfall: penalty === null ? "hard" : "penalty",

@@ -41,7 +41,7 @@ export function agentInputs(state) {
   add({ key: "bidMw", label: "Contracted capacity bid", step: "bid", kind: "number", unit: "MW", min: m.minBidMw, max: m.maxBidMw,
     get: (s) => s.bid.baseMw, benchmark: 300, set: (s, v) => clear({ ...s, bid: { ...s.bid, baseMw: Math.round(v), greenshoe: false } }) });
   add({ key: "peakPlan", label: "Peak Hours plan", step: "bid", kind: "choice", options: Object.entries(PEAK_PLANS).map(([k, p]) => [k, p.label]),
-    get: (s) => s.seci.peakPlan, benchmark: "any", set: (s, v) => clear({ ...s, seci: { ...s.seci, peakPlan: v } }) });
+    get: (s) => s.seci.peakPlan, benchmark: "price", set: (s, v) => clear({ ...s, seci: { ...s.seci, peakPlan: v } }) });
   add({ key: "shortfall", label: "Shortfall plan", step: "bid", kind: "choice", options: Object.entries(SHORTFALL_MODES).map(([k, p]) => [k, p.label]),
     get: (s) => s.seci.shortfall, benchmark: "penalty", set: (s, v) => clear({ ...s, seci: { ...s.seci, shortfall: v } }) });
   add({ key: "ppaDate", label: "Expected PPA Effective Date", step: "bid", kind: "date",

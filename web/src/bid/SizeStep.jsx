@@ -4,7 +4,7 @@ import * as E from "../rtc/engine";
 import { LiveChart } from "../rtc/charts";
 import { DATA_COLORS } from "../chartTheme";
 import { Section, Stat, nf, pf } from "../rtc/ui";
-import { SIZE_KEY, SOURCES, anyHours, energyMix, marketLabel, peakHours, plantMw, sizesAtMax } from "./model";
+import { SIZE_KEY, SOURCES, anyMask, energyMix, marketLabel, peakMask, plantMw, sizesAtMax } from "./model";
 import { SOURCE_COLORS } from "./SourcesStep";
 import Checklist, { BidderInputs } from "./Checklist";
 import Dispatch15 from "./Dispatch15";
@@ -61,12 +61,14 @@ function DispatchWeek({ hourly, peak, market, peakAny, sizes, rules = [] }) {
       return g > 0 ? Number(((hourly.direct[t] * hourly[key][t]) / g).toFixed(2)) : 0;
     });
     const labels = idx.map((t) => `${E.MONTHS[E.MONTH_OF_HOUR[t]]} ${String(E.HOUR_OF_DAY[t]).padStart(2, "0")}h`);
-    const ph = new Set(peakAny ? (peak.windows?.length ? anyHours(peak) : []) : peakHours(peak));
+    // the peak hours of the year, hour by hour (a plan may pick different hours each day)
+    const pm = peakAny ? (peak.windows?.length ? anyMask(peak) : new Uint8Array(E.HOURS)) : peakMask(peak);
+    const isPeak = (t) => pm[t] === 1;
     const areas = [];
     idx.forEach((t, i) => {
-      if (ph.has(E.HOUR_OF_DAY[t]) && (i === 0 || !ph.has(E.HOUR_OF_DAY[idx[i - 1]]))) {
+      if (isPeak(t) && (i === 0 || !isPeak(idx[i - 1]))) {
         let j = i;
-        while (j + 1 < idx.length && ph.has(E.HOUR_OF_DAY[idx[j + 1]])) j += 1;
+        while (j + 1 < idx.length && isPeak(idx[j + 1])) j += 1;
         areas.push([{ xAxis: labels[i] }, { xAxis: labels[j] }]);
       }
     });
@@ -81,7 +83,7 @@ function DispatchWeek({ hourly, peak, market, peakAny, sizes, rules = [] }) {
         return hourSankeyHtml(hourly, t, {
           gens, titles: { ...Object.fromEntries(gens.map((k) => [k, title(k)])), bess: "Battery" },
           colors: { ...SOURCE_COLORS, ppa: "#d4ff3f", surplus: DATA_COLORS.surplus },
-          rules, peakHour: (h) => ph.has(E.HOUR_OF_DAY[h]), label: labels[t - start], mode: getTheme(),
+          rules, peakHour: isPeak, label: labels[t - start], mode: getTheme(),
         });
       }
       const parts = [`<b>${labels[t - start]}</b>`, head("Output")];

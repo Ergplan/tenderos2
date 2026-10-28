@@ -14,6 +14,7 @@ import SolarStudio from "../plant/SolarStudio";
 import WindStudio from "../plant/WindStudio";
 import { PEAK_PLANS, SHORTFALL_MODES } from "../seci/terms";
 import { SECI_LIMITS, WHATIF_NOTE, defaultWhatIf, runWhatIf } from "./model";
+import { loadMarketPrices } from "../bid/model";
 
 const KEY = "tenderos-whatif";
 
@@ -98,7 +99,10 @@ export default function WhatIfTab() {
   const [week, setWeek] = useState(28);
   useEffect(() => { const v = load(); if (v) setState((s) => ({ ...s, ...v, bess: { ...s.bess, ...(v.bess || {}) }, costs: { ...s.costs, ...(v.costs || {}) }, om: { ...s.om, ...(v.om || {}) }, fin: { ...s.fin, ...(v.fin || {}) } })); setLoaded(true); }, []);
   useEffect(() => { if (!loaded) return; try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage off: the case lasts for the page */ } }, [state, loaded]);
-  const res = useMemo(() => runWhatIf(state), [state]);
+  // the IEX prices pick the Peak Hours of the "costliest hours" plan
+  const [prices, setPrices] = useState(null);
+  useEffect(() => { loadMarketPrices().then(setPrices).catch(() => setPrices(null)); }, []);
+  const res = useMemo(() => runWhatIf(state, { prices }), [state, prices]);
   const set = (v) => setState((s) => ({ ...s, ...v }));
   const setIn = (part, v) => setState((s) => ({ ...s, [part]: { ...s[part], ...v } }));
   const curve = useMemo(() => irrCurve(res), [res]);

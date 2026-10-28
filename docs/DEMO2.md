@@ -86,6 +86,41 @@ and losses the HiGHS sizing receives). It also checks that the months add up to 
 the 15-minute blocks keep each hour's energy. `tools/check_live_model.mjs` recalculates the section
 in LibreOffice.
 
+## Peak Hours: the 6 costliest hours each day
+
+SECI RTC-TM-V lets the Buying Entity choose any 6 hours a day, day-ahead, between 18:00 and 10:00
+the next morning (Amendment-01 p. 2; PSA p. 18). The new default plan in the SECI tab and the
+What-if tab, "The 6 costliest hours each day" (`web/src/seci/peakPrices.js`), works as follows:
+* Each day, the 6 hours of that window with the highest IEX Day-Ahead Market prices are held to the
+  90% peak floor (`web/public/market/iex_hourly_prices.json`, Sep 2025 to Sep 2026). A buyer
+  would most likely pick these hours.
+* Every other hour, including the window's other 10, is held to the 70% off-peak floor.
+* The hours change from day to day. The sizing (HiGHS), the 15-minute dispatch, the What-if
+  dispatch and the charts all get them hour by hour.
+* The bid checklist's "Peak hours" row says which hours are picked most often (18:00–24:00 on
+  these prices) and their average price against the whole window: ₹7.41 against ₹5.45/kWh.
+* The agent's Peak Hours chart shows how often each hour is picked.
+
+Until the prices load, this plan holds all 16 window hours, as "Any 6 of the 16 hours" does.
+That plan (the safest) and "Evening 18:00–24:00" remain as choices.
+
+On a 200 MW bid with the benchmark inputs, sized with HiGHS and the shortfall penalty allowed:
+
+| Peak Hours plan | Tariff | Solar / wind | Battery | Peak hours met (year 1) | Short (worst year, peak / off-peak) |
+| --- | --- | --- | --- | --- | --- |
+| Any 6 of the 16 hours | ₹7.04 | 523 / 293 MW | 423 MW / 1,692 MWh | 85.8% | 109.3 / 0.5 MU |
+| The 6 costliest hours each day | ₹6.50 | 432 / 311 MW | 297 MW / 1,188 MWh | 85.1% | 32.1 / 81.2 MU |
+
+With only 6 hours a night held to 90%, the plant needs a smaller battery and the tariff falls by
+₹0.54/kWh. The optimiser then accepts some off-peak shortfall at 1.5 × tariff where that costs
+less than more plant. Choose "Meet every block" to rule that out.
+
+`tools/check_peak_prices.mjs` checks the following on the price file:
+* each window gets exactly 6 hours;
+* they are its costliest hours, and none falls outside the window;
+* the sizing request carries them;
+* the charts' floors and the What-if dispatch use them.
+
 ## Solar plant studio
 
 `web/src/plant/solar.js` and `SolarStudio.jsx`. Open it from the solar source in Supply sources,
@@ -224,6 +259,6 @@ A tab of its own (`web/src/market/`).
 
 | Command | Covers |
 | --- | --- |
-| `make check-web` | adds `check_trace`, `check_generation`, `check_plant`, `check_whatif` and `check_market` |
+| `make check-web` | adds `check_trace`, `check_generation`, `check_peak_prices`, `check_plant`, `check_whatif` and `check_market` |
 | `make test` | adds `tests/engine/test_cerc_order.py` |
 | `make e2e` | adds `tests/e2e/test_demo2.py`: the traceable model from Round the clock, both studios writing into the SECI bid and the profile view, the What-if returns and checks, a dispatch number traced to its generation formula, months and 15-minute blocks, and a CERC order uploaded, read, checked and deleted |

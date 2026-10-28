@@ -83,7 +83,8 @@ export default function SeciTab({ initialScenario = null }) {
   const [saveMessage, setSaveMessage] = useState("");
   useEffect(() => { sessionLinked = linked; }, [linked]);
   const [prices, setPrices] = useState(null);
-  const terms = useMemo(() => seciTerms(state.seci), [state.seci]);
+  // the IEX prices pick the Peak Hours of the "costliest hours" plan
+  const terms = useMemo(() => seciTerms(state.seci, prices), [state.seci, prices]);
   const missing = useMemo(() => missingInputs(state, terms), [state, terms]);
   const sizing = useSizing({ state, setState, terms, prices, session: sizingSession, module: "seci" });
 

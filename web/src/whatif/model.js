@@ -13,12 +13,13 @@ import * as E from "../rtc/engine.js";
 import { scaleToCuf, peakHours } from "../bid/model.js";
 import { PACK, PEAK_PLANS, seciTerms } from "../seci/terms.js";
 import { genSource } from "../model/generation.js";
+import { costliestHours } from "../seci/peakPrices.js";
 
 export const WHATIF_NOTE = "Rule-based dispatch (battery held for the Peak Hours): an instant check of a size, not the HiGHS optimum.";
 
 export function defaultWhatIf() {
   return {
-    peakPlan: "any",
+    peakPlan: "price",
     shortfall: "penalty",
     contractedMw: 300,
     solarMwac: 785,
@@ -86,12 +87,23 @@ export function peakHourMask(plan) {
 }
 
 /**
+ * The Peak Hours of the year, hour by hour: the costliest IEX hours of each day's window under the
+ * "costliest hours" plan (when the prices are there), else the plan's hours of every day.
+ */
+export function peakYearMask(plan, prices = null) {
+  const picked = PEAK_PLANS[plan]?.byPrice ? costliestHours(prices) : null;
+  if (picked) return picked.mask;
+  const day = peakHourMask(plan);
+  return Uint8Array.from({ length: E.HOURS }, (_, t) => day[E.HOUR_OF_DAY[t]]);
+}
+
+/**
  * One year's hourly dispatch. f: the year's degradation factors (E.yearFactors). Returns the
  * year's totals at the meter, each floor's hours met and energy short, and (hourly: true) the hours.
  */
-export function dispatchYear(input, prof, f, { hourly = false } = {}) {
+export function dispatchYear(input, prof, f, { hourly = false, peak: peakYear = null } = {}) {
   const terms = whatIfTerms(input);
-  const peak = peakHourMask(input.peakPlan);
+  const peak = peakYear || peakYearMask(input.peakPlan);
   const floors = Object.fromEntries(terms.rules.map((r) => [r.hours, r.target]));
   const C = input.contractedMw;
   const poi = (1 - input.trafoLossPct) * (1 - input.lineLossPct);
@@ -110,7 +122,7 @@ export function dispatchYear(input, prof, f, { hourly = false } = {}) {
   const t = { demand: 0, delivered: 0, excess: 0, curtail: 0, charge: 0, discharge: 0, solar: 0, wind: 0, injected: 0 };
   const rules = { peak: { hours: 0, met: 0, shortMWh: 0 }, offpeak: { hours: 0, met: 0, shortMWh: 0 } };
   for (let h = 0; h < E.HOURS; h += 1) {
-    const isPeak = peak[E.HOUR_OF_DAY[h]] === 1;
+    const isPeak = peak[h] === 1;
     const s = S * prof.solarCf[h];
     const w = W * prof.windCf[h];
     const g = s + w;
@@ -216,11 +228,12 @@ function debtIrr(finance) {
  * The whole what-if: dispatch of every year, the financial model at the bid tariff and the tariff
  * the target IRR needs, the lender's view and the tender checks.
  */
-export function runWhatIf(raw) {
+export function runWhatIf(raw, { prices = null } = {}) {
   const d = defaultWhatIf();
   const input = { ...d, ...raw, bess: { ...d.bess, ...(raw?.bess || {}) }, costs: { ...d.costs, ...(raw?.costs || {}) }, om: { ...d.om, ...(raw?.om || {}) }, fin: { ...d.fin, ...(raw?.fin || {}) } };
   const terms = whatIfTerms(input);
   const prof = profilesFor(input);
+  const peak = peakYearMask(input.peakPlan, prices);
   const fin = finOf(input, terms);
   const bess = { ...E.DEFAULT_BESS, ...input.bess, durationH: input.bessHours };
   const sizes = sizesOf(input);
@@ -230,7 +243,7 @@ export function runWhatIf(raw) {
   let year1 = null;
   for (let y = 1; y <= years; y += 1) {
     const f = E.yearFactors(y, fin, bess);
-    const r = dispatchYear(input, prof, f, { hourly: y === 1 });
+    const r = dispatchYear(input, prof, f, { hourly: y === 1, peak });
     if (y === 1) year1 = r;
     ops.push({ year: y, ...f, ...r, hourly: undefined });
   }

@@ -7,6 +7,7 @@ import { DATA_COLORS } from "../dataColors.js";
 import { capexBySource, modelInputs } from "../bid/model.js";
 import { irrCurve } from "../bid/quote.js";
 import { PACK, PEAK_PLANS, moneyAtStake } from "./terms.js";
+import { hourRanges } from "./peakPrices.js";
 import { financeOf } from "./voice.js";
 
 /** The charts and what each shows (the agent's tool lists them). */
@@ -23,11 +24,17 @@ const HOURS24 = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"))
 const r = (v, d = 1) => (Number.isFinite(v) ? Number(v.toFixed(d)) : null);
 const inWindow = (h) => h >= 18 || h < 10; // the Peak Hours window, RfS 8.1(c) as amended
 
-/** The floor (MW) to meet in each hour of the day under the bidder's Peak Hours plan. */
-export function floorsByHour(state) {
+/**
+ * The floor (MW) to meet in each hour of the day under the bidder's Peak Hours plan. When the plan
+ * picks the costliest hours each day (terms.peak.picked), an hour's floor is the average over the
+ * days: the peak floor on the days it is picked, the off-peak floor on the others.
+ */
+export function floorsByHour(state, terms = null) {
   const m = PACK.model;
   const mw = state.bid.baseMw || 0;
   const plan = PEAK_PLANS[state.seci?.peakPlan] || PEAK_PLANS.any;
+  const share = plan.byPrice ? terms?.peak?.picked?.share : null;
+  if (share) return share.map((f) => (f * m.peakFloor + (1 - f) * m.offpeakFloor) * mw);
   const held = (h) => (plan.hours >= 16 ? inWindow(h) : h >= plan.start && h < plan.start + plan.hours);
   return HOURS24.map((_, h) => (held(h) ? m.peakFloor : m.offpeakFloor) * mw);
 }
@@ -64,10 +71,10 @@ const axisMw = { type: "value", name: "MW" };
 const legend = { top: 0, type: "scroll" };
 const grid = { left: 56, right: 18, top: 44, bottom: 34 };
 
-function peakWindow(state, hourly) {
+function peakWindow(state, hourly, terms = null) {
   const mw = state.bid.baseMw || 0;
   const m = PACK.model;
-  const floors = floorsByHour(state);
+  const floors = floorsByHour(state, terms);
   const plan = PEAK_PLANS[state.seci?.peakPlan] || PEAK_PLANS.any;
   const series = [
     { name: `Floor you plan for (${plan.label})`, type: "line", step: "middle", symbol: "none", data: floors.map((v) => r(v)), lineStyle: { color: DATA_COLORS.signal, width: 2 }, itemStyle: { color: DATA_COLORS.signal },
@@ -75,6 +82,11 @@ function peakWindow(state, hourly) {
         data: [[{ name: "Peak Hours may fall here", xAxis: "18" }, { xAxis: "23" }], [{ name: "…and here", xAxis: "00" }, { xAxis: "09" }]] } },
     { name: "Contracted capacity", type: "line", symbol: "none", data: HOURS24.map(() => mw), lineStyle: { color: DATA_COLORS.demand, type: "dashed", width: 1 }, itemStyle: { color: DATA_COLORS.demand } },
   ];
+  const picked = plan.byPrice ? terms?.peak?.picked : null;
+  if (picked) {
+    series[0].name = "Floor you plan for (average of the days)";
+    series.push({ name: "Days the hour is a Peak Hour", type: "bar", yAxisIndex: 1, barWidth: "55%", data: picked.share.map((f) => r(f * 100, 1)), itemStyle: { color: "rgba(212,255,63,0.35)" }, tooltip: { valueFormatter: (v) => `${v}% of days` } });
+  }
   if (plan.hours < 16) {
     series.push({ name: "Floor if a morning hour is picked", type: "line", step: "middle", symbol: "none", data: HOURS24.map((_, h) => r((inWindow(h) ? m.peakFloor : m.offpeakFloor) * mw)), lineStyle: { color: DATA_COLORS.unmet, type: "dotted" }, itemStyle: { color: DATA_COLORS.unmet } });
   }
@@ -82,6 +94,12 @@ function peakWindow(state, hourly) {
     contractedMw: mw, peakFloorMw: r(m.peakFloor * mw), offpeakFloorMw: r(m.offpeakFloor * mw),
     window: "18:00 to 10:00 (16 hours); the buyer picks any 6 of them a day ahead", plan: plan.label,
     hoursHeldToPeakFloor: floors.filter((v) => v === m.peakFloor * mw).length,
+    ...(picked ? {
+      howPicked: `each day, the 6 hours of the window with the highest ${picked.marketLabel} prices`,
+      hoursMostOftenPicked: hourRanges(picked.mostOften),
+      shareOfDaysPickedByHour: Object.fromEntries(picked.share.map((f, h) => [HOURS24[h], r(f * 100, 0)]).filter(([, v]) => v > 0)),
+      averagePricePickedRsPerKwh: r(picked.pickedRsPerKwh, 2), averagePriceWindowRsPerKwh: r(picked.windowRsPerKwh, 2),
+    } : {}),
   };
   if (state.lp && hourly?.direct) {
     const d = delivered(hourly);
@@ -98,13 +116,15 @@ function peakWindow(state, hourly) {
   }
   return {
     title: "Peak Hours and the floors, by hour of the day",
-    caption: `The buyer picks 6 Peak Hours a day, day-ahead, anywhere in the shaded 18:00–10:00 window: ${r(m.peakFloor * 100, 0)}% of ${mw} MW in those, ${r(m.offpeakFloor * 100, 0)}% in every other block.`,
-    option: { animation: false, grid, legend, tooltip: { trigger: "axis", valueFormatter: (v) => `${v} MW` }, xAxis: { type: "category", data: HOURS24, name: "hour" }, yAxis: { ...axisMw, min: 0 }, series },
+    caption: `The buyer picks 6 Peak Hours a day, day-ahead, anywhere in the shaded 18:00–10:00 window: ${r(m.peakFloor * 100, 0)}% of ${mw} MW in those, ${r(m.offpeakFloor * 100, 0)}% in every other block.`
+      + (picked ? ` Planned on the 6 costliest ${picked.marketLabel} hours of each day; the bars show how often each hour is one of them.` : ""),
+    option: { animation: false, grid: picked ? { ...grid, right: 48 } : grid, legend, tooltip: { trigger: "axis", valueFormatter: (v) => `${v} MW` }, xAxis: { type: "category", data: HOURS24, name: "hour" },
+      yAxis: picked ? [{ ...axisMw, min: 0 }, { type: "value", name: "% of days", min: 0, max: 100, splitLine: { show: false } }] : { ...axisMw, min: 0 }, series },
     summary,
   };
 }
 
-function typicalDay(state, hourly, { month = null } = {}) {
+function typicalDay(state, hourly, { month = null } = {}, terms = null) {
   needSized(state, hourly);
   const mo = Number.isInteger(month) && month >= 1 && month <= 12 ? month - 1 : null;
   const gens = ["solar", "wind", "biomass"].filter((k) => hourly[k]);
@@ -120,7 +140,7 @@ function typicalDay(state, hourly, { month = null } = {}) {
     { name: "Battery to the PPA", type: "bar", stack: "ppa", data: mean.discharge.map((v) => r(v)), itemStyle: { color: DATA_COLORS.bess } },
     { name: "Battery charging", type: "bar", data: mean.charge.map((v) => r(-v)), itemStyle: { color: "rgba(169,139,255,0.45)" } },
     { name: "Contracted supply", type: "line", symbol: "none", step: "middle", data: mean.demand.map((v) => r(v)), lineStyle: { color: DATA_COLORS.demand, type: "dashed", width: 1 }, itemStyle: { color: DATA_COLORS.demand } },
-    { name: "Floor", type: "line", symbol: "none", step: "middle", data: floorsByHour(state).map((v) => r(v)), lineStyle: { color: DATA_COLORS.signal, width: 1.5 }, itemStyle: { color: DATA_COLORS.signal } },
+    { name: "Floor", type: "line", symbol: "none", step: "middle", data: floorsByHour(state, terms).map((v) => r(v)), lineStyle: { color: DATA_COLORS.signal, width: 1.5 }, itemStyle: { color: DATA_COLORS.signal } },
   ];
   if (mean.export.some((v) => v > 0.5)) series.splice(gens.length + 1, 0, { name: "Sold as surplus", type: "bar", stack: "ppa", data: mean.export.map((v) => r(v)), itemStyle: { color: DATA_COLORS.surplus } });
   const del = mean.direct.map((d, h) => d + mean.discharge[h]);
@@ -133,14 +153,14 @@ function typicalDay(state, hourly, { month = null } = {}) {
     summary: {
       period: when, deliveredAverageMw: r(del.reduce((a, v) => a + v, 0) / 24, 0),
       solarPeak: top(gens.includes("solar") ? mean.solar : new Array(24).fill(0)), batteryDischargePeak: top(mean.discharge), batteryChargingPeak: top(mean.charge),
-      hoursBelowFloorOnAverage: del.map((v, h) => (v < floorsByHour(state)[h] - 0.5 ? HOURS24[h] : null)).filter(Boolean),
+      hoursBelowFloorOnAverage: del.map((v, h) => (v < floorsByHour(state, terms)[h] - 0.5 ? HOURS24[h] : null)).filter(Boolean),
     },
   };
 }
 
-function monthlyEnergy(state, hourly) {
+function monthlyEnergy(state, hourly, terms = null) {
   needSized(state, hourly);
-  const floors = floorsByHour(state);
+  const floors = floorsByHour(state, terms);
   const del = new Array(12).fill(0);
   const short = new Array(12).fill(0);
   const sold = new Array(12).fill(0);
@@ -267,9 +287,9 @@ function money(state, terms) {
  */
 export function agentChart(kind, { state, terms, hourly = null, params = {} }) {
   switch (kind) {
-    case "peak_window": return { kind, ...peakWindow(state, hourly) };
-    case "typical_day": return { kind, ...typicalDay(state, hourly, params) };
-    case "monthly_energy": return { kind, ...monthlyEnergy(state, hourly) };
+    case "peak_window": return { kind, ...peakWindow(state, hourly, terms) };
+    case "typical_day": return { kind, ...typicalDay(state, hourly, params, terms) };
+    case "monthly_energy": return { kind, ...monthlyEnergy(state, hourly, terms) };
     case "irr_vs_tariff": return { kind, ...irrVsTariff(state, terms, params) };
     case "cash_flows": return { kind, ...cashFlows(state, terms) };
     case "money": return { kind, ...money(state, terms) };

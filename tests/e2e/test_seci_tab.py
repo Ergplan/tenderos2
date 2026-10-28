@@ -100,7 +100,7 @@ def test_bid_on_screen(tmp_path):
         # what you bid
         page.click("[data-testid=seci-step-bid]")
         page.fill("[data-testid=seci-bid-mw]", "200")
-        page.click("[data-testid=seci-peak-any]")
+        page.click("[data-testid=seci-peak-price]")  # the 6 costliest IEX hours of each day's window
         page.click("[data-testid=seci-shortfall-penalty]")
         page.fill("[data-testid=seci-ppa-date]", "2026-06-07")
         dates = page.locator("[data-testid=seci-tab]").inner_text()
@@ -127,6 +127,8 @@ def test_bid_on_screen(tmp_path):
             assert label in size_text, size_text
         table = page.locator("[data-testid=bid-compliance]").inner_text()
         assert "of hours" in table and "Peak Hours floor" in table, table
+        peak_row = page.locator("[data-testid=check-peak\\.hours]").inner_text()
+        assert "highest IEX DAM" in peak_row and "most often 18:00" in peak_row, peak_row
         # the hour under the mouse as a see-through Sankey: sources, uses, and the block's floor
         chart = page.locator(".rtc-card", has_text="Year-1 dispatch").locator("canvas").first
         chart.scroll_into_view_if_needed()

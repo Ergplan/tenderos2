@@ -323,6 +323,8 @@ export function peakHours(peak) {
 }
 
 export function peakMask(peak) {
+  // hour by hour when the plan picks its own hours each day (SECI: the costliest hours)
+  if (peak?.mask?.length === E.HOURS) return Uint8Array.from(peak.mask);
   const hours = new Set(peakHours(peak));
   const mask = new Uint8Array(E.HOURS);
   for (let t = 0; t < E.HOURS; t += 1) if (hours.has(E.HOUR_OF_DAY[t])) mask[t] = 1;

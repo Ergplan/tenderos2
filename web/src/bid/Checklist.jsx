@@ -2,6 +2,7 @@ import React from "react";
 import { CheckCircle2, CircleMinus, Info, XCircle } from "lucide-react";
 import { Section, nf, pf } from "../rtc/ui";
 import { SourceChip } from "./RequirementsStep";
+import { hourRanges } from "../seci/peakPrices";
 import { FINANCE_FIELDS, SIZE_KEY, SOURCES, SOURCE_FIELDS, anyHours, plantMw, solarMinMw } from "./model";
 
 const STATUS = {
@@ -67,8 +68,12 @@ export function buildChecklist(state, terms, lp, bidTariff = null) {
       status: worst === null ? "info" : outcomes.every((o) => o.met) ? "met" : "failed" });
   }
   if (prov["peak.hours"]) {
+    const picked = terms.peak?.picked;
     add({ id: "peak.hours", condition: "Peak hours", source: prov["peak.hours"], tender: `${prov["peak.hours"].display} a day${prov["peak.setBy"] ? `; ${prov["peak.setBy"].display.toLowerCase()}` : ""}`,
-      result: terms.peakAny
+      result: picked
+        ? `Each day, the 6 hours of the 18:00–10:00 window with the highest ${picked.marketLabel} prices are held to the peak floor (most often ${hourRanges(picked.mostOften)}; ₹${picked.pickedRsPerKwh.toFixed(2)}/kWh on average, against ₹${picked.windowRsPerKwh.toFixed(2)} for the whole window)`
+        : terms.peak?.pricesPending ? "The IEX prices are not loaded yet: every hour of the 18:00–10:00 window is held to the peak floor"
+        : terms.peakAny
         ? (terms.peak?.windows?.length ? `Every hour inside the windows (${anyHours(terms.peak).length} h a day) is checked against the peak floor` : `Every hour of the day is checked against the peak floor`)
         : `Checked in the chosen window`, status: "met" });
   }
