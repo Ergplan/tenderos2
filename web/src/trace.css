@@ -122,3 +122,30 @@
 .profile-view .rtc-subhead input[type=range] { width: 200px; vertical-align: middle; margin: 0 8px; }
 @media (max-width: 1100px) { .studio-body { grid-template-columns: 1fr; } .studio-col { border-right: 0; border-bottom: 1px solid var(--line); } }
 .bid-source .profile-view .rtc-grid-2 { grid-template-columns: 1fr; }
+
+/* What-if analysis (web/src/whatif/WhatIfTab.jsx). */
+.whatif-verdict { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; margin: 18px 0 4px; padding: 14px 18px; border: 1px solid var(--line-2); border-left: 4px solid var(--muted); background: var(--surface); }
+.whatif-verdict > div { display: grid; gap: 3px; }
+.whatif-verdict b { font-size: 15px; }
+.whatif-verdict span { color: var(--ink-2); font-size: 13px; }
+.whatif-verdict.tone-good { border-left-color: var(--good); } .whatif-verdict.tone-good > svg { color: var(--good); }
+.whatif-verdict.tone-warn { border-left-color: var(--warn); } .whatif-verdict.tone-warn > svg { color: var(--warn); }
+.whatif-verdict.tone-bad { border-left-color: var(--bad); } .whatif-verdict.tone-bad > svg { color: var(--bad); }
+.whatif-verdict-fin { text-align: right; }
+.whatif-verdict .good, .whatif-checks .good { color: var(--good); }
+.whatif-verdict .bad, .whatif-checks .bad { color: var(--bad); }
+.whatif-tariff { display: grid; grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); gap: 16px; align-items: stretch; margin-bottom: 14px; }
+.whatif-tariff .rtc-field input { font-size: 22px; font-weight: 600; }
+.whatif-needed { display: grid; align-content: center; gap: 4px; padding: 12px 16px; border: 1px solid var(--line); background: var(--surface); }
+.whatif-needed span { color: var(--muted); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+.whatif-needed b { font-size: 24px; font-variant-numeric: tabular-nums; }
+.whatif-needed small { color: var(--muted); }
+.whatif-needed button { justify-self: start; }
+.whatif-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+.whatif-group { padding: 12px; border: 1px solid var(--line); background: var(--bg-2); }
+.whatif-group .rtc-subhead { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.whatif-group .rtc-subhead button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; font-size: 11px; }
+.whatif-checks tr.is-bad td { background: color-mix(in srgb, var(--bad) 7%, transparent); }
+.whatif-checks td small { display: block; color: var(--muted); font-size: 11px; }
+.whatif .rtc-subhead input[type=range] { width: 160px; vertical-align: middle; margin: 0 8px; }
+@media (max-width: 900px) { .whatif-tariff, .whatif-verdict { grid-template-columns: 1fr; } .whatif-verdict-fin { text-align: left; } .whatif-inputs { grid-template-columns: 1fr; } }

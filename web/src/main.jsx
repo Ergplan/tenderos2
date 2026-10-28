@@ -4,7 +4,7 @@
 // signs out. The legacy FDRE tabs (yield assessment, EYA report, custom dispatch and the
 // rest) are not part of this application.
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FolderOpen, Gavel, Lock, LogOut, Scale, UserRound, Users } from "lucide-react";
+import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Lock, LogOut, Scale, UserRound, Users } from "lucide-react";
 import { flushActivity, startActivityTracker, trackEvent } from "./activity";
 import "./styles.css";
 import "./chartTheme";
@@ -13,6 +13,7 @@ import BessTab from "./bess/BessTab";
 import BidTab from "./bid/BidTab";
 import SeciTab from "./seci/SeciTab";
 import CfdTab from "./cfd/CfdTab.jsx";
+import WhatIfTab from "./whatif/WhatIfTab";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
 import { ALL_TAB_IDS } from "../lib/tabs";
@@ -24,6 +25,7 @@ const TABS = [
   ["seciRtc", FileStack, "SECI RTC tender"],
   ["bessTender", BatteryCharging, "BESS Tender"],
   ["cfd", Scale, "CfD Bid"],
+  ["whatIf", FlaskConical, "What-if analysis"],
 ];
 
 function Sidebar({ activeTab, setActiveTab, user, allowed }) {
@@ -107,6 +109,7 @@ export default function App({ user = null, initialScenario = null }) {
         {canView && activeTab === "seciRtc" && <SeciTab initialScenario={opened("seci")} />}
         {canView && activeTab === "bessTender" && <BessTab initialScenario={opened("bess")} />}
         {canView && activeTab === "cfd" && <CfdTab />}
+        {canView && activeTab === "whatIf" && <WhatIfTab />}
       </main>
     </div>
   );

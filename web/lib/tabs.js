@@ -6,6 +6,7 @@ export const TAB_CATALOG = [
   { id: "seciRtc", label: "SECI RTC tender", engine: ["rtc", "bid"] },
   { id: "bessTender", label: "BESS Tender", engine: ["bess"] },
   { id: "cfd", label: "CfD Bid", engine: [] },
+  { id: "whatIf", label: "What-if analysis", engine: [] },
 ];
 
 export const ALL_TAB_IDS = TAB_CATALOG.map((t) => t.id);

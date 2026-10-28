@@ -54,7 +54,7 @@ export function TraceButton({ label = "Trace the model", target }) {
   const t = useTrace();
   if (!t?.available) return null;
   return (
-    <button type="button" className="ghost trace-open" onClick={() => t.openTrace(target)} data-testid="trace-open">
+    <button type="button" className="secondary trace-open" onClick={() => t.openTrace(target)} data-testid="trace-open">
       <Calculator size={14} /> {label}
     </button>
   );
