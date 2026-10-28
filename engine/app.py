@@ -7,6 +7,7 @@
   /api/rtc/lp                         HiGHS least-tariff sizing, streamed as NDJSON
   /api/bid/dispatch15[...]            15-minute dispatch of a sized plant for every PPA year (ZIP of CSVs, Excel)
   /api/bid/document/pdf               HTML parts (the SECI bid letters) laid out as one A4 PDF
+  /api/bid/cerc-order                 a CERC tariff-adoption order (PDF) read into its facts, with quotes
 
 The web app (Next.js) is the only client: it signs users in and forwards these paths.
 Run: uvicorn engine.app:app --port 8000
@@ -37,6 +38,7 @@ from engine.extraction.tenderset import search as set_search
 from engine.extraction.tenderset.docling import docling_available
 from engine.extraction.tenderset.llamaparse import llamaparse_available
 from engine.extraction.tenderset.read_set import MAX_FILES
+from engine.market.cerc_order import read_order
 from engine.sizing import dispatch15 as D15
 from engine.sizing import rtc_lp as RLP
 
@@ -209,6 +211,16 @@ for _prefix in TENDER_PREFIXES:
     app.add_api_route(f"{_prefix}/catalog", tender_catalog, methods=["GET"])
     app.add_api_route(f"{_prefix}/read", tender_read, methods=["POST"], status_code=200)
     app.add_api_route(f"{_prefix}/read/{{job_id}}", tender_read_job, methods=["GET"])
+
+
+@app.post("/api/bid/cerc-order")
+def cerc_order(req: BessParseRequest) -> dict[str, Any]:
+    payload = _decode(req.file.content_base64)
+    try:
+        check_readable(req.file.name, payload)
+        return _finite(read_order(req.file.name, payload))
+    except (UnreadableDocument, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/bess/parse")

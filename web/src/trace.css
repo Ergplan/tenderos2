@@ -149,3 +149,28 @@
 .whatif-checks td small { display: block; color: var(--muted); font-size: 11px; }
 .whatif .rtc-subhead input[type=range] { width: 160px; vertical-align: middle; margin: 0 8px; }
 @media (max-width: 900px) { .whatif-tariff, .whatif-verdict { grid-template-columns: 1fr; } .whatif-verdict-fin { text-align: left; } .whatif-inputs { grid-template-columns: 1fr; } }
+
+/* Recent tenders (web/src/market/RecentTendersTab.jsx). */
+.market-grid, .market-orders { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 14px; }
+.market-card { display: grid; align-content: start; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); background: var(--surface); }
+.market-card header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.market-card header small { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.market-card h3 { margin: 0; font-size: 16px; text-transform: none; letter-spacing: 0; }
+.market-tag { padding: 2px 8px; border: 1px solid var(--tag); color: color-mix(in srgb, var(--tag) 70%, var(--ink)); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.market-figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.market-figs > div { display: grid; gap: 2px; padding: 8px 10px; background: var(--bg-2); }
+.market-figs span { color: var(--muted); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.market-figs b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.market-figs small { color: var(--muted); font-size: 11px; }
+.market-sources { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; color: var(--muted); font-size: 12px; }
+.market-sources a { display: inline-flex; align-items: center; gap: 3px; color: var(--wind); }
+.market-file { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; color: var(--wind); font-size: 12px; }
+.market-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.market-form label { display: grid; gap: 4px; color: var(--muted); font-size: 11.5px; }
+.market-form label.wide { grid-column: 1 / -1; }
+.market-form input, .market-form textarea, .market-order td input { padding: 6px 8px; border: 1px solid var(--line-2); background: var(--bg-2); color: var(--ink); font: inherit; font-size: 13px; }
+.market-order td input { width: 100%; padding: 3px 6px; }
+.market-order td.num input { width: 80px; text-align: right; }
+.market-quote { display: block; color: var(--faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.market-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+@media (max-width: 700px) { .market-grid, .market-orders { grid-template-columns: 1fr; } .market-form { grid-template-columns: 1fr; } }
