@@ -30,6 +30,43 @@ LibreOffice against the app. `tools/check_trace.mjs` checks the trace itself:
 * precedents and dependents mirror each other;
 * the equity IRR carries the app's value and traces to the financing inputs and the dispatch.
 
+### Generation a CFO can check by hand
+
+The energy lines of the model (delivered, sold, short of the floor) come from the hourly dispatch.
+The plant's generation does not need the dispatch, so it is a formula. The "Generation (capacity ×
+CUF × 365 days × 24 hours)" section of the Live model sheet, in Excel and on screen, builds it
+for solar and for wind:
+
+| Line | Formula |
+| --- | --- |
+| January … December CUF | inputs: the mean of the month's hours of the profile the dispatch ran |
+| Annual CUF | (Jan CUF × 31 + Feb CUF × 28 + … + Dec CUF × 31) ÷ 365 |
+| Degradation factor, year *n* | (1 − degradation)^(*n* − 1) |
+| Generation, year *n* | MW × CUF × 365 × 24 ÷ 1,000 × degradation factor (MU) |
+| At the 33 kV bus | generation × (1 − losses from the CUF's measuring point to the bus) |
+| Year 1 by month | MW × month's CUF × days × 24 ÷ 1,000; the twelve add up to year 1 |
+| Solar and wind at the 33 kV bus | the sum of the two |
+| Generated but not delivered or sold | bus generation (+ biomass, hydro, thermal) − delivered − sold |
+
+The only thing left to the dispatch is where each hour's energy goes: to the procurer, into the
+battery, sold or curtailed. A dispatch number in the explorer says that in plain words and links
+to the generation it comes from.
+
+Selecting a solar or wind generation number opens a drill-down from the year to the 15-minute
+blocks:
+* the year's arithmetic;
+* the twelve months, each with MW × CUF × days × 24;
+* any day's 96 blocks, each MW × capacity factor × ¼ h, split from the hour the way the
+  15-minute dispatch splits it (`engine/sizing/dispatch15.py` `split_hourly`, ported in
+  `web/src/model/generation.js`);
+* all 35,040 blocks added back up to the year.
+
+`tools/check_generation.mjs` checks that the formula gives the dispatch's own generation for every
+year in the What-if tab, Round the clock (one site and split sites) and Tender to Bid (the profile
+and losses the HiGHS sizing receives). It also checks that the months add up to the year and that
+the 15-minute blocks keep each hour's energy. `tools/check_live_model.mjs` recalculates the section
+in LibreOffice.
+
 ## Solar plant studio
 
 `web/src/plant/solar.js` and `SolarStudio.jsx`. Open it from the solar source in Supply sources,
@@ -168,6 +205,6 @@ A tab of its own (`web/src/market/`).
 
 | Command | Covers |
 | --- | --- |
-| `make check-web` | adds `check_trace`, `check_plant`, `check_whatif` and `check_market` |
+| `make check-web` | adds `check_trace`, `check_generation`, `check_plant`, `check_whatif` and `check_market` |
 | `make test` | adds `tests/engine/test_cerc_order.py` |
-| `make e2e` | adds `tests/e2e/test_demo2.py`: the traceable model from Round the clock, both studios writing into the SECI bid and the profile view, the What-if returns and checks, and a CERC order uploaded, read, checked and deleted |
+| `make e2e` | adds `tests/e2e/test_demo2.py`: the traceable model from Round the clock, both studios writing into the SECI bid and the profile view, the What-if returns and checks, a dispatch number traced to its generation formula, months and 15-minute blocks, and a CERC order uploaded, read, checked and deleted |

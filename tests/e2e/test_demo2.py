@@ -118,6 +118,43 @@ def test_what_if():
         assert page.locator("[data-testid=trace-name]").inner_text() == "Project IRR"
 
 
+def test_generation_traces_to_15_minutes():
+    """A CFO's path: a dispatch number in plain words, its generation as MW × CUF × 365 × 24, then
+    the year's months and one day's 15-minute blocks."""
+    with _session() as page:
+        page.click("aside.sidebar button:has-text('What-if analysis')")
+        page.wait_for_selector("[data-testid=whatif-verdict]")
+        page.locator("[data-testid=whatif-returns] [data-trace=projectIrr]").click()
+        page.wait_for_selector("[data-testid=trace-explorer]")
+        page.fill("[data-testid=trace-search]", "Delivered to the procurer")
+        page.locator(".trace-grid td.kind-opt button").first.click()  # year 1 (the total column is a SUM)
+        note = page.locator("[data-testid=trace-dispatch]")
+        assert "365 days × 24 hours" in note.inner_text()
+        assert "solver" not in note.inner_text().lower()
+        note.locator(".trace-ref").first.click()
+        assert "Solar and wind at the 33 kV bus · Year 1" == page.locator("[data-testid=trace-name]").inner_text()
+        # the bus total reads solar and wind; solar's year is MW × CUF × 365 × 24
+        page.locator("[data-testid=trace-formula] .trace-ref", has_text="Solar generation").first.click()
+        formula = page.locator("[data-testid=trace-formula]").inner_text()
+        assert "365" in formula and "24" in formula and "CUF" in formula
+        drill = page.locator("[data-testid=gen-drill]")
+        year = drill.locator("[data-testid=gen-year]").inner_text()
+        assert "× 365 days × 24 h" in year
+        mu = float(re.search(r"= ([\d,]+\.\d) MU", year).group(1).replace(",", ""))
+        assert abs(mu - float(page.locator("[data-testid=trace-value]").inner_text().split()[0].replace(",", ""))) < 0.11
+        months = drill.locator("[data-testid=gen-months]")
+        assert months.locator("tbody tr").count() == 12
+        assert abs(float(months.locator("tfoot td").last.inner_text().replace(",", "")) - mu) < 0.11
+        # June, its 21st: 96 blocks, dark at night and generating at noon
+        months.locator("tbody tr").nth(5).click()
+        page.select_option("[data-testid=gen-day]", label="21 June")
+        blocks = drill.locator("[data-testid=gen-blocks] tbody tr")
+        assert blocks.count() == 96
+        assert blocks.nth(0).locator("td").last.inner_text() == "0.0"
+        assert float(blocks.nth(48).locator("td").last.inner_text().replace(",", "")) > 0
+        assert "35,040 blocks" in drill.locator("[data-testid=gen-all-blocks]").inner_text()
+
+
 def test_recent_tenders_and_cerc_upload(tmp_path):
     pdf = tmp_path / "CERC order 412-AT-2025.pdf"
     doc = pymupdf.open()

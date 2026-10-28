@@ -3,6 +3,8 @@
 // the 25-year model and, for the Live model sheet (web/lib/liveModel.js), the model's inputs and
 // the hourly simulation's energy by year. Plain JavaScript (no JSX) so tools/check_live_model.mjs
 // can build it in Node.
+import * as E from "./engine.js";
+import { cufPoint, genSource } from "../model/generation.js";
 
 /** The financial inputs the Live model sheet reads. */
 export const LIVE_FIN_KEYS = [
@@ -41,7 +43,7 @@ const pct = (v, d = 1) => `${(v * 100).toFixed(d)}%`;
  * fin: the model's financial inputs (with demandGrowth), bess: the battery at the 33 kV bus,
  * sites: { split: true } for solar and wind on separate sites, or null.
  */
-export function rtcModelExport({ inputs, sizes, costs, fin, bess, sites, finance }) {
+export function rtcModelExport({ inputs, sizes, costs, fin, bess, sites, finance, profiles = null }) {
   const y1 = finance.rows[0];
   const n = finance.rows.length;
   const split = Boolean(sites?.split);
@@ -195,8 +197,19 @@ export function rtcModelExport({ inputs, sizes, costs, fin, bess, sites, finance
         demandMWh: mwh(r.demandMu), deliveredMWh: mwh(r.deliveredMu), excessMWh: mwh(r.excessMu),
         genBusMWh: mwh(r.genBusMu), injectedMWh: mwh(r.injectedMu), trafoLossMWh: mwh(r.trafoLossMu), lineLossMWh: mwh(r.lineLossMu), meterMWh: mwh(r.meterMu),
       })),
+      gen: profiles ? rtcGen(inputs, fin, profiles) : null,
       app: liveResults(finance, fin),
     },
+  };
+}
+
+/** The generation build-up: the tab's profiles where they were measured, and their losses to the 33 kV bus (with any other loss). */
+function rtcGen(inputs, fin, { solarCf, windCf, solarName, windName }) {
+  const lf = E.lossFactors(inputs, 1);
+  const aux = 1 - (inputs.lossPct || 0);
+  return {
+    solar: genSource({ cf: solarCf, toBus: 1 - lf.solar * aux, degradation: fin.solarDegradation, cufAt: cufPoint("solar", inputs.solarFileAt ?? undefined), profile: solarName ? `Uploaded solar profile ${solarName}` : "Typical solar profile" }),
+    wind: genSource({ cf: windCf, toBus: 1 - lf.wind * aux, degradation: fin.windDegradation, cufAt: cufPoint("wind", inputs.windFileAt ?? undefined), profile: windName ? `Uploaded wind profile ${windName}` : "Typical wind profile" }),
   };
 }
 

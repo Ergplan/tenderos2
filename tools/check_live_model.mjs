@@ -289,15 +289,17 @@ function rtcCase(sites) {
   const costs = { ...E.DEFAULT_COSTS };
   const fin0 = { ...E.DEFAULT_FINANCE, sellSurplus: true, surplusPrice: 2.5 };
   const lf = E.lossFactors(inputs, bess.rte);
-  const solarCf = Float64Array.from(E.synthSolarCf({ targetCuf: inputs.solarCuf, dcAc: inputs.solarDcAc }), (v) => v * lf.solar);
-  const windCf = Float64Array.from(E.synthWindCf({ targetCuf: inputs.windCuf }), (v) => v * lf.wind);
+  const solarRaw = E.synthSolarCf({ targetCuf: inputs.solarCuf, dcAc: inputs.solarDcAc });
+  const windRaw = E.synthWindCf({ targetCuf: inputs.windCuf });
+  const solarCf = Float64Array.from(solarRaw, (v) => v * lf.solar);
+  const windCf = Float64Array.from(windRaw, (v) => v * lf.wind);
   const bessBus = { ...bess, rte: lf.rteBus };
   const demand = E.buildDemand({ annualEnergyMu: inputs.annualEnergyMu });
   const ctx = E.buildContext({ demand, solarCf, windCf, plantMw: inputs.plantCapacityMw, bess: bessBus, lossPct: inputs.lossPct, trafoLossPct: inputs.trafoLossPct, lineLossPct: inputs.lineLossPct, sellSurplus: true, extraExportMw: 0, sites });
   const sizes = E.withDuration({ ...Object.fromEntries(Object.entries(E.DEFAULT_VARS).map(([k, v]) => [k, v.value])), bessWindShare: 0.4 }, bess);
   const fin = { ...fin0, demandGrowth: 0 };
   const finance = E.runFinancialModel(ctx, sizes, { costs, fin, bess: bessBus, dfrTarget: inputs.dfrTarget, tariffLocked: false });
-  return { finance, body: rtcModelExport({ inputs, sizes, costs, fin, bess: bessBus, sites, finance }) };
+  return { finance, body: rtcModelExport({ inputs, sizes, costs, fin, bess: bessBus, sites, finance, profiles: { solarCf: solarRaw, windCf: windRaw } }) };
 }
 const WORKBOOKS = [
   ["Round the clock, one site", rtcCase(null), "Round the clock"],

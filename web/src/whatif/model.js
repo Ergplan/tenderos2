@@ -12,6 +12,7 @@
 import * as E from "../rtc/engine.js";
 import { scaleToCuf, peakHours } from "../bid/model.js";
 import { PACK, PEAK_PLANS, seciTerms } from "../seci/terms.js";
+import { genSource } from "../model/generation.js";
 
 export const WHATIF_NOTE = "Rule-based dispatch (battery held for the Peak Hours): an instant check of a size, not the HiGHS optimum.";
 
@@ -270,11 +271,11 @@ export function runWhatIf(raw) {
     meetsTarget: Number.isFinite(atBid.equityIrr) && atBid.equityIrr >= fin.targetEquityIrr - 1e-6,
     bankable: atBid.minDscr === null || atBid.minDscr >= (input.fin.minDscr || 1.1) - 1e-9,
   };
-  return { input, terms, prof, sizes, costs, fin, bess, ops, year1, atBid, needed, finance, checks, verdict, penaltyY1, live: liveRequest(input, terms, sizes, costs, fin, bess, ops, atBid) };
+  return { input, terms, prof, sizes, costs, fin, bess, ops, year1, atBid, needed, finance, checks, verdict, penaltyY1, live: liveRequest(input, terms, sizes, costs, fin, bess, ops, atBid, prof) };
 }
 
 /** The live-model request for the traceable model and the Excel workbook, at the bid tariff. */
-function liveRequest(input, terms, sizes, costs, fin, bess, ops, finance) {
+function liveRequest(input, terms, sizes, costs, fin, bess, ops, finance, prof) {
   const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
   return {
     title: `What-if · ${input.contractedMw} MW SECI RTC-TM at ₹${fin.tariff.toFixed(3)}/kWh`,
@@ -291,6 +292,11 @@ function liveRequest(input, terms, sizes, costs, fin, bess, ops, finance) {
     fin: pick(fin, ["tariffEscalation", "solarOmLakhPerMw", "windOmLakhPerMw", "bessOmLakhPerMwh", "omEscalation", "insurancePct", "otherFixedCr", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple", "debtFraction", "interestRate", "tenorYears", "targetEquityIrr", "discountRate", "taxRate", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays", "sellSurplus", "repayment", "taxDepreciation"]),
     bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
     ops: ops.map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "blockShortfallMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"])).map((o) => ({ ...o, genBusMWh: o.injectedMWh })),
+    // the generation build-up: the profiles the dispatch ran, at the CUFs entered (at the 33 kV bus)
+    gen: {
+      solar: sizes.solarMw > 0 ? genSource({ cf: prof.solarCf, degradation: fin.solarDegradation, cufAt: "33 kV bus", profile: input.solarUpload?.name ? `Uploaded solar profile ${input.solarUpload.name}` : "Typical solar profile" }) : null,
+      wind: sizes.windMw > 0 ? genSource({ cf: prof.windCf, degradation: fin.windDegradation, cufAt: "33 kV bus", profile: input.windUpload?.name ? `Uploaded wind profile ${input.windUpload.name}` : "Typical wind profile" }) : null,
+    },
     app: { tariff: finance.tariff, equityIrr: finance.equityIrr, projectIrr: finance.projectIrr, minDscr: finance.minDscr },
   };
 }

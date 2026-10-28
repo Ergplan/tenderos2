@@ -393,6 +393,69 @@ export function addLiveModel(wb, m) {
   S.one("bookBase", "Depreciable value (less salvage)", "₹ cr", { f: `${S.s("total")}*(1-${S.s("salvage")})`, v: bookBase, fmt: "cr" });
   S.one("bookDepYr", "Book depreciation a year", "₹ cr/yr", { f: `${S.s("bookBase")}/${S.s("bookLife")}`, v: bookBase / S.v("bookLife"), fmt: "cr" });
 
+  // ---- generation: capacity × CUF × 365 days × 24 hours, built up from the monthly CUFs
+  const gen = ["solar", "wind"].filter((k) => m.gen?.[k] && on[k]);
+  const busKeys = [];
+  if (gen.length) {
+    S.section("Generation (capacity × CUF × 365 days × 24 hours)");
+    const DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    for (const k of gen) {
+      const g = m.gen[k];
+      const name = k === "solar" ? "Solar" : "Wind";
+      const at = g.cufAt ? ` (at the ${g.cufAt})` : "";
+      const from = g.profile ? `${g.profile}: ` : "";
+      S.group(`${name}: CUF of each month, from the hourly profile`);
+      if (g.monthCuf) {
+        g.monthCuf.forEach((c, i) => S.one(`${k}CufM${i + 1}`, `${MONTHS[i]} CUF`, "%", {
+          v: c, kind: "input", fmt: "pct", source: `${from}mean of the ${DAYS[i] * 24} hours of ${MONTHS[i]}`,
+        }));
+        S.one(`${k}Cuf`, `${name} CUF${at}`, "%", {
+          f: `(${g.monthCuf.map((_, i) => `${S.s(`${k}CufM${i + 1}`)}*${DAYS[i]}`).join("+")})/365`,
+          v: g.monthCuf.reduce((a, c, i) => a + c * DAYS[i], 0) / 365, fmt: "pct", bold: true,
+          note: "Each month's CUF weighted by its days: the mean of the 8,760 hours",
+        });
+      } else {
+        S.one(`${k}Cuf`, `${name} CUF${at}`, "%", { v: g.cuf, kind: "input", fmt: "pct", source: `${from}mean of the 8,760 hours` });
+      }
+      S.one(`${k}Deg`, `${name} degradation`, "%/yr", { v: g.degradation, kind: "input", fmt: "pct", source: src(`${k}.degradation`) });
+      if (g.toBus > 0) S.one(`${k}ToBus`, `${name} losses to the 33 kV bus`, "%", { v: g.toBus, kind: "input", fmt: "pct", source: src(`${k}.losses`, "Loss chain") });
+
+      S.group(`${name}: generation by year`);
+      S.series(`${k}DegF`, `${name} degradation factor`, "×", {
+        f: (y) => `(1-${S.s(`${k}Deg`)})^(${S.yr(y)}-1)`, v: (y) => (1 - g.degradation) ** (y - 1), fmt: "factor",
+      });
+      const cuf = S.v(`${k}Cuf`);
+      S.series(`${k}Gen`, `${name} generation${at}`, "MU", {
+        f: (y) => `${S.s(`${k}Mw`)}*${S.s(`${k}Cuf`)}*365*24/1000*${S.at(`${k}DegF`, y)}`,
+        v: (y) => (S.v(`${k}Mw`) * cuf * 365 * 24 / 1000) * S.v(`${k}DegF`, y), fmt: "mu", total: true,
+        note: "MW × CUF × 365 days × 24 hours ÷ 1,000 (MWh to MU) × the year's degradation factor",
+      });
+      if (g.toBus > 0) {
+        S.series(`${k}Bus`, `${name} at the 33 kV bus`, "MU", {
+          f: (y) => `${S.at(`${k}Gen`, y)}*(1-${S.s(`${k}ToBus`)})`, v: (y) => S.v(`${k}Gen`, y) * (1 - g.toBus), fmt: "mu", total: true,
+        });
+        busKeys.push(`${k}Bus`);
+      } else busKeys.push(`${k}Gen`);
+
+      if (g.monthCuf) {
+        S.group(`${name}: year 1 by month (MW × month's CUF × days × 24 hours)`);
+        g.monthCuf.forEach((c, i) => S.one(`${k}MuM${i + 1}`, MONTHS[i], "MU", {
+          f: `${S.s(`${k}Mw`)}*${S.s(`${k}CufM${i + 1}`)}*${DAYS[i]}*24/1000`, v: (S.v(`${k}Mw`) * c * DAYS[i] * 24) / 1000, fmt: "mu",
+        }));
+        const months = g.monthCuf.reduce((a, c, i) => a + (S.v(`${k}Mw`) * c * DAYS[i] * 24) / 1000, 0);
+        S.one(`${k}MuYear`, "Twelve months together (= year 1 above)", "MU", {
+          f: `SUM(${S.s(`${k}MuM1`)}:${S.s(`${k}MuM12`)})`, v: months, fmt: "mu", bold: true,
+        });
+      }
+    }
+    S.group("All renewable generation");
+    S.series("genBus", "Solar and wind at the 33 kV bus", "MU", {
+      f: (y) => busKeys.map((key) => S.at(key, y)).join("+"), v: (y) => busKeys.reduce((a, key) => a + S.v(key, y), 0), fmt: "mu", total: true, bold: true,
+      note: "What the plant can generate in the year. The dispatch below decides how much of it reaches the procurer",
+    });
+  }
+
   // ---- energy from the optimiser
   S.section(sim ? "Energy (the hourly simulation of each year, summed)" : "Energy (the optimiser's hourly dispatch, summed by year)");
   const op = (y) => m.ops[y - 1];
@@ -420,8 +483,25 @@ export function addLiveModel(wb, m) {
   if (on.biomass) S.series("biomassMu", "Biomass generation", "MU", { v: (y) => mu(op(y).biomassMWh), kind: "opt", fmt: "mu", total: true });
   if (hydro) S.series("hydroMu", "Hydro energy", "MU", { v: (y) => mu(op(y).hydroMWh), kind: "opt", fmt: "mu", total: true });
   if (thermal) S.series("thermalMu", "Thermal (non-RE) energy", "MU", { v: (y) => mu(op(y).thermalMWh), kind: "opt", fmt: "mu", total: true });
+  if (gen.length) {
+    // what the dispatch did not use: the generation (a formula above) less what it delivered and sold
+    const used = ["delivered", "excess", on.biomass && "biomassMu", hydro && "hydroMu", thermal && "thermalMu"].filter(Boolean);
+    const extra = used.slice(2);
+    S.series("unused", "Generated but not delivered or sold", "MU", {
+      f: (y) => `${S.at("genBus", y)}${extra.map((k) => `+${S.at(k, y)}`).join("")}-${S.at("delivered", y)}-${S.at("excess", y)}`,
+      v: (y) => S.v("genBus", y) + extra.reduce((a, k) => a + S.v(k, y), 0) - S.v("delivered", y) - S.v("excess", y),
+      fmt: "mu", total: true,
+      note: "Curtailed (more than the contract and the battery could take that hour), lost in the battery's round trip and, where delivery is measured at the meter, lost in the transformer and line",
+    });
+    S.series("usedShare", "Share of the generation delivered or sold", "%", {
+      f: (y) => `IF(${S.at("genBus", y)}>0,(${S.at("delivered", y)}+${S.at("excess", y)})/(${S.at("genBus", y)}${extra.map((k) => `+${S.at(k, y)}`).join("")}),0)`,
+      v: (y) => { const g = S.v("genBus", y) + extra.reduce((a, k) => a + S.v(k, y), 0); return g > 0 ? (S.v("delivered", y) + S.v("excess", y)) / g : 0; },
+      fmt: "pct",
+    });
+  }
   if (meter) {
-    S.series("genBusMu", "Generated at the 33 kV bus", "MU", { v: (y) => mu(op(y).genBusMWh), kind: "opt", fmt: "mu", total: true });
+    if (gen.length) S.series("genBusMu", "Generated at the 33 kV bus", "MU", { f: (y) => S.at("genBus", y), v: (y) => S.v("genBus", y), fmt: "mu", total: true });
+    else S.series("genBusMu", "Generated at the 33 kV bus", "MU", { v: (y) => mu(op(y).genBusMWh), kind: "opt", fmt: "mu", total: true });
     S.series("injectedMu", "Injected at the 33 kV bus", "MU", { v: (y) => mu(op(y).injectedMWh), kind: "opt", fmt: "mu", total: true });
     S.series("trafoLossMu", "Power transformer loss", "MU", { v: (y) => mu(op(y).trafoLossMWh), kind: "opt", fmt: "mu", total: true });
     S.series("lineLossMu", "Transmission line loss", "MU", { v: (y) => mu(op(y).lineLossMWh), kind: "opt", fmt: "mu", total: true });
@@ -876,6 +956,15 @@ export function liveModelInput(raw) {
     ops: raw.ops.slice(0, 60).map((o) => ({
       ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"]),
       ...(finite(o?.surplusRevenueCr) ? { surplusRevenueCr: o.surplusRevenueCr } : {}),
+    })),
+    gen: Object.fromEntries(["solar", "wind"].filter((k) => raw.on?.[k] && finite(raw.gen?.[k]?.cuf) && raw.gen[k].cuf > 0).map((k) => {
+      const g = raw.gen[k];
+      const months = Array.isArray(g.monthCuf) && g.monthCuf.length === 12 && g.monthCuf.every(finite) ? g.monthCuf.map((c) => Math.min(1, Math.max(0, c))) : null;
+      const text = (s) => (typeof s === "string" ? s.replace(/[^\w ()·,.%/-]/g, "").slice(0, 80) : "");
+      return [k, {
+        cuf: Math.min(1, g.cuf), monthCuf: months, toBus: Math.min(0.5, Math.max(0, n(g.toBus))),
+        degradation: Math.min(0.2, Math.max(0, n(g.degradation))), cufAt: text(g.cufAt), profile: text(g.profile),
+      }];
     })),
     sources: Object.fromEntries(Object.entries(raw.sources || {}).slice(0, 200)
       .filter(([k, v]) => /^[\w.]{1,60}$/.test(k) && typeof v === "string").map(([k, v]) => [k, v.slice(0, 80)])),

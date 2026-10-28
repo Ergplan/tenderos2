@@ -205,7 +205,13 @@ export function traceModel(live) {
   const keys = Object.fromEntries(Object.entries(res.cells).map(([k, ref]) => [k, ref.split("!").pop().replace(/\$/g, "")]));
   // each model line's key → { addr } for one value, { row } for a year series
   const lines = Object.fromEntries(Object.entries(res.addr || {}).map(([k, a]) => [k, typeof a === "number" ? { row: a } : { addr: String(a).replace(/\$/g, "") }]));
-  return { sheet: LIVE_SHEET, title: m.title, N, yearRow, maxCol: ws.maxCol, rows, cells, keys, lines, values: res.values };
+  // each row's line key, and the hourly profiles behind the generation build-up (for the drill-down
+  // from a year to its months and 15-minute blocks; the profiles are not part of the Excel request)
+  const rowKey = {};
+  for (const [k, l] of Object.entries(lines)) rowKey[l.row ?? cells[l.addr]?.row] = k;
+  const gen = Object.fromEntries(Object.entries(m.gen || {}).filter(([k]) => live.gen?.[k]?.hourly?.length >= 8760)
+    .map(([k, g]) => [k, { ...g, hourly: live.gen[k].hourly }]));
+  return { sheet: LIVE_SHEET, title: m.title, engine: m.engine, N, yearRow, maxCol: ws.maxCol, rows, cells, keys, lines, rowKey, gen, values: res.values };
 }
 
 /** A short name for a cell: its row label and, for a year series, the year. */

@@ -6,6 +6,8 @@ import { createPortal } from "react-dom";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calculator, Search, Sigma, X } from "lucide-react";
 import { cellName, colName, formulaParts, inputsOf, traceModel } from "./trace";
+import { MONTHS, dayLabel, quarterHours } from "./generation";
+import { MONTH_DAYS } from "../rtc/engine";
 
 const TraceContext = createContext(null);
 export const useTrace = () => useContext(TraceContext);
@@ -109,6 +111,134 @@ function Formula({ model, c, onPick }) {
   );
 }
 
+// the dispatch's lines that a CFO reads as "what happened to the generation"
+const DISPATCH_WORDS = {
+  delivered: "the energy the procurer received",
+  excess: "the energy sold in the market",
+  demand: "the energy the contract asks for: the contracted MW in every hour of the year",
+  blockShort: "the energy short of each hour's floor (peak and off-peak blocks)",
+};
+
+/** A dispatch number in plain words, with the generation formula it is drawn from. */
+function DispatchNote({ model, c, onPick }) {
+  const key = model.rowKey?.[c.row];
+  const year = c.col >= 5 ? c.col - 4 : null;
+  const at = (k) => {
+    const l = model.lines[k];
+    if (!l) return null;
+    const a = l.addr || `${colName(year ? 4 + year : 3)}${l.row}`;
+    return model.cells[a] ? a : null;
+  };
+  const gen = at("genBus");
+  const unused = at("unused");
+  const who = model.engine === "simulation" ? "the hourly simulation" : "the HiGHS optimiser";
+  if (key === "demand") return <p className="rtc-note">An input of the tender: {DISPATCH_WORDS.demand}.</p>;
+  return (
+    <div className="trace-dispatch" data-testid="trace-dispatch">
+      <p className="rtc-note">
+        {DISPATCH_WORDS[key] ? `This is ${DISPATCH_WORDS[key]}, ` : "This is "}
+        added up over the {year ? "year's" : "PPA's"} hours. The plant&apos;s generation is a plain formula (MW × CUF × 365 days × 24 hours);
+        what {who} decides is only where each hour&apos;s energy goes: first to the procurer, then into the battery,
+        then sold, and the rest curtailed.
+      </p>
+      {gen && (
+        <>
+          <div className="trace-label">The generation it comes from</div>
+          <div className="trace-list"><Ref model={model} addr={gen} onPick={onPick} />{unused && <Ref model={model} addr={unused} onPick={onPick} />}</div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const nf = (v, d = 1) => (Number.isFinite(v) ? v.toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d }) : "–");
+const pctf = (v, d = 2) => `${nf(v * 100, d)}%`;
+const hhmm = (q) => `${String(Math.floor(q / 4)).padStart(2, "0")}:${String((q % 4) * 15).padStart(2, "0")}`;
+
+/**
+ * From a year of solar or wind to its months and its 15-minute blocks, with the arithmetic in
+ * each line: the year is MW × CUF × 365 × 24, a month MW × its CUF × its days × 24, a block
+ * MW × its capacity factor × ¼ hour (the hour split the way the 15-minute dispatch splits it).
+ */
+function GenDrill({ model, c }) {
+  const key = model.rowKey?.[c.row] || "";
+  const hit = /^(solar|wind)(Gen|Bus|Cuf|DegF|MuYear|CufM(\d+)|MuM(\d+))$/.exec(key);
+  const tech = hit?.[1];
+  const g = tech ? model.gen?.[tech] : null;
+  const year = c.col >= 5 && c.col <= 4 + model.N ? c.col - 4 : 1;
+  const [month, setMonth] = useState(() => Number(hit?.[4] || hit?.[5] || 1) - 1);
+  const [day, setDay] = useState(0);
+  useEffect(() => { setMonth(Number(hit?.[4] || hit?.[5] || 1) - 1); setDay(0); }, [c.addr]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mwCell = tech ? model.cells[model.lines[`${tech}Mw`]?.addr] : null;
+  const mw = mwCell?.value || 0;
+  const deg = g ? (1 - g.degradation) ** (year - 1) : 1;
+  const bus = hit?.[2] === "Bus" ? 1 - g.toBus : 1;
+  const monthDay0 = MONTH_DAYS.slice(0, month).reduce((a, d) => a + d, 0);
+  const blocks = useMemo(() => (g ? quarterHours(g.hourly, (monthDay0 + day) * 24, (monthDay0 + day + 1) * 24) : []), [g, monthDay0, day]);
+  const yearBlocks = useMemo(() => (g ? quarterHours(g.hourly).reduce((a, v) => a + v, 0) : 0), [g]);
+  if (!g) return null;
+  const name = tech === "solar" ? "Solar" : "Wind";
+  const where = bus < 1 ? "at the 33 kV bus" : `at the ${g.cufAt || "point its CUF is measured"}`;
+  const busTxt = bus < 1 ? ` × (1 − ${pctf(g.toBus)} to the bus)` : "";
+  const degTxt = year > 1 ? ` × ${nf(deg, 4)} degradation` : "";
+  const yearMu = (mw * g.cuf * 365 * 24 / 1000) * deg * bus;
+  const monthMu = (m) => (mw * g.monthCuf[m] * MONTH_DAYS[m] * 24 / 1000) * deg * bus;
+  const dayCuf = blocks.reduce((a, v) => a + v, 0) / blocks.length;
+  const blockMwh = (v) => mw * v * deg * bus * 0.25;
+  return (
+    <section className="gen-drill" data-testid="gen-drill">
+      <div className="trace-label">{name}, year {year}: from the year to the 15-minute blocks</div>
+      <p className="gen-line" data-testid="gen-year">
+        <b>Year {year}</b> {nf(mw)} MW × {pctf(g.cuf)} CUF × 365 days × 24 h ÷ 1,000{degTxt}{busTxt} = <b>{nf(yearMu)} MU</b> {where}
+      </p>
+      {g.monthCuf && (
+        <table className="gen-table" data-testid="gen-months">
+          <thead><tr><th>Month</th><th>CUF</th><th>MW × CUF × days × 24 h</th><th>MU</th></tr></thead>
+          <tbody>
+            {g.monthCuf.map((cu, m) => (
+              <tr key={m} className={m === month ? "is-sel" : ""} onClick={() => { setMonth(m); setDay(0); }}>
+                <td><button type="button" className="link">{MONTHS[m].slice(0, 3)}</button></td>
+                <td>{pctf(cu, 1)}</td>
+                <td>{nf(mw, 0)} × {pctf(cu, 1)} × {MONTH_DAYS[m]} × 24</td>
+                <td>{nf(monthMu(m))}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr><td colSpan={3}>Twelve months (days-weighted CUF {pctf(g.cuf)})</td><td><b>{nf(g.monthCuf.reduce((a, _, m) => a + monthMu(m), 0))}</b></td></tr></tfoot>
+        </table>
+      )}
+      <div className="gen-day">
+        <label>
+          15-minute blocks of
+          <select value={day} onChange={(e) => setDay(Number(e.target.value))} data-testid="gen-day">
+            {Array.from({ length: MONTH_DAYS[month] }, (_, d) => <option key={d} value={d}>{dayLabel(monthDay0 + d)}</option>)}
+          </select>
+        </label>
+        <span className="rtc-note">Day: {nf(mw, 0)} MW × {pctf(dayCuf)} × 24 h{degTxt}{busTxt} = <b>{nf(blocks.reduce((a, v) => a + blockMwh(v), 0), 0)} MWh</b></span>
+      </div>
+      <div className="gen-blocks" data-testid="gen-blocks">
+        <table className="gen-table">
+          <thead><tr><th>Block</th><th>Capacity factor</th><th>MW × factor × ¼ h</th><th>MWh</th></tr></thead>
+          <tbody>
+            {blocks.map((v, q) => (
+              <tr key={q} className={v > 0 ? "" : "is-zero"}>
+                <td>{hhmm(q)}–{hhmm(q + 1)}</td>
+                <td>{nf(v, 3)}</td>
+                <td>{nf(mw, 0)} × {nf(v, 3)} × 0.25</td>
+                <td>{nf(blockMwh(v), 1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="rtc-note" data-testid="gen-all-blocks">
+        All 35,040 blocks of the year together: {nf(mw, 0)} MW × {pctf(yearBlocks / 35040)} × 8,760 h ÷ 1,000{degTxt}{busTxt} = <b>{nf((mw * (yearBlocks / 4) / 1000) * deg * bus)} MU</b>, the year above.
+        Each hour of the {name.toLowerCase()} profile is split into four blocks along its trend, keeping the hour&apos;s energy, as the 15-minute dispatch does.
+      </p>
+    </section>
+  );
+}
+
 function TracePanel({ model, addr, onPick, onBack, canBack }) {
   const c = model.cells[addr];
   const [showInputs, setShowInputs] = useState(false);
@@ -132,8 +262,10 @@ function TracePanel({ model, addr, onPick, onBack, canBack }) {
           <details className="trace-excel"><summary>Excel formula</summary><code>={c.formula}</code></details>
         </>
       ) : (
-        <p className="rtc-note">{c.kind === "input" ? "An input: change it in the inputs of this tab (or in the Excel model) and every number that uses it moves." : c.kind === "opt" ? "From the dispatch (the HiGHS sizing or the hourly simulation), summed for the year." : "A value, not a formula."}</p>
+        c.kind === "opt" ? <DispatchNote model={model} c={c} onPick={onPick} />
+          : <p className="rtc-note">{c.kind === "input" ? "An input: change it in the inputs of this tab (or in the Excel model) and every number that uses it moves." : "A value, not a formula."}</p>
       )}
+      <GenDrill model={model} c={c} />
       {c.refs.length > 0 && (
         <>
           <div className="trace-label">Reads ({c.refs.length})</div>
