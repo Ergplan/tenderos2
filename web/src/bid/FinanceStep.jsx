@@ -10,6 +10,7 @@ import { SourceChip } from "./RequirementsStep";
 import Checklist from "./Checklist";
 import QuoteCheck from "./QuoteCheck";
 import { downloadModel, modelExport } from "./exportModel";
+import { TraceButton, TraceProvider } from "../model/ModelExplorer";
 
 /** Cost lines of the sources switched on, added after "Other fixed" in the cash-flow table. */
 function costLines(state) {
@@ -81,10 +82,14 @@ export default function FinanceStep({ state, patch, set, lockProps, goto, terms,
   const y1 = finance.rows[0];
   const saleLabel = lp.market ? `IEX ${lp.market} sale` : "Surplus sale";
 
+  const getLive = () => modelExport({ state, terms, finance, costs, fin, prices, bess, ops, dfrTarget: annualTarget }).live;
+
   return (
-    <>
+    <TraceProvider getLive={getLive}>
       <Section index="5" title="Bid tariff" note={`Tariff that gives a ${pf(fin.targetEquityIrr, 1)} equity IRR on the least-tariff plant`}
         actions={(
+          <>
+          <TraceButton />
           <button type="button" className="primary" disabled={saving} data-testid="bid-download"
             onClick={async () => {
               setSaving(true); setSaveError("");
@@ -92,21 +97,22 @@ export default function FinanceStep({ state, patch, set, lockProps, goto, terms,
             }}>
             {saving ? <Loader2 className="spin" size={14} /> : <Download size={14} />} Download financial model (Excel)
           </button>
+          </>
         )}>
         {saveError && <div className="alert"><TriangleAlert size={14} /> {saveError}</div>}
         {termChanged && <div className="alert"><TriangleAlert size={14} /> The PPA term changed after sizing: size the plant again so every year is modelled.</div>}
         <div className="rtc-grid rtc-grid-4" data-testid="bid-finance">
-          <Stat label={finance.tariffLocked ? "Tariff (fixed)" : "Bid tariff"} value={`₹${nf(finance.tariff, 3)}/kWh`} detail={`HiGHS screening ₹${nf(lp.tariff, 3)}`} />
+          <Stat label={finance.tariffLocked ? "Tariff (fixed)" : "Bid tariff"} value={`₹${nf(finance.tariff, 3)}/kWh`} detail={`HiGHS screening ₹${nf(lp.tariff, 3)}`} trace={{ key: "tariff" }} />
           <div className="bid-input-with-src">
             <Stat label="Ceiling tariff" value={ceiling ? `₹${nf(ceiling, 2)}/kWh` : "Not stated"} detail={headroom === null ? "" : headroom >= 0 ? `₹${nf(headroom, 3)} below the ceiling` : `₹${nf(-headroom, 3)} above the ceiling`} tone={headroom !== null && headroom < 0 ? "bad" : undefined} />
             <SourceChip source={prov.ceiling} />
           </div>
-          <Stat label="Equity IRR" value={pf(finance.equityIrr, 2)} detail={finance.tariffLocked ? `target ${pf(fin.targetEquityIrr, 2)}` : "the target, by construction"} />
-          <Stat label="Project IRR" value={pf(finance.projectIrr, 2)} detail="post-tax, unlevered" />
-          <Stat label="Minimum DSCR" value={nf(finance.minDscr, 2)} detail={`average ${nf(finance.avgDscr, 2)}`} tone={finance.minDscr !== null && finance.minDscr < 1.1 ? "bad" : undefined} />
-          <Stat label="Project cost" value={`₹${nf(finance.capex.total, 0)} cr`} detail={`₹${nf(finance.capex.total / (total || 1), 2)} cr per contracted MW · LCOE ₹${nf(finance.lcoe, 3)}/kWh at ${pf(fin.discountRate, 1)}`} />
-          <Stat label="Year-1 supply" value={`${nf(y1.deliveredMu, 0)} MU`} detail={`${pf(y1.dfr, 1)} of contracted`} />
-          <Stat label="Year-1 operating cost" value={`₹${nf(y1.opex, 0)} cr`} detail={[state.sources.biomass ? `biomass fuel ₹${nf(y1.fuel, 0)} cr` : null, state.sources.hydro ? `hydro ₹${nf(y1.hydroCost || 0, 0)} cr` : null, state.sources.thermal ? `thermal ₹${nf(y1.thermalCost || 0, 0)} cr` : null].filter(Boolean).join(" · ") || "O&M and insurance"} />
+          <Stat label="Equity IRR" value={pf(finance.equityIrr, 2)} detail={finance.tariffLocked ? `target ${pf(fin.targetEquityIrr, 2)}` : "the target, by construction"} trace={{ key: "equityIrr" }} />
+          <Stat label="Project IRR" value={pf(finance.projectIrr, 2)} detail="post-tax, unlevered" trace={{ key: "projectIrr" }} />
+          <Stat label="Minimum DSCR" value={nf(finance.minDscr, 2)} detail={`average ${nf(finance.avgDscr, 2)}`} tone={finance.minDscr !== null && finance.minDscr < 1.1 ? "bad" : undefined} trace={{ key: "minDscr" }} />
+          <Stat label="Project cost" trace={{ key: "capexTotal" }} value={`₹${nf(finance.capex.total, 0)} cr`} detail={`₹${nf(finance.capex.total / (total || 1), 2)} cr per contracted MW · LCOE ₹${nf(finance.lcoe, 3)}/kWh at ${pf(fin.discountRate, 1)}`} />
+          <Stat label="Year-1 supply" trace={{ line: "delivered", year: 1 }} value={`${nf(y1.deliveredMu, 0)} MU`} detail={`${pf(y1.dfr, 1)} of contracted`} />
+          <Stat label="Year-1 operating cost" trace={{ line: "opex", year: 1 }} value={`₹${nf(y1.opex, 0)} cr`} detail={[state.sources.biomass ? `biomass fuel ₹${nf(y1.fuel, 0)} cr` : null, state.sources.hydro ? `hydro ₹${nf(y1.hydroCost || 0, 0)} cr` : null, state.sources.thermal ? `thermal ₹${nf(y1.thermalCost || 0, 0)} cr` : null].filter(Boolean).join(" · ") || "O&M and insurance"} />
         </div>
       </Section>
 
@@ -130,23 +136,23 @@ export default function FinanceStep({ state, patch, set, lockProps, goto, terms,
             <Stat label="Performance guarantee (PBG)" value={pbg === null ? "Not stated" : `₹${nf(pbg, 2)} cr`} detail={pbg === null ? "" : `for ${nf(total, 0)} MW${state.bid.greenshoe ? " incl. greenshoe" : ""}`} />
             <SourceChip source={prov.pbg} />
           </div>
-          <Stat label="Equity" value={`₹${nf(finance.equity, 0)} cr`} detail={`debt ₹${nf(finance.debt, 0)} cr`} />
-          <Stat label="Equity payback" value={finance.payback ? `year ${finance.payback}` : "beyond term"} />
+          <Stat label="Equity" trace={{ key: "equity" }} value={`₹${nf(finance.equity, 0)} cr`} detail={`debt ₹${nf(finance.debt, 0)} cr`} />
+          <Stat label="Equity payback" trace={{ key: "payback" }} value={finance.payback ? `year ${finance.payback}` : "beyond term"} />
         </div>
       </Section>
 
       <Section index="5.3" title="Revenue stack" note={`PPA supply revenue and ${saleLabel.toLowerCase()} revenue, year by year`}>
         <div className="rtc-grid rtc-grid-4" data-testid="bid-revenue">
-          <Stat label="PPA supply, year 1" value={`₹${nf(y1.energyRevenue, 0)} cr`} detail={`${nf(y1.deliveredMu, 0)} MU at ₹${nf(y1.tariff, 3)}/kWh`} />
+          <Stat label="PPA supply, year 1" trace={{ line: "ppaRev", year: 1 }} value={`₹${nf(y1.energyRevenue, 0)} cr`} detail={`${nf(y1.deliveredMu, 0)} MU at ₹${nf(y1.tariff, 3)}/kWh`} />
           <Stat label={`${saleLabel}, year 1`} value={`₹${nf(y1.surplusRevenue, 0)} cr`} detail={y1.excessMu > 0 ? `${nf(y1.excessMu, 0)} MU at ₹${nf((y1.surplusRevenue * 1e4) / (y1.excessMu * 1000), 2)}/kWh realised` : "nothing sold"} />
           <Stat label={`${saleLabel}, ${fin.years} years`} value={`₹${nf(finance.rows.reduce((a, r) => a + r.surplusRevenue, 0), 0)} cr`} detail={`${pf(finance.rows.reduce((a, r) => a + r.surplusRevenue, 0) / Math.max(1e-9, finance.totals.revenue), 1)} of all revenue`} />
-          <Stat label={`Total revenue, ${fin.years} years`} value={`₹${nf(finance.totals.revenue, 0)} cr`} detail={`penalties ₹${nf(finance.totals.penalty, 0)} cr`} />
+          <Stat trace={{ key: "revenueTotal" }} label={`Total revenue, ${fin.years} years`} value={`₹${nf(finance.totals.revenue, 0)} cr`} detail={`penalties ₹${nf(finance.totals.penalty, 0)} cr`} />
         </div>
         <RevenueStack finance={finance} saleLabel={saleLabel} />
       </Section>
 
       <div className="story-divider"><span>Financial model · {fin.years} years</span></div>
       <FinanceView state={{ ...state, fin }} patch={patch} set={set} lockProps={lockProps} finance={finance} sizes={sizes} extraLines={costLines(state)} />
-    </>
+    </TraceProvider>
   );
 }

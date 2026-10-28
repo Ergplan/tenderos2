@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
-import { Lock, Unlock, Upload } from "lucide-react";
+import { Lock, Sigma, Unlock, Upload } from "lucide-react";
 import * as E from "./engine";
+import { useTrace } from "../model/ModelExplorer";
 
 export const HOUR_LABELS = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"));
 
@@ -146,7 +147,18 @@ export function UploadButton({ label, onFile, disabled }) {
   );
 }
 
-export function Stat({ label, value, detail, tone }) {
+/** A headline number; with `trace` ({ key } or { line, year }) it opens the traceable model at it. */
+export function Stat({ label, value, detail, tone, trace }) {
+  const t = useTrace();
+  if (trace && t?.available) {
+    return (
+      <button type="button" className={`rtc-stat is-traceable ${tone ? `tone-${tone}` : ""}`} onClick={() => t.openTrace(trace)} title="Show how this number is worked out" data-trace={trace.key || trace.line}>
+        <span>{label}<Sigma size={11} className="trace-mark" /></span>
+        <strong>{value}</strong>
+        {detail && <small>{detail}</small>}
+      </button>
+    );
+  }
   return (
     <div className={`rtc-stat ${tone ? `tone-${tone}` : ""}`}>
       <span>{label}</span>

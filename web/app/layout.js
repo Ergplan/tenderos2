@@ -5,6 +5,7 @@ import "@/src/cfd.css";
 import "@/src/meter.css";
 import "@/src/seci.css";
 import "@/src/team.css";
+import "@/src/trace.css";
 import { PRE_PAINT } from "@/src/themeScript";
 
 export const metadata = {

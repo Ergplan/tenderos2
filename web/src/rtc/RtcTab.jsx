@@ -4,6 +4,7 @@ import * as E from "./engine";
 import SaveDialog from "../scenarios/SaveDialog";
 import OptimizerTheatre from "./Theatre";
 import FinanceView from "./FinanceView";
+import { TraceProvider } from "../model/ModelExplorer";
 import PlantToMeter from "./MeterView";
 import { trackEvent } from "../activity";
 import { Answer, Alternatives, AgeingImpact, DispatchStory, EnergyFlow, SolverLog, TariffMap } from "./results";
@@ -469,8 +470,10 @@ export default function RtcTab({ initialScenario = null, user = null }) {
         <EnergyFlow sim={sim} inputs={inputs} fin={d.fin} />
       </Section>
       <div className="story-divider"><span>Financial model · {state.fin.years} years</span></div>
-      <FinanceView state={state} patch={patch} set={set} lockProps={lockProps} finance={finance} sizes={sizes} energyLines={METER_LINES}
-        actions={<ModelDownload request={() => rtcModelExport({ inputs, sizes, costs: d.costs, fin: finInput, bess: bessBus, sites, finance })} />} />
+      <TraceProvider getLive={() => rtcModelExport({ inputs, sizes, costs: d.costs, fin: finInput, bess: bessBus, sites, finance }).live}>
+        <FinanceView state={state} patch={patch} set={set} lockProps={lockProps} finance={finance} sizes={sizes} energyLines={METER_LINES}
+          actions={<ModelDownload request={() => rtcModelExport({ inputs, sizes, costs: d.costs, fin: finInput, bess: bessBus, sites, finance })} />} />
+      </TraceProvider>
       <AgeingImpact ctx={ctx} sizes={sizes} costs={d.costs} fin={finInput} bess={bessBus} dfrTarget={inputs.dfrTarget} finance={finance} />
       <TariffMap opt={opt} sizes={sizes} applySizes={applySizes} />
       <Alternatives opt={opt} sizes={sizes} target={inputs.dfrTarget} applySizes={applySizes} />

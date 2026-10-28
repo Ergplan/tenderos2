@@ -826,7 +826,8 @@ export function addLiveModel(wb, m) {
   ws.headerFooter = { oddFooter: "&L&A&R&P / &N" };
 
   const cells = Object.fromEntries(KEYS.map(([key]) => [key, `'${LIVE_SHEET}'!${S.cell[`key_${key}`]}`]));
-  return { sheet: ws, cells, values: Object.fromEntries(Object.entries(out).map(([k, [, v]]) => [k, v])), rows: S.val };
+  // addr: every row's key → its address ("$C$12" for one value, the row number for a year series)
+  return { sheet: ws, cells, values: Object.fromEntries(Object.entries(out).map(([k, [, v]]) => [k, v])), rows: S.val, addr: { ...S.cell } };
 }
 
 /**

@@ -3,6 +3,16 @@ import { Download } from "lucide-react";
 import { LiveChart } from "./charts";
 import { DATA_COLORS } from "../chartTheme";
 import { Field, SelectBox, Section, Stat, SwitchBox, downloadText, nf, pf } from "./ui";
+import { TraceButton, useTrace } from "../model/ModelExplorer";
+
+// the financial model's rows → the lines of the traceable model (web/lib/liveModel.js keys)
+const TRACE_LINE = {
+  demandMu: "demand", deliveredMu: "delivered", dfr: "dfr", excessMu: "excess", shortfallMu: "shortfall", tariff: "trf",
+  energyRevenue: "ppaRev", surplusRevenue: "mktRev", revenue: "revenue", insurance: "insuranceCr", other: "otherCr", opex: "opex",
+  ebitda: "ebitda", bookDep: "bookDep", interest: "interest", principal: "principal", pbt: "pbt", taxDep: "taxDep", tax: "tax", pat: "pat",
+  dWc: "dWc", augCapex: "aug", cfads: "cfads", debtService: "debtService", fcfe: "fcfe", cumEquity: "cumEq", projectCf: "projCf",
+  openingDebt: "openDebt", closingDebt: "closeDebt", dscr: "dscr", receivables: "recv",
+};
 
 // ---------------------------------------------------------------- 06 financial model
 
@@ -69,6 +79,8 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
   }, [extraLines, energyLines]);
   const rows = finance.rows;
   const years = rows.map((r) => `Y${r.year}`);
+  const trace = useTrace();
+  const traceable = Boolean(trace?.available);
   const plOption = useMemo(() => ({
     animation: false,
     grid: { left: 60, right: 56, top: 36, bottom: 64 },
@@ -123,12 +135,12 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
   return (
     <>
       <section className="rtc-stats" data-testid="rtc-finance-stats">
-        <Stat label={finance.tariffLocked ? "Tariff (fixed)" : "Tariff for target IRR"} value={`₹${nf(finance.tariff, 3)}`} detail={fin.tariffEscalation ? `levelised ₹${nf(finance.levelisedTariff, 3)}` : "flat, ₹/kWh"} />
-        <Stat label="LCOE" value={`₹${nf(finance.lcoe, 3)}`} detail={`@ ${pf(fin.discountRate, 1)} discount`} />
-        <Stat label="Equity IRR" value={pf(finance.equityIrr, 2)} detail={`NPV @ target ₹${nf(finance.equityNpv, 0)} cr`} tone={finance.equityIrr >= fin.targetEquityIrr - 1e-4 ? "good" : "bad"} />
-        <Stat label="Project IRR" value={pf(finance.projectIrr, 2)} detail="post-tax, unlevered" />
-        <Stat label="DSCR min / avg" value={`${nf(finance.minDscr, 2)} / ${nf(finance.avgDscr, 2)}`} detail={`${fin.tenorYears}-yr ${fin.repayment === "annuity" ? "annuity" : "equal principal"}`} tone={finance.minDscr !== null && finance.minDscr < 1.1 ? "bad" : undefined} />
-        <Stat label="Equity payback" value={finance.payback ? `Year ${finance.payback}` : "–"} detail={`equity ₹${nf(finance.equity, 0)} cr · debt ₹${nf(finance.debt, 0)} cr`} />
+        <Stat label={finance.tariffLocked ? "Tariff (fixed)" : "Tariff for target IRR"} value={`₹${nf(finance.tariff, 3)}`} detail={fin.tariffEscalation ? `levelised ₹${nf(finance.levelisedTariff, 3)}` : "flat, ₹/kWh"} trace={{ key: "tariff" }} />
+        <Stat label="LCOE" value={`₹${nf(finance.lcoe, 3)}`} detail={`@ ${pf(fin.discountRate, 1)} discount`} trace={{ key: "lcoe" }} />
+        <Stat label="Equity IRR" value={pf(finance.equityIrr, 2)} detail={`NPV @ target ₹${nf(finance.equityNpv, 0)} cr`} tone={finance.equityIrr >= fin.targetEquityIrr - 1e-4 ? "good" : "bad"} trace={{ key: "equityIrr" }} />
+        <Stat label="Project IRR" value={pf(finance.projectIrr, 2)} detail="post-tax, unlevered" trace={{ key: "projectIrr" }} />
+        <Stat label="DSCR min / avg" value={`${nf(finance.minDscr, 2)} / ${nf(finance.avgDscr, 2)}`} detail={`${fin.tenorYears}-yr ${fin.repayment === "annuity" ? "annuity" : "equal principal"}`} tone={finance.minDscr !== null && finance.minDscr < 1.1 ? "bad" : undefined} trace={{ key: "minDscr" }} />
+        <Stat label="Equity payback" value={finance.payback ? `Year ${finance.payback}` : "–"} detail={`equity ₹${nf(finance.equity, 0)} cr · debt ₹${nf(finance.debt, 0)} cr`} trace={{ key: "payback" }} />
       </section>
 
       <Section index="F.1" title="Assumptions" note="Unlock the tariff to solve it for the target equity IRR; lock it to compute returns at a fixed tariff">
@@ -178,8 +190,9 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
         </Section>
       </div>
 
-      <Section index="F.4" title={`${fin.years}-year financial model`} note={`Project cost ₹${nf(finance.capex.total, 1)} cr (hard ₹${nf(finance.capex.hard, 1)} + pre-op ₹${nf(finance.capex.preop, 1)})`} actions={<>{actions}<button type="button" className="secondary" onClick={exportCsv}><Download size={14} /> Export CSV</button></>}>
-        <div className="table-wrap rtc-model">
+      <Section index="F.4" title={`${fin.years}-year financial model`} note={`Project cost ₹${nf(finance.capex.total, 1)} cr (hard ₹${nf(finance.capex.hard, 1)} + pre-op ₹${nf(finance.capex.preop, 1)})`} actions={<><TraceButton />{actions}<button type="button" className="secondary" onClick={exportCsv}><Download size={14} /> Export CSV</button></>}>
+        {traceable && <p className="rtc-note">Click any number to see its formula and every input behind it.</p>}
+        <div className="table-wrap rtc-model fin-table">
           <table>
             <thead>
               <tr><th>Line item</th><th>Y0</th>{years.map((y) => <th key={y}>{y}</th>)}</tr>
@@ -192,7 +205,9 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
                   <tr key={i} className={strong ? "rtc-model-total" : ""}>
                     <td>{label}</td>
                     <td>{y0 === null ? "" : fmtCell(y0, fmt)}</td>
-                    {rows.map((r) => <td key={r.year}>{fmtCell(r[key], fmt, sign)}</td>)}
+                    {rows.map((r) => (traceable && TRACE_LINE[key]
+                      ? <td key={r.year} className="is-traceable" onClick={() => trace.openTrace({ line: TRACE_LINE[key], year: r.year })} title="Show how this number is worked out">{fmtCell(r[key], fmt, sign)}</td>
+                      : <td key={r.year}>{fmtCell(r[key], fmt, sign)}</td>))}
                   </tr>
                 );
               })}
