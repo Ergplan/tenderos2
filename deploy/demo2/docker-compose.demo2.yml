@@ -1,0 +1,51 @@
+# TenderOS Demo 2 on the shared VM, beside Demo 1 (compose project "tenderos", ~/tenderos) and the
+# old app (fdre-dashboard). This project ("tenderos2") has its own database, engine and web app;
+# it borrows Demo 1's Docling service over Demo 1's network instead of starting a second one, and
+# its router replaces Demo 1's on port 8081 (and 80/443 with docker-compose.demo2-https.yml) with
+# a chooser of all three apps. deploy/demo2/install.sh puts it up; rollback.sh gives 8081 back to
+# Demo 1's router.
+#   COMPOSE_PROJECT_NAME=tenderos2
+#   COMPOSE_FILE=docker-compose.yml:deploy/demo2/docker-compose.demo2.yml
+services:
+  engine:
+    environment:
+      DOCLING_URL: ${DOCLING_URL-http://tenderos-docling-1:5001}
+    networks:
+      - default
+      - demo1
+
+  # Demo 1's Docling serves both demos (it holds several GB of models)
+  docling:
+    profiles: ["own-docling"]
+
+  web:
+    ports: !reset []
+    environment:
+      COOKIE_SECURE: "false"
+      DEMO_MODE: "1"
+      APP_SWITCH_URL: /__switch
+
+  router:
+    image: caddy:2.8-alpine
+    depends_on:
+      - web
+    ports:
+      - "${ROUTER_PORT:-8081}:8081"
+    volumes:
+      - ./deploy/demo2/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/demo2/apps.caddy:/etc/caddy/apps.caddy:ro
+      - ./deploy/demo2/chooser:/srv/chooser:ro
+      - ./web/public/brand:/srv/chooser-assets:ro
+    networks:
+      - default
+      - demo1
+      - old_app
+    restart: unless-stopped
+
+networks:
+  demo1:
+    name: ${DEMO1_NETWORK:-tenderos_default}
+    external: true
+  old_app:
+    name: ${OLD_APP_NETWORK:-fdre-dashboard_default}
+    external: true

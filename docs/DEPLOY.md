@@ -223,7 +223,46 @@ docker compose -p tenderos ps docling engine
 * **Files.** Uploaded files (signed copies) live in the `team_files` Docker volume. The backup
   script archives them beside the database. See `docs/TEAM.md`.
 
-## 7. Removing it
+## 7. Demo 2 beside Demo 1 on the shared VM
+
+Demo 2 (this repository, `Ergplan/tenderos2`, public) runs as its own compose project `tenderos2`
+in `~/tenderos2`, beside Demo 1 (`~/tenderos`, project `tenderos`) and the old app.
+
+* **Its own:** database, engine and web app, with its own volumes.
+* **Borrowed from Demo 1:** the Docling service, reached over Demo 1's network (it holds several GB
+  of models).
+* **Router:** its router takes over port 8081, and 80/443 when Demo 1 had HTTPS, reusing Demo 1's
+  certificate volume. It serves a chooser of all three apps: Demo 2, Demo 1 and the old app.
+
+Nothing of Demo 1 changes except that its router container is stopped.
+
+As the `venture` user, on the VM:
+
+```
+cd ~ && git clone -b claude/laughing-pascal-7akw12 https://github.com/Ergplan/tenderos2.git
+cd ~/tenderos2 && bash deploy/demo2/install.sh
+```
+
+`install.sh` does the following:
+
+1. Writes `.env` the first time:
+   * a new database password and session secret;
+   * the API keys and `SITE_ADDRESS` copied from `~/tenderos/.env`, not printed;
+   * `COMPOSE_PROJECT_NAME=tenderos2`;
+   * the compose files, with the HTTPS overlay when Demo 1 has a certificate.
+2. Builds the engine and web images.
+3. Starts the database, the engine and the web app, and waits for the web app to be healthy.
+4. Stops Demo 1's router and starts Demo 2's.
+
+Then open the usual address and choose "TenderOS Demo 2".
+
+* **Update:** `cd ~/tenderos2 && git pull && docker compose build engine web && docker compose up -d engine web`.
+* **Undo the router switch:** `bash deploy/demo2/rollback.sh`. Port 8081 and HTTPS go back to Demo 1's router, with the two-app chooser.
+* **Stop Demo 2 entirely:** `docker compose stop` in `~/tenderos2`. Its volumes stay.
+* **Memory:** Demo 2 adds a Postgres, an engine and a web app, about 1.5 GB in use. Check
+  `free -h` before installing on a small VM.
+
+## 8. Removing it
 
 Delete the VM, the static IP and the firewall rules:
 

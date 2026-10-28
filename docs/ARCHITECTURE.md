@@ -89,6 +89,17 @@ The bid agent works as follows:
 `web/src/bid/quote.js` gives a quoted tariff's equity and project IRR, for Financials on both
 tabs, the bid forms and the agent.
 
+## Demo 2 additions
+
+`docs/DEMO2.md` describes them. In short:
+
+| Part | Folder | What it does |
+| --- | --- | --- |
+| Traceable model | `web/src/model/` | The Live model sheet (`web/lib/liveModel.js`) built into an in-memory grid; the explorer shows each number's formula, precedents, dependents and inputs |
+| Plant studios | `web/src/plant/` | Solar layout and ₹/Wp cost build-up with string or central inverters; wind turbines by make, CUF at the site's wind, farm cost; profiles on screen |
+| What-if | `web/src/whatif/` | Rule-based hourly dispatch of every year at the entered sizes, the 25-year model at the bid tariff, the SECI RTC-TM-V checks |
+| Recent tenders | `web/src/market/`, `web/lib/market.js`, `engine/market/` | SECI results as reported; CERC orders uploaded, read by the engine (`/api/bid/cerc-order`) and stored in `market_orders` |
+
 ## Day and night mode
 
 The switch is at the foot of the sidebar, in the top bar of the library pages and on the sign-in

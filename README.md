@@ -1,4 +1,25 @@
-# TenderOS
+# TenderOS (Demo 2)
+
+This repository is TenderOS Demo 2. Demo 1 is kept unchanged in `Ergplan/tenderos`; Demo 2 starts
+from it and adds:
+
+* **A traceable financial model.** Click any number of a financial model (SECI RTC, Tender to Bid,
+  Round the clock, What-if) and see its formula with every reference named and valued, what it reads,
+  what reads it and every input it rests on: the Live model sheet of the Excel export, in the app
+  (`web/src/model/`).
+* **Solar plant and wind farm studios.** A grid-scale solar plant laid out from module, mounting and
+  string or central inverters, its cost built up in ₹/Wp; wind turbines by make (Vestas, GE Vernova,
+  Suzlon, Siemens Gamesa, Envision, Inox, Adani) with their CUF at your site's wind and the farm's
+  cost. Either writes its cost into the bid (`web/src/plant/`). Uploaded solar and wind profiles
+  are shown with their CUF.
+* **What-if analysis.** Your size, costs, financing and bid tariff in; equity, project and lender's
+  IRR, DSCR and the tariff the target IRR needs out, and whether the plant meets the SECI RTC-TM-V
+  floors and limits (`web/src/whatif/`).
+* **Recent tenders.** Recent SECI auction results as reported, with sources, and CERC
+  tariff-adoption orders uploaded and read into their facts with page and quote (`web/src/market/`,
+  `engine/market/`).
+
+`docs/DEMO2.md` describes each, and `docs/DEPLOY.md` §7 runs Demo 2 beside Demo 1 on the shared VM.
 
 TenderOS is a workspace for bidding Indian renewable power tenders. You upload a tender, and it
 reads what the tender requires, each item with its page and quote. You then enter the sources you
@@ -17,6 +38,8 @@ model as Excel formulas (change an input and the returns follow).
 | Round the clock | RTC / FDRE sizing and finance from your own inputs, with the same Excel workbook and Live model tab |
 | BESS tender | Standalone battery tenders |
 | CfD bid | SECI CfD-I strike price (`docs/CFD.md`) |
+| **What-if analysis** | Demo 2: your plant, costs, financing and bid tariff; returns, the lender's view and tender compliance (`docs/DEMO2.md`) |
+| **Recent tenders** | Demo 2: SECI auction results and CERC tariff-adoption orders (`docs/DEMO2.md`) |
 
 Further reading: `docs/ARCHITECTURE.md` (the parts and the data flow) and `docs/EXTRACTION.md` (the
 tender reader). `docs/E2E-NHPC.md` reports one tender run end to end: the NHPC FDRE-II RfS, 1,200 MW

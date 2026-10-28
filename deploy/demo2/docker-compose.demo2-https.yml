@@ -1,0 +1,25 @@
+# HTTPS for the Demo 2 router, on top of docker-compose.demo2.yml: the chooser and all three apps
+# at https://${SITE_ADDRESS} as well as on port 8081. It reuses the certificate Demo 1's router
+# already holds (its volume tenderos_router_data), so nothing new is requested.
+#   COMPOSE_FILE=docker-compose.yml:deploy/demo2/docker-compose.demo2.yml:deploy/demo2/docker-compose.demo2-https.yml
+#   SITE_ADDRESS=34-131-67-235.sslip.io
+services:
+  router:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env, e.g. 34-131-67-235.sslip.io}
+    volumes:
+      - ./deploy/demo2/Caddyfile.https:/etc/caddy/Caddyfile:ro
+      - router_data:/data
+      - router_config:/config
+
+volumes:
+  router_data:
+    name: ${ROUTER_DATA_VOLUME:-tenderos_router_data}
+    external: true
+  router_config:
+    name: ${ROUTER_CONFIG_VOLUME:-tenderos_router_config}
+    external: true

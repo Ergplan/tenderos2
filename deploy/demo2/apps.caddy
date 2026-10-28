@@ -1,0 +1,54 @@
+# The routes the Demo 2 router serves on every address: the chooser and the three apps.
+header Vary Cookie
+
+route {
+	handle /__switch/demo2 {
+		header Set-Cookie "tenderos_app=demo2; Path=/; Max-Age=2592000; SameSite=Lax; HttpOnly"
+		redir * / 303
+	}
+	handle /__switch/new {
+		header Set-Cookie "tenderos_app=new; Path=/; Max-Age=2592000; SameSite=Lax; HttpOnly"
+		redir * / 303
+	}
+	handle /__switch/old {
+		header Set-Cookie "tenderos_app=old; Path=/; Max-Age=2592000; SameSite=Lax; HttpOnly"
+		redir * / 303
+	}
+	handle /__switch* {
+		header Set-Cookie "tenderos_app=; Path=/; Max-Age=0"
+		header Cache-Control no-store
+		root * /srv/chooser
+		rewrite * /index.html
+		file_server
+	}
+
+	@demo2 header_regexp demo2 Cookie (^|;\s*)tenderos_app=demo2(;|$)
+	handle @demo2 {
+		reverse_proxy tenderos2-web-1:3000 {
+			flush_interval -1
+		}
+	}
+	@new header_regexp app Cookie (^|;\s*)tenderos_app=new(;|$)
+	handle @new {
+		reverse_proxy tenderos-web-1:3000 {
+			flush_interval -1
+		}
+	}
+	@old header_regexp old Cookie (^|;\s*)tenderos_app=old(;|$)
+	handle @old {
+		reverse_proxy fdre-dashboard-web-1:3000 {
+			flush_interval -1
+		}
+	}
+
+	handle /chooser-assets/* {
+		root * /srv
+		file_server
+	}
+	handle {
+		header Cache-Control no-store
+		root * /srv/chooser
+		rewrite * /index.html
+		file_server
+	}
+}
