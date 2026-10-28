@@ -142,15 +142,18 @@ A tab of its own (`web/src/whatif/model.js` and `WhatIfTab.jsx`).
 
 A tab of its own (`web/src/market/`).
 
-* **SECI results** (`seed.js`). Four recent auctions as the trade press reported them, each with
-  its source links and caveats:
-  * RTC-IV;
-  * the 1 GW FDRE-RTC;
-  * FDRE Tranche VII peak power;
-  * ISTS Tranche XXI solar with storage.
+* **SECI results** (`seed.js`). Eight recent auctions, read from SECI's own result notices
+  (Tenders › Results › View Bidder Detail on www.seci.co.in):
+  * Wind Tranche XIX and XX;
+  * FDRE-RTC-V and RTC-IV;
+  * FDRE-VII and FDRE-IX (peak power);
+  * ISTS-XX and ISTS-XXI (solar with storage).
 
-  The publications' sites could not be opened from the build session, so the figures are as the
-  search results reported them. Check SECI's own result notices before relying on one.
+  Each record gives the RfS number and date, the dates of the e-reverse auction and the LoAs,
+  every awarded bidder with the capacity it bid, the capacity awarded and its tariff, and the
+  bidders not awarded at their final tariff. Each links its notice. `tools/check_market.mjs`
+  checks that the awards add up, that no bidder got more than it bid, and that no unawarded
+  bidder was below the highest awarded tariff.
 * **CERC orders.** Upload a tariff-adoption order (PDF). The engine (`engine/market/cerc_order.py`,
   `POST /api/bid/cerc-order`) reads its petition, date of order, petitioner, capacity, tariffs and
   successful bidders, each with its page and quote, using rules over the text, no model. The order
@@ -165,6 +168,6 @@ A tab of its own (`web/src/market/`).
 
 | Command | Covers |
 | --- | --- |
-| `make check-web` | adds `check_trace`, `check_plant` and `check_whatif` |
+| `make check-web` | adds `check_trace`, `check_plant`, `check_whatif` and `check_market` |
 | `make test` | adds `tests/engine/test_cerc_order.py` |
 | `make e2e` | adds `tests/e2e/test_demo2.py`: the traceable model from Round the clock, both studios writing into the SECI bid and the profile view, the What-if returns and checks, and a CERC order uploaded, read, checked and deleted |

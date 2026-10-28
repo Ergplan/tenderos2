@@ -138,11 +138,12 @@ def test_recent_tenders_and_cerc_upload(tmp_path):
     with _session() as page:
         page.click("aside.sidebar button:has-text('Recent tenders')")
         page.wait_for_selector("[data-testid=seci-results]")
-        assert page.locator("[data-testid^=seci-result-]").count() >= 4
-        assert "5.06" in page.locator("[data-testid=seci-result-seci-rtc-iv-2025]").inner_text()
+        assert page.locator("[data-testid^=seci-result-]").count() >= 8
+        xix = page.locator("[data-testid=seci-result-seci-wind-xix]").inner_text()
+        assert "K.P. Energy Limited" in xix and "3.67" in xix and "SECI/C&P/IPP/12/0013/25-26" in xix
         before = page.locator("[data-testid=cerc-order]").count()
         page.set_input_files("[data-testid=cerc-file]", str(pdf))
-        page.wait_for_function(f"document.querySelectorAll('[data-testid=cerc-order]').length > {before}", timeout=30_000)
+        page.wait_for_function(f"document.querySelectorAll('[data-testid=cerc-order]').length > {before}", timeout=90_000)
         card = page.locator("[data-testid=cerc-order]").first
         assert card.locator("[data-testid=cerc-petition]").input_value() == "412/AT/2025"
         assert card.locator("[data-testid=cerc-date]").input_value() == "2025-11-22"

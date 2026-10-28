@@ -174,3 +174,5 @@
 .market-quote { display: block; color: var(--faint); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .market-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 @media (max-width: 700px) { .market-grid, .market-orders { grid-template-columns: 1fr; } .market-form { grid-template-columns: 1fr; } }
+.market-official { padding: 2px 6px; border: 1px solid var(--good); color: var(--good); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.market-others summary { color: var(--muted); font-size: 12px; cursor: pointer; }

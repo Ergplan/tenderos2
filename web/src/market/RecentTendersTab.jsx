@@ -7,7 +7,7 @@ import { CheckCircle2, ExternalLink, FileText, Gavel, Loader2, Save, Trash2, Upl
 import { Section, Stat, nf } from "../rtc/ui";
 import { LiveChart } from "../rtc/charts";
 import { DATA_COLORS } from "../chartTheme";
-import { SECI_RESULTS, SECI_SITE, TRADING_MARGIN_NOTE, tariffRange, weightedTariff } from "./seed";
+import { SECI_RESULTS, SECI_SITE, TRADING_MARGIN_NOTE, latest, tariffRange, weightedTariff } from "./seed";
 
 async function api(path, opts = {}) {
   const res = await fetch(path, { credentials: "same-origin", ...opts });
@@ -16,7 +16,8 @@ async function api(path, opts = {}) {
   return data;
 }
 
-const PRODUCT_COLORS = { "RTC (round-the-clock RE)": DATA_COLORS.signal, "FDRE-RTC": DATA_COLORS.wind, "FDRE peak power": DATA_COLORS.bess, "Solar + BESS": DATA_COLORS.solar, CERC: "#ff8a5f" };
+const PRODUCT_COLORS = { "RTC (round-the-clock RE)": DATA_COLORS.signal, "FDRE-RTC": "#4fd1c5", "FDRE peak power": DATA_COLORS.bess, "Solar + ESS": DATA_COLORS.solar, Wind: DATA_COLORS.wind, CERC: "#ff8a5f" };
+const fmtDate = (iso) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "–");
 
 function ResultCard({ r }) {
   const [lo, hi] = tariffRange(r);
@@ -25,21 +26,30 @@ function ResultCard({ r }) {
     <article className="market-card" data-testid={`seci-result-${r.id}`}>
       <header>
         <span className="market-tag" style={{ "--tag": PRODUCT_COLORS[r.product] || DATA_COLORS.muted }}>{r.product}</span>
-        <small>{r.agency} · e-reverse auction {r.auctionDate}</small>
+        {r.official && <span className="market-official">SECI result notice</span>}
+        <small>e-reverse auction {fmtDate(r.auctionDate)} · LoAs {fmtDate(r.loaDate)}</small>
       </header>
       <h3>{r.tender}</h3>
+      <small className="rtc-note">RfS {r.rfsNo}{r.rfsDate ? `, ${fmtDate(r.rfsDate)}` : ""}</small>
       <div className="market-figs">
-        <div><span>Discovered tariff</span><b>{lo === null ? "–" : lo === hi ? `₹${nf(lo, 2)}` : `₹${nf(lo, 2)}–${nf(hi, 2)}`}</b><small>{r.tariffUnit}{w ? ` · weighted ₹${nf(w, 3)}` : ""}</small></div>
-        <div><span>Awarded</span><b>{r.awardedMw ? `${nf(r.awardedMw, 0)} MW` : "–"}</b><small>{r.tenderedMw ? `of ${nf(r.tenderedMw, 0)} MW tendered` : ""}</small></div>
-        <div><span>Winners</span><b>{r.winners.length}</b></div>
+        <div><span>Tariff awarded</span><b>{lo === null ? "–" : lo === hi ? `₹${nf(lo, 2)}` : `₹${nf(lo, 2)}–${nf(hi, 2)}`}</b><small>{r.tariffUnit}{w ? ` · weighted ₹${nf(w, 3)}` : ""}</small></div>
+        <div><span>Awarded</span><b>{nf(r.awardedMw, r.awardedMw % 1 ? 1 : 0)} MW</b><small>of {nf(r.tenderedMw, 0)} MW tendered{r.storageMwh ? ` · ${nf(r.storageMwh, 0)} MWh` : ""}</small></div>
+        <div><span>Winners</span><b>{r.winners.length}</b><small>{r.others.length} more in the auction</small></div>
       </div>
       <table className="studio-cost">
-        <thead><tr><th>Successful bidder</th><th className="num">MW</th><th className="num">₹/kWh</th></tr></thead>
-        <tbody>{r.winners.map((x) => <tr key={x.name}><td>{x.name}</td><td className="num">{x.mw === null ? "n/a" : nf(x.mw, 0)}</td><td className="num">{x.tariff === null ? "n/a" : nf(x.tariff, 2)}</td></tr>)}</tbody>
+        <thead><tr><th>Successful bidder</th><th className="num">Bid MW</th><th className="num">Awarded MW</th><th className="num">₹/kWh</th></tr></thead>
+        <tbody>{r.winners.map((x) => <tr key={x.name}><td>{x.name}</td><td className="num">{nf(x.bidMw, x.bidMw % 1 ? 1 : 0)}</td><td className="num"><b>{nf(x.mw, x.mw % 1 ? 1 : 0)}</b></td><td className="num">{nf(x.tariff, 2)}</td></tr>)}</tbody>
       </table>
+      {r.others.length > 0 && (
+        <details className="market-others">
+          <summary>{r.others.length} bidders not awarded, at their final e-RA tariff</summary>
+          <table className="studio-cost">
+            <tbody>{r.others.map((x) => <tr key={`${x.name}-${x.tariff}`}><td>{x.name}</td><td className="num">{nf(x.bidMw, x.bidMw % 1 ? 1 : 0)} MW</td><td className="num">₹{nf(x.tariff, 2)}</td></tr>)}</tbody>
+          </table>
+        </details>
+      )}
       {r.note && <p className="rtc-note">{r.note}</p>}
       <div className="market-sources">
-        <span>As reported by</span>
         {r.sources.map((s) => <a key={s.url} href={s.url} target="_blank" rel="noreferrer">{s.label} <ExternalLink size={11} /></a>)}
       </div>
     </article>
@@ -120,7 +130,7 @@ export default function RecentTendersTab() {
   }
   const chart = useMemo(() => {
     const items = [
-      ...SECI_RESULTS.map((r) => ({ name: r.tender, product: r.product, range: tariffRange(r), w: weightedTariff(r) })),
+      ...[...SECI_RESULTS].sort((a, b) => a.product.localeCompare(b.product) || String(b.auctionDate).localeCompare(String(a.auctionDate))).map((r) => ({ name: `${r.tender.match(/\(([^)]+)\)$/)?.[1] || r.tender} · ${r.product}`, product: r.product, range: tariffRange(r), w: weightedTariff(r) })),
       ...orders.filter((o) => o.tariff_min !== null).map((o) => ({ name: `CERC ${o.petition || o.file_name}`, product: "CERC", range: [Number(o.tariff_min), Number(o.tariff_max)], w: null })),
     ].filter((x) => x.range[0] !== null);
     return {
@@ -136,15 +146,20 @@ export default function RecentTendersTab() {
       ],
     };
   }, [orders]);
-  const rtc = SECI_RESULTS.filter((r) => /RTC/.test(r.product));
-  const latestRtc = rtc.map(weightedTariff).filter(Boolean);
+  const tile = (product) => {
+    const r = latest(product);
+    if (!r) return { value: "–", detail: "" };
+    const [lo, hi] = tariffRange(r);
+    return { value: lo === hi ? `₹${nf(lo, 2)}` : `₹${nf(lo, 2)}–${nf(hi, 2)}`, detail: `${r.tender.match(/\(([^)]+)\)$/)?.[1] || r.tender}, ${fmtDate(r.auctionDate)}` };
+  };
+  const tiles = [["FDRE-RTC", "FDRE-RTC, latest"], ["FDRE peak power", "FDRE peak power, latest"], ["Wind", "Wind, latest"], ["Solar + ESS", "Solar + storage, latest"]].map(([p, label]) => ({ label, ...tile(p) }));
   return (
     <div className="rtc story bid market">
       <section className="story-hero">
         <div>
           <div className="eyebrow"><Gavel size={13} /> Recent tenders · SECI results and CERC tariff adoption</div>
           <h1>Recent tenders</h1>
-          <p>What recent auctions discovered, and what CERC adopted: SECI&apos;s latest results as reported, and the tariff-adoption orders you upload, read into their facts with the page each came from.</p>
+          <p>What recent auctions discovered, and what CERC adopted: SECI&apos;s latest results from its own result notices, and the tariff-adoption orders you upload, read into their facts with the page each came from.</p>
         </div>
         <div className="story-hero-tools">
           <a className="rtc-reset" href={SECI_SITE} target="_blank" rel="noreferrer"><ExternalLink size={13} /> SECI&apos;s site</a>
@@ -153,10 +168,7 @@ export default function RecentTendersTab() {
 
       <Section index="1" title="Discovered tariffs side by side" note={TRADING_MARGIN_NOTE}>
         <div className="rtc-grid rtc-grid-4">
-          <Stat label="RTC / FDRE-RTC, latest" value={latestRtc.length ? `₹${nf(Math.max(...latestRtc), 3)}` : "–"} detail="capacity-weighted, as reported" />
-          <Stat label="Results listed" value={String(SECI_RESULTS.length)} detail="SECI auctions, 2025–26" />
-          <Stat label="CERC orders uploaded" value={String(orders.length)} detail={`${orders.filter((o) => o.checked).length} checked`} />
-          <Stat label="Solar + BESS, latest" value="₹3.12–3.13" detail="ISTS Tranche XXI, as reported" />
+          {tiles.map((t) => <Stat key={t.label} label={t.label} value={t.value} detail={t.detail} />)}
         </div>
         <LiveChart option={chart} height={Math.max(220, 40 * (SECI_RESULTS.length + orders.length) + 40)} />
       </Section>
@@ -175,7 +187,7 @@ export default function RecentTendersTab() {
         </div>
       </Section>
 
-      <Section index="3" title="SECI auction results" note="As the trade press reported them: open the sources, and SECI's own result notices, before relying on a figure">
+      <Section index="3" title="SECI auction results" note={`${SECI_RESULTS.length} recent auctions from SECI's result notices: every awarded bidder, its capacity and tariff, and who else bid`}>
         <div className="market-grid" data-testid="seci-results">
           {SECI_RESULTS.map((r) => <ResultCard key={r.id} r={r} />)}
         </div>
