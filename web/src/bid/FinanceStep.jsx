@@ -49,7 +49,7 @@ function RevenueStack({ finance, saleLabel }) {
  * quoteTariff / onQuoteTariff: the tariff the bidder will quote (the SECI tab keeps it in its bid
  * forms); by default state.quoteTariff.
  */
-export default function FinanceStep({ state, patch, set, lockProps, goto, terms, prices, quoteTariff, onQuoteTariff }) {
+export default function FinanceStep({ state, patch, set, lockProps, goto, terms, prices, quoteTariff, onQuoteTariff, traceRequest = null }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const { lp } = state;
@@ -85,7 +85,7 @@ export default function FinanceStep({ state, patch, set, lockProps, goto, terms,
   const getLive = () => modelExport({ state, terms, finance, costs, fin, prices, bess, ops, dfrTarget: annualTarget }).live;
 
   return (
-    <TraceProvider getLive={getLive}>
+    <TraceProvider getLive={getLive} request={traceRequest}>
       <Section index="5" title="Bid tariff" note={`Tariff that gives a ${pf(fin.targetEquityIrr, 1)} equity IRR on the least-tariff plant`}
         actions={(
           <>

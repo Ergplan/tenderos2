@@ -33,10 +33,12 @@ const hourly = (() => {
   return h;
 })();
 let chartShown = null;
+let traceShown = null;
 let sized = 0;
 const ctx = {
   getHourly: () => (state.lp ? hourly : null),
   showChart: (c) => { chartShown = c; },
+  showTrace: (t) => { traceShown = t; },
   getState: () => state,
   apply: (fn) => { state = fn(state); },
   getTerms: () => seciTerms(state.seci),
@@ -47,6 +49,7 @@ const ctx = {
   getRun: () => null,
 };
 const run = createToolRunner(ctx);
+const r1 = (v) => Number(v.toFixed(1));
 
 // ---- the tool list the session gets
 const names = AGENT_TOOLS.map((t) => t.name);
@@ -110,6 +113,37 @@ assert.equal(sizedRes.dates.scsd, "2028-06-07");
 assert.ok(shownSteps.includes("size"));
 const fin = await run("get_financials");
 assert.ok(fin.bidTariff > 0 && Math.abs(fin.equityIrrPct - 14) < 0.01 && fin.projectIrrPct > 0, JSON.stringify(fin));
+
+// ---- the CFO's check: the energy as MW × CUF × 365 × 24, a month, a day's 15-minute blocks
+const gen = await run("explain_generation", { source: "solar", year: 1, month: null, day: null, their_mu: null, show: true });
+assert.ok(gen.ok, JSON.stringify(gen));
+const sol = gen.sources[0];
+assert.equal(sol.mw, 610);
+assert.match(sol.steps[0], /^610\.0 MW × [\d.]+% CUF × 365 × 24 ÷ 1,000 = [\d,.]+ MU$/);
+const base = (610 * sol.cufPct / 100 * 8760) / 1000;
+assert.ok(Math.abs(sol.generationMu - base) < 0.06, `year 1 is MW × CUF × 8,760: ${sol.generationMu} vs ${base}`);
+assert.ok(Math.abs(sol.months.reduce((a, m) => a + m.mu, 0) - sol.atBusMu) < 0.6, "the months add up to the year");
+assert.match(sol.excelCells.generation, /^'Live model'!E\d+$/);
+assert.match(gen.spoken, /610 megawatts times [\d.]+ percent CUF times 365 days times 24 hours/);
+assert.equal(shownSteps.at(-1), "finance");
+assert.deepEqual(traceShown, { line: sol.atBusMu !== sol.generationMu ? "solarBus" : "solarGen", year: 1, drill: null });
+// the CFO reads out a figure: the model's own matches; MW × CUF × 8,760 alone is explained
+const mine = await run("explain_generation", { source: "solar", year: 1, month: null, day: null, their_mu: sol.atBusMu, show: false });
+assert.ok(mine.check.matches, JSON.stringify(mine.check));
+assert.ok(mine.spoken.startsWith("Your"), mine.spoken);
+const y10 = await run("explain_generation", { source: "solar", year: 10, month: null, day: null, their_mu: r1(base), show: false });
+assert.equal(y10.check.matches, false);
+assert.match(y10.check.verdict, /degradation/, y10.check.verdict);
+const june = await run("explain_generation", { source: "solar", year: 1, month: 6, day: 21, their_mu: null, show: true });
+assert.equal(june.sources[0].month.month, "June");
+assert.equal(june.sources[0].day.blocks, 96);
+assert.equal(june.sources[0].day.date, "21 June");
+assert.match(june.sources[0].day.peakBlock.steps, /610\.0 MW × [\d.]+ × 0\.25 h/);
+assert.deepEqual(traceShown.drill, { month: 6, day: 21 });
+const all = await run("explain_generation", { source: "all", year: 1, month: null, day: null, their_mu: null, show: false });
+assert.equal(all.sources.length, 2);
+assert.ok(Math.abs(all.dispatch.generatedAtBusMu - all.dispatch.deliveredMu - all.dispatch.soldMu - all.dispatch.notDeliveredOrSoldMu) < 0.2, JSON.stringify(all.dispatch));
+assert.ok(!/solver/i.test(all.spoken));
 
 // a change after sizing clears it and says so
 const changed = await run("set_input", { key: "wind.capex", value: 6.8 });

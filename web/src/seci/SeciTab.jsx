@@ -190,6 +190,11 @@ export default function SeciTab({ initialScenario = null }) {
   const next = SECI_STEPS[index + 1];
   const prev = SECI_STEPS[index - 1];
   const props = { state, setState, patch, set, lockProps, isLocked, goto, prices, terms, missing };
+  // the agent opens the traceable model at a line (explain_generation): the Financials step shows it
+  const [traceAsk, setTraceAsk] = useState(null);
+  const onTrace = useCallback((t) => setTraceAsk({ ...t, at: Date.now() }), []);
+  // once the user leaves the Financials, coming back does not open it again
+  useEffect(() => { if (step.id !== "finance") setTraceAsk(null); }, [step.id]);
 
   return (
     <TeamContext.Provider value={teamCtx}>
@@ -239,7 +244,7 @@ export default function SeciTab({ initialScenario = null }) {
         {step.id === "bid" && <BidStep {...props} />}
         {step.id === "sources" && <SourcesStep {...props} startSizing={sizing.startSizing} hourly={sizing.hourly} />}
         {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={sizing.startSizing} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} />}
-        {step.id === "finance" && <FinanceStep {...props} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
+        {step.id === "finance" && <FinanceStep {...props} traceRequest={traceAsk} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
         {step.id === "forms" && <BidForms {...props} />}
       </div>
 
@@ -259,7 +264,7 @@ export default function SeciTab({ initialScenario = null }) {
         />
       )}
 
-      <LiveAgent state={state} setState={setState} terms={terms} goto={goto} sizing={sizing} info={agent} onDock={setDocked} />
+      <LiveAgent state={state} setState={setState} terms={terms} goto={goto} sizing={sizing} info={agent} onDock={setDocked} onTrace={onTrace} />
       {teamOpen && <TeamPanel team={teamCtx} state={state} bidName={linked?.name} onAccept={acceptAnswer} letterFor={letterFor} onClose={() => setTeamOpen(false)} focusId={teamFocus} />}
     </div>
     </TeamContext.Provider>

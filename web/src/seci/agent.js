@@ -8,7 +8,9 @@
 // Facts come only from the tools: the tender from its pack (each with document and page), the
 // numbers from the sizing and the financial model. Nothing the agent says is written into the
 // tender pack or used to change a rule.
-import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, missingInputs } from "../bid/model.js";
+import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, missingInputs, modelInputs, opsFromLp } from "../bid/model.js";
+import { liveModelRequest } from "../bid/liveModelRequest.js";
+import { explainGeneration } from "../model/explainGeneration.js";
 import { quotedReturns } from "../bid/quote.js";
 import { PACK, PEAK_PLANS, SHORTFALL_MODES, keyDates, moneyAtStake } from "./terms.js";
 import { FORM_FIELDS, bidChecks, formIssues, visibleFields } from "./forms.js";
@@ -236,14 +238,31 @@ export const AGENT_TOOLS = [
   { type: "function", name: "open_format", description: "Show one RfS bid format on screen (e.g. '7.1' Covering Letter, '7.6' Financial Requirement, '7.10' Financial Bid) or 'particulars', and list its blanks: the input key to set each with set_input, the value now, where it comes from, and the RfS words around the blank with the page.", parameters: obj({ id: { type: "string" } }, ["id"]) },
   { type: "function", name: "show_chart", description: `Open a chart beside the conversation, drawn from the bid itself, and get a short summary of what it shows to describe it. Use it whenever the user asks to see, draw, plot or compare something, and on your own when a picture explains better: ${Object.entries(CHART_KINDS).map(([k, v]) => `${k}: ${v}`).join("; ")}.`,
     parameters: obj({ kind: { type: "string", enum: Object.keys(CHART_KINDS) }, month: { type: ["integer", "null"], description: "typical_day only: 1-12, or null for the whole year" }, from: { type: ["number", "null"], description: "irr_vs_tariff only: lowest tariff, or null" }, to: { type: ["number", "null"], description: "irr_vs_tariff only: highest tariff, or null" } }, ["kind", "month", "from", "to"]) },
+  { type: "function", name: "explain_generation", description: "How the plant's energy is worked out, with the bid's own numbers from the traceable financial model (the same as the Excel model): for solar and wind, MW × CUF × 365 days × 24 hours ÷ 1,000 = million units, the year's degradation and the losses to the 33 kV bus; the twelve months (MW × month's CUF × days × 24); a day's 96 fifteen-minute blocks (MW × capacity factor × ¼ hour); and what the dispatch did with the year's energy (delivered, sold, curtailed). Use it whenever the user asks how energy, generation, CUF or units are calculated, or gives their own figure to check (their_mu). show true opens that line of the traceable model on screen with its drill-down.", parameters: obj({
+    source: { type: "string", enum: ["solar", "wind", "all"] },
+    year: { type: ["integer", "null"], description: "PPA year, 1 if not said" },
+    month: { type: ["integer", "null"], description: "1-12 for a month's figure, else null" },
+    day: { type: ["integer", "null"], description: "Day of that month for its 15-minute blocks, else null" },
+    their_mu: { type: ["number", "null"], description: "The user's own figure in million units (MU) to check, else null" },
+    show: { type: "boolean" },
+  }, ["source", "year", "month", "day", "their_mu", "show"]) },
   { type: "function", name: "mark_format_reviewed", description: "Record that the bidder has reviewed a format as filled. Only when the bidder says they have reviewed it.", parameters: obj({ id: { type: "string" }, reviewed: { type: "boolean" } }, ["id", "reviewed"]) },
 ];
+
+/** The traceable model's request for the sized plant, as the Financials step builds it. */
+function liveOf(state, terms) {
+  const { costs, fin, bess } = modelInputs(state, terms);
+  const ops = opsFromLp(state.lp, fin, bess);
+  const finance = financeOf(state, terms);
+  return liveModelRequest({ state, lp: state.lp, finance, costs, fin, bess, ops, dfrTarget: 0 });
+}
 
 /**
  * Runs the tools against the tab. ctx: { getState() (the latest state, updated at once by apply),
  * apply(fn) (set the state), getTerms(), goto(step), highlight(target), runSizing() (resolves
  * with the sizing or null), stopSizing(), getRun(), getHourly() (the year-1 hourly dispatch),
- * showChart(chart) (open the chart window) }.
+ * showChart(chart) (open the chart window), showTrace({ line, year, drill }) (open the traceable
+ * model at a line) }.
  */
 export function createToolRunner(ctx) {
   const input = (key) => agentInputs(ctx.getState()).find((x) => x.key === key);
@@ -396,6 +415,16 @@ export function createToolRunner(ctx) {
       ctx.showChart?.(chart);
       return { ok: true, shown: chart.title, caption: chart.caption, summary: chart.summary };
     },
+    explain_generation: ({ source = "all", year = 1, month = null, day = null, their_mu: theirMu = null, show = false }) => {
+      const s = ctx.getState();
+      if (!s.lp) return { ok: false, error: "Size the plant first: the generation is worked out on the sized plant." };
+      const res = explainGeneration(liveOf(s, ctx.getTerms()), { source, year, month, day, theirMu });
+      if (res.ok && show) {
+        ctx.goto("finance");
+        ctx.showTrace?.(res.show);
+      }
+      return res;
+    },
     mark_format_reviewed: ({ id, reviewed }) => {
       const fmt = PACK.formats.find((f) => f.id === id);
       if (!fmt) return { ok: false, error: `No format ${id}.` };
@@ -430,6 +459,8 @@ Delegate to the backend whenever the user asks about the tender, asks to see, dr
 
 Lead a guided model-filling exercise. At the start, greet the user in one sentence and ask the backend to brief the key bid conditions and give the first question. After each answer, ask the backend to set it and fetch the next question. When everything is in, offer to run the optimiser. While it runs (a minute or more), say so; you can keep answering questions about the tender meanwhile. Then explain the results and the financials, ask what tariff they want to quote, and finish with the bid forms.
 
+A CFO or reviewer may ask how the energy is worked out or read out their own calculation (for example "785 times 25 percent times 8,760"). Delegate: the backend works it out from the model and opens it on screen. Say the formula with its numbers, megawatts times CUF times 365 days times 24 hours, and confirm their figure or say exactly what differs. Do not call it the solver's number: the generation is a formula, and the dispatch only decides where each hour's energy goes.
+
 When the backend reports a warning, such as a tariff below what the target IRR needs, an input out of range or a check not met, say it plainly with the numbers it gave.`;
 
 export const BACKEND_INSTRUCTIONS = `You operate the SECI RTC-TM-V bid model in the user's browser through function tools, for a voice assistant that speaks your results aloud.
@@ -448,6 +479,8 @@ The guided exercise:
 6. review_bid_forms. Fill the particulars first (open_format "particulars"), then each RfS format the bid needs in order: open_format, read out its blanks still empty, set them as the user answers (the keys come from open_format), and ask the user to review it on screen; mark_format_reviewed only when they say it is reviewed.
 
 Show, don't only tell: call show_chart whenever the user asks to see, draw, plot or compare something, and on your own when explaining the Peak Hours and the floors (peak_window), how the sized plant runs through a day (typical_day), the energy month by month (monthly_energy), what a tariff earns (irr_vs_tariff), the cash flows (cash_flows) or the money at stake (money). Then describe the chart in one or two sentences from its summary.
+
+How the energy is worked out: when the user asks how generation, energy, CUF or million units are calculated, asks for a month or a day in 15-minute blocks, or reads out their own figure to check, call explain_generation with show true (their_mu when they give a figure, in million units; convert from MWh or kWh if they say so). Say the steps it returns with the numbers: megawatts times CUF times 365 times 24 divided by a thousand, then the degradation and the losses to the bus if any. If they gave a figure, start with the verdict: it matches, or what it leaves out. Say the dispatch does not make the energy; it only decides where each hour's energy goes, and give the delivered, sold and not used figures when asked. Point out the Excel cell when they want to check it in the workbook.
 
 At any time: answer tender questions with tender_lookup; change any input the user names (list_inputs gives the keys; percent inputs are in percent, 24 means 24%); after a change that clears the sizing, offer to run the optimizer again; go_to_step to show what you talk about.
 

@@ -196,3 +196,8 @@
 .gen-day select { padding: 2px 4px; }
 .gen-blocks { max-height: 240px; overflow: auto; border: 1px solid var(--line); }
 .gen-blocks thead th { position: sticky; top: 0; background: var(--surface); }
+
+/* opened while the bid agent is docked on the right: leave its column free, so the conversation stays in view */
+@media (min-width: 1200px) {
+  body:has(.agent-panel) .trace-overlay { right: 462px; }
+}

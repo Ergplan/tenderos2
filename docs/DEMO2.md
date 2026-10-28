@@ -61,6 +61,25 @@ blocks:
   `web/src/model/generation.js`);
 * all 35,040 blocks added back up to the year.
 
+**Ask the bid agent.** In the SECI tab, the bid agent (voice, GPT-Live) has a tool,
+`explain_generation` (`web/src/model/explainGeneration.js`). It works the energy out from the same
+traceable model and opens it on screen, beside the conversation, at that line, year, month and
+day. The CFO can ask:
+* "How is the solar energy worked out?" The agent gives the steps with the bid's numbers:
+  megawatts × CUF × 365 × 24 ÷ 1,000, then the year's degradation, then the losses to the bus.
+* "What about June?" or "Show me 21 June in 15-minute blocks." The agent gives the month's
+  figure, the hours the plant generates that day, and the largest block's arithmetic.
+* "I get 1,719 million units for year 5, is that right?" The agent says whether the figure
+  matches. If not, it says what the figure leaves out (the year's degradation, the losses to the
+  bus) or by how much it differs.
+* "Where did the rest of the energy go?" The agent gives the generation, what was delivered and
+  sold, and what was curtailed or lost.
+
+The agent names the Excel cell for each figure. Without a microphone, or without a voice key on
+the server, "Check the energy" in the agent's panel asks the same question typed: technology,
+year, and the user's own figure. `tools/check_seci_agent.mjs` and `tests/e2e/test_seci_tab.py`
+check both.
+
 `tools/check_generation.mjs` checks that the formula gives the dispatch's own generation for every
 year in the What-if tab, Round the clock (one site and split sites) and Tender to Bid (the profile
 and losses the HiGHS sizing receives). It also checks that the months add up to the year and that

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { BarChart3, Bot, Loader2, Maximize2, Mic, MicOff, Minimize2, PhoneOff, Sparkles, X } from "lucide-react";
+import { BarChart3, Bot, Calculator, Loader2, Maximize2, Mic, MicOff, Minimize2, PhoneOff, Sparkles, X } from "lucide-react";
 import { LiveChart } from "../rtc/charts";
 import { LiveEvents, createToolRunner } from "./agent";
 import { agentChart } from "./charts";
@@ -22,6 +22,7 @@ const TOOL_WORDS = {
   show_chart: (a, r) => (r?.ok ? `Showed a chart: ${r.shown}` : `Chart: ${r?.error || ""}`),
   open_format: (a) => `Opened ${a.id === "particulars" ? "the particulars" : `Format ${a.id}`}`,
   mark_format_reviewed: (a) => `${a.reviewed ? "Marked" : "Unmarked"} Format ${a.id} reviewed`,
+  explain_generation: (a, r) => (r?.ok ? `Worked out the ${a.source === "all" ? "solar and wind" : a.source} energy, year ${r.year}: MW × CUF × 365 × 24${r.check ? ` (${r.check.matches ? "your figure matches" : "your figure differs"})` : ""}` : `Energy: ${r?.error || ""}`),
 };
 
 function highlightTarget(target) {
@@ -70,11 +71,41 @@ export function ChartWindow({ chart, onClose }) {
 }
 
 /**
+ * "Check the energy" without talking: the same explain_generation tool the voice agent calls,
+ * typed. The answer goes into the conversation and the traceable model opens at the line.
+ */
+function EnergyCheck({ run, addTurn }) {
+  const [source, setSource] = useState("solar");
+  const [year, setYear] = useState(1);
+  const [mine, setMine] = useState("");
+  const [busy, setBusy] = useState(false);
+  const check = async () => {
+    setBusy(true);
+    const theirMu = mine.trim() === "" ? null : Number(mine.replace(/,/g, ""));
+    addTurn("you", `How is the ${source === "all" ? "solar and wind" : source} energy in year ${year} worked out?${Number.isFinite(theirMu) && theirMu !== null ? ` I get ${theirMu.toLocaleString("en-IN")} MU.` : ""}`, false);
+    const r = await run({ source, year: Number(year) || 1, month: null, day: null, their_mu: Number.isFinite(theirMu) ? theirMu : null, show: true });
+    addTurn("agent", r.ok ? r.spoken : r.error, false);
+    setBusy(false);
+  };
+  return (
+    <form className="agent-energy" data-testid="agent-energy" onSubmit={(e) => { e.preventDefault(); check(); }}>
+      <span className="rtc-note">Check the energy: MW × CUF × 365 × 24</span>
+      <select value={source} onChange={(e) => setSource(e.target.value)} aria-label="Technology" data-testid="agent-energy-source">
+        <option value="solar">Solar</option><option value="wind">Wind</option><option value="all">Both</option>
+      </select>
+      <label>Year <input type="number" min={1} max={40} value={year} onChange={(e) => setYear(e.target.value)} data-testid="agent-energy-year" /></label>
+      <label>My figure <input inputMode="decimal" placeholder="MU" value={mine} onChange={(e) => setMine(e.target.value)} data-testid="agent-energy-mine" /></label>
+      <button type="submit" className="secondary" disabled={busy} data-testid="agent-energy-check"><Calculator size={13} /> Check</button>
+    </form>
+  );
+}
+
+/**
  * The bid agent: a GPT-Live voice conversation whose backend works this tab through the tools in
  * agent.js (setting inputs, running HiGHS, reading results, checking a tariff, the bid forms).
  * The server creates the session (/api/seci/live); audio flows over WebRTC; nothing is recorded.
  */
-export default function LiveAgent({ state, setState, terms, goto, sizing, info, onDock = () => {} }) {
+export default function LiveAgent({ state, setState, terms, goto, sizing, info, onDock = () => {}, onTrace = () => {} }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { onDock(open); }, [open, onDock]);
   const [phase, setPhase] = useState("idle"); // idle | connecting | connected | working | closing
@@ -133,6 +164,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
       getRun: () => sizingRef.current.run,
       getHourly: () => sizingRef.current.hourly,
       showChart: setChart,
+      showTrace: onTrace,
     });
     const c = { audio: new Audio() };
     c.audio.autoplay = true;
@@ -233,6 +265,9 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
         ))}
       </div>
       <ChartWindow chart={chart} onClose={() => setChart(null)} />
+      <EnergyCheck run={(args) => createToolRunner({
+        getState: () => stateRef.current, apply: () => {}, getTerms: () => termsRef.current, goto, showTrace: onTrace,
+      })("explain_generation", args)} addTurn={addTurn} />
       <div className="voice-log agent-log" data-testid="agent-log" aria-live="polite">
         {turns.length === 0 && <p>{info?.backendModel ? `Voice ${info.model}; the bid work by ${info.backendModel}.` : ""}</p>}
         {turns.map((t, i) => <p key={i} className={t.who}>{t.text}</p>)}

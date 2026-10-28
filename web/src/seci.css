@@ -193,3 +193,10 @@
 .letter-table th { background: #ecebe6; }
 .alert.warn { border-color: var(--warn); color: var(--warn); }
 @media (max-width: 760px) { .letter-paper { padding: 22px 16px; font-size: 14px; } }
+/* "Check the energy": the agent's generation check, typed */
+.agent-energy { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; }
+.agent-energy > .rtc-note { flex-basis: 100%; }
+.agent-energy label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.agent-energy input { width: 74px; padding: 3px 5px; }
+.agent-energy input[type=number] { width: 52px; }
+.agent-energy select { padding: 3px 4px; }

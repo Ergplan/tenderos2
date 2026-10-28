@@ -146,6 +146,25 @@ def test_bid_on_screen(tmp_path):
         page.click("[data-testid=agent-chart-size]")
         assert "big" in page.locator("[data-testid=agent-chart]").get_attribute("class")
         page.click("[data-testid=agent-chart-size]")
+        # the CFO's check, typed in the agent: solar year 1 as MW × CUF × 365 × 24, the trace opens beside the conversation
+        page.click("[aria-label='Close the chart']")
+        page.click("[data-testid=agent-energy-check]")
+        page.wait_for_selector("[data-testid=trace-explorer]")
+        assert page.locator("[data-testid=trace-name]").inner_text().startswith("Solar at the 33 kV bus · Year 1")
+        said = page.locator("[data-testid=agent-log] p.agent").last.inner_text()
+        assert "megawatts times" in said and "365 days times 24 hours" in said, said
+        assert page.locator("[data-testid=gen-months] tbody tr").count() == 12
+        model_mu = page.locator("[data-testid=trace-value]").inner_text().split()[0]
+        page.fill("[data-testid=agent-energy-mine]", model_mu)
+        page.click("[data-testid=agent-energy-check]")
+        page.wait_for_function("document.querySelector('[data-testid=agent-log] p.agent:last-of-type')?.textContent.startsWith('Your')")
+        assert "matches the model" in page.locator("[data-testid=agent-log] p.agent").last.inner_text()
+        # a second question moves the open model to its year
+        page.fill("[data-testid=agent-energy-year]", "5")
+        page.click("[data-testid=agent-energy-check]")
+        page.wait_for_function("document.querySelector('[data-testid=trace-name]')?.textContent.endsWith('Year 5')")
+        assert "year-5 degradation" in page.locator("[data-testid=agent-log] p.agent").last.inner_text()
+        page.keyboard.press("Escape")
         page.click("[aria-label='Close the agent']")
         page.click("[data-testid=seci-step-bid]")
         money = page.locator("[data-testid=seci-money]").inner_text()

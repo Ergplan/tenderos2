@@ -37,16 +37,18 @@ export function fmtCell(c) {
  * Wraps a page whose numbers can be traced. getLive() returns the live-model request (the Excel
  * export's `live` block) for the page's current model; it is called only when the model opens.
  */
-export function TraceProvider({ getLive, children }) {
+export function TraceProvider({ getLive, request = null, children }) {
   const [target, setTarget] = useState(null);
   const getRef = useRef(getLive);
   getRef.current = getLive;
   const openTrace = useCallback((t = {}) => setTarget({ ...t, at: Date.now() }), []);
+  // a request from outside (the voice agent): open at its line, year and drill-down
+  useEffect(() => { if (request) openTrace(request); }, [request, openTrace]);
   const value = useMemo(() => ({ openTrace, available: Boolean(getLive) }), [openTrace, getLive]);
   return (
     <TraceContext.Provider value={value}>
       {children}
-      {target && <ModelExplorer getLive={() => getRef.current?.()} target={target} onClose={() => setTarget(null)} />}
+      {target && <ModelExplorer key={target.at} getLive={() => getRef.current?.()} target={target} onClose={() => setTarget(null)} />}
     </TraceContext.Provider>
   );
 }
@@ -160,15 +162,16 @@ const hhmm = (q) => `${String(Math.floor(q / 4)).padStart(2, "0")}:${String((q %
  * each line: the year is MW × CUF × 365 × 24, a month MW × its CUF × its days × 24, a block
  * MW × its capacity factor × ¼ hour (the hour split the way the 15-minute dispatch splits it).
  */
-function GenDrill({ model, c }) {
+function GenDrill({ model, c, drill = null }) {
   const key = model.rowKey?.[c.row] || "";
   const hit = /^(solar|wind)(Gen|Bus|Cuf|DegF|MuYear|CufM(\d+)|MuM(\d+))$/.exec(key);
   const tech = hit?.[1];
   const g = tech ? model.gen?.[tech] : null;
   const year = c.col >= 5 && c.col <= 4 + model.N ? c.col - 4 : 1;
-  const [month, setMonth] = useState(() => Number(hit?.[4] || hit?.[5] || 1) - 1);
-  const [day, setDay] = useState(0);
-  useEffect(() => { setMonth(Number(hit?.[4] || hit?.[5] || 1) - 1); setDay(0); }, [c.addr]); // eslint-disable-line react-hooks/exhaustive-deps
+  const startMonth = () => Number(drill?.month || hit?.[4] || hit?.[5] || 1) - 1;
+  const [month, setMonth] = useState(startMonth);
+  const [day, setDay] = useState(() => (drill?.day ? drill.day - 1 : 0));
+  useEffect(() => { setMonth(startMonth()); setDay(drill?.day ? drill.day - 1 : 0); }, [c.addr, drill]); // eslint-disable-line react-hooks/exhaustive-deps
   const mwCell = tech ? model.cells[model.lines[`${tech}Mw`]?.addr] : null;
   const mw = mwCell?.value || 0;
   const deg = g ? (1 - g.degradation) ** (year - 1) : 1;
@@ -239,7 +242,7 @@ function GenDrill({ model, c }) {
   );
 }
 
-function TracePanel({ model, addr, onPick, onBack, canBack }) {
+function TracePanel({ model, addr, onPick, onBack, canBack, drill = null }) {
   const c = model.cells[addr];
   const [showInputs, setShowInputs] = useState(false);
   const inputs = useMemo(() => (showInputs ? inputsOf(model, addr) : []), [model, addr, showInputs]);
@@ -265,7 +268,7 @@ function TracePanel({ model, addr, onPick, onBack, canBack }) {
         c.kind === "opt" ? <DispatchNote model={model} c={c} onPick={onPick} />
           : <p className="rtc-note">{c.kind === "input" ? "An input: change it in the inputs of this tab (or in the Excel model) and every number that uses it moves." : "A value, not a formula."}</p>
       )}
-      <GenDrill model={model} c={c} />
+      <GenDrill model={model} c={c} drill={drill} />
       {c.refs.length > 0 && (
         <>
           <div className="trace-label">Reads ({c.refs.length})</div>
@@ -308,6 +311,7 @@ export default function ModelExplorer({ getLive, target, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target.at]);
   const [sel, setSel] = useState(() => resolve(model, target));
+  const [first] = useState(sel); // the number it opened at keeps the request's month and day
   const [history, setHistory] = useState([]);
   const [query, setQuery] = useState("");
   const gridRef = useRef(null);
@@ -394,7 +398,7 @@ export default function ModelExplorer({ getLive, target, onClose }) {
                 </tbody>
               </table>
             </div>
-            {sel && <TracePanel model={model} addr={sel} onPick={pick} onBack={back} canBack={history.length > 0} />}
+            {sel && <TracePanel model={model} addr={sel} onPick={pick} onBack={back} canBack={history.length > 0} drill={sel === first ? target.drill : null} />}
           </div>
         )}
         <footer className="trace-legend">
