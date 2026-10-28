@@ -126,7 +126,7 @@ def test_bid_on_screen(tmp_path):
         for label in ("SOLAR", "WIND", "BATTERY"):
             assert label in size_text, size_text
         table = page.locator("[data-testid=bid-compliance]").inner_text()
-        assert "of hours" in table and "Peak Hours floor" in table, table
+        assert ("Met in every block" in table or "of blocks" in table) and "Peak Hours floor" in table, table
         peak_row = page.locator("[data-testid=check-peak\\.hours]").inner_text()
         assert "highest IEX DAM" in peak_row and "most often 18:00" in peak_row, peak_row
         # the hour under the mouse as a see-through Sankey: sources, uses, and the block's floor

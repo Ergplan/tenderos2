@@ -23,6 +23,24 @@ export const SHORTFALL_MODES = {
 
 export const DEFAULT_SETTINGS = { peakPlan: "price", shortfall: "penalty", ppaDate: null };
 
+/**
+ * A typical SECI RTC-TM-V design per contracted MW, for the first sizing's start before there is a
+ * last sizing: the HiGHS optimum of a 200 MW bid on the benchmark inputs with the costliest-hours
+ * plan (tariff ₹6.50/kWh; delivered energy falls linearly over the term). Only where the sizing
+ * starts: a rough start still halves the time against none (measured: 73 s against 116 s).
+ */
+const TYPICAL = { tariff: 6.5, perMw: { solarMw: 2.162, windMw: 1.557, bessMw: 1.485, bessMwh: 5.939 }, deliveredFirst: 7317.7, deliveredLast: 7112.9 };
+function typicalSeed(years) {
+  const n = Math.max(1, years);
+  return {
+    from: "a typical SECI RTC-TM design",
+    tariff: TYPICAL.tariff,
+    perMw: TYPICAL.perMw,
+    deliveredPerMw: Array.from({ length: n }, (_, i) => TYPICAL.deliveredFirst + ((TYPICAL.deliveredLast - TYPICAL.deliveredFirst) * i) / Math.max(1, n - 1)),
+    exportPerMw: new Array(n).fill(0),
+  };
+}
+
 const byId = Object.fromEntries(PACK.conditions.map((c) => [c.id, c]));
 
 /** A condition's first quote as a provenance chip (located: the pack's test checks every quote). */
@@ -104,6 +122,7 @@ export function seciTerms(settings = DEFAULT_SETTINGS, prices = null) {
     sale: "allowed", // power above the contracted capacity may be sold (PSA 2.11.5)
     site: null,
     years: m.years, // RfS cl. 20.2: 25 years from the SCSD
+    typicalSeed,
     yearsAssumed: false,
     supplyStart: dates?.scsd || null,
     ceiling: null,

@@ -236,4 +236,24 @@ assert.deepEqual(defaultBidState().prebid, { bidder: "", edits: {}, off: {} });
 assert.equal(mergeBidState({ ...defaultBidState(), prebid: { bidder: "Acme Power" } }).prebid.bidder, "Acme Power");
 assert.deepEqual(mergeBidState({ ...defaultBidState(), prebid: undefined }).prebid, { bidder: "", edits: {}, off: {} });
 
+// ---- each sizing starts from the last one, scaled to the bid (rtc_lp.solve's seed)
+{
+  const { sizingSeedOf, seedFor } = await import("../web/src/bid/model.js");
+  const { seciTerms } = await import("../web/src/seci/terms.js");
+  const life = Array.from({ length: 25 }, (_, i) => ({ year: i + 1, deliveredMwh: 1.5e6 - i * 1000, exportMwh: 0 }));
+  const lp = { tariff: 6.5014, sizes: { solarMw: 432, windMw: 311, bessMw: 297, bessMwh: 1188 }, lifetime: life };
+  const seed = sizingSeedOf(lp, 200);
+  assert.equal(seed.perMw.solarMw, 2.16);
+  const at300 = seedFor({ sizingSeed: seed }, {}, 300, 25);
+  assert.equal(at300.sizes.solarMw, 648, "scaled to the bid");
+  assert.equal(at300.deliveredMwh[0], 1.5e6 * 1.5);
+  assert.equal(at300.tariff, 6.5);
+  assert.equal(seedFor({ sizingSeed: seed }, {}, 300, 20), null, "another term: no seed");
+  assert.equal(seedFor({}, {}, 300, 25), null, "no last sizing and no typical design: no seed");
+  // the SECI tab's first sizing starts from its typical design
+  const typical = seedFor({}, seciTerms(), 200, 25);
+  assert.ok(typical && typical.from.includes("typical SECI") && Math.abs(typical.sizes.bessMwh - 1187.8) < 0.1);
+  assert.equal(typical.deliveredMwh.length, 25);
+}
+
 console.log("Tender to Bid model checks passed");

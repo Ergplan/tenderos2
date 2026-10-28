@@ -129,3 +129,33 @@ def test_lp_bills_at_the_220kv_meter_after_transformer_and_line_losses():
     assert lossy["tariff"] * eta == pytest.approx(bus["tariff"], rel=1e-4)
     assert lossy["perYear"][0]["dfr"] == pytest.approx(bus["perYear"][0]["dfr"], abs=1e-6)
     assert lossy["perYear"][0]["deliveredMu"] == pytest.approx(bus["perYear"][0]["deliveredMu"] * eta, rel=1e-6)
+
+
+@pytest.mark.slow  # four full solves: several minutes
+@pytest.mark.skipif(M.highspy is None, reason="highspy not installed")
+def test_a_seed_reaches_the_same_optimum_in_fewer_solves():
+    """The browser starts each sizing from the last one (bid/model.js seedFor): its tariff and tax
+    timing start the first solve near the answer; the optimum is the same. A seed that does not fit
+    (wrong number of years, a size missing) is ignored."""
+    solar, wind, demand = _case()
+    payload = {
+        "ctx": {"demand": demand.tolist(), "solarCf": solar.tolist(), "windCf": wind.tolist(), "plantMw": 285},
+        "bess": BESS, "costs": COSTS, "fin": FIN, "dfrTarget": 0.85, "dfrBasis": "annual",
+        "vars": {"solarMw": {"min": 0, "max": 1200}, "windMw": {"min": 0, "max": 900}, "bessMw": {"min": 0, "max": 500}},
+        "tariffGuess": 5.5, "returnLifetime": True,
+    }
+    cold = M.solve(dict(payload))
+    assert cold["ok"]
+    seed = {"from": "your last sizing", "tariff": round(cold["tariff"], 2), "sizes": cold["sizes"],
+            "deliveredMwh": [y["deliveredMwh"] for y in cold["lifetime"]], "exportMwh": [y["exportMwh"] for y in cold["lifetime"]]}
+    lines = []
+    warm = M.solve({**payload, "seed": seed, "tariffGuess": seed["tariff"]}, on_log=lines.append)
+    assert warm["ok"]
+    assert warm["tariff"] == pytest.approx(cold["tariff"], abs=0.003)
+    assert len(warm["iterations"]) < len(cold["iterations"])
+    assert any("from your last sizing" in line["msg"] for line in lines)
+    # a seed for another term, or without the battery's size, is not used
+    for bad in ({**seed, "deliveredMwh": seed["deliveredMwh"][:10]}, {**seed, "sizes": {"solarMw": 1, "windMw": 1}}):
+        lines = []
+        res = M.solve({**payload, "seed": bad}, on_log=lines.append)
+        assert res["ok"] and any("tax paid in the year it arises" in line["msg"] for line in lines)

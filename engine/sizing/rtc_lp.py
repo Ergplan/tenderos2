@@ -45,6 +45,7 @@ MONTH_OF_HOUR = np.repeat(np.arange(12), [d * 24 for d in MONTH_DAYS])
 HOUR_OF_DAY = np.tile(np.arange(24), 365)
 RS_CR_PER_MWH_AT_1RS = 1e-4  # 1 MWh at Rs 1/kWh = Rs 1,000 = 1e-4 crore
 VAR_KEYS = ("solarMw", "windMw", "bessMw", "bessMwh")
+THROUGHPUT_COST = 1e-3  # Rs/kWh charged or discharged: a tie-breaker only (dispatch15 has the same)
 
 
 class LpInputError(ValueError):
@@ -606,6 +607,7 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
             return ~peak_mask
         return np.ones(HOURS, bool)
 
+    battery_cols = []  # each modelled year's charge and discharge columns (the tie-breaker below)
     for yi, year in enumerate(rep):
         f = year_factors(year, fin, bess)
         base = n_size + yi * per_year
@@ -624,6 +626,7 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
         target = np.minimum(dem, plant / poi)
         demand_by_year.append(dem)
         deliver_cols.append([c_dir, c_dis] + ([c_disB] if split else []))
+        battery_cols.append([c_ch, c_dis] + ([c_lB, c_disB] if split else []))
         sgen = solar_cf * f["solarFactor"] * loss
         wgen = wind_cf * f["windFactor"] * loss
         bf = f["bessFactor"]
@@ -896,6 +899,12 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
                 cost_vec[ex_cols[yi]] = -market_w[yi] * price_series * poi
             elif sell:
                 cost_vec[ex_cols[yi]] = -surplus_w[yi] * poi
+        # a negligible cost per MWh the battery charges or discharges (as in dispatch15): of two
+        # dispatches worth the same, the one that uses the wind or sun before the battery, instead
+        # of curtailing them while the battery discharges
+        for yi, cols in enumerate(battery_cols):
+            for c in cols:
+                cost_vec[c] += THROUGHPUT_COST * energy_w[yi]
         const = tw["capex"] * evac * preop + pv_flat * evac * ins + pv_om * float(fin.get("otherFixedCr") or 0)
         return cost_vec, energy_vec, const, energy_w
 
@@ -984,23 +993,28 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
         h.setOptionValue(key, val)
     h.cbLogging.subscribe(lambda e: note("highs-log", e.message.rstrip()) if e.message.strip() else None)
 
-    seed = payload.get("seed") or {}
-    lam = float(payload.get("tariffGuess") or seed.get("tariff") or 5.0)
-    if seed.get("sizes") and seed.get("deliveredMwh"):
-        ss = seed["sizes"]
-        taxable = reference_taxable(fin, costs, bess, ss, np.asarray(seed["deliveredMwh"], float),
-                                    np.asarray(seed.get("exportMwh") or np.zeros(n), float), lam)
-        taxed_in = tax_timing(fin, taxable)
-        note("highs", f"Start: λ ₹{lam:.4f}/kWh and tax timing from the screening design "
-                      f"(solar {ss['solarMw']:.0f} MW, wind {ss['windMw']:.0f} MW, BESS {ss['bessMw']:.0f} MW)")
-    else:
-        taxed_in = tax_timing(fin, None)
-        note("highs", f"Start: λ ₹{lam:.4f}/kWh, tax paid in the year it arises (refined after the first solve)")
-
     def describe_timing(z: np.ndarray) -> str:
         paid = [y for y in range(1, n + 1) if z[y] == y]
         return f"tax paid from year {paid[0]}" if paid and paid == list(range(paid[0], n + 1)) else (
             f"tax paid in years {', '.join(map(str, paid))}" if paid else "no tax paid in the PPA term")
+
+    # a starting design (the last sizing, a typical one, or a screening design): its tariff and the
+    # years it pays tax start the first solve near the answer. Starting from "tax paid from year 1"
+    # instead moves the design a long way in the first solves (about half the time, measured)
+    seed = payload.get("seed") or {}
+    seed_ok = (isinstance(seed.get("sizes"), dict) and all(isinstance(seed["sizes"].get(k), (int, float)) for k in VAR_KEYS)
+               and len(seed.get("deliveredMwh") or []) == n and len(seed.get("exportMwh") or [0.0] * n) == n)
+    lam = float(payload.get("tariffGuess") or seed.get("tariff") or 5.0)
+    if seed_ok:
+        ss = seed["sizes"]
+        taxable = reference_taxable(fin, costs, bess, ss, np.asarray(seed["deliveredMwh"], float),
+                                    np.asarray(seed.get("exportMwh") or np.zeros(n), float), lam)
+        taxed_in = tax_timing(fin, taxable)
+        note("highs", f"Start: λ ₹{lam:.4f}/kWh and tax timing from {str(seed.get('from') or 'the screening design')[:80]} "
+                      f"(solar {ss['solarMw']:.0f} MW, wind {ss['windMw']:.0f} MW, BESS {ss['bessMw']:.0f} MW; {describe_timing(taxed_in)})")
+    else:
+        taxed_in = tax_timing(fin, None)
+        note("highs", f"Start: λ ₹{lam:.4f}/kWh, tax paid in the year it arises (refined after the first solve)")
 
     cost_vec, energy_vec, cost_const, energy_w = objective(tariff_weights(fin, taxed_in), lam)
     lp = highspy.HighsLp()

@@ -3,7 +3,7 @@
 // and the hourly dispatch survive switching dashboard tabs through the caller's `session` object.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trackEvent } from "../activity";
-import { dispatch15Request, hourlyAtMeter, loadMarketPrices, lpPayload, missingInputs, plantMw, resourceProfiles, runSizing } from "./model";
+import { dispatch15Request, hourlyAtMeter, loadMarketPrices, lpPayload, missingInputs, plantMw, resourceProfiles, runSizing, sizingSeedOf } from "./model";
 import { getJson } from "./readTender";
 
 /**
@@ -50,7 +50,8 @@ export default function useSizing({ state, setState, terms, prices, session, mod
       setHourly(h ? hourlyAtMeter(h, summary.evacuationEfficiency) : null);
       const used = payload.ctx.surplusPrice ? state.market.source : null;
       const lp = { ...summary, market: used, flatPrice: used ? null : (payload.ctx.sellSurplus ? payload.fin.surplusPrice : null) };
-      setState((s) => ({ ...s, lp }));
+      // remembered for the next sizing's start, even after an input change clears the result
+      setState((s) => ({ ...s, lp, sizingSeed: sizingSeedOf(lp, payload.ctx.plantMw) || s.sizingSeed || null }));
       setRun((r) => ({ ...r, active: false, finished: Date.now() }));
       return lp;
     } catch (err) {

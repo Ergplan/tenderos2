@@ -17,17 +17,20 @@ function ComplianceTable({ lp }) {
   if (!rules.length) return null;
   return (
     <div className="bid-compliance" data-testid="bid-compliance">
-      <div className="bid-compliance-row head"><span>Supply floor</span><span>Target</span>{years.map((y) => <span key={y.year}>Year {y.year}</span>)}</div>
+      <div className="bid-compliance-row head"><span>Supply floor</span><span>Floor (of contracted MW)</span>{years.map((y) => <span key={y.year}>Year {y.year}</span>)}</div>
       {rules.map((r, i) => (
         <div key={r.id} className="bid-compliance-row">
           <span>{r.label || r.id}</span>
           <span>{pf(r.target, 1)}</span>
           {years.map((y) => {
             const o = y.rules[i];
-            // a time-block floor: the share of its hours at the floor (and the energy short)
+            // a time-block floor: met in every block (with the lowest block's supply), or the share
+            // of blocks at the floor and the energy short, which the penalty pays for
             if (o.basis === "block") {
-              return <span key={y.year} className={o.met ? "ok" : o.penaltyMultiple != null ? "warn" : "bad"} title={`${nf(o.shortfallMu, 2)} MU short; lowest hour ${pf(o.achieved, 1)}`}>
-                {o.met ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {pf(o.hoursMet, 1)} of hours</span>;
+              return <span key={y.year} className={o.met ? "ok" : o.penaltyMultiple != null ? "warn" : "bad"} title={`${nf(o.shortfallMu, 2)} MU short; lowest block ${pf(o.achieved, 1)} of contracted capacity`}>
+                {o.met ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {o.met
+                  ? `Met in every block (lowest ${pf(o.achieved, 1)})`
+                  : `Met in ${pf(o.hoursMet, 1)} of blocks; ${nf(o.shortfallMu, 1)} MU short${o.penaltyMultiple != null ? ", penalty paid" : ""}`}</span>;
             }
             return <span key={y.year} className={o.met ? "ok" : "bad"}>{o.met ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {pf(o.achieved, 1)}</span>;
           })}

@@ -121,6 +121,49 @@ less than more plant. Choose "Meet every block" to rule that out.
 * the sizing request carries them;
 * the charts' floors and the What-if dispatch use them.
 
+## Faster sizing: each run starts from the last
+
+The HiGHS sizing finds the least tariff in rounds. Each round is one full solve of the 25-year
+hourly model: guess a tariff and the years the project pays tax, solve, update both, and stop
+when they agree. The first solve, from cold, takes most of the time: on the SECI 200 MW case about
+60–95 s, whichever HiGHS method or thread count is used (measured). The number of rounds and their
+cost depend on how far the starting guess is from the answer. With "₹5.50, tax paid from year 1",
+the design moves a long way before the tax years settle (year 10 here).
+
+Each sizing now starts from a design (`seed` in the request, `rtc_lp.solve`):
+* the last sizing of this bid, scaled to the bid size (`state.sizingSeed`, kept when an input
+  change clears the result);
+* else, on the SECI tab, a typical SECI RTC-TM design per contracted MW (`seciTerms().typicalSeed`).
+
+The design's tariff and tax years start the first solve. The optimum is the same. Measured on the
+SECI 200 MW bid:
+
+| Start | Time | Rounds |
+| --- | --- | --- |
+| ₹5.50, tax from year 1 (before) | 116 s | 5 |
+| The typical SECI design (first sizing) | 55 s | 1 |
+| The last sizing, after wind capex +5% | 53 s (93 s before) | 2 |
+| A rough design (sizes −15%, tariff +6%) | 73 s | 3 |
+| The costliest-hours design, sizing "Any 6 of 16" | 76 s (103 s before) | 4 |
+
+The sizing also puts a negligible cost (₹0.001/kWh) on every MWh the battery charges or
+discharges, as the 15-minute dispatch does. Of two dispatches worth the same, it picks the one that
+uses the wind or the sun before the battery. Before this, an hour could curtail wind while the
+battery discharged (Jan 05:00 in the SECI chart). Now no hour does: 0 of 3,461 discharge hours.
+
+The supply floor table now reads "Met in every block (lowest 90.0%)" when a floor holds. The
+lowest block is that block's supply as a share of contracted capacity. When a floor does not hold,
+the table gives the share of blocks met and the energy short. "Above the floor" in the hour's
+Sankey is energy delivered between the floor and the contracted capacity. The procurer pays the
+tariff for it; it is not a requirement.
+
+`tests/engine/test_rtc_lp.py::test_a_seed_reaches_the_same_optimum_in_fewer_solves` (slow) checks
+the following:
+* a seeded sizing reaches the same tariff in fewer rounds;
+* a seed that does not fit is ignored.
+
+`tools/check_bid_model.mjs` checks the seed's scaling.
+
 ## Solar plant studio
 
 `web/src/plant/solar.js` and `SolarStudio.jsx`. Open it from the solar source in Supply sources,

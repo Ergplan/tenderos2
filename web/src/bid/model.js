@@ -517,6 +517,39 @@ export function modelInputs(state, terms) {
 
 const round = (arr, d) => Array.from(arr, (v) => Math.round(v * 10 ** d) / 10 ** d);
 
+/**
+ * What the next sizing starts from (rtc_lp.solve's seed): a sized design's tariff, sizes and energy
+ * by year, per contracted MW so it scales to another bid size. Kept in the state as sizingSeed
+ * when a sizing finishes; inputs changing do not clear it.
+ */
+export function sizingSeedOf(lp, plant) {
+  const life = lp?.lifetime || [];
+  if (!life.length || !(plant > 0) || !lp.sizes) return null;
+  const per = (v) => (Number.isFinite(v) ? v / plant : 0);
+  return {
+    from: "your last sizing",
+    tariff: lp.tariff,
+    perMw: Object.fromEntries(Object.entries(lp.sizes).filter(([, v]) => Number.isFinite(v)).map(([k, v]) => [k, per(v)])),
+    deliveredPerMw: life.map((y) => per(y.deliveredMwh)),
+    exportPerMw: life.map((y) => per(y.exportMwh)),
+  };
+}
+
+/** The seed for a sizing of `plant` MW over `years`: the last sizing, else the tender's typical design; null when neither fits. */
+export function seedFor(state, terms, plant, years) {
+  const s = state.sizingSeed || terms.typicalSeed?.(years) || null;
+  if (!s || !(plant > 0) || s.deliveredPerMw?.length !== years) return null;
+  const keys = ["solarMw", "windMw", "bessMw", "bessMwh"];
+  if (!keys.every((k) => Number.isFinite(s.perMw?.[k]))) return null;
+  return {
+    from: s.from,
+    tariff: Math.round(s.tariff * 100) / 100,
+    sizes: Object.fromEntries(Object.entries(s.perMw).map(([k, v]) => [k, v * plant])),
+    deliveredMwh: s.deliveredPerMw.map((v) => v * plant),
+    exportMwh: (s.exportPerMw || s.deliveredPerMw.map(() => 0)).map((v) => v * plant),
+  };
+}
+
 export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
   const m = modelInputs(state, terms);
   const rules = terms.rules || [];
@@ -548,6 +581,12 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
     timeLimitS: 1200, // HiGHS budget for all Dinkelbach iterations together
   };
   delete payload.costs.plants;
+  // start from the last sizing (or the tender's typical design), scaled to this bid: about half the time
+  const seed = seedFor(state, terms, m.plantMw, m.fin.years || 25);
+  if (seed) {
+    payload.seed = seed;
+    payload.tariffGuess = seed.tariff;
+  }
   if (m.biomass) payload.biomass = m.biomass;
   if (m.plants.length) payload.plants = m.plants;
   // the tender's least green share applies once a non-RE source supplies
@@ -573,7 +612,7 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
 
 /** Start the 15-minute dispatch of the sized plant for every PPA year (an engine job). */
 export function dispatch15Request(payload, lp) {
-  const { returnHourly, returnLifetime, tariffGuess, timeLimitS, ...rest } = payload;
+  const { returnHourly, returnLifetime, tariffGuess, timeLimitS, seed, ...rest } = payload;
   const sizes = Object.fromEntries(Object.entries(lp.sizes || {}).map(([k, v]) => [k, Math.max(0, Number(v) || 0)]));
   return { payload: rest, sizes, tariff: lp.tariff };
 }
