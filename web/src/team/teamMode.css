@@ -1,0 +1,95 @@
+/* Team mode: the send icons on input boxes, a box's thread, the Messages drawer, Team setup. */
+.ping-layer { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 40; }
+.ping-dot {
+  position: absolute; display: inline-flex; align-items: center; gap: 2px; height: 20px; min-width: 20px; padding: 0 4px;
+  justify-content: center; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--muted);
+  opacity: 0.42; cursor: pointer; transition: opacity 0.12s, transform 0.12s; font: 600 10px/1 var(--font-mono); pointer-events: none;
+}
+.ping-dot.hot, .ping-dot.unread { pointer-events: auto; }
+.ping-dot:hover, .ping-dot.hot { opacity: 1; color: var(--ink); border-color: var(--line-3); transform: scale(1.08); }
+.ping-dot.has-thread { opacity: 0.95; color: var(--ink); border-color: var(--line-3); }
+.ping-dot.unread { opacity: 1; background: var(--signal); color: var(--on-signal); border-color: var(--signal); }
+.ping-dot span { font-size: 9.5px; }
+.ping-flash { outline: 2px solid var(--signal) !important; outline-offset: 2px; transition: outline-color 1.2s; }
+
+.ping-pop {
+  position: fixed; z-index: 60; width: min(400px, calc(100vw - 24px)); max-height: min(560px, calc(100vh - 24px)); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line-2); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); color: var(--ink);
+}
+.ping-pop > header { display: flex; justify-content: space-between; gap: 10px; padding: 12px 12px 8px; border-bottom: 1px solid var(--line); }
+.ping-pop > header small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.ping-now { padding: 6px 12px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.ping-now strong { color: var(--ink); }
+.ping-thread { overflow-y: auto; padding: 8px 12px; display: grid; gap: 10px; min-height: 60px; }
+.ping-thread article { display: grid; grid-template-columns: 26px 1fr; gap: 8px; }
+.ping-thread article header { display: flex; gap: 6px; align-items: baseline; font-size: 12px; }
+.ping-thread article header small, .ping-thread time { color: var(--muted); font-size: 10.5px; }
+.ping-thread time { margin-left: auto; }
+.ping-thread p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ping-avatar { width: 26px; height: 26px; display: inline-grid; place-items: center; border-radius: 50%; background: var(--surface-3); color: var(--ink-2); font: 600 10px/1 var(--font-mono); flex: none; }
+.ping-thread article.mine .ping-avatar { background: var(--signal); color: var(--on-signal); }
+.ping-at { color: var(--signal); font-weight: 600; }
+.ping-offer { margin-top: 5px; display: flex; gap: 8px; align-items: center; justify-content: space-between; padding: 6px 8px; border: 1px dashed var(--line-3); font-size: 12px; }
+.ping-offer .secondary { min-height: 26px; padding: 0 10px; font-size: 11px; }
+.ping-err { margin: 0 12px; font-size: 11.5px; }
+.ping-compose { position: relative; border-top: 1px solid var(--line); padding: 10px 12px 12px; display: grid; gap: 8px; }
+.ping-compose textarea { width: 100%; resize: vertical; min-height: 54px; background: var(--bg); color: var(--ink); border: 1px solid var(--line-2); padding: 8px; font: 13px/1.4 var(--font-sans); }
+.ping-compose-row { display: flex; gap: 6px; align-items: center; }
+.ping-value { flex: 1; min-width: 0; background: var(--bg); color: var(--ink); border: 1px solid var(--line-2); padding: 7px 8px; font-size: 12px; }
+.ping-send { min-height: 32px; padding: 0 12px; display: inline-flex; gap: 6px; align-items: center; }
+.ping-sug { position: absolute; left: 12px; right: 12px; bottom: calc(100% - 8px); margin: 0; padding: 4px 0; list-style: none; background: var(--surface-2); border: 1px solid var(--line-2); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); z-index: 2; }
+.ping-sug li { display: flex; gap: 8px; align-items: center; padding: 6px 10px; cursor: pointer; font-size: 12px; }
+.ping-sug li span:nth-child(2) { display: grid; }
+.ping-sug li small { color: var(--muted); font-size: 10.5px; }
+.ping-sug li em { margin-left: auto; font-style: normal; color: var(--good); font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; }
+.ping-sug li.on { background: var(--surface-3); }
+
+.side-badge { margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--signal); color: var(--on-signal); font: 700 10px/18px var(--font-mono); text-align: center; }
+
+.team-inbox {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 55; width: min(420px, 100vw); overflow-y: auto; padding: 18px 16px;
+  background: var(--surface); border-left: 1px solid var(--line-2); box-shadow: -18px 0 50px rgba(0, 0, 0, 0.35); display: grid; align-content: start; gap: 12px;
+}
+.team-inbox > header { display: flex; justify-content: space-between; align-items: start; }
+.team-inbox > header strong { display: block; font-size: 20px; margin-top: 4px; }
+.team-inbox-tools { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.team-inbox ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.team-inbox li { border: 1px solid var(--line); padding: 10px 12px; background: var(--bg-2); display: grid; gap: 5px; }
+.team-inbox li.unread { border-color: var(--signal); }
+.team-inbox-head { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; }
+.team-inbox-head span { color: var(--muted); }
+.team-inbox-head time { margin-left: auto; color: var(--muted); font-size: 10.5px; }
+.team-inbox-field { font-size: 12.5px; color: var(--ink-2); }
+.team-inbox-field small { display: block; color: var(--muted); font-size: 10.5px; }
+.team-inbox li p { margin: 0; font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.team-inbox-value { color: var(--ink-2); }
+.team-inbox-actions { display: flex; gap: 6px; }
+.team-inbox-actions .primary, .team-inbox-actions .secondary { min-height: 28px; padding: 0 10px; font-size: 11px; }
+.team-actas { display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--muted); }
+.team-actas select { background: var(--bg); color: var(--ink); border: 1px solid var(--line-2); padding: 5px 8px; }
+
+.team-setup .team-table-wrap { overflow-x: auto; }
+.team-table { min-width: 980px; }
+.team-table td { vertical-align: top; padding: 8px; border-bottom: 1px solid var(--line); }
+.team-table th { text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 8px; }
+.team-table td small { display: block; color: var(--muted); font-size: 10.5px; margin-top: 3px; }
+.team-table input, .team-table select, .team-add input, .team-add select { background: var(--bg); color: var(--ink); border: 1px solid var(--line-2); padding: 6px 8px; font-size: 12.5px; width: 100%; }
+.team-table tr.inactive { opacity: 0.5; }
+.team-admin { display: flex; gap: 6px; align-items: center; font-size: 11.5px; color: var(--ink-2); margin-top: 6px; white-space: nowrap; }
+.team-admin input { width: auto !important; }
+.team-tabs { display: flex; flex-wrap: wrap; gap: 4px; max-width: 360px; }
+.team-tabs button { padding: 4px 8px; font-size: 11px; border: 1px solid var(--line-2); background: transparent; color: var(--muted); }
+.team-tabs button.on { background: var(--surface-3); color: var(--ink); border-color: var(--line-3); }
+.team-tabs button:disabled { cursor: default; }
+.team-row-actions { display: grid; gap: 6px; justify-items: start; }
+.team-row-actions .primary { min-height: 28px; padding: 0 10px; font-size: 11px; display: inline-flex; gap: 5px; align-items: center; }
+.team-add { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr auto auto; gap: 8px; align-items: center; margin-top: 14px; }
+.team-add .primary { min-height: 34px; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.team-add small { grid-column: 1 / -1; color: var(--muted); }
+.team-cover { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.team-cover article { border: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 6px; }
+.team-cover ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12px; }
+.team-cover small { color: var(--muted); }
+.team-rights p { display: flex; gap: 6px; align-items: baseline; font-size: 13px; line-height: 1.5; }
+@media (max-width: 820px) { .team-add { grid-template-columns: 1fr; } }
+.team-notice { position: fixed; right: 18px; bottom: 18px; z-index: 70; max-width: 420px; cursor: pointer; }

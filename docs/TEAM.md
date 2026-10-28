@@ -4,6 +4,64 @@ The SECI RTC tender tab lets the tender's team share one saved bid. Anyone on th
 any data point to a team or a person. The assignee answers with a value, a note or a file, and the
 tender's super admin accepts the answer into the bid or returns it.
 
+## Team mode: ping a teammate from any box
+
+Every input box of every tab carries a small send icon at its top-right corner. The icon is clickable
+while its box is under the mouse or has focus, so it never covers a button above the box. Click it
+and the box's thread opens, Slack style:
+
+* the box's label, where it is (tab › step › section) and its value now;
+* the messages about it, each with who wrote it and when;
+* a composer. Type `@` to see teammates, with those who cover the tab first. Pick one with Enter or
+  a click. Add a **value** if you are answering.
+
+People are mentioned by **handle**: the name in lower case, words joined by dots (`@finance.desk`,
+`@priya.sharma`).
+
+* **Who is told.** The people mentioned, and on a reply everyone already in the thread, get it
+  under **Messages** in the sidebar. A badge counts what is unread.
+* **Email.** The people mentioned are emailed when mail is set up. On a demo, the mail goes to the
+  demo outbox, as for assignments.
+* **Open field.** Messages lists each ping with the box, the place and the text. "Open field"
+  switches to the tab, opens the step, scrolls to the box and opens its thread.
+* **Fill in.** A reply that carries a value shows **Fill in**, which puts the value in the box as if
+  typed. For a choice, it picks the option with that value or name.
+* **Badges.** A box with messages shows their count on its icon. The icon turns yellow when one is
+  unread for you.
+
+**Team setup** (sidebar, under Team) lists the team. Each person has:
+
+* their **role**: a team, and whether they are a super admin;
+* a **title**, such as CFO;
+* the **tabs they cover**;
+* an **email**.
+
+A super admin edits a row and saves it, or adds a person. Everyone else sees the table read-only.
+"Who to ping for what" shows, tab by tab, who covers it. The send icons can show on every box (the
+default) or only on hover; this is a setting of the browser.
+
+On a demo, **View as** (in Messages and on Team setup) switches between the seats. Each demo seat
+has a title and the tabs it covers.
+
+| Part | Where |
+| --- | --- |
+| Tables: `team_messages`, `team_notices`; `team_members.title`, `tabs`; `team_outbox.message_id` | `web/db/migrations/011_team_messages.sql` |
+| Server | `web/lib/teamMessages.js`; `GET/POST /api/team/messages` (`?thread=`, `?tab=`, inbox), `POST /api/team/messages/read` |
+| Browser | `web/src/team/`: `FieldPings.jsx` (the icons and threads), `fields.js` (boxes read from the page, Fill in), `mentions.js` (handles, mentions, thread keys), `Inbox.jsx`, `TeamSetup.jsx`, `useTeamMode.js` |
+
+**How a box is named.** Boxes are read from the page, so no tab is wired by hand.
+
+* A box with a `data-testid` keeps it as its key, which is stable.
+* Any other box gets its section heading and label, numbered when two boxes share them.
+* Renaming a label or a section gives the box a new thread; the old messages stay in Messages.
+
+**Tests:**
+
+* `node tools/check_team_messages.mjs`: handles, mentions, suggestions and thread keys.
+* `tests/e2e/test_team_mode.py` (demo mode). The manager pings `@finance.desk` from a What-if box.
+  The Finance desk sees it unread, opens the field and replies with 320. The manager fills it in,
+  and a title change is saved on Team setup.
+
 ## The team
 
 | Team | Usually answers |
@@ -122,7 +180,8 @@ Then rebuild or restart the web service.
 
 ## Not yet
 
-* The team is for the SECI RTC tender tab only; the other tabs have no Assign buttons yet.
+* Assignments (accept or return into a saved bid) are for the SECI RTC tender tab only. Pings work
+  on every tab.
 * There is one team for the whole server, not one per tender.
 * Assignments are per saved bid; a bid that is not saved cannot be shared.
 * There are no reminders before a due date.

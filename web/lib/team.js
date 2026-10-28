@@ -15,6 +15,7 @@ import { query, tx } from "./db";
 import { HttpError } from "./auth";
 import { DEMO_MODE } from "./demo";
 import { mailMode, sendMail } from "./mail";
+import { ALL_TAB_IDS } from "./tabs";
 
 export const TEAMS = {
   management: "Tender management",
@@ -35,14 +36,15 @@ export function assertUuid(id, what = "Not found.") {
 // the demo's seats: one per team, each with a fictional address (.example is reserved, never
 // delivered) so the demo outbox shows who would be emailed
 const DEMO_SEATS = [
-  { name: "Tender manager", team: "management", super_admin: true, email: "tender.manager@arkaja-renewables.example" },
-  { name: "Finance desk", team: "finance", email: "finance@arkaja-renewables.example" },
-  { name: "Procurement desk", team: "procurement", email: "procurement@arkaja-renewables.example" },
-  { name: "Legal desk", team: "legal", email: "legal@arkaja-renewables.example" },
-  { name: "Technical desk", team: "technical", email: "technical@arkaja-renewables.example" },
+  { name: "Tender manager", team: "management", super_admin: true, email: "tender.manager@arkaja-renewables.example", title: "Head of bids", tabs: ALL_TAB_IDS },
+  { name: "Finance desk", team: "finance", email: "finance@arkaja-renewables.example", title: "CFO's office", tabs: ["tenderBid", "rtc", "seciRtc", "cfd", "whatIf"] },
+  { name: "Procurement desk", team: "procurement", email: "procurement@arkaja-renewables.example", title: "EPC and equipment costs", tabs: ["tenderBid", "rtc", "seciRtc", "bessTender", "whatIf"] },
+  { name: "Legal desk", team: "legal", email: "legal@arkaja-renewables.example", title: "Contracts and tender conditions", tabs: ["tenderBid", "seciRtc", "bessTender", "recentTenders"] },
+  { name: "Technical desk", team: "technical", email: "technical@arkaja-renewables.example", title: "Resource, design and grid", tabs: ["tenderBid", "rtc", "seciRtc", "bessTender", "whatIf"] },
 ];
 
-const MEMBER_COLS = "id, name, email, team, super_admin, user_id, active, created_at";
+const MEMBER_COLS = "id, name, email, team, super_admin, user_id, active, title, tabs, created_at";
+const cleanTabs = (tabs) => (Array.isArray(tabs) ? ALL_TAB_IDS.filter((id) => tabs.includes(id)) : null);
 
 export async function listMembers({ all = false } = {}) {
   const { rows } = await query(`SELECT ${MEMBER_COLS} FROM team_members ${all ? "" : "WHERE active"} ORDER BY super_admin DESC, team, name`);
@@ -53,13 +55,15 @@ async function seedDemo() {
   const { rows } = await query("SELECT count(*)::int AS n FROM team_members");
   if (rows[0].n === 0) {
     for (const s of DEMO_SEATS) {
-      await query("INSERT INTO team_members (name, email, team, super_admin) VALUES ($1, $2, $3, $4)", [s.name, s.email, s.team, Boolean(s.super_admin)]);
+      await query("INSERT INTO team_members (name, email, team, super_admin, title, tabs) VALUES ($1, $2, $3, $4, $5, $6)", [s.name, s.email, s.team, Boolean(s.super_admin), s.title, s.tabs]);
     }
     return;
   }
   // seats made before they had addresses get theirs (an address someone typed is kept)
   for (const s of DEMO_SEATS) {
     await query("UPDATE team_members SET email = $2 WHERE name = $1 AND team = $3 AND email = ''", [s.name, s.email, s.team]);
+    // and a title and the tabs they cover (Team setup), unless someone set them
+    await query("UPDATE team_members SET title = $2, tabs = $4 WHERE name = $1 AND team = $3 AND title = '' AND cardinality(tabs) = 0", [s.name, s.title, s.team, s.tabs]);
   }
 }
 
@@ -103,17 +107,17 @@ function requireSuper(me) {
   if (!me.super_admin) throw new HttpError(403, "Only the tender's super admin can do this.");
 }
 
-export async function addMember(me, { name, email = "", team, superAdmin = false }) {
+export async function addMember(me, { name, email = "", team, superAdmin = false, title = "", tabs = [] }) {
   requireSuper(me);
   if (!str(name).trim()) throw new HttpError(400, "Name is required.");
   if (!TEAMS[team]) throw new HttpError(400, "Unknown team.");
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "That email address does not look right.");
-  const { rows } = await query(`INSERT INTO team_members (name, email, team, super_admin) VALUES ($1, $2, $3, $4) RETURNING ${MEMBER_COLS}`,
-    [str(name, 120).trim(), str(email, 200).trim(), team, Boolean(superAdmin)]);
+  const { rows } = await query(`INSERT INTO team_members (name, email, team, super_admin, title, tabs) VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${MEMBER_COLS}`,
+    [str(name, 120).trim(), str(email, 200).trim(), team, Boolean(superAdmin), str(title, 120).trim(), cleanTabs(tabs) || []]);
   return rows[0];
 }
 
-export async function updateMember(me, id, { name, email, team, superAdmin, active }) {
+export async function updateMember(me, id, { name, email, team, superAdmin, active, title, tabs }) {
   requireSuper(me);
   assertUuid(id, "Member not found.");
   if (team !== undefined && !TEAMS[team]) throw new HttpError(400, "Unknown team.");
@@ -121,9 +125,11 @@ export async function updateMember(me, id, { name, email, team, superAdmin, acti
   if (id === me.id && (superAdmin === false || active === false)) throw new HttpError(400, "You cannot remove your own super admin rights.");
   const { rows } = await query(
     `UPDATE team_members SET name = COALESCE($2, name), email = COALESCE($3, email), team = COALESCE($4, team),
-            super_admin = COALESCE($5, super_admin), active = COALESCE($6, active) WHERE id = $1 RETURNING ${MEMBER_COLS}`,
+            super_admin = COALESCE($5, super_admin), active = COALESCE($6, active), title = COALESCE($7, title), tabs = COALESCE($8, tabs)
+      WHERE id = $1 RETURNING ${MEMBER_COLS}`,
     [id, name === undefined ? null : str(name, 120).trim(), email === undefined ? null : str(email, 200).trim(), team ?? null,
-      superAdmin === undefined ? null : Boolean(superAdmin), active === undefined ? null : Boolean(active)],
+      superAdmin === undefined ? null : Boolean(superAdmin), active === undefined ? null : Boolean(active),
+      title === undefined ? null : str(title, 120).trim(), tabs === undefined ? null : cleanTabs(tabs)],
   );
   if (!rows[0]) throw new HttpError(404, "Member not found.");
   return rows[0];

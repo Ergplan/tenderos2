@@ -122,6 +122,19 @@ less than more plant. Choose "Meet every block" to rule that out.
 * the sizing request carries them;
 * the charts' floors and the What-if dispatch use them.
 
+## Team mode
+
+Every input box of every tab has a send icon. It opens the box's thread, where you ping a teammate
+with `@name`. They see it under **Messages** (sidebar), open the field from there and reply, with a
+value if they have it. The asker puts the value in the box with **Fill in**. **Team setup**
+(sidebar) assigns each person:
+
+* a role (a team, and whether they are a super admin);
+* a title;
+* the tabs they cover (they come first in the @ suggestions).
+
+`docs/TEAM.md` has the details.
+
 ## TenderOS in Claude (MCP connector)
 
 TenderOS serves a remote MCP server at `/api/mcp/<MCP_TOKEN>`. Add it to claude.ai or Claude
