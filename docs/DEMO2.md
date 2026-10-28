@@ -122,6 +122,19 @@ less than more plant. Choose "Meet every block" to rule that out.
 * the sizing request carries them;
 * the charts' floors and the What-if dispatch use them.
 
+## TenderOS in Claude (MCP connector)
+
+TenderOS serves a remote MCP server at `/api/mcp/<MCP_TOKEN>`. Add it to claude.ai or Claude
+Desktop as a custom connector, and Claude can:
+
+* search the tender with page links;
+* size a bid with HiGHS and read its financials;
+* check a quoted tariff;
+* run What-if;
+* explain the winning bid.
+
+`docs/MCP.md` has the setup and a demo script.
+
 ## SECI Amendment-03 and the winning bid
 
 **Amendment-03** (25.06.2026, `web/public/tenders/seci-rtc-tm-v/Amendment-03.pdf`) renamed the

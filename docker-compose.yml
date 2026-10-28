@@ -56,6 +56,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_LIVE_BACKEND_MODEL: ${OPENAI_LIVE_BACKEND_MODEL:-}
       OPENAI_LIVE_VOICE: ${OPENAI_LIVE_VOICE:-}
+      # the MCP server for Claude connectors at /api/mcp/<MCP_TOKEN> (docs/MCP.md); off when unset
+      MCP_TOKEN: ${MCP_TOKEN:-}
       # team sharing: files people upload (signed copies) and the email that tells them of work
       FILES_DIR: /data/files
       SMTP_HOST: ${SMTP_HOST:-}
