@@ -56,7 +56,7 @@ export function buildChecklist(state, terms, lp, bidTariff = null) {
       const worstShare = outcomes.length ? Math.min(...outcomes.map((o) => o.hoursMet ?? (o.met ? 1 : 0))) : null;
       const shortMu = outcomes.length ? Math.max(...outcomes.map((o) => o.shortfallMu || 0)) : null;
       const pen = rule.penaltyMultiple != null ? `; shortfall costs ${nf(rule.penaltyMultiple, 1)} × tariff` : "; no shortfall allowed";
-      add({ id: `rule.${rule.id}`, condition: rule.label, source: prov[`rule.${rule.id}`], tender: `At least ${pf(rule.target, 0)} of contracted capacity in every ${rule.hours === "peak" ? "peak" : rule.hours === "offpeak" ? "off-peak" : ""} time-block${pen}`,
+      add({ id: `rule.${rule.id}`, condition: rule.label, source: prov[`rule.${rule.id}`], tender: `At least ${pf(rule.target, 0)}${rule.max != null ? ` and at most ${pf(rule.max, 0)}` : ""} of contracted capacity in every ${{ peak: "peak", offpeak: "off-peak", solar: "Solar Hours", remaining: "Remaining Hours" }[rule.hours] || ""} time-block${pen}${rule.excessTariffShare != null ? `; above ${pf(rule.max, 0)} the buyer may take the power at ${pf(rule.excessTariffShare, 0)} of the tariff` : ""}`,
         result: worstShare === null ? pending : outcomes.every((o) => o.met)
           ? `Met in every block of every modelled year: the lowest block gets ${pf(Math.min(...outcomes.map((o) => o.achieved ?? 1)), 1)} of contracted capacity; no penalty`
           : `Met in ${pf(worstShare, 1)} of the blocks; ${nf(shortMu, 2)} MU short in the worst modelled year${rule.penaltyMultiple != null ? `, paid at ${nf(rule.penaltyMultiple, 1)} × tariff` : ""}`,

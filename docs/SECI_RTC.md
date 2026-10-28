@@ -1,20 +1,23 @@
 # SECI RTC tender tab
 
 The **SECI RTC tender** tab takes one tender from its documents to a priced, sized bid and a
-filled bid pack. The tender is SECI's RTC-TM-V: 1,000 MW of round-the-clock power from
-ISTS-connected RE projects with storage, RfS No. SECI/C&P/IPP/13/0020/25-26 dated 10.03.2026.
+filled bid pack. The tender is SECI's FDRE-RTC-V: 1,000 MW of firm and dispatchable
+round-the-clock power from ISTS-connected RE projects with storage, RfS No.
+SECI/C&P/IPP/13/0020/25-26 dated 10.03.2026. It was issued as RTC-TM-V (thermal mimic);
+Amendment-03 (25.06.2026) renamed it and rewrote its supply profile.
 
 A **bid agent**, a GPT-Live voice conversation, can walk the bidder through the tab from start to
 finish and works the bid on screen.
 
 ## The documents
 
-The five documents are in `web/public/tenders/seci-rtc-tm-v/`:
+The six documents are in `web/public/tenders/seci-rtc-tm-v/`:
 
 * the RfS (139 pages);
 * Amendment-01;
 * Amendment-02;
 * Clarifications-01;
+* Amendment-03 (15 pages; it amends the RfS and the PPA);
 * the Standard PSA.
 
 Where an amendment or a clarification changes the RfS, the amended rule applies. The RfS's
@@ -23,11 +26,13 @@ original wording is kept beside each condition, under "RfS as issued".
 The tender pack `web/src/seci/seci-rtc-tm-v.json` holds the following, each item with its
 document, page and quote:
 
-* 61 bid conditions, in force after the amendments. 30 of them are stated only in the RfS, for
+* 63 bid conditions, in force after the amendments. 30 of them are stated only in the RfS, for
   example the fees, the EMD and PBG instruments, liquidity, who may bid, the e-Reverse Auction and
   its 80% cap, success charges, PPA signing and Financial Closure.
 * The RfS's original wording for 26 conditions.
-* 23 amendment changes, each clause as it was and as it is now.
+* 31 amendment changes, each clause as it was and as it is now (8 from Amendment-03: the name,
+  connectivity at bid submission, the DFR, offtake, excess power, the Solar and Remaining Hours
+  definitions and the penalty illustration).
 * 9 clarifications.
 * 14 steps of the bid process, from registration on the portal to the PPA.
 * 20 bid formats (Section 7 and the annexures signed with the bid), with 221 blanks. Each blank
@@ -55,26 +60,50 @@ clauses still refer to it.
 | Step | What it shows | Code |
 | --- | --- | --- |
 | Documents | The documents, how the bid goes, the amendment trail (filter by amendment), SECI's clarifications and the points to raise with SECI; each quote links to its page in the PDF | `DocumentsStep.jsx` |
-| Conditions | The 61 conditions grouped, each marked as issued, amended, removed or unclear, with the RfS's original wording | `ConditionsStep.jsx` |
-| What you bid | The contracted MW (50 to 500), the Peak Hours plan, the shortfall plan, the PPA date and the dates that follow from it (Amendment-02: SCSD 24 months after the PPA, Financial Closure 6 months before the SCSD, latest start SCSD + 6 months), and the EMD, PBG and net worth on the sized plant | `BidStep.jsx`, `terms.js` |
+| Conditions | The 63 conditions grouped, each marked as issued, amended, removed or unclear, with the RfS's original wording | `ConditionsStep.jsx` |
+| What you bid | The contracted MW (50 to 500), the supply profile (Amendment-03, or the terms before it to compare) and the Solar Hours, the Peak Hours plan, the shortfall plan, the PPA date and the dates that follow from it (Amendment-02: SCSD 24 months after the PPA, Financial Closure 6 months before the SCSD, latest start SCSD + 6 months), and the EMD, PBG and net worth on the sized plant | `BidStep.jsx`, `terms.js` |
 | Supply sources | Solar, wind, biomass and the mandatory battery, with costs (Tender to Bid's step) | `../bid/SourcesStep.jsx` |
-| Size | HiGHS sizes the least-tariff plant against every peak and off-peak block | `../bid/SizeStep.jsx`, `../bid/useSizing.js` |
+| Size | HiGHS sizes the least-tariff plant against every block's floor: Peak, Solar and Remaining Hours | `../bid/SizeStep.jsx`, `../bid/useSizing.js` |
 | Financials | The tariff for the target equity IRR, the equity and project IRR, **your quote** checked against the target, and the Excel workbook with its Live model tab (every cell a formula) | `../bid/FinanceStep.jsx`, `../bid/QuoteCheck.jsx`, `web/lib/liveModel.js` |
 | Bid forms | The particulars, asked once; every RfS format this bid needs, filled and reviewed one by one beside the RfS page; each format as its full letter in the RfS wording, editable in place; the checks against the tender; the bid pack as Word; the letters as Word and PDF | `BidForms.jsx`, `LetterView.jsx`, `forms.js`, `formats.js`, `letters/`, `POST /api/seci/forms`, `POST /api/seci/letters`, `POST /api/bid/document/pdf` |
 
 ## How the tender's supply rules reach the engine
 
-`seciTerms(settings)` (`web/src/seci/terms.js`) turns the tender and the bidder's two planning
+`seciTerms(settings)` (`web/src/seci/terms.js`) turns the tender and the bidder's planning
 choices into terms shaped like Tender to Bid's terms. The sizing, the finance and the Excel export
 are the same code as in Tender to Bid.
 
-The supply rules are two time-block floors on the contracted capacity, both with
-`basis: "block"`:
+Under Amendment-03 (cl. 8.1.a, the default `profile: "amd3"`) the supply rules are three
+time-block floors on the contracted capacity, all with `basis: "block"`:
 
-| Rule | Hours | Floor |
-| --- | --- | --- |
-| Peak | `hours: "peak"` | 90% |
-| Off-peak | `hours: "offpeak"` | 70% |
+| Rule | Hours | Floor | Most the buyer takes |
+| --- | --- | --- | --- |
+| Peak | `hours: "peak"` | 90% | the contract |
+| Solar Hours | `hours: "solar"`: the Solar Hours that are not Peak Hours | 50% | 60% (`max: 0.6`) |
+| Remaining Hours | `hours: "remaining"`: neither Solar nor Peak Hours | 70% | the contract |
+
+`profile: "amd1"` gives the terms before Amendment-03, to compare: 90% in the Peak Hours and 70%
+in every other block (`hours: "offpeak"`).
+
+**Solar Hours.** GRID-INDIA defines them by State under the GNA Regulations (RfS cl. 42.66 as
+amended); the tender does not fix them. The model assumes 08:00 to 18:00 (`model.solarHours` in the
+pack) until the bidder enters the project State's hours. The sizing request carries them as
+`solarMask`. An hour the buyer picks as a Peak Hour is held to 90%, even inside the Solar Hours.
+
+**The Solar Hours excess.** Above 60% in a Solar Hour, the power goes first to the Buying Entity,
+day-ahead, at 50% of the tariff (cl. 8.3 as amended); only if it declines may it be sold to a
+third party or the exchange. The rule carries `excessTariffShare: 0.5`. With market sales on, the
+model takes the buyer as accepting whenever the market price is above half the tariff, so each
+MWh sold in those hours earns `min(market price, 0.5 × tariff)`:
+
+* in the sizing LP (`rtc_lp.solve`) the sale's value in those hours is capped at that;
+* the lifetime rows split the sales into `exportMwh` (the market) and `buyerExcessMwh` (the buyer),
+  with `buyerExcessShare: 0.5`;
+* the finance adds `buyerRevenue = buyerExcessMWh × 0.5 × the year's tariff`;
+* the Live model has the same rows as formulas ("Of which the buyer takes", "Solar Hours excess sold
+  to the buyer").
+
+With market sales off, nothing is sold: the excess is curtailed.
 
 **Peak Hours.** The Buying Entity picks any 6 hours between 18:00 and 10:00, and names them only a
 day ahead. The bidder chooses one of two plans:
@@ -92,7 +121,8 @@ day ahead. The bidder chooses one of two plans:
 
 The engine side is in `engine/sizing/rtc_lp.py`:
 
-* `block_rules` and `penalty_mult` set up the floors;
+* `block_rules` and `penalty_mult` set up the floors; `rule_hours` gives each rule's hours from
+  `peakMask` and `solarMask`, and a rule's `max` caps the delivery target in its hours;
 * the per-hour rows are `delivered + shortfall ≥ floor`;
 * `rule_outcome` reports the hours met and the MWh short.
 
@@ -144,7 +174,8 @@ of that hour (`web/src/bid/hourSankey.js`). It reads left to right:
 2. **Where the energy went:** to the PPA, battery charging, sold, curtailed, and the transformer
    and line losses.
 3. **The hour's tender condition:**
-   * the delivery that meets the peak (90%) or off-peak (70%) floor;
+   * the delivery that meets the hour's floor (Peak 90%, Solar Hours 50%, Remaining Hours 70%;
+     off-peak 70% before Amendment-03);
    * any delivery above the floor;
    * any shortfall, as a dashed box, with the 1.5× tariff penalty it costs.
 

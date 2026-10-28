@@ -1,6 +1,6 @@
 # TenderOS Demo 2
 
-Demo 2 is Demo 1 (`Ergplan/tenderos`, commit `3a3aa62`, day and night mode) with five additions.
+Demo 2 is Demo 1 (`Ergplan/tenderos`, commit `3a3aa62`, day and night mode) with the additions below.
 Demo 1 is not changed by any of them; on the shared VM both run side by side (`docs/DEPLOY.md` §7).
 
 ## Traceable financial model
@@ -94,7 +94,8 @@ What-if tab, "The 6 costliest hours each day" (`web/src/seci/peakPrices.js`), wo
 * Each day, the 6 hours of that window with the highest IEX Day-Ahead Market prices are held to the
   90% peak floor (`web/public/market/iex_hourly_prices.json`, Sep 2025 to Sep 2026). A buyer
   would most likely pick these hours.
-* Every other hour, including the window's other 10, is held to the 70% off-peak floor.
+* Every other hour, including the window's other 10, is held to its own floor: under Amendment-03,
+  50% in the Solar Hours and 70% in the Remaining Hours (before it, 70% off-peak).
 * The hours change from day to day. The sizing (HiGHS), the 15-minute dispatch, the What-if
   dispatch and the charts all get them hour by hour.
 * The bid checklist's "Peak hours" row says which hours are picked most often (18:00–24:00 on
@@ -120,6 +121,50 @@ less than more plant. Choose "Meet every block" to rule that out.
 * they are its costliest hours, and none falls outside the window;
 * the sizing request carries them;
 * the charts' floors and the What-if dispatch use them.
+
+## SECI Amendment-03 and the winning bid
+
+**Amendment-03** (25.06.2026, `web/public/tenders/seci-rtc-tm-v/Amendment-03.pdf`) renamed the
+tender SECI-FDRE-RTC-V and rewrote its supply profile. It is in the tender pack with its 8 changes,
+and the conditions it amends cite its pages. The model sizes it by default (`docs/SECI_RTC.md`,
+"How the tender's supply rules reach the engine"):
+
+| Hours | Floor | Most the buyer takes |
+| --- | --- | --- |
+| Peak Hours (6 a day, the buyer's pick in 18:00–10:00) | 90% | the contract |
+| Solar Hours (GRID-INDIA's for the State; 08:00–18:00 assumed) | 50% | 60% |
+| Remaining Hours | 70% | the contract |
+
+Every block's shortfall costs 1.5 × the tariff. Above 60% in a Solar Hour, the buyer has the first
+right to the power at half the tariff. With market sales on, the model sells each such MWh to
+whichever pays more, so it earns min(market price, 0.5 × tariff).
+
+The sizing, the 15-minute dispatch, the finance, the Excel workbook (Live model and dispatch
+sheets), the What-if tab, the charts, the hourly tooltip, the checklist and the bid agent all
+follow it. "Before Amendment-03" on the What you bid step gives the earlier terms (90% peak, 70%
+off-peak) to compare.
+
+On the default 200 MW bid (benchmark inputs, costliest-hours plan, nothing sold), the profile
+moves the tariff from ₹6.50 to ₹7.46/kWh. The plant shifts to 2.22 MWac of solar, 1.19 MW of wind
+and 8.6 MWh of battery per contracted MW. Solar Hours deliver at most 60%, so the battery must
+carry more of the night.
+
+**Winning bid** (step 8 of the SECI tab, after Bid forms; `web/src/seci/WinningBid.jsx`,
+`winningBid.js`) bridges from ₹6.50 to the winners' ₹5.25 one change at a time:
+
+* Amendment-03;
+* green-market purchases;
+* battery cost;
+* selling the Solar Hours surplus;
+* finance;
+* wind.
+
+Beside the bridge it shows:
+
+* what one winner disclosed against the bridge's design;
+* the biggest levers, and each change on its own;
+* which results compare;
+* what could not be verified.
 
 ## Faster sizing: each run starts from the last
 
@@ -178,11 +223,11 @@ number on them is a formula except the following:
 | Column | Formula |
 | --- | --- |
 | Solar, wind output (MW) | MW × the hour's capacity factor × the year's degradation factor |
-| Direct to the PPA | MIN(contract ÷ share to the meter − discharge, generation − charge − sold) |
+| Direct to the PPA | MIN(contract ÷ share to the meter − discharge, generation − charge − sold); in a Solar Hour (Amendment-03) the contract is × 60% |
 | Curtailed | generation − direct − charge − sold |
 | Battery energy | last hour's + charge × η − discharge ÷ η (η = √ round trip), from the year's start level |
 | Delivered, at the meter | (direct + discharge) × share reaching the meter |
-| Floor, short | contract × the hour's floor (90% peak, 70% off-peak); MAX(0, floor − delivered) |
+| Floor, short | contract × the hour's floor (90% peak; 50% Solar Hours and 70% Remaining Hours under Amendment-03, 70% off-peak before it); MAX(0, floor − delivered) |
 
 Each sheet's year totals are SUMs of its hours. In the Live model, "Contracted energy",
 "Delivered to the procurer", "Short of the time-block floors" and "Sold in the market" are formulas

@@ -39,7 +39,7 @@ export function liveModelRequest({ state, lp, finance, costs, fin, bess, ops, df
     },
     fin: pick(fin, LIVE_FIN_KEYS),
     bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
-    ops: ops.slice(0, n).map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh"])),
+    ops: ops.slice(0, n).map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh"])),
     gen,
     dispatch: dispatchFor(lp), // the modelled years hour by hour: the workbook's dispatch sheets
     sources,

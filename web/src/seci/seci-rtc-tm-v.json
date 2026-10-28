@@ -1,7 +1,7 @@
 {
  "id": "seci-rtc-tm-v",
- "short": "SECI RTC-TM-V",
- "title": "Supply of 1000 MW Round-the-Clock Thermal Mimic (RTC-TM) power from ISTS-connected RE projects",
+ "short": "SECI FDRE-RTC-V",
+ "title": "Supply of 1000 MW Firm and Dispatchable RE Round-the-Clock (FDRE-RTC) power from ISTS-connected RE projects (issued as RTC-TM-V)",
  "issuer": "Solar Energy Corporation of India Limited (SECI)",
  "rfsNo": "SECI/C&P/IPP/13/0020/25-26",
  "rfsDate": "2026-03-10",
@@ -47,6 +47,16 @@
    "file": "Clarifications-01.pdf",
    "pages": 2,
    "summary": "SECI's answers to bidders' queries: most requests refused ('Tender conditions remain unchanged'); DFR, Peak Hours and technical criteria referred to the amendments."
+  },
+  {
+   "id": "amd3",
+   "kind": "amendment",
+   "title": "Amendment-03",
+   "ref": "SECI/C&P/IPP/13/0020/25-26/Amendment-03",
+   "date": "2026-06-25",
+   "file": "Amendment-03.pdf",
+   "pages": 15,
+   "summary": "Renames the tender SECI-FDRE-RTC-V. DFR per time-block now 90% in the Peak Hours, at least 50% and at most 60% in the Solar Hours, and 70% in the Remaining Hours; excess above 60% in the Solar Hours goes first to the Buying Entity at 50% of the tariff; connectivity must start by 31 Dec 2029; revised penalty illustration. Amends the PPA to match."
   },
   {
    "id": "psa",
@@ -456,6 +466,133 @@
     "quote": "Minimum Net-Worth requirement = [(Rs. 96,80,000 x Rated cumulative Installed Capacity of Solar PV component (MW)) + (Rs. 1,36,80,000 x Rated cumulative Installed Capacity of Wind Power component and other RE sources (MW)) + (Rs. 24,00,000 x Rated cumulative Installed Capacity of ESS component (MWh))]"
    },
    "effect": "The net worth needed rises slightly, on installed capacity."
+  },
+  {
+   "id": "a3-title",
+   "doc": "amd3",
+   "sno": 1,
+   "document": "RfS",
+   "clause": "General",
+   "topic": "Name of the tender",
+   "after": {
+    "doc": "amd3",
+    "page": 1,
+    "quote": "The phrase \"RTC-TM-V\" and \"SECI-RTC-TM-V\" occurring anywhere in the RfS, PPA, and PSA shall be read as \"FDRE-RTC-V\" and \"SECI-FDRE-RTC-V\", respectively."
+   },
+   "effect": "The tender is now Firm and Dispatchable RE Round-the-Clock (SECI-FDRE-RTC-V) in the RfS, PPA and PSA."
+  },
+  {
+   "id": "a3-7.5",
+   "doc": "amd3",
+   "sno": 3,
+   "document": "RfS",
+   "clause": "7.5",
+   "topic": "Connectivity at bid submission",
+   "after": {
+    "doc": "amd3",
+    "page": 1,
+    "quote": "At the substation being chosen in line with Sl. i, ii, iii, and iv above, the Bidder shall have been granted connectivity with a Start Date of Connectivity on or before 31st December 2029."
+   },
+   "effect": "The bid needs a connectivity grant at the chosen substation starting by 31 December 2029 (copy in Format-7.1)."
+  },
+  {
+   "id": "a3-8.1a",
+   "doc": "amd3",
+   "sno": 5,
+   "document": "RfS",
+   "clause": "8.1.a",
+   "topic": "Demand Fulfilment Ratio",
+   "before": {
+    "doc": "amd1",
+    "page": 2,
+    "quote": "(ii) a minimum DFR of 70% in each time-block during the off-Peak Hours."
+   },
+   "after": {
+    "doc": "amd3",
+    "page": 3,
+    "quote": "(ii) a minimum DFR of 50% and a maximum DFR of 60% in each time-block during the Solar Hours;"
+   },
+   "effect": "Three kinds of hour instead of two: 90% in every Peak-Hours block (unchanged), at least 50% and at most 60% in every Solar-Hours block, 70% in every other block (the Remaining Hours)."
+  },
+  {
+   "id": "a3-8.1i",
+   "doc": "amd3",
+   "sno": 7,
+   "document": "RfS",
+   "clause": "8.1.i",
+   "topic": "Offtake",
+   "before": {
+    "doc": "amd3",
+    "page": 3,
+    "quote": "The Buying Entities shall compulsorily off-take all such power, subject to the maximum power scheduled in any time-block being equal to the Contracted Capacity."
+   },
+   "after": {
+    "doc": "amd3",
+    "page": 3,
+    "quote": "Excess power during Solar Hours, above the maximum DFR requirement, shall be dealt with in line with Clause 8.3 of the RfS."
+   },
+   "effect": "The buyer must take everything up to the contracted capacity in the Peak and Remaining Hours, but only up to 60% in the Solar Hours."
+  },
+  {
+   "id": "a3-8.3",
+   "doc": "amd3",
+   "sno": 9,
+   "document": "RfS",
+   "clause": "8.3",
+   "topic": "Excess power",
+   "before": {
+    "doc": "rfs",
+    "page": 18,
+    "quote": "In case such power is purchased by the Buying Entity, it shall be purchased at the PPA tariff (plus SECI's trading margin)."
+   },
+   "after": {
+    "doc": "amd3",
+    "page": 4,
+    "quote": "In case such power is purchased by the Buying Entity, it shall be purchased at 50% of the PPA tariff (plus SECI's trading margin)."
+   },
+   "effect": "Power above 60% in the Solar Hours is offered first to the buyer, day-ahead, at half the tariff; only if it declines may it go to a third party or the exchange."
+  },
+  {
+   "id": "a3-42.66",
+   "doc": "amd3",
+   "sno": 14,
+   "document": "RfS",
+   "clause": "42.66",
+   "topic": "Solar Hours",
+   "after": {
+    "doc": "amd3",
+    "page": 5,
+    "quote": "\"SOLAR HOURS\" shall have the meaning assigned to such term by GRID-INDIA under the GNA Regulations for the State in which the Project is located."
+   },
+   "effect": "The Solar Hours are GRID-INDIA's for the project's State, not fixed in the tender."
+  },
+  {
+   "id": "a3-42.68",
+   "doc": "amd3",
+   "sno": 16,
+   "document": "RfS",
+   "clause": "42.68",
+   "topic": "Remaining Hours",
+   "after": {
+    "doc": "amd3",
+    "page": 6,
+    "quote": "\"REMAINING HOURS\" shall mean all hours other than the Solar Hours and the Peak Hours, i.e., such Non-Solar Hours that do not fall within the Peak Hours."
+   },
+   "effect": "Every hour that is neither a Solar Hour nor a Peak Hour."
+  },
+  {
+   "id": "a3-annexC",
+   "doc": "amd3",
+   "sno": 18,
+   "document": "RfS",
+   "clause": "Annexure-C",
+   "topic": "Penalty illustration",
+   "after": {
+    "doc": "amd3",
+    "page": 13,
+    "quote": "Penalty for the above month = (1.5 x 4.0 x 412.5 x 1000)/100000= INR 24.75 Lakhs"
+   },
+   "effect": "Revised illustration: the 1.5 x tariff penalty now sums the shortfalls of the Peak, Solar and Remaining Hours."
   }
  ],
  "clarifications": [
@@ -582,9 +719,14 @@
    "id": "scope",
    "group": "The tender",
    "label": "What is bought",
-   "value": "1000 MW of Round-the-Clock Thermal Mimic (RTC-TM) power from ISTS-connected RE projects",
-   "status": "unchanged",
+   "value": "1000 MW of Firm and Dispatchable RE Round-the-Clock (FDRE-RTC) power from ISTS-connected RE projects",
+   "status": "amended",
    "sources": [
+    {
+     "doc": "amd3",
+     "page": 1,
+     "quote": "Round-the-Clock (FDRE-RTC) Power from ISTS- connected Renewable Energy (RE) Power Projects in India"
+    },
     {
      "doc": "amd1",
      "page": 1,
@@ -605,7 +747,9 @@
      }
     ],
     "note": "RfS title and cl. 1.5: 1000 MW RTC-TM from ISTS-connected RE projects, Build-Own-Operate. Same as the pack; no amendment."
-   }
+   },
+   "by": "amd3",
+   "was": "Round-the-Clock Thermal Mimic (RTC-TM) power"
   },
   {
    "id": "bidSize",
@@ -718,6 +862,11 @@
    "status": "unchanged",
    "sources": [
     {
+     "doc": "amd3",
+     "page": 3,
+     "quote": "(i) a minimum DFR of 90% in each time-block during the Peak Hours;"
+    },
+    {
      "doc": "amd1",
      "page": 2,
      "quote": "(i) a minimum DFR of 90% in each time-block during the Peak Hours"
@@ -731,18 +880,75 @@
       "quote": "(i) a minimum DFR of 90% in each time-block during the Peak Hours;"
      }
     ],
-    "note": "RfS cl. 8.1.a(i): 90% in every Peak-Hours block. Amendment-01 restated it unchanged."
+    "note": "RfS cl. 8.1.a(i): 90% in every Peak-Hours block. Amendment-01 and Amendment-03 restated it unchanged."
    }
+  },
+  {
+   "id": "dfrSolar",
+   "group": "Supply",
+   "label": "Solar Hours band",
+   "value": "At least 50% and at most 60% of contracted capacity in every 15-minute block of the Solar Hours that is not a Peak Hour",
+   "status": "amended",
+   "by": "amd3",
+   "was": "70% (off-peak floor, Amendment-01)",
+   "sources": [
+    {
+     "doc": "amd3",
+     "page": 3,
+     "quote": "(ii) a minimum DFR of 50% and a maximum DFR of 60% in each time-block during the Solar Hours;"
+    },
+    {
+     "doc": "amd3",
+     "page": 7,
+     "quote": "(ii) a minimum DFR of 50% and a maximum DFR of 60% in each time-block during the Solar Hours;"
+    }
+   ],
+   "rfs": {
+    "quotes": [
+     {
+      "doc": "rfs",
+      "page": 16,
+      "quote": "(ii) a minimum DFR of 80% in each time-block during the off-Peak Hours;"
+     }
+    ],
+    "note": "The RfS had no Solar Hours: these blocks were off-peak at 80%. Amendment-03 adds the band to RfS cl. 8.1.a and PPA Article 4.4.1. The model treats an hour that is both a Solar Hour and a Peak Hour as a Peak Hour (90%)."
+   }
+  },
+  {
+   "id": "solarHours",
+   "group": "Supply",
+   "label": "Solar Hours",
+   "value": "As GRID-INDIA defines them under the GNA Regulations for the project's State; the model assumes 08:00 to 18:00 until you set them",
+   "status": "amended",
+   "by": "amd3",
+   "flag": "GRID-INDIA notifies the Solar Hours by State: check them for the project's State before bidding; the tender does not fix them.",
+   "sources": [
+    {
+     "doc": "amd3",
+     "page": 5,
+     "quote": "\"SOLAR HOURS\" shall have the meaning assigned to such term by GRID-INDIA under the GNA Regulations for the State in which the Project is located."
+    },
+    {
+     "doc": "amd3",
+     "page": 6,
+     "quote": "\"Remaining Hours\" shall mean all hours other than the Solar Hours and the Peak Hours, i.e., such Non-Solar Hours that do not fall within the Peak Hours."
+    }
+   ]
   },
   {
    "id": "dfrOffpeak",
    "group": "Supply",
-   "label": "Off-peak floor",
-   "value": "At least 70% of contracted capacity in every 15-minute block outside the Peak Hours",
+   "label": "Remaining Hours floor",
+   "value": "At least 70% of contracted capacity in every 15-minute block of the Remaining Hours (neither Solar Hours nor Peak Hours)",
    "status": "amended",
-   "by": "amd1",
-   "was": "80%, relaxable to 70% for two monsoon months",
+   "by": "amd3",
+   "was": "70% in every block outside the Peak Hours (Amendment-01); 80% in the RfS",
    "sources": [
+    {
+     "doc": "amd3",
+     "page": 3,
+     "quote": "(iii) a minimum DFR of 70% in each time-block during the Remaining Hours, i.e. Non-Solar Hours other than Peak Hours."
+    },
     {
      "doc": "amd1",
      "page": 2,
@@ -762,7 +968,7 @@
       "quote": "any two calendar months between (and including) July and September, during which the minimum DFR requirement in each time-block during the off-Peak Hours shall stand relaxed to 70%"
      }
     ],
-    "note": "RfS cl. 8.1.a(ii): 80% off-peak, relaxable to 70% for two RPD-designated months in Jul-Sep (notice by 31 May). Amendment-01 replaced 8.1.a: 70% in every off-peak block all year; the pack's 70% is current."
+    "note": "RfS cl. 8.1.a(ii): 80% off-peak, relaxable to 70% for two RPD-designated months in Jul-Sep. Amendment-01 made it 70% in every off-peak block; Amendment-03 keeps 70% only in the Remaining Hours and sets the Solar Hours apart (50% to 60%)."
    }
   },
   {
@@ -871,10 +1077,15 @@
    "id": "penalty",
    "group": "Supply",
    "label": "Shortfall penalty",
-   "value": "1.5 × the tariff on the energy short of each block's floor, settled monthly",
+   "value": "1.5 × the tariff on the energy short of each block's floor (Peak, Solar and Remaining Hours), settled monthly",
    "status": "amended",
-   "by": "amd1",
+   "by": "amd3",
    "sources": [
+    {
+     "doc": "amd3",
+     "page": 13,
+     "quote": "Penalty for the above month = (1.5 x 4.0 x 412.5 x 1000)/100000= INR 24.75 Lakhs"
+    },
     {
      "doc": "amd1",
      "page": 18,
@@ -908,9 +1119,14 @@
    "label": "Event of Default",
    "value": "Failing the block floors for two consecutive Contract Years (not counting the first, short one)",
    "status": "amended",
-   "by": "amd1",
+   "by": "amd3",
    "flag": "The literal wording ('in every time-block') would make a single missed block in two years a default: worth a pre-bid query.",
    "sources": [
+    {
+     "doc": "amd3",
+     "page": 9,
+     "quote": "failure to maintain minimum DFR requirement as per Article 4.4.1 in every time-block during Peak, Solar and Remaining Hours for a period of 2 (two) consecutive Contract Years"
+    },
     {
      "doc": "amd1",
      "page": 12,
@@ -922,9 +1138,14 @@
    "id": "offtake",
    "group": "Supply",
    "label": "Offtake",
-   "value": "The Buying Entity must take all power scheduled up to the contracted capacity; you schedule day-ahead",
-   "status": "unchanged",
+   "value": "The Buying Entity must take all power scheduled in the Peak and Remaining Hours up to the contracted capacity, and in the Solar Hours up to 60%; you schedule day-ahead",
+   "status": "amended",
    "sources": [
+    {
+     "doc": "amd3",
+     "page": 3,
+     "quote": "The Buying Entities shall compulsorily off-take all the power during Peak Hours and Remaining Hours, subject to the maximum power scheduled in any time-block being equal to the Contracted Capacity."
+    },
     {
      "doc": "psa",
      "page": 19,
@@ -940,15 +1161,27 @@
      }
     ],
     "note": "RfS cl. 8.1.i: same as the pack. Unchanged."
-   }
+   },
+   "by": "amd3",
+   "was": "All power scheduled up to the contracted capacity, in every block"
   },
   {
    "id": "excess",
    "group": "Supply",
    "label": "Power above the contracted capacity",
-   "value": "Free to sell to any third party or power exchange, no NOC needed",
-   "status": "unchanged",
+   "value": "Above the contracted capacity: free to sell to a third party or an exchange (the buyer pays the tariff if it takes it). In the Solar Hours, power above 60% is offered first to the Buying Entity, day-ahead, at 50% of the tariff; only if it declines may it be sold elsewhere",
+   "status": "amended",
    "sources": [
+    {
+     "doc": "amd3",
+     "page": 4,
+     "quote": "only after giving the first right of refusal to SECI/ Buying Entity(ies) by giving day-ahead advance notice to both SECI and Buying Entity(ies) of such excess supply during Solar Hours."
+    },
+    {
+     "doc": "amd3",
+     "page": 4,
+     "quote": "In case such power is purchased by the Buying Entity, it shall be purchased at 50% of the PPA tariff (plus SECI's trading margin)."
+    },
     {
      "doc": "psa",
      "page": 19,
@@ -973,8 +1206,10 @@
       "quote": "Any instance of third-party sale of power from the Project by the RPD, while the Contracted Capacity in any-time block remains unfulfilled, shall constitute a breach"
      }
     ],
-    "note": "RfS cl. 8.3: excess above Contracted Capacity can be sold freely; if the Buying Entity buys it, at PPA tariff. RfS adds a 2x market-rate penalty for third-party sales while a block is short (see newConditions). Unchanged."
-   }
+    "note": "RfS cl. 8.3: excess above Contracted Capacity can be sold freely; if the Buying Entity buys it, at PPA tariff. Amendment-03 adds the Solar Hours: above 60%, the buyer's first right at 50% of the tariff."
+   },
+   "by": "amd3",
+   "was": "Free to sell to any third party or power exchange, no NOC needed"
   },
   {
    "id": "green",
@@ -1138,10 +1373,15 @@
    "id": "substation",
    "group": "Plant",
    "label": "Delivery Point substation",
-   "value": "One of the four substation choices of cl. 7.5, scheduled to commission by 30 June 2028 (proof in Format-7.1)",
+   "value": "One of the four substation choices of cl. 7.5, scheduled to commission by 30 June 2028 (proof in Format-7.1), with a connectivity grant there starting on or before 31 December 2029",
    "status": "amended",
-   "by": "amd1",
+   "by": "amd3",
    "sources": [
+    {
+     "doc": "amd3",
+     "page": 1,
+     "quote": "At the substation being chosen in line with Sl. i, ii, iii, and iv above, the Bidder shall have been granted connectivity with a Start Date of Connectivity on or before 31st December 2029."
+    },
     {
      "doc": "amd1",
      "page": 2,
@@ -2247,6 +2487,14 @@
   "years": 25,
   "peakFloor": 0.9,
   "offpeakFloor": 0.7,
+  "remainingFloor": 0.7,
+  "solarFloor": 0.5,
+  "solarMax": 0.6,
+  "solarExcessTariffShare": 0.5,
+  "solarHours": {
+   "start": 8,
+   "end": 18
+  },
   "penaltyMultiple": 1.5,
   "peakWindow": {
    "start": 18,

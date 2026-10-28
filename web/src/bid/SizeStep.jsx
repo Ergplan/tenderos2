@@ -21,7 +21,7 @@ function ComplianceTable({ lp }) {
       {rules.map((r, i) => (
         <div key={r.id} className="bid-compliance-row">
           <span>{r.label || r.id}</span>
-          <span>{pf(r.target, 1)}</span>
+          <span>{pf(r.target, 1)}{r.max != null ? ` to ${pf(r.max, 1)}` : ""}</span>
           {years.map((y) => {
             const o = y.rules[i];
             // a time-block floor: met in every block (with the lowest block's supply), or the share
@@ -48,7 +48,7 @@ const DISPATCHABLE = ["biomass", "thermal", "hydro"];
  * market sales on top; the dashed lines are what biomass, thermal and hydro actually generated
  * (their output also charges the battery). The tooltip gives the hour's full balance.
  */
-function DispatchWeek({ hourly, peak, market, peakAny, sizes, rules = [] }) {
+function DispatchWeek({ hourly, peak, market, peakAny, sizes, rules = [], solarMask = null }) {
   // a tender with time-block floors (SECI RTC-TM): the hover is a see-through Sankey of the hour
   const sankey = rules.some((r) => r.basis === "block");
   const [week, setWeek] = useState(0);
@@ -86,7 +86,7 @@ function DispatchWeek({ hourly, peak, market, peakAny, sizes, rules = [] }) {
         return hourSankeyHtml(hourly, t, {
           gens, titles: { ...Object.fromEntries(gens.map((k) => [k, title(k)])), bess: "Battery" },
           colors: { ...SOURCE_COLORS, ppa: "#d4ff3f", surplus: DATA_COLORS.surplus },
-          rules, peakHour: isPeak, label: labels[t - start], mode: getTheme(),
+          rules, peakHour: isPeak, solarHour: (h) => Boolean(solarMask?.[h]), label: labels[t - start], mode: getTheme(),
         });
       }
       const parts = [`<b>${labels[t - start]}</b>`, head("Output")];
@@ -126,7 +126,7 @@ function DispatchWeek({ hourly, peak, market, peakAny, sizes, rules = [] }) {
         { name: "Contracted supply", type: "line", step: "middle", data: idx.map((t) => hourly.demand[t]), lineStyle: { color: "#f4f4f1", type: "dashed", width: 1 }, itemStyle: { color: "#f4f4f1" }, symbol: "none" },
       ],
     };
-  }, [hourly, week, peak, market, peakAny, sizes, rules, sankey]);
+  }, [hourly, week, peak, market, peakAny, sizes, rules, solarMask, sankey]);
   if (!hourly) return <p className="rtc-note">Run the sizing again to see the hour-by-hour dispatch (it is not kept when the page reloads).</p>;
   return (
     <div className="rtc-card">
@@ -245,7 +245,7 @@ export default function SizeStep({ state, terms, run, startSizing, stopSizing, s
                 <Stat label="Curtailed" value={`${nf(mix.curtail / 1000, 0)} MU`} />
               </div>
             )}
-            <DispatchWeek hourly={hourly} peak={terms.peak} market={lp.market} peakAny={terms.peakAny} sizes={lp.sizes} rules={terms.rules || []} />
+            <DispatchWeek hourly={hourly} peak={terms.peak} market={lp.market} peakAny={terms.peakAny} sizes={lp.sizes} rules={terms.rules || []} solarMask={terms.solar?.mask || null} />
           </Section>
         </>
       )}

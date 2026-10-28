@@ -5,13 +5,15 @@ import { PACK } from "./terms";
 
 const fmtDate = (iso) => (iso ? iso.split("-").reverse().join(".") : "–");
 const docOf = (id) => PACK.documents.find((d) => d.id === id);
+// a quote that itself quotes a term ("SOLAR HOURS" shall mean ...) reads with single marks inside the outer ones
+const inner = (text) => String(text).replace(/"([^"]*)"/g, "‘$1’");
 
 /** A quote with a link to its page in the PDF. */
 export function QuoteLink({ quote, label = null }) {
   const doc = docOf(quote.doc);
   return (
     <span className="seci-quote-link">
-      <q>{quote.quote}</q>{" "}
+      <q>{inner(quote.quote)}</q>{" "}
       {doc?.file
         ? <a className="seci-link" href={`${PACK.folder}${doc.file}#page=${quote.page}`} target="_blank" rel="noreferrer">{label || doc.title}, p. {quote.page}</a>
         : <span className="seci-link">{doc?.title}</span>}

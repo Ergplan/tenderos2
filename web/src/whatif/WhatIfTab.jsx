@@ -12,7 +12,7 @@ import * as E from "../rtc/engine";
 import { TraceButton, TraceProvider } from "../model/ModelExplorer";
 import SolarStudio from "../plant/SolarStudio";
 import WindStudio from "../plant/WindStudio";
-import { PEAK_PLANS, SHORTFALL_MODES } from "../seci/terms";
+import { PEAK_PLANS, PROFILES, SHORTFALL_MODES } from "../seci/terms";
 import { SECI_LIMITS, WHATIF_NOTE, defaultWhatIf, runWhatIf } from "./model";
 import { loadMarketPrices } from "../bid/model";
 
@@ -111,6 +111,9 @@ export default function WhatIfTab() {
   const V = VERDICT[res.verdict];
   const VIcon = V.icon;
   const y1 = res.year1;
+  // the blocks outside the Peak Hours: off-peak (Amendment-01), or Solar and Remaining (Amendment-03)
+  const other = Object.entries(y1.rules).filter(([k]) => k !== "peak").reduce((a, [, r]) => ({ met: a.met + r.met, hours: a.hours + r.hours }), { met: 0, hours: 0 });
+  other.share = other.hours ? other.met / other.hours : 1;
   const capex = res.atBid.capex;
   const rows = res.atBid.rows;
 
@@ -184,9 +187,9 @@ export default function WhatIfTab() {
           </table>
           <div className="rtc-grid rtc-grid-4">
             <Stat label="Peak blocks at the floor, year 1" value={pf(y1.rules.peak.share, 1)} detail={`${nf(y1.rules.peak.met, 0)} of ${nf(y1.rules.peak.hours, 0)} hours`} tone={y1.rules.peak.share >= 0.999 ? "good" : undefined} />
-            <Stat label="Off-peak blocks at the floor" value={pf(y1.rules.offpeak.share, 1)} detail={`${nf(y1.rules.offpeak.met, 0)} of ${nf(y1.rules.offpeak.hours, 0)} hours`} tone={y1.rules.offpeak.share >= 0.999 ? "good" : undefined} />
+            <Stat label={y1.rules.offpeak ? "Off-peak blocks at the floor" : "Solar and Remaining blocks at the floor"} value={pf(other.share, 1)} detail={`${nf(other.met, 0)} of ${nf(other.hours, 0)} hours`} tone={other.share >= 0.999 ? "good" : undefined} />
             <Stat label="Short of the floors, year 1" value={`${nf(y1.blockShortfallMWh / 1000, 1)} MU`} detail={`penalty ₹${nf(res.penaltyY1, 1)} cr at 1.5 × tariff`} trace={{ line: "blockPenCr", year: 1 }} />
-            <Stat label="Surplus sold / curtailed" value={`${nf(y1.excessMWh / 1000, 0)} / ${nf(y1.curtailMWh / 1000, 0)} MU`} detail={state.fin.sellSurplus ? `at ₹${nf(state.fin.surplusPrice, 2)}/kWh` : "sale switched off"} />
+            <Stat label="Surplus sold / curtailed" value={`${nf(y1.excessMWh / 1000, 0)} / ${nf(y1.curtailMWh / 1000, 0)} MU`} detail={!state.fin.sellSurplus ? "sale switched off" : res.ops[0].buyerExcessMWh > 0 ? `${nf(res.ops[0].buyerExcessMWh / 1000, 0)} MU of it to the buyer at half the tariff (Solar Hours), the rest at ₹${nf(state.fin.surplusPrice, 2)}/kWh` : `at ₹${nf(state.fin.surplusPrice, 2)}/kWh`} />
           </div>
         </Section>
 
@@ -196,6 +199,7 @@ export default function WhatIfTab() {
               <div className="rtc-subhead">Tender and plan</div>
               <div className="rtc-grid rtc-grid-2">
                 <Field label="Contracted capacity (bid)" unit="MW" value={state.contractedMw} onChange={(v) => set({ contractedMw: v })} step={10} min={0} hint={`The tender takes ${SECI_LIMITS.minBidMw}–${SECI_LIMITS.maxBidMw} MW from one bidder`} />
+                <SelectBox label="Supply profile" value={state.profile || "amd3"} onChange={(v) => set({ profile: v })} options={Object.entries(PROFILES).map(([k, p]) => [k, p.label])} hint={PROFILES[state.profile || "amd3"]?.detail} />
                 <SelectBox label="Peak Hours plan" value={state.peakPlan} onChange={(v) => set({ peakPlan: v })} options={Object.entries(PEAK_PLANS).map(([k, p]) => [k, p.label])} hint={PEAK_PLANS[state.peakPlan]?.detail} />
                 <SelectBox label="Shortfall below a floor" value={state.shortfall} onChange={(v) => set({ shortfall: v })} options={Object.entries(SHORTFALL_MODES).map(([k, p]) => [k, p.label])} hint={SHORTFALL_MODES[state.shortfall]?.detail} />
               </div>

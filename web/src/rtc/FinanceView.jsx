@@ -30,6 +30,7 @@ const FIN_LINES = [
   ["Profit & loss (₹ cr)", null],
   ["Energy revenue", "energyRevenue", 1],
   ["Surplus revenue", "surplusRevenue", 1],
+  ["Excess sold to the buyer", "buyerRevenue", 1],
   ["Shortfall penalty", "penalty", 1, -1],
   ["Total revenue", "revenue", 1, 1, true],
   ["O&M", "om", 1, -1],
@@ -66,7 +67,8 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
   // energyLines: rows added before "Delivered" (Round the clock: the 33 kV bus to the 220 kV meter);
   // actions: buttons beside Export CSV (Round the clock: the Excel workbook)
   const lines = useMemo(() => {
-    let out = FIN_LINES;
+    // the Solar Hours excess sold to the buyer (SECI FDRE-RTC-V) only when there is some
+    let out = finance.rows.some((r) => r.buyerRevenue > 0) ? FIN_LINES : FIN_LINES.filter((l) => l[1] !== "buyerRevenue");
     if (energyLines?.length) {
       const at = out.findIndex((l) => l[1] === "deliveredMu");
       out = [...out.slice(0, at), ...energyLines, ["Delivered to the customer at the meter (MU)", "deliveredMu", 1], ...out.slice(at + 1)];
@@ -76,7 +78,7 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
       out = [...out.slice(0, at), ...extraLines, ...out.slice(at)];
     }
     return out;
-  }, [extraLines, energyLines]);
+  }, [extraLines, energyLines, finance.rows]);
   const rows = finance.rows;
   const years = rows.map((r) => `Y${r.year}`);
   const trace = useTrace();

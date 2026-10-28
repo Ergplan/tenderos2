@@ -107,15 +107,23 @@ def _inputs(payload: dict) -> dict:
             mult = item.get("penaltyMultiple")
             if basis not in ("annual", "monthly", "block"):
                 raise DispatchError("compliance basis must be 'annual', 'monthly' or 'block'")
+            cap, share = item.get("max"), item.get("excessTariffShare")
             rules.append({"id": str(item.get("id") or f"rule{len(rules) + 1}"), "label": str(item.get("label") or ""),
                           "target": min(1.0, target), "hours": item.get("hours") or "all", "basis": basis,
-                          "penalty": None if mult is None else max(0.0, float(mult))})
+                          "penalty": None if mult is None else max(0.0, float(mult)),
+                          # Amendment-03: the most the PPA takes in the rule's blocks, and what power
+                          # above it earns at most as a share of the tariff (as rtc_lp)
+                          "max": None if cap is None or basis != "block" else min(1.0, max(target, float(cap))),
+                          "share": None if share is None else min(1.0, max(0.0, float(share)))})
     if not rules:
         target = float(payload.get("dfrTarget") or 0)
         if target > 0:
             rules.append({"id": "dfr", "label": "Supply floor", "target": target, "hours": "all",
                           "basis": "monthly" if payload.get("dfrBasis") == "monthly" else "annual"})
     peak_mask = RLP._series(payload["peakMask"], "peakMask") > 0.5 if payload.get("peakMask") is not None else None
+    solar_mask = RLP._series(payload["solarMask"], "solarMask") > 0.5 if payload.get("solarMask") is not None else None
+    if solar_mask is None and any(r["hours"] in ("solar", "remaining") for r in rules):
+        raise DispatchError("Solar and Remaining Hours rules need the solarMask")
     bio = payload.get("biomass") if isinstance(payload.get("biomass"), dict) else None
     plants = []
     for item in payload.get("plants") or []:
@@ -134,7 +142,7 @@ def _inputs(payload: dict) -> dict:
             "ramp": min(1.0, max(0.0, float(item["rampPerHour"]))) if item.get("rampPerHour") is not None else None,
         })
     return {
-        "plant": plant, "fin": fin, "bess": bess, "sell": sell, "rules": rules, "peak_mask": peak_mask,
+        "plant": plant, "fin": fin, "bess": bess, "sell": sell, "rules": rules, "peak_mask": peak_mask, "solar_mask": solar_mask,
         "demand": RLP._series(ctx.get("demand"), "demand"),
         "solar_cf": RLP._series(ctx.get("solarCf"), "solarCf"),
         "wind_cf": RLP._series(ctx.get("windCf"), "windCf"),
@@ -151,10 +159,14 @@ def _inputs(payload: dict) -> dict:
     }
 
 
-def _block_mask(rule: dict, peak_mask_blocks: np.ndarray | None) -> np.ndarray:
+def _block_mask(rule: dict, peak_mask_blocks: np.ndarray | None, solar_mask_blocks: np.ndarray | None = None) -> np.ndarray:
     """The 15-minute blocks a time-block floor applies to, each on its own (SECI RTC-TM: 90% in every
-    peak block, 70% in every off-peak block)."""
+    peak block, 70% in every off-peak block; Amendment-03: the Solar Hours outside the Peak Hours,
+    and the Remaining Hours, neither Solar nor Peak)."""
     peak = peak_mask_blocks if peak_mask_blocks is not None else np.zeros(BLOCKS, bool)
+    if rule["hours"] in ("solar", "remaining"):
+        solar = solar_mask_blocks if solar_mask_blocks is not None else np.zeros(BLOCKS, bool)
+        return (solar if rule["hours"] == "solar" else ~solar) & ~peak
     if rule["hours"] == "peak" or rule["hours"] == "any":
         return peak if peak_mask_blocks is not None else np.ones(BLOCKS, bool)
     if rule["hours"] == "offpeak":
@@ -198,6 +210,14 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
     wgen = W * split_hourly(inp["wind_cf"], 1.0 if inp["wind_cf"].max(initial=0) <= 1 else None) * f["windFactor"] * inp["loss"]
     ren = sgen + wgen
     peak_blocks = np.repeat(inp["peak_mask"], BLOCKS_PER_HOUR) if inp["peak_mask"] is not None else None
+    solar_blocks = np.repeat(inp["solar_mask"], BLOCKS_PER_HOUR) if inp["solar_mask"] is not None else None
+    share_b = np.full(BLOCKS, np.inf)  # the blocks whose sales earn at most a share of the tariff
+    for rule in inp["rules"]:
+        if rule["basis"] == "block" and rule["max"] is not None:  # the PPA takes at most max x demand
+            mask = _block_mask(rule, peak_blocks, solar_blocks)
+            target[mask] = np.minimum(target[mask], rule["max"] * dem[mask])
+        if rule["basis"] == "block" and rule["share"] is not None:
+            share_b[_block_mask(rule, peak_blocks, solar_blocks)] = rule["share"]
     lam = tariff * (1 + float(fin.get("tariffEscalation") or 0)) ** (year - 1)
 
     # ---- columns, each a block of BLOCKS: dir, ch, dis, u (SoC above the floor), [ex], [bio], [plants]
@@ -326,7 +346,7 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
     for rule in inp["rules"]:
         if rule["basis"] != "block":
             continue
-        idx = b[_block_mask(rule, peak_blocks)]
+        idx = b[_block_mask(rule, peak_blocks, solar_blocks)]
         if idx.size == 0:
             continue
         c0 = n_col
@@ -357,7 +377,10 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
     if inp["sell"]:
         esc = (1 + float(fin.get("surplusEscalation") or 0)) ** (year - 1)
         price_b = (np.repeat(inp["price"], BLOCKS_PER_HOUR) if inp["price"] is not None else np.full(BLOCKS, inp["flat_price"])) * esc
-        worth = np.minimum(price_b, 0.995 * lam) if inp["ppa_first"] else price_b
+        # a block whose excess the buyer may take at a share of the tariff earns at most that
+        # (Amendment-03: the buyer's first right at 50%); elsewhere the PPA comes first if asked
+        cap_b = np.where(np.isfinite(share_b), share_b, 0.995 if inp["ppa_first"] else np.inf) * lam
+        worth = np.minimum(price_b, cap_b)
         cost[col["ex"]] -= worth * DT * poi
 
     A = sp.csc_matrix((np.concatenate(rows_v), (np.concatenate(rows_i), np.concatenate(rows_j))), shape=(n_row, n_col))
@@ -365,6 +388,7 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
     return {"A": A, "cost": cost, "lo": lo, "hi": hi, "rlo": np.concatenate(rlo), "rhi": np.concatenate(rhi), "col": col,
             "short0": short0, "floor_rows": floor_rows, "block_cols": block_cols, "year": year, "dem": dem, "sgen": sgen, "wgen": wgen, "ren": ren,
             "eta": eta, "E": E, "bf": bf, "min_soc": min_soc, "BM": BM, "pl_live": pl_live, "peak_blocks": peak_blocks,
+            "solar_blocks": solar_blocks, "share_lam": share_b * lam,
             "price_b": price_b, "inp": inp, "sizes": sizes}
 
 
@@ -373,6 +397,7 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
     inp, sizes, col, year = m["inp"], m["sizes"], m["col"], m["year"]
     dem, sgen, wgen, ren, eta, E, bf, min_soc, BM = (m[k] for k in ("dem", "sgen", "wgen", "ren", "eta", "E", "bf", "min_soc", "BM"))
     pl_live, peak_blocks, price_b, short0, floor_rows, lo = m["pl_live"], m["peak_blocks"], m["price_b"], m["short0"], m["floor_rows"], m["lo"]
+    solar_blocks, share_lam = m["solar_blocks"], m["share_lam"]
     out = {k: np.maximum(0.0, x[c]) for k, c in col.items()}
     ch, dis, direct = RLP.net_battery(out["ch"], out["dis"], out["dir"], eta)
     ex = out.get("ex", np.zeros(BLOCKS))
@@ -382,6 +407,8 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
     curtail = np.maximum(0.0, gen - direct - ch - ex)
     delivered = direct + dis
     poi = inp["poi"]
+    # sales the buyer takes at a share of the tariff: the blocks where that beats the market
+    to_buyer = np.where(price_b > share_lam, ex, 0.0) if price_b is not None else np.zeros(BLOCKS)
     soc = (x[col["u"]] + min_soc * E * bf) / E if E > 1e-9 else np.zeros(BLOCKS)
 
     def share(mask: np.ndarray) -> float:
@@ -393,7 +420,7 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
         if rule["basis"] == "block":
             # every block on its own: the share of the rule's blocks at the floor, the lowest block,
             # and the energy short of the floor (MU at the meter), as rtc_lp reports the hours
-            mask = _block_mask(rule, peak_blocks)
+            mask = _block_mask(rule, peak_blocks, solar_blocks)
             ratio = delivered[mask] / np.maximum(1e-9, dem[mask])
             short = np.maximum(0.0, rule["target"] * dem[mask] - delivered[mask])
             met_share = float((ratio >= rule["target"] - 1e-6).mean()) if ratio.size else 1.0
@@ -434,6 +461,7 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
         "solarMu": float(sgen.sum() * DT / 1000),
         "windMu": float(wgen.sum() * DT / 1000),
         "soldMu": float(ex.sum() * DT * poi / 1000),
+        "toBuyerMu": float(to_buyer.sum() * DT * poi / 1000),
         "curtailedMu": float(curtail.sum() * DT / 1000),
         "chargedMu": float(ch.sum() * DT / 1000),
         "dischargedMu": float(dis.sum() * DT * poi / 1000),
@@ -448,6 +476,8 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
     }
     series = {"demand": dem * poi, "solar": sgen, "wind": wgen, "biomass": biomass, **pgen, "charge": ch, "discharge": dis * poi,
               "soc": soc, "direct": direct * poi, "delivered": delivered * poi, "sold": ex * poi, "curtailed": curtail}
+    if np.isfinite(share_lam).any() and price_b is not None:
+        series["toBuyer"] = to_buyer * poi
     if poi < 1:
         series["evacLoss"] = (delivered + ex) * (1 - poi)
     # each block's time-block floor (the highest rule over it) and the delivery short of it, at the meter
@@ -455,7 +485,7 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
     if block_rules:
         need = np.zeros(BLOCKS)
         for rule in block_rules:
-            mask = _block_mask(rule, peak_blocks)
+            mask = _block_mask(rule, peak_blocks, solar_blocks)
             need[mask] = np.maximum(need[mask], rule["target"] * dem[mask])
         series["floor"] = need * poi
         series["floorShort"] = np.maximum(0.0, need - delivered) * poi
@@ -537,10 +567,12 @@ def year_csv(series: dict, year: int) -> str:
             ("biomass", "Biomass output MW")]
     cols += [(k, f"{k.capitalize()} output MW") for k in series if k not in
              ("demand", "solar", "wind", "biomass", "charge", "discharge", "soc", "direct", "delivered", "sold", "curtailed", "price", "evacLoss",
-              "floor", "floorShort")]
+              "floor", "floorShort", "toBuyer")]
     cols += [("charge", "Battery charging MW"), ("discharge", "Battery discharging MW"), ("soc", "Battery state of charge %"),
              ("direct", "Direct to PPA MW"), ("delivered", "Delivered to PPA MW"), ("sold", "Sold in market MW"),
              ("curtailed", "Curtailed MW")]
+    if "toBuyer" in series:
+        cols.append(("toBuyer", "Of which sold to the buyer at a share of the tariff MW"))
     if "evacLoss" in series:
         cols.append(("evacLoss", "Power transformer and line losses MW"))
     if "floor" in series:

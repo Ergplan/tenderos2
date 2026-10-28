@@ -169,12 +169,15 @@ def _formula_delivered(d: dict, y: dict, sizes: dict, fin: dict, bess: dict) -> 
     wind = np.asarray(d["windCf"]) * f["windFactor"] * sizes["windMw"]
     ch, dis = np.asarray(y["charge"]), np.asarray(y["discharge"])
     sold = np.asarray(y["sold"]) if d["sell"] else 0.0
-    direct = np.minimum(d["contract"] / d["poi"] - dis, solar + wind - ch - sold)
+    solar_hr = np.asarray(d["solarHours"]) == 1 if d.get("solarHours") is not None else np.zeros(M.HOURS, bool)
+    cap = np.where(solar_hr, d.get("solarMax", 1.0), 1.0)  # Amendment-03: at most 60% in a Solar Hour
+    direct = np.minimum(cap * d["contract"] / d["poi"] - dis, solar + wind - ch - sold)
     delivered = (direct + dis) * d["poi"]
     level = min(max(d["initSoc"] - d["minSoc"], 0), d["maxSoc"] - d["minSoc"]) * sizes["bessMwh"] * y["bf"] + np.cumsum(ch * d["eta"] - dis / d["eta"])
     short = 0.0
     if d["blocks"]:
-        floor = d["contract"] * np.where(np.asarray(d["peak"]) == 1, d["peakFloor"], d["offFloor"])
+        other = np.where(solar_hr, d.get("solarFloor", 0.0), d["offFloor"])
+        floor = d["contract"] * np.where(np.asarray(d["peak"]) == 1, d["peakFloor"], other)
         short = float(np.maximum(0.0, floor - delivered).sum())
     return float(delivered.sum()), short, float(level.min())
 

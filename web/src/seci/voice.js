@@ -148,17 +148,17 @@ export function buildScript(state) {
   const amended = PACK.conditions.filter((c) => c.status === "amended").length;
   const items = [
     { id: "intro", step: "documents", kind: "say",
-      say: `Welcome. This is ${PACK.short}: ${PACK.issuer.replace(/ \(SECI\)/, "")} is buying ${say(PACK.tenderedMw)} megawatts of round-the-clock thermal mimic power from renewable projects. I have read the RfS, Amendment 1, Amendment 2, the clarifications and the power sale agreement. ${amended} conditions were changed by the amendments. I will explain the key conditions, take your inputs one by one, size the plant and explain the results.` },
+      say: `Welcome. This is ${PACK.short}: ${PACK.issuer.replace(/ \(SECI\)/, "")} is buying ${say(PACK.tenderedMw)} megawatts of firm and dispatchable round-the-clock power from renewable projects. Amendment 3 renamed it from round-the-clock thermal mimic. I have read the RfS, Amendments 1, 2 and 3, the clarifications and the power sale agreement. ${amended} conditions were changed by the amendments. I will explain the key conditions, take your inputs one by one, size the plant and explain the results.` },
     { id: "c.size", step: "conditions", kind: "say",
       say: `What you bid: between ${m.minBidMw} and ${m.maxBidMw} megawatts of contracted capacity, one tariff fixed for the whole term. Amendment 1 lowered the minimum from 100 to 50 megawatts. Bidders within two percent of the lowest tariff win.` },
     { id: "c.dfr", step: "conditions", kind: "say",
-      say: `The supply rule is per 15-minute block, not an annual average. In every block of the peak hours you must supply at least ${say(m.peakFloor * 100)} percent of contracted capacity, and in every other block at least ${say(m.offpeakFloor * 100)} percent. Amendment 1 lowered off-peak from 80 to 70 percent and removed the 90 percent annual requirement.` },
+      say: `The supply rule is per 15-minute block, not an annual average. Amendment 3 splits the day three ways. In every block of the peak hours you must supply at least ${say(m.peakFloor * 100)} percent of contracted capacity. In the solar hours, which the grid operator sets for your state, at least ${say(m.solarFloor * 100)} and at most ${say(m.solarMax * 100)} percent; above that the buyer may take the power at half the tariff, and only if it declines may you sell it elsewhere. In the remaining hours at least ${say(m.remainingFloor * 100)} percent.` },
     { id: "c.peak", step: "conditions", kind: "say",
       say: "The buyer picks 6 peak hours each day, a day ahead, anywhere between 6 in the evening and 10 the next morning. Since you only learn them the day before, the safe plan holds 90 percent through all sixteen of those hours." },
     { id: "c.penalty", step: "conditions", kind: "say",
       say: "A block below its floor is penalised at one and a half times the tariff on the energy short, settled every month. Missing the floors for two consecutive contract years is an event of default." },
     { id: "c.plant", step: "conditions", kind: "say",
-      say: "Storage is mandatory and must charge from renewable power only. A battery must sit with solar or wind generation. Power above your contracted capacity can be sold to anyone. Supply starts 24 months after the PPA, with financial closure six months before that." },
+      say: "Storage is mandatory and must charge from renewable power only. A battery must sit with solar or wind generation. Power above your contracted capacity can be sold to anyone, except the solar hours excess, which goes first to the buyer at half the tariff. Supply starts 24 months after the PPA, with financial closure six months before that." },
     { id: "c.money", step: "conditions", kind: "say",
       say: "The EMD, the performance guarantee and the net worth you need are all set on your installed solar megawatts, wind megawatts and storage megawatt hours, not on the contracted capacity. I will work them out once the plant is sized." },
     { id: "bidMw", step: "bid", kind: "number", target: "bidMw",
@@ -234,7 +234,9 @@ export function explainResults(state) {
     `For ${say(mw)} megawatts, the least-tariff plant has ${say(z.solarMw)} megawatts AC of solar, that is ${say(z.solarMw * (state.src.solar.dcAc || 1))} megawatts peak of panels, ${say(z.windMw)} megawatts of wind, and a battery of ${say(z.bessMw)} megawatts and ${say(z.bessMwh)} megawatt hours.`,
     `That is ${say(z.solarMw / mw, 1)} times the contracted capacity in solar and ${say(z.windMw / mw, 1)} times in wind.`,
     `The sizing tariff is ${say(lp.tariff, 2)} rupees per unit.`,
-    `In year 1 the plant meets the peak floor in ${hours(rules.peak)} and the off-peak floor in ${hours(rules.offpeak)}.`,
+    rules.solar || rules.remaining
+      ? `In year 1 the plant meets the peak floor in ${hours(rules.peak)}, the Solar Hours floor in ${hours(rules.solar)} and the Remaining Hours floor in ${hours(rules.remaining)}.`
+      : `In year 1 the plant meets the peak floor in ${hours(rules.peak)} and the off-peak floor in ${hours(rules.offpeak)}.`,
     worstShort > 0.005 ? `It falls ${say(worstShort, 1)} million units short of the floors in the worst modelled year, paid at one and a half times the tariff: cheaper than the plant that would cover it.` : "It meets every block's floor.",
     `On this plant the EMD is ${crore(money.emdRs)}, the performance guarantee ${crore(money.pbgRs)}, and you need a net worth of at least ${crore(money.netWorthRs)}.`,
   ];

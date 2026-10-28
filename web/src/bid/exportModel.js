@@ -119,12 +119,14 @@ export function modelExport({ state, terms, finance, costs, fin, prices, bess, o
   if (state.sources.biomass) energyMu.push(["Biomass generation", "biomassMu", "mu", "MU"]);
   if (state.sources.hydro) energyMu.push(["Hydro energy", "hydroMu", "mu", "MU"]);
   if (state.sources.thermal) energyMu.push(["Thermal (non-RE) energy", "thermalMu", "mu", "MU"]);
+  const buyerSold = finance.rows.some((r) => r.buyerExcessMu > 0);
   const energy = { title: "Energy and tariff", lines: [
     ["Contracted energy", "demandMu", "mu", "MU"], ["Delivered to the procurer", "deliveredMu", "mu", "MU"], ["Delivered ÷ contracted", "dfr", "pct", "", false],
-    ["Sold in the market", "excessMu", "mu", "MU"], ...energyMu, ["Tariff", "tariff", "tariff", "₹/kWh", false],
+    [buyerSold ? "Sold, in the market and to the buyer" : "Sold in the market", "excessMu", "mu", "MU"], ...(buyerSold ? [["Of which the buyer takes at half the tariff (Solar Hours excess)", "buyerExcessMu", "mu", "MU"]] : []), ...energyMu, ["Tariff", "tariff", "tariff", "₹/kWh", false],
   ] };
   const revenue = { title: "Revenue", lines: [
-    ["PPA supply revenue", "energyRevenue"], [lp.market ? `Market sale revenue (IEX ${lp.market})` : "Market sale revenue", "surplusRevenue"], ["Shortfall penalty", "penalty"], ["Total revenue", "revenue"],
+    ["PPA supply revenue", "energyRevenue"], [lp.market ? `Market sale revenue (IEX ${lp.market})` : "Market sale revenue", "surplusRevenue"],
+    ...(buyerSold ? [["Solar Hours excess sold to the buyer", "buyerRevenue"]] : []), ["Shortfall penalty", "penalty"], ["Total revenue", "revenue"],
   ] };
   const costsSection = { title: "Operating costs", lines: [
     ["O&M", "om"], ["Insurance", "insurance"], ["Other fixed cost", "other"], ...plantLines, ["Total operating cost", "opex"],

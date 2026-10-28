@@ -7,7 +7,8 @@
 // The dispatch is rule-based and instant (so every change answers at once): renewable output
 // serves the contract; the battery charges from surplus; in the Peak Hours it discharges to the
 // full contracted capacity, outside them only up to the off-peak floor, keeping energy for the
-// peak. Energy is counted at the billing meter after the power transformer and line losses, as in
+// peak. Under Amendment-03 the contract in a Solar Hour is at most 60%, and what the plant sells
+// above it in those hours goes to the buyer at half the tariff when the market pays more. Energy is counted at the billing meter after the power transformer and line losses, as in
 // the rest of the app. The HiGHS sizing in the SECI tab optimises the dispatch; this does not.
 import * as E from "../rtc/engine.js";
 import { scaleToCuf, peakHours } from "../bid/model.js";
@@ -21,6 +22,7 @@ export function defaultWhatIf() {
   return {
     peakPlan: "price",
     shortfall: "penalty",
+    profile: "amd3", // the supply profile: Amendment-03's (in force) or Amendment-01's ("amd1")
     contractedMw: 300,
     solarMwac: 785,
     dcAc: 1.4,
@@ -61,10 +63,13 @@ export function defaultWhatIf() {
   };
 }
 
-/** The tender's rules this run checks: SECI RTC-TM-V, under the bidder's peak plan and shortfall choice. */
+/** The tender's rules this run checks: SECI FDRE-RTC-V, under the bidder's profile, peak plan and shortfall choice. */
 export function whatIfTerms(input) {
-  return seciTerms({ peakPlan: input.peakPlan, shortfall: input.shortfall, ppaDate: null });
+  return seciTerms({ peakPlan: input.peakPlan, shortfall: input.shortfall, ppaDate: null, profile: input.profile === "amd1" ? "amd1" : "amd3", solarHours: input.solarHours || null });
 }
+
+/** The words for a rule's hours. */
+export const HOURS_TEXT = { peak: "peak", offpeak: "off-peak", solar: "Solar", remaining: "Remaining" };
 
 const profileCache = new Map();
 /** Hourly capacity factors at the given CUF: the typical shape, or an uploaded one. */
@@ -105,6 +110,10 @@ export function dispatchYear(input, prof, f, { hourly = false, peak: peakYear = 
   const terms = whatIfTerms(input);
   const peak = peakYear || peakYearMask(input.peakPlan);
   const floors = Object.fromEntries(terms.rules.map((r) => [r.hours, r.target]));
+  // Amendment-03: the Solar Hours outside the Peak Hours (an hour picked as a Peak Hour stays one)
+  const solarRule = terms.rules.find((r) => r.hours === "solar");
+  const solarHr = terms.solar?.mask || null;
+  const offKey = solarRule ? "remaining" : "offpeak";
   const C = input.contractedMw;
   const poi = (1 - input.trafoLossPct) * (1 - input.lineLossPct);
   const S = input.solarMwac * f.solarFactor;
@@ -119,17 +128,19 @@ export function dispatchYear(input, prof, f, { hourly = false, peak: peakYear = 
   const busNeed = C / poi; // what the bus must send for the contract at the meter
   const sell = Boolean(input.fin.sellSurplus);
   const H = hourly ? { delivered: new Float32Array(E.HOURS), floor: new Float32Array(E.HOURS), solar: new Float32Array(E.HOURS), wind: new Float32Array(E.HOURS), discharge: new Float32Array(E.HOURS), charge: new Float32Array(E.HOURS), excess: new Float32Array(E.HOURS), curtail: new Float32Array(E.HOURS), soc: new Float32Array(E.HOURS), peak: new Uint8Array(E.HOURS) } : null;
-  const t = { demand: 0, delivered: 0, excess: 0, curtail: 0, charge: 0, discharge: 0, solar: 0, wind: 0, injected: 0 };
-  const rules = { peak: { hours: 0, met: 0, shortMWh: 0 }, offpeak: { hours: 0, met: 0, shortMWh: 0 } };
+  const t = { demand: 0, delivered: 0, excess: 0, solarExcess: 0, curtail: 0, charge: 0, discharge: 0, solar: 0, wind: 0, injected: 0 };
+  const rules = Object.fromEntries(terms.rules.map((r) => [r.hours, { hours: 0, met: 0, shortMWh: 0 }]));
   for (let h = 0; h < E.HOURS; h += 1) {
     const isPeak = peak[h] === 1;
+    const kind = isPeak ? "peak" : solarRule && solarHr[h] ? "solar" : offKey;
+    const cap = kind === "solar" ? busNeed * (solarRule.max ?? 1) : busNeed; // the most the PPA takes
     const s = S * prof.solarCf[h];
     const w = W * prof.windCf[h];
     const g = s + w;
-    const direct = Math.min(g, busNeed);
+    const direct = Math.min(g, cap);
     let surplus = g - direct;
     // the battery fills the contract in the peak, only the floor outside it
-    const want = isPeak ? busNeed : busNeed * (floors.offpeak ?? 0);
+    const want = isPeak ? busNeed : busNeed * (floors[kind] ?? 0);
     let dis = 0;
     if (direct < want && Ecap > 0) dis = Math.max(0, Math.min(want - direct, B, (soc - socMin) * eta));
     soc -= dis / eta;
@@ -140,18 +151,19 @@ export function dispatchYear(input, prof, f, { hourly = false, peak: peakYear = 
       surplus -= ch;
     }
     const deliveredBus = direct + dis;
-    const room = sell ? Math.max(0, busNeed - deliveredBus) : 0;
+    const room = sell ? Math.max(0, busNeed - deliveredBus) : 0; // the connection the PPA leaves
     const ex = Math.min(surplus, room);
     const cu = surplus - ex;
     const delivered = deliveredBus * poi;
-    const floor = (isPeak ? floors.peak : floors.offpeak) * C;
-    const r = isPeak ? rules.peak : rules.offpeak;
+    const floor = floors[kind] * C;
+    const r = rules[kind];
     r.hours += 1;
     if (delivered >= floor - 1e-6) r.met += 1;
     else r.shortMWh += floor - delivered;
     t.demand += C;
     t.delivered += delivered;
     t.excess += ex * poi;
+    if (kind === "solar") t.solarExcess += ex * poi;
     t.curtail += cu;
     t.charge += ch;
     t.discharge += dis * poi;
@@ -185,7 +197,8 @@ export function dispatchYear(input, prof, f, { hourly = false, peak: peakYear = 
     trafoLossMWh: t.injected * input.trafoLossPct,
     lineLossMWh: t.injected * (1 - input.trafoLossPct) * input.lineLossPct,
     meterMWh: t.injected * poi,
-    blockShortfallMWh: rules.peak.shortMWh + rules.offpeak.shortMWh,
+    solarExcessMWh: t.solarExcess, // sold in the Solar Hours: the buyer's first right (Amendment-03)
+    blockShortfallMWh: Object.values(rules).reduce((a, r) => a + r.shortMWh, 0),
     rules: Object.fromEntries(Object.entries(rules).map(([k, r]) => [k, { ...r, share: r.hours ? r.met / r.hours : 1 }])),
     hourly: H,
   };
@@ -245,7 +258,11 @@ export function runWhatIf(raw, { prices = null } = {}) {
     const f = E.yearFactors(y, fin, bess);
     const r = dispatchYear(input, prof, f, { hourly: y === 1, peak });
     if (y === 1) year1 = r;
-    ops.push({ year: y, ...f, ...r, hourly: undefined });
+    // Amendment-03: the buyer takes the Solar Hours sales at its share of the bid tariff when the
+    // (flat) market price is higher; otherwise they go to the market
+    const share = terms.rules.find((x) => x.hours === "solar")?.excessTariffShare;
+    const toBuyer = share != null && fin.surplusPrice > share * fin.tariff * (1 + (fin.tariffEscalation || 0)) ** (y - 1) ? r.solarExcessMWh : 0;
+    ops.push({ year: y, ...f, ...r, excessMWh: r.excessMWh - toBuyer, buyerExcessMWh: toBuyer, buyerExcessShare: share || 0, hourly: undefined });
   }
   const run = (locked, tariff = fin.tariff) => E.runFinancialModel(null, sizes, { costs, fin: { ...fin, tariff }, bess, dfrTarget: 0, tariffLocked: locked, ops, solveBy: "npv" });
   const atBid = run(true);
@@ -263,7 +280,7 @@ export function runWhatIf(raw, { prices = null } = {}) {
     const y1 = year1.rules[rule.hours];
     const worst = Math.min(...ops.map((o) => o.rules[rule.hours].share));
     add(rule.id, rule.label, hard ? worst >= 1 - 1e-9 : true,
-      `year 1: ${(y1.share * 100).toFixed(1)}% of ${rule.hours === "peak" ? "peak" : "off-peak"} hours at ${(rule.target * 100).toFixed(0)}% of contracted; worst year ${(worst * 100).toFixed(1)}%`
+      `year 1: ${(y1.share * 100).toFixed(1)}% of ${HOURS_TEXT[rule.hours] || rule.hours} hours at ${(rule.target * 100).toFixed(0)}% of contracted; worst year ${(worst * 100).toFixed(1)}%`
         + (hard ? "" : `; short ${(y1.shortMWh / 1000).toFixed(1)} MU paid at ${rule.penaltyMultiple}× tariff`), hard);
   }
   const penaltyY1 = atBid.rows[0]?.blockPenalty || 0;
@@ -291,7 +308,7 @@ export function runWhatIf(raw, { prices = null } = {}) {
 function liveRequest(input, terms, sizes, costs, fin, bess, ops, finance, prof) {
   const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
   return {
-    title: `What-if · ${input.contractedMw} MW SECI RTC-TM at ₹${fin.tariff.toFixed(3)}/kWh`,
+    title: `What-if · ${input.contractedMw} MW SECI FDRE-RTC-V at ₹${fin.tariff.toFixed(3)}/kWh`,
     engine: "simulation",
     sourceAll: "What-if tab",
     tariff: fin.tariff,
@@ -304,7 +321,7 @@ function liveRequest(input, terms, sizes, costs, fin, bess, ops, finance, prof) 
     costs: { ...costs, plants: [] },
     fin: pick(fin, ["tariffEscalation", "solarOmLakhPerMw", "windOmLakhPerMw", "bessOmLakhPerMwh", "omEscalation", "insurancePct", "otherFixedCr", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple", "debtFraction", "interestRate", "tenorYears", "targetEquityIrr", "discountRate", "taxRate", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays", "sellSurplus", "repayment", "taxDepreciation"]),
     bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
-    ops: ops.map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "blockShortfallMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"])).map((o) => ({ ...o, genBusMWh: o.injectedMWh })),
+    ops: ops.map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "blockShortfallMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"])).map((o) => ({ ...o, genBusMWh: o.injectedMWh })),
     // the generation build-up: the profiles the dispatch ran, at the CUFs entered (at the 33 kV bus)
     gen: {
       solar: sizes.solarMw > 0 ? genSource({ cf: prof.solarCf, degradation: fin.solarDegradation, cufAt: "33 kV bus", profile: input.solarUpload?.name ? `Uploaded solar profile ${input.solarUpload.name}` : "Typical solar profile" }) : null,

@@ -456,24 +456,43 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
         hours = item.get("hours") or "all"
         # "any": the floor must hold in whichever hours are chosen (the procurer decides the peak
         # hours): it is applied to every hour of the day on its own, within peakMask if given
-        if hours not in ("all", "peak", "offpeak", "any"):
-            raise LpInputError("compliance hours must be 'all', 'peak', 'offpeak' or 'any'")
+        # "solar" and "remaining" (SECI FDRE-RTC-V, Amendment-03): the Solar Hours (solarMask) that
+        # are not Peak Hours, and the hours that are neither Solar nor Peak Hours
+        if hours not in ("all", "peak", "offpeak", "any", "solar", "remaining"):
+            raise LpInputError("compliance hours must be 'all', 'peak', 'offpeak', 'any', 'solar' or 'remaining'")
         basis = item.get("basis") or "annual"
         if basis not in ("annual", "monthly", "block"):
             raise LpInputError("compliance basis must be 'annual', 'monthly' or 'block'")
         mult = item.get("penaltyMultiple")
         if mult is not None and (basis != "block" or float(mult) < 0):
             raise LpInputError("penaltyMultiple applies to block rules only, and is 0 or more")
+        if hours in ("solar", "remaining") and basis != "block":
+            raise LpInputError("Solar and Remaining Hours rules are per time-block (basis 'block')")
+        # max: the most the PPA takes in the rule's hours, as a share of the contract (Amendment-03:
+        # 60% in the Solar Hours); excessTariffShare: what power above it earns at most, as a share
+        # of the tariff (the buyer's first right at 50% of the tariff)
+        cap = item.get("max")
+        share = item.get("excessTariffShare")
+        if cap is not None and not (target <= float(cap) <= 1 and basis == "block"):
+            raise LpInputError("a rule's max is a block rule's share of the contract, at or above its target")
+        if share is not None and not 0 <= float(share) <= 1:
+            raise LpInputError("excessTariffShare is between 0 and 1")
         rules.append({"id": str(item.get("id") or f"rule{len(rules) + 1}"), "label": str(item.get("label") or ""),
                       "target": min(1.0, target), "hours": hours, "basis": basis,
-                      "penalty": None if mult is None else float(mult)})
+                      "penalty": None if mult is None else float(mult),
+                      "max": None if cap is None else float(cap), "share": None if share is None else float(share)})
     peak_mask = None
     if any(r["hours"] == "any" for r in rules) and payload.get("peakMask") is not None:
         peak_mask = _series(payload.get("peakMask"), "peakMask") > 0.5
-    if any(r["hours"] in ("peak", "offpeak") for r in rules):
+    if any(r["hours"] in ("peak", "offpeak", "remaining") for r in rules):
         peak_mask = _series(payload.get("peakMask"), "peakMask") > 0.5
         if not peak_mask.any():
             raise LpInputError("peakMask marks no peak hours")
+    solar_mask = None
+    if any(r["hours"] in ("solar", "remaining") for r in rules):
+        solar_mask = _series(payload.get("solarMask"), "solarMask") > 0.5
+        if not solar_mask.any():
+            raise LpInputError("solarMask marks no Solar Hours")
 
     rep = representative_years(fin, bess, mode)
     weights = interpolation_weights(rep, n)
@@ -600,7 +619,14 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
         return [(m, ((MONTH_OF_HOUR == m) if m >= 0 else np.ones(HOURS, bool)) & hours_mask) for m in months]
 
     def rule_hours(rule: dict) -> np.ndarray:
-        """The hours a rule covers: all, the peak hours (peakMask) or the rest."""
+        """The hours a rule covers: all, the peak hours (peakMask), the rest, the Solar Hours outside
+        the peak hours (solarMask; an hour the buyer picks as a Peak Hour is held as one), or the
+        hours that are neither."""
+        no_peak = peak_mask if peak_mask is not None else np.zeros(HOURS, bool)
+        if rule["hours"] == "solar":
+            return solar_mask & ~no_peak
+        if rule["hours"] == "remaining":
+            return ~solar_mask & ~no_peak
         if rule["hours"] == "peak":
             return peak_mask
         if rule["hours"] == "offpeak":
@@ -624,6 +650,10 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
             c_lB, c_disB, c_socB = (base + (SPLIT_BLOCK + b) * HOURS + t for b in range(3))
         dem = demand * f["demandFactor"] / poi  # at the bus
         target = np.minimum(dem, plant / poi)
+        for rule in block_rules:
+            if rule["max"] is not None:  # the PPA takes at most this share in the rule's hours
+                hrs = rule_hours(rule)
+                target[hrs] = np.minimum(target[hrs], rule["max"] * dem[hrs])
         demand_by_year.append(dem)
         deliver_cols.append([c_dir, c_dis] + ([c_disB] if split else []))
         battery_cols.append([c_ch, c_dis] + ([c_lB, c_disB] if split else []))
@@ -842,13 +872,31 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
 
     ex_cols = [n_size + yi * per_year + 4 * HOURS + t for yi in range(len(rep))] if sell else []
 
+    # the hours whose sales earn at most a share of the tariff (a rule's excessTariffShare)
+    share_val = np.full(HOURS, np.inf)
+    for rule in block_rules:
+        if rule["share"] is not None:
+            share_val[rule_hours(rule)] = rule["share"]
+    priced_share = bool(sell) and bool(np.isfinite(share_val).any())
+    sale_prices = (price_series if price_series is not None else np.full(HOURS, surplus_price)) if sell else None
+
+    last_weights: dict = {}  # the last objective's weights and λ: the split of sales below uses them
+
+    def sale_cap_of(yi: int, lam_now: float, energy_w: np.ndarray, market_w: np.ndarray | None) -> np.ndarray:
+        """The most a MWh sold in each hour of modelled year yi is worth, in sale-price terms."""
+        if market_w is None or market_w[yi] <= 0:
+            return np.zeros(HOURS)
+        unit = lam_now * energy_w[yi] / market_w[yi]  # the tariff, as a sale price
+        return np.where(np.isfinite(share_val), share_val, 0.995 if ppa_first else np.inf) * unit
+
     def objective(tw: dict, lam_now: float = 0.0) -> tuple[np.ndarray, np.ndarray, float, np.ndarray]:
         """cost(x) (Rs cr, PV at the equity IRR) and energy(x) (Rs cr per Rs/kWh of tariff)."""
         rev_w = tw["rev"][1:]
         opex_w = tw["opex"][1:]
         energy_w = RS_CR_PER_MWH_AT_1RS * (weights.T @ (rev_w * tariff_esc))
         surplus_w = RS_CR_PER_MWH_AT_1RS * surplus_price * (weights.T @ rev_w)
-        market_w = RS_CR_PER_MWH_AT_1RS * (weights.T @ (rev_w * surplus_esc)) if (price_series is not None or ppa_first) else None
+        market_w = RS_CR_PER_MWH_AT_1RS * (weights.T @ (rev_w * surplus_esc)) if (price_series is not None or ppa_first or priced_share) else None
+        last_weights.update(energy_w=energy_w, market_w=market_w, lam=lam_now)
         pv_om = float(opex_w @ om_esc)
         pv_flat = float(opex_w.sum())
 
@@ -889,12 +937,13 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
             if penalty_mult is not None:
                 # a time-block shortfall (at the meter) costs penaltyMultiple x the year's tariff
                 energy_vec[sf_cols[yi]] = -penalty_mult * energy_w[yi] * poi
-            if ppa_first:
+            if ppa_first or priced_share:
                 # a sale is worth at most what the same MWh earns on the PPA (0.5% less, so the
-                # PPA wins a tie): supplying the PPA always comes first
-                prices = price_series if price_series is not None else np.full(HOURS, surplus_price)
-                cap = 0.995 * lam_now * energy_w[yi] / market_w[yi] if market_w[yi] > 0 else 0.0
-                cost_vec[ex_cols[yi]] = -market_w[yi] * np.minimum(prices, cap) * poi
+                # PPA wins a tie): supplying the PPA always comes first. In a rule's hours with an
+                # excessTariffShare (Amendment-03's Solar Hours), at most that share of the tariff:
+                # the buyer has the first right to it at that price, so it takes it whenever the
+                # market pays more, and the plant earns the lower of the two
+                cost_vec[ex_cols[yi]] = -market_w[yi] * np.minimum(sale_prices, sale_cap_of(yi, lam_now, energy_w, market_w)) * poi
             elif sell and price_series is not None:
                 cost_vec[ex_cols[yi]] = -market_w[yi] * price_series * poi
             elif sell:
@@ -1105,7 +1154,7 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
             return {"id": rule["id"], "label": rule["label"], "target": rule["target"], "basis": "block",
                     "achieved": float(ratio.min()) if ratio.size else 1.0, "hoursMet": met_share,
                     "shortfallMu": float(short.sum() * poi / 1000), "met": met_share >= 1 - 1e-9,
-                    "penaltyMultiple": rule["penalty"]}
+                    "penaltyMultiple": rule["penalty"], **({"max": rule["max"]} if rule["max"] is not None else {})}
         shares = [float(delivered[mask].sum() / max(1e-9, dem[mask].sum())) for _, mask in rule_groups(rule) if mask.any()]
         achieved = min(shares) if shares else 1.0
         return {"id": rule["id"], "label": rule["label"], "target": rule["target"], "achieved": achieved,
@@ -1206,6 +1255,22 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
                    if block_rules else None)
         if rev_y is None:
             rev_y = ex * surplus_price * RS_CR_PER_MWH_AT_1RS
+        buyer_y = None
+        if priced_share:
+            # sales in the hours where the buyer's share of the tariff is below the market price
+            # went to the buyer at that share (it has the first right); the rest to the market
+            lw = last_weights
+            mk_mwh, mk_rev, buy_mwh = [], [], []
+            for yi, c in enumerate(ex_cols):
+                e = np.asarray(x[c], float) * poi
+                buyer = np.isfinite(share_val) & (sale_prices > sale_cap_of(yi, lw["lam"], lw["energy_w"], lw["market_w"]))
+                mk_mwh.append(float(e[~buyer].sum()))
+                mk_rev.append(RS_CR_PER_MWH_AT_1RS * float(sale_prices[~buyer] @ e[~buyer]))
+                buy_mwh.append(float(e[buyer].sum()))
+            ex = weights @ np.array(mk_mwh)
+            rev_y = (weights @ np.array(mk_rev)) * (surplus_esc if price_series is not None else 1.0)
+            buyer_y = weights @ np.array(buy_mwh)
+            result["buyerExcessShare"] = float(np.nanmin(np.where(np.isfinite(share_val), share_val, np.nan)))
         result["lifetime"] = [
             {
                 "year": y,
@@ -1216,6 +1281,7 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
                 "biomassMwh": float(bio_y[y - 1]) if bio_y is not None else 0.0,
                 **{f"{pid}Mwh": float(v[y - 1]) for pid, v in plant_y.items()},
                 **({"blockShortfallMwh": float(short_y[y - 1])} if short_y is not None else {}),
+                **({"buyerExcessMwh": float(buyer_y[y - 1])} if buyer_y is not None else {}),
             }
             for y in range(1, n + 1)
         ]
@@ -1263,6 +1329,11 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
             result["hourly"].update({k: r2(v) for k, v in site.items()})
         if price_series is not None:
             result["hourly"]["price"] = np.round(price_series, 3).tolist()
+        if priced_share:
+            # the most a MWh sold earns in each hour of year 1 (Rs/kWh): a share of the tariff where the
+            # buyer has the first right (Amendment-03's Solar Hours), else no cap (null)
+            cap = np.where(np.isfinite(share_val), share_val * result["tariff"], np.nan)
+            result["hourly"]["saleCap"] = [None if np.isnan(v) else round(float(v), 4) for v in cap]
     if payload.get("returnDispatch"):
         # every modelled year hour by hour, for the workbook's dispatch sheets (web/lib/dispatchSheets.js):
         # the inputs and the optimiser's three choices; the rest is formulas there. Solar, wind and a
@@ -1273,6 +1344,11 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
         else:
             peak_rule = next((r for r in block_rules if r["hours"] == "peak"), None)
             off_rule = next((r for r in block_rules if r["hours"] == "offpeak"), None)
+            # Amendment-03: Solar Hours (with the most the buyer takes) and Remaining Hours instead of off-peak
+            sol_rule = next((r for r in block_rules if r["hours"] == "solar"), None)
+            rem_rule = next((r for r in block_rules if r["hours"] == "remaining"), None)
+            amd3 = bool(peak_rule and sol_rule and rem_rule) and not off_rule
+            off_rule = off_rule or (rem_rule if amd3 else None)
             blocks = bool(peak_rule and off_rule)
             r6 = lambda a: np.round(np.asarray(a, float), 6).tolist()  # noqa: E731
             result["dispatch"] = {
@@ -1282,6 +1358,8 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
                 "peakFloor": float(peak_rule["target"]) if blocks else 0.0, "offFloor": float(off_rule["target"]) if blocks else 0.0,
                 "solarCf": r6(solar_cf), "windCf": r6(wind_cf),
                 "peak": peak_mask.astype(int).tolist() if blocks else None,
+                **({"solarHours": rule_hours(sol_rule).astype(int).tolist(), "solarFloor": float(sol_rule["target"]),
+                    "solarMax": float(sol_rule["max"]) if sol_rule["max"] is not None else 1.0} if amd3 else {}),
                 "weights": np.round(weights, 9).tolist(),
                 "byYear": [
                     {"year": int(y), "bf": float(year_factors(y, fin, bess)["bessFactor"]),

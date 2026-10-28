@@ -1,11 +1,11 @@
 """Browser end to end: the SECI RTC tender tab.
 
-* test_documents_and_conditions: the five documents (the RfS among them), how the bid goes, the
+* test_documents_and_conditions: the six documents (the RfS and Amendment-03 among them), how the bid goes, the
   amendment trail, SECI's clarifications, the points to raise with SECI and the bid conditions with
   their quotes and the RfS's original wording; a PDF link opens the page.
 * test_bid_on_screen: the bid (200 MW, any 6 Peak Hours, pay the penalty, a PPA date and the
-  dates it sets), the benchmarks for the sources, HiGHS sizing against every peak and off-peak
-  block, the money at stake; a tariff quoted below the target IRR is warned with the equity and
+  dates it sets), Amendment-03's supply profile with its Solar Hours, the benchmarks for the
+  sources, HiGHS sizing against every Peak, Solar and Remaining Hours block, the money at stake; a tariff quoted below the target IRR is warned with the equity and
   project IRR it earns; the particulars and the RfS formats are filled and reviewed one by one; the
   bid pack (Word) and the financial model (Excel, its Live model recalculated by LibreOffice when
   installed) download.
@@ -60,7 +60,7 @@ def test_documents_and_conditions():
     with _session() as page:
         _open_tab(page)
         docs = page.locator("[data-testid=seci-docs] article")
-        assert docs.count() == len(PACK["documents"]) == 5
+        assert docs.count() == len(PACK["documents"]) == 6
         rfs = page.locator("[data-testid=seci-doc-rfs]")
         assert "139 pages" in rfs.inner_text() and rfs.locator("a:has-text('Open the PDF')").get_attribute("href").endswith("RfS.pdf")
         assert page.locator("[data-testid=seci-process] li").count() == len(PACK["bidProcess"]) >= 10
@@ -102,6 +102,11 @@ def test_bid_on_screen(tmp_path):
         page.fill("[data-testid=seci-bid-mw]", "200")
         page.click("[data-testid=seci-peak-price]")  # the 6 costliest IEX hours of each day's window
         page.click("[data-testid=seci-shortfall-penalty]")
+        # Amendment-03's profile is in force: Solar Hours 08:00-18:00 until the bidder sets the State's
+        assert page.locator("[data-testid=seci-profile-amd3]").get_attribute("aria-checked") == "true"
+        assert page.input_value("[data-testid=seci-solar-start]") == "8" and page.input_value("[data-testid=seci-solar-end]") == "18"
+        bid_text = page.locator("[data-testid=seci-tab]").inner_text()
+        assert "100–120 MW in the Solar Hours" in bid_text and "140 MW in the Remaining Hours" in bid_text, "50-60% and 70% of 200 MW"
         page.fill("[data-testid=seci-ppa-date]", "2026-06-07")
         dates = page.locator("[data-testid=seci-tab]").inner_text()
         assert "07.06.2028" in dates and "07.12.2027" in dates, "SCSD 24 months after the PPA, Financial Closure 6 months before it"
@@ -127,6 +132,7 @@ def test_bid_on_screen(tmp_path):
             assert label in size_text, size_text
         table = page.locator("[data-testid=bid-compliance]").inner_text()
         assert ("Met in every block" in table or "of blocks" in table) and "Peak Hours floor" in table, table
+        assert "Solar Hours band" in table and "Remaining Hours floor" in table, table
         peak_row = page.locator("[data-testid=check-peak\\.hours]").inner_text()
         assert "highest IEX DAM" in peak_row and "most often 18:00" in peak_row, peak_row
         # the hour under the mouse as a see-through Sankey: sources, uses, and the block's floor
@@ -136,7 +142,7 @@ def test_bid_on_screen(tmp_path):
         page.mouse.move(box["x"] + box["width"] * 0.45, box["y"] + box["height"] * 0.5)
         page.wait_for_selector("svg[data-sankey]", timeout=10_000)
         tip = page.locator("svg[data-sankey]").first.locator("xpath=../..").inner_text()
-        assert ("Peak block" in tip or "Off-peak block" in tip) and "To the PPA" in tip and "floor" in tip, tip
+        assert any(f"{k} block" in tip for k in ("Peak", "Solar Hours", "Remaining Hours")) and "To the PPA" in tip and "floor" in tip, tip
         # the agent's charts, drawn from the sized plant (the agent opens the same ones as it talks)
         page.click("[data-testid=agent-open]")
         for kind in ("peak_window", "typical_day", "monthly_energy", "irr_vs_tariff", "cash_flows", "money"):

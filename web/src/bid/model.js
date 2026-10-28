@@ -583,7 +583,8 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
     dfrTarget: rules.find((r) => r.hours === "all")?.target ?? 0,
     dfrBasis: "annual",
     vars: m.vars,
-    compliance: rules.map(({ id, label, basis, hours, target, penaltyMultiple }) => ({ id, label, basis, hours, target, ...(penaltyMultiple != null ? { penaltyMultiple } : {}) })),
+    compliance: rules.map(({ id, label, basis, hours, target, penaltyMultiple, max, excessTariffShare }) => ({ id, label, basis, hours, target,
+      ...(penaltyMultiple != null ? { penaltyMultiple } : {}), ...(max != null ? { max } : {}), ...(excessTariffShare != null ? { excessTariffShare } : {}) })),
     returnLifetime: true,
     returnHourly: true,
     returnDispatch: true, // every modelled year hour by hour, for the workbook's dispatch sheets
@@ -615,8 +616,10 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
     }
   }
   if (splitSitesOn(state)) payload.sites = { split: true };
-  if (rules.some((r) => r.hours === "peak" || r.hours === "offpeak")) payload.peakMask = Array.from(peakMask(terms.peak));
+  if (rules.some((r) => r.hours === "peak" || r.hours === "offpeak" || r.hours === "remaining")) payload.peakMask = Array.from(peakMask(terms.peak));
   else if (rules.some((r) => r.hours === "any") && terms.peak?.windows?.length) payload.peakMask = Array.from(anyMask(terms.peak));
+  // SECI FDRE-RTC-V (Amendment-03): the Solar Hours, whose floor, cap and excess differ
+  if (rules.some((r) => r.hours === "solar" || r.hours === "remaining")) payload.solarMask = Array.from(terms.solar.mask);
   return payload;
 }
 
@@ -728,7 +731,10 @@ export function opsFromLp(lp, fin, bess) {
       deliveredMWh,
       dfr: demandMWh > 0 ? deliveredMWh / demandMWh : 1,
       minMonthlyDfr: repFor(y).minMonthlyDfr ?? NaN,
-      excessMWh: row.exportMwh || 0,
+      excessMWh: row.exportMwh || 0, // sold in the market
+      // Amendment-03: the Solar Hours excess the buyer takes at a share of the tariff (its first right)
+      buyerExcessMWh: row.buyerExcessMwh || 0,
+      buyerExcessShare: lp.buyerExcessShare || 0,
       curtailMWh: NaN,
       biomassMWh: row.biomassMwh || 0,
       hydroMWh: row.hydroMwh || 0,
@@ -753,7 +759,9 @@ export function energyMix(hourly) {
     if (g > 0) GEN_KEYS.forEach((k, i) => { out[k] += (d * gen[i]) / g; });
     out.battery += hourly.discharge[t];
     out.export += hourly.export[t];
-    if (hourly.price) out.exportRevenueCr += hourly.export[t] * hourly.price[t] * 1e-4;
+    // a sale in an hour the buyer has the first right to earns at most its share of the tariff (Amendment-03)
+    const cap = hourly.saleCap?.[t];
+    if (hourly.price) out.exportRevenueCr += hourly.export[t] * (cap != null ? Math.min(hourly.price[t], cap) : hourly.price[t]) * 1e-4;
     out.curtail += hourly.curtail[t];
     out.demand += hourly.demand[t];
     out.unmet += Math.max(0, hourly.demand[t] - d - hourly.discharge[t]);

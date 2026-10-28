@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronLeft, CircleDollarSign, ClipboardCheck, FileStack, FolderOpen, Gavel, Layers, ListChecks, RotateCcw, Save, Scale, Users, Zap } from "lucide-react";
+import { ArrowRight, ChevronLeft, CircleDollarSign, ClipboardCheck, FileStack, FolderOpen, Gavel, Layers, ListChecks, RotateCcw, Save, Scale, Trophy, Users, Zap } from "lucide-react";
 import SaveDialog from "../scenarios/SaveDialog";
 import { scenarioApi } from "../scenarios/client";
 import useTeam, { TeamContext } from "../team/useTeam";
@@ -21,6 +21,7 @@ import BidForms from "./BidForms";
 import { formIssues } from "./forms";
 import { formatsSummary } from "./formats";
 import LiveAgent from "./LiveAgent";
+import WinningBid from "./WinningBid";
 import { TENDER, defaultSeciState } from "./state";
 
 export { defaultSeciState };
@@ -34,6 +35,7 @@ export const SECI_STEPS = [
   { id: "size", title: "Size", icon: Zap, color: "#f5b83d" },
   { id: "finance", title: "Financials", icon: CircleDollarSign, color: "#7ddc9a" },
   { id: "forms", title: "Bid forms", icon: ClipboardCheck, color: "#a98bff" },
+  { id: "winning", title: "Winning bid", icon: Trophy, color: "#ffd166" },
 ];
 
 /** A saved bid (this browser's, or one opened from the library) as the tab's state. */
@@ -69,7 +71,7 @@ let sessionLinked = null;
 const sizingSession = { hourly: null, run: null };
 
 /**
- * SECI RTC-TM-V: the tender and its amendments, the bid conditions in force, what the bidder
+ * SECI FDRE-RTC-V (issued as RTC-TM-V): the tender and its amendments, the bid conditions in force, what the bidder
  * offers, the supply sources and the HiGHS sizing against the time-block floors (the Tender to Bid
  * steps), the financial model with its formula workbook, the bid forms, and a voice bid agent
  * (GPT-Live) that works through it all on screen.
@@ -204,7 +206,7 @@ export default function SeciTab({ initialScenario = null }) {
         <div>
           <div className="eyebrow"><Gavel size={13} /> {PACK.short} · RfS No. {PACK.rfsNo}</div>
           <h1>RTC tender · SECI</h1>
-          <p>{PACK.title}. The tender and its amendments, the conditions in force, what you bid, your supply sources sized against every peak and off-peak block, the financial model, and the RfS's bid formats to fill and review. Talk to the bid agent to go through it by voice.</p>
+          <p>{PACK.title}. The tender and its amendments, the conditions in force, what you bid, your supply sources sized against every block's floor (Peak, Solar and Remaining Hours, Amendment-03), the financial model, and the RfS's bid formats to fill and review. Talk to the bid agent to go through it by voice.</p>
         </div>
         <div className="story-hero-tools">
           {linked && <span className="rtc-live" data-testid="seci-linked">{linked.name} · v{linked.version}</span>}
@@ -247,6 +249,7 @@ export default function SeciTab({ initialScenario = null }) {
         {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={sizing.startSizing} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} />}
         {step.id === "finance" && <FinanceStep {...props} traceRequest={traceAsk} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
         {step.id === "forms" && <BidForms {...props} />}
+        {step.id === "winning" && <WinningBid {...props} />}
       </div>
 
       <footer className="story-page-foot bid-foot">

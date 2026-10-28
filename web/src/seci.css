@@ -200,3 +200,28 @@
 .agent-energy input { width: 74px; padding: 3px 5px; }
 .agent-energy input[type=number] { width: 52px; }
 .agent-energy select { padding: 3px 4px; }
+
+/* the Winning bid step: how the tender's winners bid ₹5.25 */
+.win-head { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.win-head > div { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); background: var(--surface); }
+.win-head strong { font-size: 15px; }
+.win-head small { color: var(--muted); }
+.win-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.win-table th { padding: 6px 8px; color: var(--muted); font-weight: 500; text-align: left; border-bottom: 1px solid var(--line); }
+.win-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; font-variant-numeric: tabular-nums; }
+.win-table td.ok { color: var(--good); }
+.win-table td.bad { color: var(--bad, #ff6b5f); }
+.win-table tr.win-alt td { color: var(--muted); font-style: italic; }
+.win-table .seci-badge { margin-left: 6px; }
+.win-levers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.win-levers article { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); background: var(--surface); }
+.win-levers span { color: var(--signal); font-family: var(--font-mono); }
+.win-levers p { margin: 0; color: var(--muted); font-size: 12.5px; }
+.win-more { margin-top: 12px; }
+.win-caveat { margin-top: 12px; padding: 12px; border: 1px dashed var(--line); }
+.win-caveat ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; }
+@media (max-width: 900px) { .win-head, .win-levers { grid-template-columns: minmax(0, 1fr); } .win-table { display: block; overflow-x: auto; } }
+.win-scroll { overflow-x: auto; }
+.win-scroll .win-table td:first-child { min-width: 280px; max-width: 460px; }
+.win-scroll .win-table td:last-child { min-width: 180px; }
+.win-scroll .win-table td:nth-child(n+2):nth-child(-n+6) { white-space: nowrap; }

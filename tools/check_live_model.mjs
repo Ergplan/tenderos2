@@ -29,7 +29,7 @@ const ExcelJS = require("exceljs");
 const close = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
 
 // ---- three bids
-function bid({ sources, src = {}, fin = {}, market, sites, years = 25, lifetime, sizes, tariffLocked = false, tariff, rules = [] }) {
+function bid({ sources, src = {}, fin = {}, market, sites, years = 25, lifetime, sizes, tariffLocked = false, tariff, rules = [], lpExtra = {} }) {
   const s = defaultBidState();
   s.bid = { baseMw: 1000, greenshoe: false };
   s.sources = { solar: false, wind: false, hydro: false, biomass: false, thermal: false, bess: false, ...sources };
@@ -47,7 +47,7 @@ function bid({ sources, src = {}, fin = {}, market, sites, years = 25, lifetime,
   if (tariffLocked) { s.tariffLocked = true; s.fin.tariff = tariff; }
   const terms = { years, sale: "allowed", rules };
   const m = modelInputs(s, terms);
-  const lp = { sizes, tariff: 5, perYear: [{ year: 1, minMonthlyDfr: 0.7 }], lifetime, ...(sites?.split ? { sites: { split: true } } : {}), ...(market?.source && market.source !== "flat" ? { market: market.source } : {}) };
+  const lp = { sizes, tariff: 5, perYear: [{ year: 1, minMonthlyDfr: 0.7 }], lifetime, ...lpExtra, ...(sites?.split ? { sites: { split: true } } : {}), ...(market?.source && market.source !== "flat" ? { market: market.source } : {}) };
   const ops = opsFromLp(lp, m.fin, m.bess);
   const dfrTarget = 0.8;
   const run = (over = {}) => E.runFinancialModel(null, over.sizes || sizes, { costs: over.costs || m.costs, fin: over.fin || m.fin, bess: m.bess, dfrTarget, tariffLocked: over.tariffLocked ?? tariffLocked, ops, solveBy: "npv" });
@@ -82,6 +82,16 @@ const CASES = [
     sizes: { solarMw: 900, windMw: 700, bessMw: 300, bessMwh: 1200 },
     lifetime: yearsOf(25, (y) => ({ demandMwh: 300 * 8760, deliveredMwh: 0.8 * 300 * 8760, exportMwh: 0, blockShortfallMwh: 9000 + 400 * y })),
   })],
+  ["SECI FDRE-RTC-V (Amendment-03): Peak, Solar and Remaining Hours; the Solar Hours excess to the buyer at half the tariff", bid({
+    sources: { solar: true, wind: true, bess: true },
+    fin: { tariffEscalation: 0.02 },
+    market: { sell: true, source: "GDAM", escalation: 0, flatPrice: 0 },
+    rules: [{ id: "peak", basis: "block", hours: "peak", target: 0.9, penaltyMultiple: 1.5 }, { id: "solar", basis: "block", hours: "solar", target: 0.5, max: 0.6, excessTariffShare: 0.5, penaltyMultiple: 1.5 },
+      { id: "remaining", basis: "block", hours: "remaining", target: 0.7, penaltyMultiple: 1.5 }],
+    sizes: { solarMw: 800, windMw: 300, bessMw: 650, bessMwh: 2600 },
+    lifetime: yearsOf(25, (y) => ({ demandMwh: 300 * 8760, deliveredMwh: 0.74 * 300 * 8760, exportMwh: 1.2e5, exportRevenueCr: 1.2e5 * 4.1e-4, buyerExcessMwh: 9e4 - 500 * y, blockShortfallMwh: 4000 + 100 * y })),
+    lpExtra: { buyerExcessShare: 0.5 },
+  })],
   ["solar alone, no debt", bid({
     sources: { solar: true },
     fin: { debtFraction: 0, tenorYears: 10 },
@@ -106,6 +116,7 @@ const SAME = {
   bookDep: "bookDep", openDebt: "openingDebt", interest: "interest", principal: "principal", closeDebt: "closingDebt", taxDep: "taxDep",
   pbt: "pbt", tax: "tax", pat: "pat", recv: "receivables", dWc: "dWc", cfads: "cfads", debtService: "debtService", dscr: "dscr",
   fcfe: "fcfe", cumEq: "cumEquity", projCf: "projectCf", trf: "tariff", delivered: "deliveredMu", demand: "demandMu", excess: "excessMu", dfr: "dfr",
+  buyerRev: "buyerRevenue", buyerMu: "buyerExcessMu",
 };
 const RESULTS = ["tariff", "equityIrr", "projectIrr", "equityNpv", "projectNpv", "minDscr", "avgDscr", "lcoe", "levelisedTariff", "capexTotal", "debt", "equity", "revenueTotal"];
 
@@ -150,7 +161,13 @@ assert.ok(CASES[1][1].finance.rows.filter((r) => r.augCapex > 0).map((r) => r.ye
 assert.ok(CASES[1][1].finance.rows.some((r) => r.penalty > 0), "a shortfall penalty");
 assert.ok(CASES[1][1].finance.rows[0].tax === 0 && CASES[1][1].finance.rows.some((r) => r.tax > 0), "tax losses carried, then tax");
 assert.ok(CASES[1][1].finance.rows[0].surplusRevenue > 0);
-assert.ok(CASES[3][1].finance.rows.every((r) => r.dscr === null), "no debt: no DSCR");
+assert.ok(CASES[4][1].finance.rows.every((r) => r.dscr === null), "no debt: no DSCR");
+{
+  // Amendment-03: the buyer pays half the year's (escalated) tariff for the Solar Hours excess
+  const r3 = CASES[3][1].finance.rows[2];
+  assert.ok(r3.buyerRevenue > 0 && Math.abs(r3.buyerRevenue - (r3.buyerExcessMu * 1000 * 0.5 * r3.tariff) / 1e4) < 1e-9, "the buyer's half tariff");
+  assert.ok(Math.abs(r3.revenue - (r3.energyRevenue + r3.surplusRevenue + r3.buyerRevenue - r3.penalty)) < 1e-9);
+}
 {
   // the block penalty: shortfall x 1.5 x the year's (escalated) tariff
   const r5 = CASES[2][1].finance.rows[4];

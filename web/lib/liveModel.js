@@ -327,6 +327,9 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
 
   S.group("Revenue and supply");
   S.one("sell", "Sell surplus in the market", "Yes / No", { v: fi.sellSurplus ? "Yes" : "No", kind: "input", list: ["Yes", "No"], source: src("market.sell") });
+  // SECI FDRE-RTC-V (Amendment-03): the buyer's first right to the Solar Hours excess, at a share of the tariff
+  const buyer = m.ops.some((o) => (o.buyerExcessMWh || 0) > 0);
+  if (buyer) S.one("buyerShare", "Solar Hours excess taken by the buyer at", "× tariff", { v: m.ops.find((o) => o.buyerExcessShare > 0)?.buyerExcessShare || 0, kind: "input", fmt: "x", source: "Tender", note: "Amendment-03: power above 60% in a Solar Hour goes first to the buyer at 50% of the tariff; it takes it when the market pays more" });
   if (!hourly) S.one("flatPrice", "Market sale price", "₹/kWh", { v: fi.surplusPrice || 0, kind: "input", fmt: "tariff", source: fi.sellSurplus ? "Your input (flat price)" : "Not used: no market sale" });
   S.one("target", "Annual supply floor", "% of contracted", { v: m.dfrTarget || 0, kind: "input", fmt: "pct", source: src("target", "Tender") });
   S.one("penalty", "Shortfall penalty", "₹/kWh short", { v: fi.shortfallPenalty || 0, kind: "input", fmt: "tariff", source: src("fin.shortfallPenalty", "Model default") });
@@ -353,7 +356,11 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
     S.one("initSoc", "Battery charge at the start of a year", "%", { v: dsp.initSoc, kind: "input", fmt: "pct", source: "Model default" });
     if (dsp.blocks) {
       S.one("peakFloor", "Peak Hours floor", "% of contracted", { v: dsp.peakFloor, kind: "input", fmt: "pct", source: "Tender" });
-      S.one("offFloor", "Off-peak floor", "% of contracted", { v: dsp.offFloor, kind: "input", fmt: "pct", source: "Tender" });
+      S.one("offFloor", dsp.solarHours ? "Remaining Hours floor" : "Off-peak floor", "% of contracted", { v: dsp.offFloor, kind: "input", fmt: "pct", source: "Tender" });
+      if (dsp.solarHours) {
+        S.one("solarFloor", "Solar Hours floor", "% of contracted", { v: dsp.solarFloor, kind: "input", fmt: "pct", source: "Tender (Amendment-03)" });
+        S.one("solarMax", "Most the buyer takes in a Solar Hour", "% of contracted", { v: dsp.solarMax, kind: "input", fmt: "pct", source: "Tender (Amendment-03)" });
+      }
     }
   }
 
@@ -492,6 +499,7 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
         poi: { f: lm(S.s("poi")), v: dsp.poi },
         eta: { f: lm(S.s("eta")), v: dsp.eta },
         ...(dsp.blocks ? { peakFloor: { f: lm(S.s("peakFloor")), v: dsp.peakFloor }, offFloor: { f: lm(S.s("offFloor")), v: dsp.offFloor } } : {}),
+        ...(dsp.solarHours ? { solarFloor: { f: lm(S.s("solarFloor")), v: dsp.solarFloor }, solarMax: { f: lm(S.s("solarMax")), v: dsp.solarMax } } : {}),
         start: !on.bess ? { v: 0 } : {
           f: `MIN(MAX(${lm(S.s("initSoc"))}-${lm(S.s("minSoc"))},0),${lm(S.s("maxSoc"))}-${lm(S.s("minSoc"))})*${lm(S.s("bessMwh"))}*${y.bf}`,
           v: range * (S.v("bessMwh") || 0) * y.bf,
@@ -532,8 +540,14 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   });
   if (blocky && dsp?.blocks) S.series("blockShort", "Short of the time-block floors", "MU", { f: (y) => fromDispatch("short", y).f, v: (y) => fromDispatch("short", y).v, fmt: "mu", total: true, note: "Each hour's energy below its floor, summed from the hour-by-hour sheets" });
   else if (blocky) S.series("blockShort", "Short of the time-block floors", "MU", { v: (y) => mu(op(y).blockShortfallMWh), kind: "opt", fmt: "mu", total: true, note: "Each hour's energy below its floor (peak and off-peak blocks), from the dispatch" });
-  if (dsp?.sell) S.series("excess", "Sold in the market", "MU", { f: (y) => fromDispatch("soldMeter", y).f, v: (y) => fromDispatch("soldMeter", y).v, fmt: "mu", total: true });
-  else S.series("excess", "Sold in the market", "MU", { v: (y) => mu(op(y).excessMWh), kind: "opt", fmt: "mu", total: true });
+  const soldText = buyer ? "Sold, in the market and to the buyer" : "Sold in the market";
+  if (dsp?.sell) S.series("excess", soldText, "MU", { f: (y) => fromDispatch("soldMeter", y).f, v: (y) => fromDispatch("soldMeter", y).v, fmt: "mu", total: true });
+  else S.series("excess", soldText, "MU", { v: (y) => mu(op(y).excessMWh + (op(y).buyerExcessMWh || 0)), kind: "opt", fmt: "mu", total: true });
+  if (buyer) {
+    S.series("buyerMu", "Of which the buyer takes (Solar Hours excess)", "MU", { v: (y) => mu(op(y).buyerExcessMWh), kind: "opt", fmt: "mu", total: true,
+      note: "The Solar Hours above 60% sold in hours where the market pays more than the buyer's share of the tariff: the buyer takes those" });
+    S.series("marketMu", "Of which sold in the market", "MU", { f: (y) => `${S.at("excess", y)}-${S.at("buyerMu", y)}`, v: (y) => S.v("excess", y) - S.v("buyerMu", y), fmt: "mu", total: true });
+  }
   if (hourly) {
     S.series("price", `Realised market price${m.market ? ` (IEX ${m.market}, hourly)` : " (hourly)"}`, "₹/kWh", {
       v: (y) => (op(y).excessMWh > 0 && finite(op(y).surplusRevenueCr) ? (op(y).surplusRevenueCr * 1e4) / op(y).excessMWh : 0),
@@ -596,9 +610,16 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
     note: "Delivered MU × tariff ₹/kWh ÷ 10 = ₹ crore",
   });
   S.series("mktRev", m.market ? `Market sale revenue (IEX ${m.market})` : "Market sale revenue", "₹ cr", {
-    f: (y) => `IF(${S.s("sell")}="Yes",${S.at("excess", y)}*${S.at("price", y)}/10,0)`,
-    v: (y) => (S.v("sell") === "Yes" ? (S.v("excess", y) * S.v("price", y)) / 10 : 0), total: true,
+    f: (y) => `IF(${S.s("sell")}="Yes",${S.at(buyer ? "marketMu" : "excess", y)}*${S.at("price", y)}/10,0)`,
+    v: (y) => (S.v("sell") === "Yes" ? (S.v(buyer ? "marketMu" : "excess", y) * S.v("price", y)) / 10 : 0), total: true,
   });
+  if (buyer) {
+    S.series("buyerRev", "Solar Hours excess sold to the buyer", "₹ cr", {
+      f: (y) => `IF(${S.s("sell")}="Yes",${S.at("buyerMu", y)}*${S.s("buyerShare")}*${S.at("trf", y)}/10,0)`,
+      v: (y) => (S.v("sell") === "Yes" ? (S.v("buyerMu", y) * S.v("buyerShare") * S.v("trf", y)) / 10 : 0), total: true,
+      note: "MU × the buyer's share × the year's tariff ÷ 10 = ₹ crore",
+    });
+  }
   S.series("penaltyCr", "Shortfall penalty", "₹ cr", { f: (y) => `${S.at("shortfall", y)}*${S.s("penalty")}/10`, v: (y) => (S.v("shortfall", y) * S.v("penalty")) / 10, total: true });
   if (blocky) {
     S.series("blockPenCr", "Time-block shortfall penalty", "₹ cr", {
@@ -609,8 +630,8 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   }
   const minusPenalties = (y) => `-${S.at("penaltyCr", y)}${blocky ? `-${S.at("blockPenCr", y)}` : ""}`;
   S.series("revenue", "Total revenue", "₹ cr", {
-    f: (y) => `${S.at("ppaRev", y)}+${S.at("mktRev", y)}${minusPenalties(y)}`,
-    v: (y) => S.v("ppaRev", y) + S.v("mktRev", y) - S.v("penaltyCr", y) - (blocky ? S.v("blockPenCr", y) : 0), total: true, bold: true,
+    f: (y) => `${S.at("ppaRev", y)}+${S.at("mktRev", y)}${buyer ? `+${S.at("buyerRev", y)}` : ""}${minusPenalties(y)}`,
+    v: (y) => S.v("ppaRev", y) + S.v("mktRev", y) + (buyer ? S.v("buyerRev", y) : 0) - S.v("penaltyCr", y) - (blocky ? S.v("blockPenCr", y) : 0), total: true, bold: true,
   });
 
   // ---- operating costs
@@ -1001,6 +1022,11 @@ function dispatchInput(d, years) {
     solarCf: solar ? series(d.solarCf, 0, 2) : null, windCf: wind ? series(d.windCf, 0, 2) : null,
     peak: blocks ? series(d.peak, 0, 1) : null,
   };
+  // Amendment-03: the Solar Hours outside the Peak Hours, their floor and the most the buyer takes
+  if (blocks && d.solarHours != null) {
+    Object.assign(out, { solarHours: series(d.solarHours, 0, 1), solarFloor: num(d.solarFloor, 0, 1), solarMax: num(d.solarMax, 0, 1) });
+    if (out.solarHours === null || out.solarFloor === null || out.solarMax === null) return null;
+  }
   const need = ["contract", "poi", "eta", "minSoc", "maxSoc", "initSoc", ...(blocks ? ["peakFloor", "offFloor", "peak"] : []), ...(solar ? ["solarCf"] : []), ...(wind ? ["windCf"] : [])];
   if ((!solar && !wind) || need.some((k) => out[k] === null)) return null;
   out.byYear = d.byYear.map((y) => ({
@@ -1055,7 +1081,7 @@ export function liveModelInput(raw) {
       augmentation: ["annual", "oneTime"].includes(raw.bess?.augmentation) ? raw.bess.augmentation : "none",
     },
     ops: raw.ops.slice(0, 60).map((o) => ({
-      ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"]),
+      ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"]),
       ...(finite(o?.surplusRevenueCr) ? { surplusRevenueCr: o.surplusRevenueCr } : {}),
     })),
     dispatch: dispatchInput(raw.dispatch, raw.ops.length),

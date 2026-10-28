@@ -1510,6 +1510,8 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
     const energyRev = op.deliveredMWh * trf * RS_CR_PER_MWH_AT_1RS;
     // op.surplusRevenueCr: surplus sold at hourly market prices (Tender to Bid, IEX); else a flat price
     const surplusRev = fin.sellSurplus ? (op.surplusRevenueCr ?? op.excessMWh * fin.surplusPrice * RS_CR_PER_MWH_AT_1RS) : 0;
+    // SECI FDRE-RTC-V (Amendment-03): the Solar Hours excess the buyer takes at a share of the year's tariff
+    const buyerRev = fin.sellSurplus ? (op.buyerExcessMWh || 0) * (op.buyerExcessShare || 0) * trf * RS_CR_PER_MWH_AT_1RS : 0;
     const shortfallMWh = Math.max(0, dfrTarget * op.demandMWh - op.deliveredMWh);
     const annualPenalty = shortfallMWh * (fin.shortfallPenalty || 0) * RS_CR_PER_MWH_AT_1RS;
     // time-block floors (SECI RTC-TM): energy short of each block's floor, at a multiple of the
@@ -1517,7 +1519,7 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
     const blockShortfallMWh = op.blockShortfallMWh || 0;
     const blockPenalty = blockShortfallMWh * (fin.blockPenaltyMultiple || 0) * trf * RS_CR_PER_MWH_AT_1RS;
     const penalty = annualPenalty + blockPenalty;
-    const revenue = energyRev + surplusRev - penalty;
+    const revenue = energyRev + surplusRev + buyerRev - penalty;
     const esc = (1 + fin.omEscalation) ** (y - 1);
     const om = omBase * esc;
     const insurance = capex.hard * fin.insurancePct;
@@ -1597,17 +1599,19 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       injectedMu: (op.evac?.injectedMWh ?? 0) / 1000,
       trafoLossMu: (op.evac?.trafoLossMWh ?? 0) / 1000,
       lineLossMu: (op.evac?.lineLossMWh ?? 0) / 1000,
-      meterMu: (op.evac?.meterMWh ?? op.deliveredMWh + (op.excessMWh || 0)) / 1000,
+      meterMu: (op.evac?.meterMWh ?? op.deliveredMWh + (op.excessMWh || 0) + (op.buyerExcessMWh || 0)) / 1000,
       deliveredMu: op.deliveredMWh / 1000,
       dfr: op.dfr,
       minMonthlyDfr: op.minMonthlyDfr,
-      excessMu: op.excessMWh / 1000,
+      excessMu: (op.excessMWh + (op.buyerExcessMWh || 0)) / 1000, // sold: in the market and, under SECI Amendment-03, to the buyer
       curtailMu: op.curtailMWh / 1000,
       shortfallMu: shortfallMWh / 1000,
       solarFactor: op.solarFactor,
       bessFactor: op.bessFactor,
       energyRevenue: energyRev,
       surplusRevenue: surplusRev,
+      buyerExcessMu: (op.buyerExcessMWh || 0) / 1000,
+      buyerRevenue: buyerRev,
       penalty,
       annualPenalty,
       blockPenalty,

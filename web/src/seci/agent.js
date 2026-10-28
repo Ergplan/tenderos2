@@ -12,7 +12,7 @@ import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, missingInput
 import { liveModelRequest } from "../bid/liveModelRequest.js";
 import { explainGeneration } from "../model/explainGeneration.js";
 import { quotedReturns } from "../bid/quote.js";
-import { PACK, PEAK_PLANS, SHORTFALL_MODES, keyDates, moneyAtStake } from "./terms.js";
+import { PACK, PEAK_PLANS, PROFILES, SHORTFALL_MODES, keyDates, moneyAtStake, solarHoursOf } from "./terms.js";
 import { FORM_FIELDS, bidChecks, formIssues, visibleFields } from "./forms.js";
 import { applies, blankValue, formatPrint, formatStatus, formatsSummary } from "./formats.js";
 import { CHART_KINDS, agentChart } from "./charts.js";
@@ -20,7 +20,7 @@ import { buildScript, explainFinance, explainResults, financeOf, parseDate, pars
 
 export const LIVE_MODEL = "gpt-live-1";
 
-const STEPS = ["documents", "conditions", "bid", "sources", "size", "finance", "forms"];
+const STEPS = ["documents", "conditions", "bid", "sources", "size", "finance", "forms", "winning"];
 const SECI_SOURCES = ["solar", "wind", "biomass", "bess"];
 const NAMES = { solar: "Solar", wind: "Wind", biomass: "Biomass", bess: "Battery" };
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -42,6 +42,17 @@ export function agentInputs(state) {
     get: (s) => s.bid.baseMw, benchmark: 300, set: (s, v) => clear({ ...s, bid: { ...s.bid, baseMw: Math.round(v), greenshoe: false } }) });
   add({ key: "peakPlan", label: "Peak Hours plan", step: "bid", kind: "choice", options: Object.entries(PEAK_PLANS).map(([k, p]) => [k, p.label]),
     get: (s) => s.seci.peakPlan, benchmark: "price", set: (s, v) => clear({ ...s, seci: { ...s.seci, peakPlan: v } }) });
+  add({ key: "profile", label: "Supply profile (Amendment-03 is in force)", step: "bid", kind: "choice", options: Object.entries(PROFILES).map(([k, p]) => [k, p.label]),
+    get: (s) => (s.seci.profile === "amd1" ? "amd1" : "amd3"), benchmark: "amd3", set: (s, v) => clear({ ...s, seci: { ...s.seci, profile: v } }) });
+  for (const [k, label] of [["start", "Solar Hours start (GRID-INDIA sets them by State)"], ["end", "Solar Hours end"]]) {
+    add({ key: `solarHours.${k}`, label, step: "bid", kind: "number", unit: "hour of the day", min: 0, max: 24, benchmark: PACK.model.solarHours[k],
+      get: (s) => solarHoursOf(s.seci)[k],
+      set: (s, v) => {
+        const h = { ...solarHoursOf(s.seci), [k]: Math.round(v) };
+        if (!(h.start < h.end)) throw new Error("The Solar Hours must start before they end, between 0 and 24.");
+        return clear({ ...s, seci: { ...s.seci, solarHours: h } });
+      } });
+  }
   add({ key: "shortfall", label: "Shortfall plan", step: "bid", kind: "choice", options: Object.entries(SHORTFALL_MODES).map(([k, p]) => [k, p.label]),
     get: (s) => s.seci.shortfall, benchmark: "penalty", set: (s, v) => clear({ ...s, seci: { ...s.seci, shortfall: v } }) });
   add({ key: "ppaDate", label: "Expected PPA Effective Date", step: "bid", kind: "date",
@@ -203,7 +214,7 @@ export function status(state, terms, run = null) {
   const missing = missingInputs(state, terms);
   return {
     step: state.step,
-    bid: { contractedMw: state.bid.baseMw, peakPlan: PEAK_PLANS[state.seci.peakPlan]?.label, shortfall: SHORTFALL_MODES[state.seci.shortfall]?.label, ppaDate: state.seci.ppaDate },
+    bid: { contractedMw: state.bid.baseMw, profile: PROFILES[state.seci.profile === "amd1" ? "amd1" : "amd3"].label, solarHours: state.seci.profile === "amd1" ? null : solarHoursOf(state.seci), peakPlan: PEAK_PLANS[state.seci.peakPlan]?.label, shortfall: SHORTFALL_MODES[state.seci.shortfall]?.label, ppaDate: state.seci.ppaDate },
     sources: SECI_SOURCES.filter((id) => state.sources[id]).map((id) => NAMES[id]),
     inputsMissing: missing.length ? missing.slice(0, 12) : "none",
     optimizer: run?.active ? "running" : lp ? "sized" : run?.error ? `failed: ${run.error}` : "not run",
@@ -222,14 +233,14 @@ const obj = (properties = {}, required = []) => ({ type: "object", properties, r
 /** The function tools, in the Responses API's format, as the session's backend sees them. */
 export const AGENT_TOOLS = [
   { type: "function", name: "get_status", description: "The bid as it stands on screen: the step shown, the bid, the sources, inputs still needed, whether the optimizer ran, the plant, the financials (bid tariff, equity and project IRR), the quoted tariff and the next input. Call it first and whenever unsure.", parameters: obj() },
-  { type: "function", name: "tender_brief", description: "The key bid conditions of SECI RTC-TM-V after the amendments, as short spoken paragraphs. Use at the start of the guided exercise.", parameters: obj() },
+  { type: "function", name: "tender_brief", description: "The key bid conditions of SECI FDRE-RTC-V (issued as RTC-TM-V) after the amendments, as short spoken paragraphs. Use at the start of the guided exercise.", parameters: obj() },
   { type: "function", name: "tender_lookup", description: "Search the tender: its conditions after the amendments, what each amendment changed, and SECI's clarifications, each with document, page and quote. Pass words (e.g. 'EMD', 'peak hours penalty', 'net worth') or an exact condition id.", parameters: obj({ query: { type: "string" } }, ["query"]) },
   { type: "function", name: "next_question", description: "The next input of the guided model-filling exercise, in order: the question to ask, its current value and the benchmark. Inputs set with set_input count as answered. Pass `keep` with an input key when the bidder keeps its current value ('next', 'same'), or keep_rest true to accept every remaining value as it stands.", parameters: obj({ keep: { type: ["string", "null"], description: "Input key the bidder keeps as it is, or null" }, keep_rest: { type: "boolean" } }, ["keep", "keep_rest"]) },
   { type: "function", name: "list_inputs", description: "The inputs of one part of the screen with their keys, current values, units, ranges and benchmarks. Percent inputs are in percent.", parameters: obj({ part: { type: "string", enum: ["bid", "sources", "forms", "all"] } }, ["part"]) },
   { type: "function", name: "set_input", description: "Change one input on screen and show it. `value` is what the bidder said: a number (percent inputs in percent, 24 means 24%), a choice key or label, a date (YYYY-MM-DD), yes/no, 'auto' for a size, or text. Changing a sizing input clears the sizing until the optimizer runs again.", parameters: obj({ key: { type: "string" }, value: { type: ["string", "number", "boolean"] } }, ["key", "value"]) },
   { type: "function", name: "use_benchmarks", description: "Fill every empty sizing and financing input with industry benchmarks (CERC norms, 2025-26 prices), marked as benchmarks on screen.", parameters: obj() },
   { type: "function", name: "go_to_step", description: "Show a step of the tab.", parameters: obj({ step: { type: "string", enum: STEPS } }, ["step"]) },
-  { type: "function", name: "run_optimizer", description: "Size the plant with HiGHS against every peak and off-peak block (takes one to a few minutes); returns the result when done. Run again after inputs change.", parameters: obj() },
+  { type: "function", name: "run_optimizer", description: "Size the plant with HiGHS against every block's floor (Peak, Solar and Remaining Hours under Amendment-03) (takes one to a few minutes); returns the result when done. Run again after inputs change.", parameters: obj() },
   { type: "function", name: "stop_optimizer", description: "Stop a sizing that is running.", parameters: obj() },
   { type: "function", name: "get_results", description: "The sized plant: sizes, sizing tariff, the share of hours each floor is met, the shortfall, EMD, PBG, the net worth needed and the dates.", parameters: obj() },
   { type: "function", name: "get_financials", description: "The 25-year financial model of the sized plant: the tariff for the target equity IRR, equity IRR, project IRR, DSCR, project cost, debt, penalties.", parameters: obj() },
@@ -451,7 +462,7 @@ export function createToolRunner(ctx) {
 
 // ---------------------------------------------------------------- the prompts
 
-export const LIVE_INSTRUCTIONS = `You are the voice of the TenderOS bid agent for SECI's RTC-TM-V tender: 1,000 MW of round-the-clock thermal-mimic power from ISTS-connected renewable projects with storage. You speak with a bid manager in India while a backend agent works the bid model on their screen.
+export const LIVE_INSTRUCTIONS = `You are the voice of the TenderOS bid agent for SECI's FDRE-RTC-V tender (issued as RTC-TM-V and renamed by Amendment-03): 1,000 MW of firm and dispatchable round-the-clock power from ISTS-connected renewable projects with storage. You speak with a bid manager in India while a backend agent works the bid model on their screen.
 
 Speak briefly: one to three sentences, then let the user talk. Use Indian number words (lakh, crore) and say units in full. Use the user's language if they switch.
 
@@ -463,7 +474,7 @@ A CFO or reviewer may ask how the energy is worked out or read out their own cal
 
 When the backend reports a warning, such as a tariff below what the target IRR needs, an input out of range or a check not met, say it plainly with the numbers it gave.`;
 
-export const BACKEND_INSTRUCTIONS = `You operate the SECI RTC-TM-V bid model in the user's browser through function tools, for a voice assistant that speaks your results aloud.
+export const BACKEND_INSTRUCTIONS = `You operate the SECI FDRE-RTC-V bid model in the user's browser through function tools, for a voice assistant that speaks your results aloud.
 
 Truth rules:
 - Every statement about the tender comes from tender_brief or tender_lookup, and you name the document and page. If the tools find nothing, say the tender documents do not say.

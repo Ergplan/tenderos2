@@ -14,9 +14,15 @@ import { defaultBidState } from "../web/src/bid/model.js";
 import { quotedReturns } from "../web/src/bid/quote.js";
 import { NOT_APPLICABLE, applies, blankValue, fieldApplies, formatGroups, formatStatus, formatsForPack, formatsSummary } from "../web/src/seci/formats.js";
 
-// ---- the terms: two time-block floors with the 1.5x penalty, peak hours as planned
+// ---- the terms: Amendment-03's three time-block floors with the 1.5x penalty, peak hours as planned
 const terms = seciTerms(DEFAULT_SETTINGS);
-assert.deepEqual(terms.rules.map((r) => [r.id, r.basis, r.hours, r.target, r.penaltyMultiple]), [["peak", "block", "peak", 0.9, 1.5], ["offpeak", "block", "offpeak", 0.7, 1.5]]);
+assert.deepEqual(terms.rules.map((r) => [r.id, r.basis, r.hours, r.target, r.penaltyMultiple]), [["peak", "block", "peak", 0.9, 1.5], ["solar", "block", "solar", 0.5, 1.5], ["remaining", "block", "remaining", 0.7, 1.5]]);
+assert.deepEqual([terms.rules[1].max, terms.rules[1].excessTariffShare], [0.6, 0.5], "Solar Hours: at most 60%; above it the buyer's first right at 50% of the tariff");
+assert.deepEqual([terms.solar.start, terms.solar.end, terms.solar.mask.reduce((a, v) => a + v, 0)], [8, 18, 3650], "Solar Hours 08:00-18:00 assumed");
+assert.deepEqual([...seciTerms({ ...DEFAULT_SETTINGS, solarHours: { start: 7, end: 17 } }).solar.mask.slice(0, 24)].map((v, h) => (v ? h : null)).filter((h) => h !== null), [7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+const before = seciTerms({ ...DEFAULT_SETTINGS, profile: "amd1" });
+assert.deepEqual(before.rules.map((r) => [r.id, r.hours, r.target]), [["peak", "peak", 0.9], ["offpeak", "offpeak", 0.7]], "before Amendment-03: 90% peak, 70% off-peak");
+assert.equal(before.solar, null);
 assert.deepEqual([terms.minBidMw, terms.maxBidMw, terms.baseMw, terms.partAllowed], [50, 500, 1000, true]);
 assert.equal(terms.mandatory.bess, true, "storage is mandatory (Clarifications-01, query 13)");
 assert.equal(terms.permitted.thermal, false, "RE only");
@@ -29,7 +35,13 @@ const state0 = { ...defaultBidState(), bid: { baseMw: 300, greenshoe: false }, s
 const filled = { ...fillBenchmarks(state0, terms), seci: { ...DEFAULT_SETTINGS }, forms: {} };
 assert.deepEqual(missingInputs(filled, terms), [], "benchmarks complete the inputs");
 const payload = lpPayload(filled, terms, resourceProfiles(filled));
-assert.deepEqual(payload.compliance.map((c) => [c.id, c.basis, c.hours, c.target, c.penaltyMultiple]), [["peak", "block", "peak", 0.9, 1.5], ["offpeak", "block", "offpeak", 0.7, 1.5]]);
+assert.deepEqual(payload.compliance.map((c) => [c.id, c.basis, c.hours, c.target, c.penaltyMultiple, c.max, c.excessTariffShare]),
+  [["peak", "block", "peak", 0.9, 1.5, undefined, undefined], ["solar", "block", "solar", 0.5, 1.5, 0.6, 0.5], ["remaining", "block", "remaining", 0.7, 1.5, undefined, undefined]]);
+assert.equal(payload.solarMask.length, 8760);
+assert.equal(payload.solarMask.reduce((a, v) => a + v, 0), 3650, "the Solar Hours go to HiGHS");
+const beforePayload = lpPayload(filled, before, resourceProfiles(filled));
+assert.equal(beforePayload.solarMask, undefined, "no Solar Hours before Amendment-03");
+assert.deepEqual(beforePayload.compliance.map((c) => c.hours), ["peak", "offpeak"]);
 const peakHoursOf = (mask) => [...new Set(Array.from(mask).map((v, t) => (v ? E.HOUR_OF_DAY[t] : null)).filter((h) => h !== null))].sort((a, b) => a - b);
 assert.deepEqual(peakHoursOf(payload.peakMask), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 18, 19, 20, 21, 22, 23], "any 6 of 18:00-10:00: all 16 hours held to 90%");
 const evening = lpPayload(filled, seciTerms({ ...DEFAULT_SETTINGS, peakPlan: "evening" }), resourceProfiles(filled));
@@ -75,8 +87,12 @@ const cond = hourCondition(hr, 0, { rules: peakRules, peakHour: () => true });
 assert.equal(cond.rule.id, "peak");
 assert.ok(Math.abs(cond.met + cond.above - cond.delivered) < 1e-9 && cond.short === 0, "a peak hour above 90% is met");
 const offShort = hourCondition({ demand: [300], direct: [150], discharge: [0] }, 0, { rules: peakRules, peakHour: () => false });
-assert.equal(offShort.rule.id, "offpeak");
+assert.equal(offShort.rule.id, "remaining");
 assert.equal(Math.round(offShort.short), 60, "70% of 300 MW needs 210 MW: 60 MW short");
+const solarShort = hourCondition({ demand: [300], direct: [100], discharge: [0] }, 0, { rules: peakRules, peakHour: () => false, solarHour: () => true });
+assert.deepEqual([solarShort.rule.id, Math.round(solarShort.short)], ["solar", 50], "a Solar Hour needs 50%: 150 MW, 50 MW short");
+assert.equal(hourCondition({ demand: [300], direct: [100], discharge: [0] }, 0, { rules: peakRules, peakHour: () => true, solarHour: () => true }).rule.id, "peak", "a Solar Hour picked as a Peak Hour is held to 90%");
+assert.equal(hourCondition({ demand: [300], direct: [150], discharge: [0] }, 0, { rules: before.rules, peakHour: () => false }).rule.id, "offpeak");
 assert.ok(/<svg[^>]*data-sankey/.test(hourSankeyHtml(hr, 0, { gens: ["solar", "wind"], titles: {}, colors: {}, rules: peakRules, peakHour: () => true, label: "Jan 10h" })));
 // solar capex per MWac; per MWp follows from the DC:AC
 assert.equal(SOURCE_FIELDS.solar.find((f) => f.key === "capex").unit, "₹ cr/MWac");

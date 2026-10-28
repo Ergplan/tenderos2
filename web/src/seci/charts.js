@@ -6,7 +6,7 @@ import * as E from "../rtc/engine.js";
 import { DATA_COLORS } from "../dataColors.js";
 import { capexBySource, modelInputs } from "../bid/model.js";
 import { irrCurve } from "../bid/quote.js";
-import { PACK, PEAK_PLANS, moneyAtStake } from "./terms.js";
+import { PACK, PEAK_PLANS, moneyAtStake, solarHoursOf } from "./terms.js";
 import { hourRanges } from "./peakPrices.js";
 import { financeOf } from "./voice.js";
 
@@ -24,6 +24,31 @@ const HOURS24 = Array.from({ length: 24 }, (_, h) => String(h).padStart(2, "0"))
 const r = (v, d = 1) => (Number.isFinite(v) ? Number(v.toFixed(d)) : null);
 const inWindow = (h) => h >= 18 || h < 10; // the Peak Hours window, RfS 8.1(c) as amended
 
+const amd3Of = (state) => state.seci?.profile !== "amd1";
+
+/** The floor outside the Peak Hours at hour h: Amendment-03's Solar Hours floor in a Solar Hour, else the Remaining Hours (or off-peak) floor. */
+export function otherFloor(state, h) {
+  const m = PACK.model;
+  if (!amd3Of(state)) return m.offpeakFloor;
+  const sh = solarHoursOf(state.seci);
+  return h >= sh.start && h < sh.end ? m.solarFloor : m.remainingFloor;
+}
+
+/** The most the PPA takes in each hour (MW): Amendment-03 caps a Solar Hour that is not a Peak Hour at 60%. */
+export function capsByHour(state, terms = null) {
+  const m = PACK.model;
+  const mw = state.bid.baseMw || 0;
+  if (!amd3Of(state)) return HOURS24.map(() => mw);
+  const sh = solarHoursOf(state.seci);
+  const plan = PEAK_PLANS[state.seci?.peakPlan] || PEAK_PLANS.any;
+  const share = plan.byPrice ? terms?.peak?.picked?.share : null;
+  return HOURS24.map((_, h) => {
+    if (!(h >= sh.start && h < sh.end)) return mw;
+    const f = share ? share[h] : (plan.hours >= 16 ? inWindow(h) : h >= plan.start && h < plan.start + plan.hours) ? 1 : 0;
+    return (f + (1 - f) * m.solarMax) * mw;
+  });
+}
+
 /**
  * The floor (MW) to meet in each hour of the day under the bidder's Peak Hours plan. When the plan
  * picks the costliest hours each day (terms.peak.picked), an hour's floor is the average over the
@@ -34,9 +59,9 @@ export function floorsByHour(state, terms = null) {
   const mw = state.bid.baseMw || 0;
   const plan = PEAK_PLANS[state.seci?.peakPlan] || PEAK_PLANS.any;
   const share = plan.byPrice ? terms?.peak?.picked?.share : null;
-  if (share) return share.map((f) => (f * m.peakFloor + (1 - f) * m.offpeakFloor) * mw);
+  if (share) return share.map((f, h) => (f * m.peakFloor + (1 - f) * otherFloor(state, h)) * mw);
   const held = (h) => (plan.hours >= 16 ? inWindow(h) : h >= plan.start && h < plan.start + plan.hours);
-  return HOURS24.map((_, h) => (held(h) ? m.peakFloor : m.offpeakFloor) * mw);
+  return HOURS24.map((_, h) => (held(h) ? m.peakFloor : otherFloor(state, h)) * mw);
 }
 
 /** Throws when the chart needs a sized plant (and, with `hourly`, its hour-by-hour dispatch). */
@@ -82,16 +107,23 @@ function peakWindow(state, hourly, terms = null) {
         data: [[{ name: "Peak Hours may fall here", xAxis: "18" }, { xAxis: "23" }], [{ name: "…and here", xAxis: "00" }, { xAxis: "09" }]] } },
     { name: "Contracted capacity", type: "line", symbol: "none", data: HOURS24.map(() => mw), lineStyle: { color: DATA_COLORS.demand, type: "dashed", width: 1 }, itemStyle: { color: DATA_COLORS.demand } },
   ];
+  const amd3 = amd3Of(state);
+  const sh = solarHoursOf(state.seci);
+  if (amd3) {
+    series.push({ name: "Most the buyer takes (60% in the Solar Hours)", type: "line", step: "middle", symbol: "none", data: capsByHour(state, terms).map((v) => r(v)), lineStyle: { color: DATA_COLORS.solar, type: "dashed", width: 1.5 }, itemStyle: { color: DATA_COLORS.solar } });
+  }
   const picked = plan.byPrice ? terms?.peak?.picked : null;
   if (picked) {
     series[0].name = "Floor you plan for (average of the days)";
     series.push({ name: "Days the hour is a Peak Hour", type: "bar", yAxisIndex: 1, barWidth: "55%", data: picked.share.map((f) => r(f * 100, 1)), itemStyle: { color: "rgba(212,255,63,0.35)" }, tooltip: { valueFormatter: (v) => `${v}% of days` } });
   }
   if (plan.hours < 16) {
-    series.push({ name: "Floor if a morning hour is picked", type: "line", step: "middle", symbol: "none", data: HOURS24.map((_, h) => r((inWindow(h) ? m.peakFloor : m.offpeakFloor) * mw)), lineStyle: { color: DATA_COLORS.unmet, type: "dotted" }, itemStyle: { color: DATA_COLORS.unmet } });
+    series.push({ name: "Floor if a morning hour is picked", type: "line", step: "middle", symbol: "none", data: HOURS24.map((_, h) => r((inWindow(h) ? m.peakFloor : otherFloor(state, h)) * mw)), lineStyle: { color: DATA_COLORS.unmet, type: "dotted" }, itemStyle: { color: DATA_COLORS.unmet } });
   }
   const summary = {
-    contractedMw: mw, peakFloorMw: r(m.peakFloor * mw), offpeakFloorMw: r(m.offpeakFloor * mw),
+    contractedMw: mw, peakFloorMw: r(m.peakFloor * mw),
+    ...(amd3 ? { solarHours: `${HOURS24[sh.start]}:00 to ${HOURS24[sh.end % 24]}:00`, solarFloorMw: r(m.solarFloor * mw), solarMaxMw: r(m.solarMax * mw), remainingFloorMw: r(m.remainingFloor * mw) }
+      : { offpeakFloorMw: r(m.offpeakFloor * mw) }),
     window: "18:00 to 10:00 (16 hours); the buyer picks any 6 of them a day ahead", plan: plan.label,
     hoursHeldToPeakFloor: floors.filter((v) => v === m.peakFloor * mw).length,
     ...(picked ? {
@@ -116,7 +148,9 @@ function peakWindow(state, hourly, terms = null) {
   }
   return {
     title: "Peak Hours and the floors, by hour of the day",
-    caption: `The buyer picks 6 Peak Hours a day, day-ahead, anywhere in the shaded 18:00–10:00 window: ${r(m.peakFloor * 100, 0)}% of ${mw} MW in those, ${r(m.offpeakFloor * 100, 0)}% in every other block.`
+    caption: `The buyer picks 6 Peak Hours a day, day-ahead, anywhere in the shaded 18:00–10:00 window: ${r(m.peakFloor * 100, 0)}% of ${mw} MW in those, `
+      + (amd3 ? `at least ${r(m.solarFloor * 100, 0)}% and at most ${r(m.solarMax * 100, 0)}% in the Solar Hours (${HOURS24[sh.start]}:00–${HOURS24[sh.end % 24]}:00 assumed), ${r(m.remainingFloor * 100, 0)}% in the Remaining Hours.`
+        : `${r(m.offpeakFloor * 100, 0)}% in every other block.`)
       + (picked ? ` Planned on the 6 costliest ${picked.marketLabel} hours of each day; the bars show how often each hour is one of them.` : ""),
     option: { animation: false, grid: picked ? { ...grid, right: 48 } : grid, legend, tooltip: { trigger: "axis", valueFormatter: (v) => `${v} MW` }, xAxis: { type: "category", data: HOURS24, name: "hour" },
       yAxis: picked ? [{ ...axisMw, min: 0 }, { type: "value", name: "% of days", min: 0, max: 100, splitLine: { show: false } }] : { ...axisMw, min: 0 }, series },

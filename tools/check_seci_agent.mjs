@@ -200,7 +200,9 @@ assert.ok((await run("open_format", { id: "particulars" })).particulars.some((x)
 assert.deepEqual(Object.keys(CHART_KINDS), ["peak_window", "typical_day", "monthly_energy", "irr_vs_tariff", "cash_flows", "money"]);
 const floorsAny = floorsByHour({ bid: { baseMw: 200 }, seci: { peakPlan: "any" } });
 assert.equal(floorsAny.filter((v) => v === 180).length, 16, "any 6 of 16: every window hour held at 90%");
-assert.deepEqual([floorsAny[18], floorsAny[9], floorsAny[10], floorsAny[17]], [180, 180, 140, 140]);
+assert.deepEqual([floorsAny[18], floorsAny[9], floorsAny[10], floorsAny[17], floorsAny[2]], [180, 180, 100, 100, 180], "Amendment-03: 50% in the Solar Hours (08-18) outside the window");
+const floorsBefore = floorsByHour({ bid: { baseMw: 200 }, seci: { peakPlan: "any", profile: "amd1" } });
+assert.deepEqual([floorsBefore[10], floorsBefore[17]], [140, 140], "before Amendment-03: 70% off-peak");
 const floorsEve = floorsByHour({ bid: { baseMw: 200 }, seci: { peakPlan: "evening" } });
 assert.equal(floorsEve.filter((v) => v === 180).length, 6);
 const unsized = agentChart("peak_window", { state: { ...state, lp: null, seci: { ...state.seci, peakPlan: "evening" } }, terms: ctx.getTerms() });

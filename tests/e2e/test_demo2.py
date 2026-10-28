@@ -196,3 +196,20 @@ def test_recent_tenders_and_cerc_upload(tmp_path):
         page.once("dialog", lambda d: d.accept())
         card.locator("[title='Delete this order']").click()
         page.wait_for_function(f"document.querySelectorAll('[data-testid=cerc-order]').length === {before}")
+
+
+def test_winning_bid_step():
+    """SECI tab, after Bid forms: how this tender's winners bid ₹5.25, as a bridge of sizing runs."""
+    with _session() as page:
+        page.click("aside.sidebar button:has-text('SECI RTC tender')")
+        page.wait_for_selector("[data-testid=seci-tab]")
+        page.click("[data-testid=seci-step-winning]")
+        bridge = page.locator("[data-testid=win-bridge]")
+        bridge.wait_for()
+        assert bridge.locator("tbody tr").count() == 8
+        text = bridge.inner_text()
+        for want in ("₹6.50", "₹7.46", "₹5.14", "₹5.39", "estimate"):
+            assert want in text, want
+        assert "₹5.25" in page.locator("[data-testid=win-head]").inner_text()
+        assert page.locator("[data-testid=win-head] a, .rtc-section a:has-text(\"SECI's result\")").count() >= 1
+        assert "Juniper" in page.locator("[data-testid=win-disclosed]").inner_text()

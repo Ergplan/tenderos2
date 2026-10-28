@@ -51,9 +51,11 @@ assert.equal(lpPayload(s, pending, resourceProfiles(s), null).peakMask.reduce((a
 // the floors by hour of the agent's charts: the average day
 const floors = floorsByHour(s, terms);
 const m = PACK.model;
-const expected = picked.share.reduce((a, f) => a + (f * m.peakFloor + (1 - f) * m.offpeakFloor) * 200, 0);
+// Amendment-03: outside the picked hours, the Solar Hours floor (08:00-18:00) or the Remaining Hours floor
+const other = (h) => (h >= 8 && h < 18 ? m.solarFloor : m.remainingFloor);
+const expected = picked.share.reduce((a, f, h) => a + (f * m.peakFloor + (1 - f) * other(h)) * 200, 0);
 assert.ok(Math.abs(floors.reduce((a, v) => a + v, 0) - expected) < 1e-6);
-assert.ok(floors[14] === m.offpeakFloor * 200, "14:00 is never a Peak Hour");
+assert.ok(floors[14] === m.solarFloor * 200, "14:00 is never a Peak Hour: a Solar Hour at 50%");
 
 // What-if: the costliest hours hold 6 hours a day to 90%, not 16
 const any = runWhatIf({ peakPlan: "any" }, { prices });

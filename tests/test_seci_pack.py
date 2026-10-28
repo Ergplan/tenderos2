@@ -68,7 +68,7 @@ def test_conditions_have_sources_unless_missing():
         assert c["group"] in {"The tender", "What you bid", "Supply", "Plant", "Dates", "Money at stake", "Eligibility", "Bid process"}, c["id"]
         assert bool(c["sources"]) == (c["status"] != "missing"), c["id"]
         if c["status"] in {"amended", "removed", "ambiguous"}:
-            assert c.get("by") in {"amd1", "amd2"}, c["id"]
+            assert c.get("by") in {"amd1", "amd2", "amd3"}, c["id"]
 
 
 def test_the_sizing_terms_match_the_conditions():
@@ -76,7 +76,9 @@ def test_the_sizing_terms_match_the_conditions():
     text = {c["id"]: c["value"] for c in PACK["conditions"]}
     assert (m["minBidMw"], m["maxBidMw"]) == (50, 500) and "50 MW to 500 MW" in text["bidSize"]
     assert m["peakFloor"] == 0.9 and "90%" in text["dfrPeak"]
-    assert m["offpeakFloor"] == 0.7 and "70%" in text["dfrOffpeak"]
+    assert m["offpeakFloor"] == m["remainingFloor"] == 0.7 and "70%" in text["dfrOffpeak"] and "Remaining Hours" in text["dfrOffpeak"]
+    assert (m["solarFloor"], m["solarMax"], m["solarExcessTariffShare"]) == (0.5, 0.6, 0.5) and "50%" in text["dfrSolar"] and "60%" in text["dfrSolar"]
+    assert "50% of the tariff" in text["excess"]
     assert m["penaltyMultiple"] == 1.5 and "1.5" in text["penalty"]
     assert m["peakWindow"] == {"start": 18, "hours": 16} and m["peakHoursChosen"] == 6 and "18:00 and 10:00" in text["peakHours"]
     assert m["scsdMonths"] == 24 and "24 months" in text["scsd"]

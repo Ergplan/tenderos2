@@ -6,9 +6,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from engine.sizing import dispatch15 as D
 from engine.sizing import rtc_lp as M
 from tests.engine.test_bid_lp import BESS0, FIN0, HOUR
-from tests.engine.test_rtc_lp import COSTS, _case
+from tests.engine.test_rtc_lp import COSTS, _case, _formula_delivered
 
 pytestmark = pytest.mark.skipif(M.highspy is None, reason="highspy not installed")
 
@@ -127,3 +128,64 @@ def test_fifteen_minute_dispatch_holds_the_block_floors_and_writes_the_workbook(
     assert [r[0] for r in summary[1:]] == [1, 2]
     monthly = list(wb["Monthly"].iter_rows(values_only=True))
     assert len(monthly) == 1 + 24
+
+
+SOLAR = ((HOUR >= 8) & (HOUR < 18)).astype(float).tolist()  # Solar Hours 08:00-18:00
+
+
+def _amd3(share=0.5):
+    """Amendment-03 (SECI FDRE-RTC-V): 90% in the peak blocks, 50-60% in the Solar Hours (power above
+    60% earns at most half the tariff), 70% in the Remaining Hours, shortfall at 1.5 x tariff."""
+    return [
+        {"id": "peak", "label": "Peak", "target": 0.9, "hours": "peak", "basis": "block", "penaltyMultiple": 1.5},
+        {"id": "solar", "label": "Solar Hours", "target": 0.5, "max": 0.6, "excessTariffShare": share, "hours": "solar", "basis": "block", "penaltyMultiple": 1.5},
+        {"id": "remaining", "label": "Remaining Hours", "target": 0.7, "hours": "remaining", "basis": "block", "penaltyMultiple": 1.5},
+    ]
+
+
+@pytest.mark.slow  # two solves and a 15-minute dispatch
+def test_amendment_03_caps_the_solar_hours_and_prices_their_excess():
+    fin = {**FIN0, "sellSurplus": True, "surplusPrice": 4.0}  # a market that pays more than half the tariff
+    payload = _payload(_amd3(), solarMask=SOLAR, fin=fin, ppaFirst=True, ctx={**_payload([])["ctx"], "sellSurplus": True}, returnDispatch=True)
+    res = M.solve(payload)
+    assert res["ok"], res.get("status")
+    h = res["hourly"]
+    delivered = np.asarray(h["direct"]) + np.asarray(h["discharge"])
+    solar = (np.asarray(SOLAR) > 0.5) & (np.asarray(PEAK) < 0.5)
+    assert delivered[solar].max() <= 60.0 + 0.02, "the PPA takes at most 60% in the Solar Hours"
+    assert delivered[~solar].max() > 60.0, "and up to the contract outside them"
+    rules = {r["id"]: r for r in res["perYear"][0]["rules"]}
+    assert set(rules) == {"peak", "solar", "remaining"}
+    # the Solar Hours surplus goes to the buyer at half the tariff (the market pays more), none to the market
+    assert res["buyerExcessShare"] == 0.5
+    life = res["lifetime"][0]
+    assert life["buyerExcessMwh"] > 1000 and life["exportMwh"] == pytest.approx(0, abs=1.0)
+    # year 1's hours say what a sale earns at most: half the tariff in a Solar Hour, no cap elsewhere
+    assert h["saleCap"][12] == pytest.approx(0.5 * res["tariff"], rel=1e-3) and h["saleCap"][2] is None
+    # the workbook's dispatch sheets: a Solar Hours column, the 60% cap and the 50% floor reproduce
+    # the LP's energy and shortfall year by year
+    d = res["dispatch"]
+    assert d["blocks"] and (d["solarFloor"], d["solarMax"], d["offFloor"]) == (0.5, 0.6, 0.7)
+    assert sum(d["solarHours"]) == 365 * 10, "08:00-18:00, none of them a Peak Hour (18:00-24:00)"
+    lives = {y["year"]: y for y in res["lifetime"]}
+    for y in d["byYear"]:
+        delivered, short, low = _formula_delivered(d, y, res["sizes"], fin, BESS0)
+        assert delivered == pytest.approx(lives[y["year"]]["deliveredMwh"], rel=1e-5)
+        assert short == pytest.approx(lives[y["year"]]["blockShortfallMwh"], rel=1e-4, abs=1.0)
+        assert low >= -1e-3
+    # the 15-minute dispatch keeps the cap and gives the buyer the Solar Hours excess
+    y1 = D.run(payload, res["sizes"], res["tariff"], years=[1])["years"][0]
+    assert {r["id"] for r in y1["rules"]} == {"peak", "solar", "remaining"}
+    assert y1["toBuyerMu"] > 1 and y1["toBuyerMu"] <= y1["soldMu"] + 1e-9
+    # with a market below half the tariff the same hours sell to the market
+    cheap = M.solve(_payload(_amd3(), solarMask=SOLAR, fin={**fin, "surplusPrice": 1.0}, ppaFirst=True, ctx={**_payload([])["ctx"], "sellSurplus": True}))
+    assert cheap["lifetime"][0]["buyerExcessMwh"] == pytest.approx(0, abs=1.0) and cheap["lifetime"][0]["exportMwh"] > 0
+
+
+def test_amendment_03_rules_are_checked():
+    with pytest.raises(M.LpInputError, match="solarMask"):
+        M.solve(_payload(_amd3()))
+    bad = _amd3()
+    bad[1]["max"] = 0.4  # below its own floor
+    with pytest.raises(M.LpInputError, match="max"):
+        M.solve(_payload(bad, solarMask=SOLAR))

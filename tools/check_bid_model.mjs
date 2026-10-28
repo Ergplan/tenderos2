@@ -252,7 +252,9 @@ assert.deepEqual(mergeBidState({ ...defaultBidState(), prebid: undefined }).preb
   assert.equal(seedFor({}, {}, 300, 25), null, "no last sizing and no typical design: no seed");
   // the SECI tab's first sizing starts from its typical design
   const typical = seedFor({}, seciTerms(), 200, 25);
-  assert.ok(typical && typical.from.includes("typical SECI") && Math.abs(typical.sizes.bessMwh - 1187.8) < 0.1);
+  assert.ok(typical && typical.from.includes("Amendment-03") && Math.abs(typical.sizes.bessMwh - 1724.4) < 0.1, "Amendment-03's design by default");
+  const before = seedFor({}, seciTerms({ profile: "amd1" }), 200, 25);
+  assert.ok(Math.abs(before.sizes.bessMwh - 1187.8) < 0.1 && before.tariff === 6.5, "the design before Amendment-03");
   assert.equal(typical.deliveredMwh.length, 25);
 }
 

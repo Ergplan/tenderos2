@@ -1,6 +1,7 @@
 // One hour of the year-1 dispatch as a see-through Sankey (an SVG string for the chart tooltip):
 // where each source's output went, and how the delivery meets the hour's supply condition (SECI
-// RTC-TM: 90% of the contract in every peak block, 70% in every off-peak block). Plain
+// FDRE-RTC-V: 90% of the contract in every peak block; Amendment-03: 50% in the Solar Hours and
+// 70% in the Remaining Hours; before it, 70% in every off-peak block). Plain
 // JavaScript, used in Node by tools/check_seci.mjs.
 //
 // Energy is counted as hourlyAtMeter (bid/model.js) gives it: the contract, the PPA, battery
@@ -12,17 +13,20 @@ import { chartColor } from "../themeColors.js";
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const mw = (v) => `${Math.round(v).toLocaleString("en-IN")} MW`;
 const MIN = 0.5; // MW: smaller flows are left out
+const RULE_HOURS = { peak: "Peak", offpeak: "Off-peak", solar: "Solar Hours", remaining: "Remaining Hours", all: "Supply" };
 
 /** The hour's supply condition: the block rule over this hour, what it needs and what was delivered. */
-export function hourCondition(hourly, t, { rules = [], peakHour = () => false } = {}) {
+export function hourCondition(hourly, t, { rules = [], peakHour = () => false, solarHour = () => false } = {}) {
   const contracted = hourly.demand?.[t] || 0;
   const delivered = (hourly.direct?.[t] || 0) + (hourly.discharge?.[t] || 0);
   const peak = peakHour(t);
-  const rule = rules.filter((r) => r.basis === "block" && (r.hours === "all" || (r.hours === "offpeak" ? !peak : peak)))
+  const solar = !peak && solarHour(t); // an hour picked as a Peak Hour is held as one
+  const covers = { all: true, peak, offpeak: !peak, solar, remaining: !peak && !solar };
+  const rule = rules.filter((r) => r.basis === "block" && covers[r.hours])
     .sort((a, b) => b.target - a.target)[0] || null;
   const need = rule ? rule.target * contracted : contracted;
   return {
-    rule, peak, contracted, delivered, need,
+    rule, peak, solar, contracted, delivered, need,
     met: Math.min(delivered, need),
     above: Math.max(0, delivered - need),
     short: Math.max(0, need - delivered),
@@ -33,7 +37,7 @@ export function hourCondition(hourly, t, { rules = [], peakHour = () => false } 
  * The hour's flows: sources → uses → the condition. gens: generator keys in hourly (solar,
  * wind, …); titles and colors by key (bess for the battery). Returns { columns, links }.
  */
-export function hourFlows(hourly, t, { gens, titles, colors, rules = [], peakHour = () => false }) {
+export function hourFlows(hourly, t, { gens, titles, colors, rules = [], peakHour = () => false, solarHour = () => false }) {
   const poi = hourly.atMeter || 1;
   const val = (k) => Math.max(0, hourly[k]?.[t] || 0);
   const gen = Object.fromEntries(gens.map((k) => [k, val(k)]));
@@ -44,7 +48,7 @@ export function hourFlows(hourly, t, { gens, titles, colors, rules = [], peakHou
   const charge = val("charge");
   const curtail = val("curtail");
   const loss = val("evacLoss");
-  const cond = hourCondition(hourly, t, { rules, peakHour });
+  const cond = hourCondition(hourly, t, { rules, peakHour, solarHour });
 
   const sources = [...gens.filter((k) => gen[k] > MIN).map((k) => ({ id: k, label: titles[k] || k, color: colors[k] }))];
   if (dis > MIN) sources.push({ id: "bess", label: titles.bess || "Battery", color: colors.bess });
@@ -55,7 +59,8 @@ export function hourFlows(hourly, t, { gens, titles, colors, rules = [], peakHou
     { id: "curtail", label: "Curtailed", color: "#8d8d99" },
     { id: "loss", label: "Losses to the meter", color: "#ff8a5f" },
   ];
-  const ruleLabel = cond.rule ? `${cond.peak ? "Peak" : "Off-peak"} floor ${Math.round(cond.rule.target * 100)}%` : "Contract";
+  const kind = RULE_HOURS[cond.rule?.hours] || "Supply";
+  const ruleLabel = cond.rule ? `${kind} floor ${Math.round(cond.rule.target * 100)}%` : "Contract";
   const right = [{ id: "met", label: `${ruleLabel}: met`, color: "#7ddc9a" }, { id: "above", label: "Above the floor", color: "#4fd1c5" }];
   if (cond.short > MIN) right.push({ id: "short", label: `Short${cond.rule?.penaltyMultiple != null ? ` (${cond.rule.penaltyMultiple}× tariff)` : " of the floor"}`, color: "#ff6b5f", ghost: true });
 
@@ -145,7 +150,7 @@ export function hourSankeyHtml(hourly, t, opts) {
   const verdict = c.short > MIN
     ? `<span style="color:${tone("#ff6b5f")}">short ${mw(c.short)}${c.rule?.penaltyMultiple != null ? `, paid at ${c.rule.penaltyMultiple}× the tariff` : ""}</span>`
     : `<span style="color:${tone("#7ddc9a")}">met</span>`;
-  const rule = c.rule ? `${c.peak ? "Peak" : "Off-peak"} block · floor ${Math.round(c.rule.target * 100)}% of ${mw(c.contracted)} = ${mw(c.need)}` : `Contract ${mw(c.contracted)}`;
+  const rule = c.rule ? `${RULE_HOURS[c.rule.hours] || "Supply"} block · floor ${Math.round(c.rule.target * 100)}% of ${mw(c.contracted)} = ${mw(c.need)}` : `Contract ${mw(c.contracted)}`;
   return `<div style="min-width:640px"><div style="display:flex;justify-content:space-between;gap:16px;margin-bottom:4px"><b>${esc(opts.label || "")}</b>`
     + `<span style="opacity:.85">${esc(rule)} · delivered ${mw(c.delivered)} · ${verdict}</span></div>${sankeySvg(flows, { mode: opts.mode })}</div>`;
 }

@@ -13,7 +13,7 @@ export const TENDER = {
       "core.identity.tender_number": PACK.rfsNo,
       "core.identity.issuing_agency": PACK.issuer,
       "core.identity.title": PACK.title,
-      "core.identity.tender_type_as_stated": "RTC-TM",
+      "core.identity.tender_type_as_stated": "FDRE-RTC (issued as RTC-TM)",
     },
   },
 };
