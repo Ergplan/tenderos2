@@ -25,7 +25,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from tests.e2e.test_tender_to_bid import DEMO, EMAIL, PASSWORD, URL, _check_live_model, _session
+from tests.e2e.test_tender_to_bid import DEMO, EMAIL, PASSWORD, URL, _check_live_model, _session, _xlsx_sheets
 
 ROOT = Path(__file__).resolve().parents[2]
 PACK = json.loads((ROOT / "web" / "src" / "seci" / "seci-rtc-tm-v.json").read_text())
@@ -306,6 +306,21 @@ def test_bid_on_screen(tmp_path):
         book = Path(tmp_path) / dl.value.suggested_filename
         dl.value.save_as(str(book))
         _check_live_model(book, tariff=float(tariff.group(1)), irr=float(irr.group(1)) / 100, tmp=tmp_path)
+        # the energy of each year is formulas on the modelled years' hour-by-hour sheets
+        sheets = _xlsx_sheets(book)
+        assert "Dispatch Y1" in sheets and "Dispatch Y25" in sheets, list(sheets)
+        assert sum(1 for f, _ in sheets["Dispatch Y1"].values() if f) > 8760 * 8  # nine formula columns an hour
+        delivered = [f for f, _ in sheets["Live model"].values() if f and "'Dispatch Y1'!" in f]
+        assert delivered, "the Live model reads the dispatch sheets"
+        # and in the traceable model: Delivered, year 1 → the year's hours
+        page.click("[data-testid=trace-open]")
+        page.wait_for_selector("[data-testid=trace-explorer]")
+        page.fill("[data-testid=trace-search]", "Delivered to the procurer")
+        page.locator(".trace-grid td.kind-calc button").nth(1).click()  # year 1 (the first is the total)
+        assert "Dispatch Y1" in page.locator("[data-testid=trace-formula]").inner_text() or "hour by hour" in page.locator("[data-testid=trace-formula]").inner_text()
+        page.locator("[data-testid=trace-formula] .trace-ref", has_text="hour by hour").first.click()
+        assert page.locator("[data-testid=dispatch-hours] tbody tr").count() == 24
+        page.keyboard.press("Escape")
 
         # every PPA year dispatched in 15-minute blocks with the time-block floors, as one workbook
         page.click("[data-testid=seci-step-size]")

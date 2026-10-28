@@ -7,6 +7,8 @@
 //
 // Units: energy in MU (million kWh), money in ₹ crore, prices in ₹/kWh. MU × ₹/kWh ÷ 10 = ₹ crore.
 
+import { addDispatchSheet, dispatchRef } from "./dispatchSheets.js";
+
 export const LIVE_SHEET = "Live model";
 
 const INK = "FF111111";
@@ -175,7 +177,7 @@ class Sheet {
  * web/src/bid/exportModel.js liveModelRequest). Returns { sheet, cells } where cells maps the
  * key results (tariff, equityIrr, ...) to their 'Live model'!C.. addresses for other sheets.
  */
-export function addLiveModel(wb, m) {
+export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   const N = m.ops.length;
   const ws = wb.addWorksheet(LIVE_SHEET, { properties: { tabColor: { argb: "FF0000FF" } } });
   const S = new Sheet(ws, N);
@@ -216,7 +218,9 @@ export function addLiveModel(wb, m) {
   r = S.next();
   r.getCell(1).value = sim
     ? "The energy comes from the Round the clock tab's hourly simulation of every year; changing a plant size here moves its cost, not its energy (change it in the tab for that)."
-    : "The optimiser's energy comes from the hourly HiGHS dispatch of every year; changing a plant size here moves its cost, not its energy (size the plant again in TenderOS for that).";
+    : m.dispatch
+      ? `Each year's energy is worked out hour by hour on the sheets ${m.dispatch.byYear.map((y) => `"Dispatch Y${y.year}"`).join(" and ")} from the optimiser's choices (green) and the inputs; years between them are interpolated as the optimiser does. Changing a plant size moves its output there, but not the optimiser's choices: size the plant again in TenderOS for a new dispatch.`
+      : "The optimiser's energy comes from the hourly HiGHS dispatch of every year; changing a plant size here moves its cost, not its energy (size the plant again in TenderOS for that). Size the plant again to include the hour-by-hour sheets.";
   r.getCell(1).font = { italic: true, color: { argb: "FF777777" } };
   r = S.next();
   S.yearRow = S.row;
@@ -334,6 +338,23 @@ export function addLiveModel(wb, m) {
     S.one("deg", "Battery capacity fade", "%/yr", { v: bs.annualDegradation || 0, kind: "input", fmt: "pct", source: src("bess.degradation") });
     S.one("augYear", "One-time augmentation year", "year", { v: bs.augmentationYear || 0, kind: "input", fmt: "int", source: src("bess.augmentationYear", "Model default (used with oneTime)") });
     S.one("decline", "Battery price decline", "%/yr", { v: bs.costDeclinePct || 0, kind: "input", fmt: "pct", source: src("bess.costDeclinePct", "Model default") });
+  }
+
+  // the hour-by-hour dispatch sheets (dispatchSheets.js) read these
+  const dsp = m.dispatch && (m.dispatch.solar ? m.gen?.solar : true) && (m.dispatch.wind ? m.gen?.wind : true) ? m.dispatch : null;
+  if (dsp) {
+    S.group("Dispatch, hour by hour (sheets Dispatch Y…)");
+    S.one("contract", "Contracted capacity", "MW", { v: dsp.contract, kind: "input", fmt: "mw", source: "The bid" });
+    S.one("poi", "Share of the energy reaching the meter", "%", { v: dsp.poi, kind: "input", fmt: "pct", source: "Power transformer and line losses", note: "(1 − transformer loss) × (1 − line loss): from the 33 kV bus to the 220 kV billing meter" });
+    S.one("rte", "Battery round trip, at the 33 kV bus", "%", { v: dsp.eta ** 2, kind: "input", fmt: "pct", source: src("bess.rte") });
+    S.one("eta", "Battery efficiency each way", "%", { f: `SQRT(${S.s("rte")})`, v: dsp.eta, fmt: "pct" });
+    S.one("minSoc", "Battery minimum charge", "%", { v: dsp.minSoc, kind: "input", fmt: "pct", source: src("bess.minSoc") });
+    S.one("maxSoc", "Battery maximum charge", "%", { v: dsp.maxSoc, kind: "input", fmt: "pct", source: src("bess.maxSoc") });
+    S.one("initSoc", "Battery charge at the start of a year", "%", { v: dsp.initSoc, kind: "input", fmt: "pct", source: "Model default" });
+    if (dsp.blocks) {
+      S.one("peakFloor", "Peak Hours floor", "% of contracted", { v: dsp.peakFloor, kind: "input", fmt: "pct", source: "Tender" });
+      S.one("offFloor", "Off-peak floor", "% of contracted", { v: dsp.offFloor, kind: "input", fmt: "pct", source: "Tender" });
+    }
   }
 
   S.group("Financing");
@@ -456,12 +477,51 @@ export function addLiveModel(wb, m) {
     });
   }
 
+  // ---- the modelled years hour by hour, on their own sheets; each PPA year's energy below is
+  // their totals, weighted as the sizing interpolates between the modelled years
+  const dTotals = {};
+  if (dsp) {
+    const lm = (addr) => `'${LIVE_SHEET}'!${String(addr).replace(/^\$?([A-Z]+)\$?(\d+)$/, "$$$1$$$2")}`;
+    for (const y of dsp.byYear) {
+      const deg = (k) => (S.cell[`${k}DegF`] ? { f: lm(S.at(`${k}DegF`, y.year)), v: S.v(`${k}DegF`, y.year) } : null);
+      const range = Math.min(Math.max(dsp.initSoc - dsp.minSoc, 0), dsp.maxSoc - dsp.minSoc);
+      const links = {
+        ...(dsp.solar ? { solarMw: { f: lm(S.s("solarMw")), v: S.v("solarMw") }, solarDegF: deg("solar") } : {}),
+        ...(dsp.wind ? { windMw: { f: lm(S.s("windMw")), v: S.v("windMw") }, windDegF: deg("wind") } : {}),
+        contract: { f: lm(S.s("contract")), v: dsp.contract },
+        poi: { f: lm(S.s("poi")), v: dsp.poi },
+        eta: { f: lm(S.s("eta")), v: dsp.eta },
+        ...(dsp.blocks ? { peakFloor: { f: lm(S.s("peakFloor")), v: dsp.peakFloor }, offFloor: { f: lm(S.s("offFloor")), v: dsp.offFloor } } : {}),
+        start: !on.bess ? { v: 0 } : {
+          f: `MIN(MAX(${lm(S.s("initSoc"))}-${lm(S.s("minSoc"))},0),${lm(S.s("maxSoc"))}-${lm(S.s("minSoc"))})*${lm(S.s("bessMwh"))}*${y.bf}`,
+          v: range * (S.v("bessMwh") || 0) * y.bf,
+        },
+      };
+      const out = addDispatchSheet(wb, dsp, y, links, { rows: dispatchRows });
+      dTotals[y.year] = out;
+    }
+  }
+  // energy of PPA year y from the modelled years' totals (MWh → MU)
+  const fromDispatch = (key, y) => {
+    const w = dsp.weights[y - 1].map((x, j) => [x, dsp.byYear[j].year]).filter(([x]) => x > 0);
+    return {
+      f: `(${w.map(([x, yr]) => `${x === 1 ? "" : `${+x.toFixed(6)}*`}${dispatchRef(yr, dTotals[yr].totals[key])}`).join("+")})/1000`,
+      v: w.reduce((a, [x, yr]) => a + x * dTotals[yr].values.totals[key], 0) / 1000,
+    };
+  };
+
   // ---- energy from the optimiser
   S.section(sim ? "Energy (the hourly simulation of each year, summed)" : "Energy (the optimiser's hourly dispatch, summed by year)");
   const op = (y) => m.ops[y - 1];
   const mu = (x) => (x || 0) / 1000;
-  S.series("demand", "Contracted energy", "MU", { v: (y) => mu(op(y).demandMWh), kind: "opt", fmt: "mu", total: true });
-  S.series("delivered", "Delivered to the procurer", "MU", { v: (y) => mu(op(y).deliveredMWh), kind: "opt", fmt: "mu", total: true });
+  if (dsp) {
+    S.series("demand", "Contracted energy", "MU", { f: () => `${S.s("contract")}*8760/1000`, v: () => (dsp.contract * 8760) / 1000, fmt: "mu", total: true });
+    S.series("delivered", "Delivered to the procurer", "MU", { f: (y) => fromDispatch("delivered", y).f, v: (y) => fromDispatch("delivered", y).v, fmt: "mu", total: true,
+      note: "The modelled years' hour-by-hour sheets (Dispatch Y…), summed; years between them interpolated as the sizing does" });
+  } else {
+    S.series("demand", "Contracted energy", "MU", { v: (y) => mu(op(y).demandMWh), kind: "opt", fmt: "mu", total: true });
+    S.series("delivered", "Delivered to the procurer", "MU", { v: (y) => mu(op(y).deliveredMWh), kind: "opt", fmt: "mu", total: true });
+  }
   S.series("dfr", "Delivered ÷ contracted", "%", {
     f: (y) => `IF(${S.at("demand", y)}>0,${S.at("delivered", y)}/${S.at("demand", y)},1)`,
     v: (y) => (S.v("demand", y) > 0 ? S.v("delivered", y) / S.v("demand", y) : 1), fmt: "pct",
@@ -470,8 +530,10 @@ export function addLiveModel(wb, m) {
     f: (y) => `MAX(0,${S.s("target")}*${S.at("demand", y)}-${S.at("delivered", y)})`,
     v: (y) => Math.max(0, S.v("target") * S.v("demand", y) - S.v("delivered", y)), fmt: "mu", total: true,
   });
-  if (blocky) S.series("blockShort", "Short of the time-block floors", "MU", { v: (y) => mu(op(y).blockShortfallMWh), kind: "opt", fmt: "mu", total: true, note: "Each hour's energy below its floor (peak and off-peak blocks), from the dispatch" });
-  S.series("excess", "Sold in the market", "MU", { v: (y) => mu(op(y).excessMWh), kind: "opt", fmt: "mu", total: true });
+  if (blocky && dsp?.blocks) S.series("blockShort", "Short of the time-block floors", "MU", { f: (y) => fromDispatch("short", y).f, v: (y) => fromDispatch("short", y).v, fmt: "mu", total: true, note: "Each hour's energy below its floor, summed from the hour-by-hour sheets" });
+  else if (blocky) S.series("blockShort", "Short of the time-block floors", "MU", { v: (y) => mu(op(y).blockShortfallMWh), kind: "opt", fmt: "mu", total: true, note: "Each hour's energy below its floor (peak and off-peak blocks), from the dispatch" });
+  if (dsp?.sell) S.series("excess", "Sold in the market", "MU", { f: (y) => fromDispatch("soldMeter", y).f, v: (y) => fromDispatch("soldMeter", y).v, fmt: "mu", total: true });
+  else S.series("excess", "Sold in the market", "MU", { v: (y) => mu(op(y).excessMWh), kind: "opt", fmt: "mu", total: true });
   if (hourly) {
     S.series("price", `Realised market price${m.market ? ` (IEX ${m.market}, hourly)` : " (hourly)"}`, "₹/kWh", {
       v: (y) => (op(y).excessMWh > 0 && finite(op(y).surplusRevenueCr) ? (op(y).surplusRevenueCr * 1e4) / op(y).excessMWh : 0),
@@ -868,7 +930,10 @@ export function addLiveModel(wb, m) {
     } else if (finite(app) || (key === "payback" && app !== undefined)) {
       S.put(row.getCell(4), { v: app, fmt, kind: "app" });
       if (finite(app) && finite(out[key][1])) {
-        const t = tol[key] ?? Math.max(1e-6, Math.abs(app) * 1e-6);
+        // within a millionth, and money within ₹1,000 (1e-4 crore): the hour-by-hour sheets carry the
+        // optimiser's MW to six decimals, so an amount that is 0 in the app (the equity NPV at the
+        // target IRR) can come out a few hundred rupees off
+        const t = tol[key] ?? Math.max(fmt === "cr" ? 1e-4 : 1e-6, Math.abs(app) * 1e-6);
         S.put(row.getCell(5), { f: `IF(ISNUMBER(C${keyRow0 + i}),C${keyRow0 + i}-D${keyRow0 + i},"")`, v: out[key][1] - app, fmt });
         row.getCell(6).value = { formula: `IF(ISNUMBER(E${keyRow0 + i}),IF(ABS(E${keyRow0 + i})<=${t},"Yes","Changed"),"")`, result: Math.abs(out[key][1] - app) <= t ? "Yes" : "Changed" };
       } else {
@@ -907,13 +972,49 @@ export function addLiveModel(wb, m) {
 
   const cells = Object.fromEntries(KEYS.map(([key]) => [key, `'${LIVE_SHEET}'!${S.cell[`key_${key}`]}`]));
   // addr: every row's key → its address ("$C$12" for one value, the row number for a year series)
-  return { sheet: ws, cells, values: Object.fromEntries(Object.entries(out).map(([k, [, v]]) => [k, v])), rows: S.val, addr: { ...S.cell } };
+  return { sheet: ws, cells, values: Object.fromEntries(Object.entries(out).map(([k, [, v]]) => [k, v])), rows: S.val, addr: { ...S.cell }, dispatch: dsp ? dTotals : null };
 }
 
 /**
  * The request's `live` block, checked: numbers are finite (else 0), choices are from their lists,
  * at most 60 years. Returns null when there is no year to model.
  */
+/**
+ * The sizing's hour-by-hour dispatch of its modelled years (rtc_lp.solve returnDispatch), checked:
+ * 8,760 finite numbers per series, at most six modelled years, weights for every PPA year. Null
+ * when absent or malformed (the Live model then shows the optimiser's yearly energy as values).
+ */
+function dispatchInput(d, years) {
+  const H = 8760;
+  if (!d || typeof d !== "object" || !Array.isArray(d.byYear) || !d.byYear.length || d.byYear.length > 6) return null;
+  const series = (a, lo = 0, hi = 1e7) => (Array.isArray(a) && a.length === H && a.every((v) => finite(v) && v >= lo - 1e-6 && v <= hi) ? a.map((v) => Math.max(lo, v)) : null);
+  const num = (v, lo, hi) => (finite(v) && v >= lo && v <= hi ? v : null);
+  const solar = Boolean(d.solar);
+  const wind = Boolean(d.wind);
+  const sell = Boolean(d.sell);
+  const blocks = Boolean(d.blocks);
+  const out = {
+    solar, wind, sell, blocks,
+    contract: num(d.contract, 1e-6, 1e6), poi: num(d.poi, 0.5, 1), eta: num(d.eta, 0.5, 1),
+    minSoc: num(d.minSoc, 0, 1), maxSoc: num(d.maxSoc, 0, 1), initSoc: num(d.initSoc, 0, 1),
+    peakFloor: blocks ? num(d.peakFloor, 0, 1) : 0, offFloor: blocks ? num(d.offFloor, 0, 1) : 0,
+    solarCf: solar ? series(d.solarCf, 0, 2) : null, windCf: wind ? series(d.windCf, 0, 2) : null,
+    peak: blocks ? series(d.peak, 0, 1) : null,
+  };
+  const need = ["contract", "poi", "eta", "minSoc", "maxSoc", "initSoc", ...(blocks ? ["peakFloor", "offFloor", "peak"] : []), ...(solar ? ["solarCf"] : []), ...(wind ? ["windCf"] : [])];
+  if ((!solar && !wind) || need.some((k) => out[k] === null)) return null;
+  out.byYear = d.byYear.map((y) => ({
+    year: Number.isInteger(y?.year) && y.year >= 1 && y.year <= years ? y.year : null,
+    bf: num(y?.bf, 0, 1.5),
+    charge: series(y?.charge), discharge: series(y?.discharge), sold: sell ? series(y?.sold) : new Array(H).fill(0),
+  }));
+  if (out.byYear.some((y) => Object.values(y).some((v) => v === null))) return null;
+  const w = d.weights;
+  if (!Array.isArray(w) || w.length !== years || !w.every((r) => Array.isArray(r) && r.length === out.byYear.length && r.every((x) => finite(x) && x >= 0 && x <= 1))) return null;
+  out.weights = w;
+  return out;
+}
+
 export function liveModelInput(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.ops) || !raw.ops.length) return null;
   const n = (v) => (finite(v) ? v : 0);
@@ -957,6 +1058,7 @@ export function liveModelInput(raw) {
       ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"]),
       ...(finite(o?.surplusRevenueCr) ? { surplusRevenueCr: o.surplusRevenueCr } : {}),
     })),
+    dispatch: dispatchInput(raw.dispatch, raw.ops.length),
     gen: Object.fromEntries(["solar", "wind"].filter((k) => raw.on?.[k] && finite(raw.gen?.[k]?.cuf) && raw.gen[k].cuf > 0).map((k) => {
       const g = raw.gen[k];
       const months = Array.isArray(g.monthCuf) && g.monthCuf.length === 12 && g.monthCuf.every(finite) ? g.monthCuf.map((c) => Math.min(1, Math.max(0, c))) : null;

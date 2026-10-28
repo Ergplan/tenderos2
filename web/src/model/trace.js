@@ -3,6 +3,7 @@
 // can show every number with the formula that makes it, the numbers it reads (precedents) and the
 // numbers that read it (dependents). Plain JavaScript, used in Node by tools/check_trace.mjs.
 import { addLiveModel, liveModelInput, LIVE_SHEET } from "../../lib/liveModel.js";
+import { HEAD_ROW, dispatchLetters } from "../../lib/dispatchSheets.js";
 
 const colNum = (letters) => [...letters].reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0);
 export const colName = (n) => {
@@ -98,7 +99,9 @@ class RecBook {
 
 // ---- reading references out of a formula
 const STRINGS = /"(?:[^"]|"")*"/g;
-const REF = /(?<![A-Z$])\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?(?![\d(A-Z])/g;
+// a cell or range, optionally on another sheet ('Dispatch Y1'!$O$5): its address is then "Dispatch Y1!O5"
+const REF = /(?<![A-Z$])(?:'([^']+)'!)?\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?(?![\d(A-Z])/g;
+const qualify = (sheet, addr) => (sheet ? `${sheet}!${addr}` : addr);
 
 /** The cells a formula reads, ranges expanded, in order of first use. */
 export function formulaRefs(formula) {
@@ -108,11 +111,13 @@ export function formulaRefs(formula) {
   const seen = new Set();
   const add = (a) => { if (!seen.has(a)) { seen.add(a); out.push(a); } };
   for (const m of text.matchAll(REF)) {
-    const c1 = colNum(m[1]);
-    const r1 = Number(m[2]);
-    if (!m[3]) { add(addrOf(r1, c1)); continue; }
-    const c2 = colNum(m[3]);
-    const r2 = Number(m[4]);
+    const sheet = m[1];
+    const c1 = colNum(m[2]);
+    const r1 = Number(m[3]);
+    if (!m[4]) { add(qualify(sheet, addrOf(r1, c1))); continue; }
+    if (sheet) continue; // a range on another sheet (the hours of a dispatch sheet): not traced cell by cell
+    const c2 = colNum(m[4]);
+    const r2 = Number(m[5]);
     for (let r = Math.min(r1, r2); r <= Math.max(r1, r2); r += 1) {
       for (let c = Math.min(c1, c2); c <= Math.max(c1, c2); c += 1) add(addrOf(r, c));
     }
@@ -128,11 +133,11 @@ export function formulaParts(formula) {
   let last = 0;
   for (const m of masked.matchAll(REF)) {
     if (m.index > last) parts.push({ text: formula.slice(last, m.index) });
-    const c1 = colNum(m[1]);
-    const r1 = Number(m[2]);
-    parts.push(m[3]
-      ? { range: [addrOf(r1, c1), addrOf(Number(m[4]), colNum(m[3]))], text: m[0] }
-      : { ref: addrOf(r1, c1), text: m[0] });
+    const c1 = colNum(m[2]);
+    const r1 = Number(m[3]);
+    parts.push(m[4]
+      ? { range: [qualify(m[1], addrOf(r1, c1)), qualify(m[1], addrOf(Number(m[5]), colNum(m[4])))], text: m[0] }
+      : { ref: qualify(m[1], addrOf(r1, c1)), text: m[0] });
     last = m.index + m[0].length;
   }
   if (last < formula.length) parts.push({ text: formula.slice(last) });
@@ -150,7 +155,8 @@ export function traceModel(live) {
   const m = liveModelInput(live);
   if (!m) return null;
   const wb = new RecBook();
-  const res = addLiveModel(wb, m);
+  // the dispatch sheets with their parameters and totals only: the hours come from the data itself
+  const res = addLiveModel(wb, m, { dispatchRows: false });
   const ws = wb.sheets[0];
   const N = m.ops.length;
   // the year header row: "Year 0" in D, years in E onwards
@@ -201,6 +207,25 @@ export function traceModel(live) {
       usedBy: [],
     };
   }
+  // the dispatch sheets' year totals the energy rows read ("Dispatch Y1!O5"): cells of their own,
+  // with the year's hours behind them (model.dispatch)
+  const sheets = new Map(wb.sheets.map((sh) => [sh.name, sh]));
+  const keyOf = m.dispatch ? Object.fromEntries(Object.entries(dispatchLetters(m.dispatch)).map(([k, l]) => [l, k])) : {};
+  for (const c of Object.values(cells)) {
+    for (const a of c.refs) {
+      if (!a.includes("!") || cells[a]) continue;
+      const [sheet, at] = a.split("!");
+      const rc = sheets.get(sheet)?.cells.get(at);
+      if (!rc) continue;
+      const year = Number(/Y(\d+)$/.exec(sheet)?.[1]);
+      const head = String(sheets.get(sheet).cells.get(addrOf(HEAD_ROW, rc.col))?.v || "").replace(/ \(MW\)$/, "");
+      cells[a] = {
+        addr: a, row: rc.row, col: rc.col, sheet, label: `Year ${year} hour by hour · ${head}`, unit: "MWh", column: "8,760 hours summed",
+        value: rc.v, formula: rc.formula, fmt: "#,##0.0", kind: "calc", source: null, refs: [], usedBy: [],
+        dispatch: { year, key: keyOf[colName(rc.col)] },
+      };
+    }
+  }
   for (const c of Object.values(cells)) for (const a of c.refs) cells[a]?.usedBy.push(c.addr);
   const keys = Object.fromEntries(Object.entries(res.cells).map(([k, ref]) => [k, ref.split("!").pop().replace(/\$/g, "")]));
   // each model line's key → { addr } for one value, { row } for a year series
@@ -211,7 +236,8 @@ export function traceModel(live) {
   for (const [k, l] of Object.entries(lines)) rowKey[l.row ?? cells[l.addr]?.row] = k;
   const gen = Object.fromEntries(Object.entries(m.gen || {}).filter(([k]) => live.gen?.[k]?.hourly?.length >= 8760)
     .map(([k, g]) => [k, { ...g, hourly: live.gen[k].hourly }]));
-  return { sheet: LIVE_SHEET, title: m.title, engine: m.engine, N, yearRow, maxCol: ws.maxCol, rows, cells, keys, lines, rowKey, gen, values: res.values };
+  const dispatch = m.dispatch ? { data: m.dispatch, years: res.dispatch } : null;
+  return { sheet: LIVE_SHEET, title: m.title, engine: m.engine, N, yearRow, maxCol: ws.maxCol, rows, cells, keys, lines, rowKey, gen, dispatch, values: res.values };
 }
 
 /** A short name for a cell: its row label and, for a year series, the year. */

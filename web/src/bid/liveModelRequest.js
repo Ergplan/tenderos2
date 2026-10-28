@@ -1,7 +1,7 @@
 // Tender to Bid: the request for the workbook's Live model sheet (web/lib/liveModel.js), which
 // rebuilds the financial model as Excel formulas. Kept apart from exportModel.js so the check
 // (tools/check_live_model.mjs) can build it in Node.
-import { FINANCE_FIELDS, SOURCES, SOURCE_FIELDS, lossFactorsOf, resourceProfiles } from "./model.js";
+import { FINANCE_FIELDS, SOURCES, SOURCE_FIELDS, dispatchFor, lossFactorsOf, resourceProfiles } from "./model.js";
 import { cufPoint, genSource } from "../model/generation.js";
 import { LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
 
@@ -41,6 +41,7 @@ export function liveModelRequest({ state, lp, finance, costs, fin, bess, ops, df
     bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
     ops: ops.slice(0, n).map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh"])),
     gen,
+    dispatch: dispatchFor(lp), // the modelled years hour by hour: the workbook's dispatch sheets
     sources,
     app: liveResults(finance, fin),
   };

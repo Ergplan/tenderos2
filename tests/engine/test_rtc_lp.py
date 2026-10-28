@@ -159,3 +159,50 @@ def test_a_seed_reaches_the_same_optimum_in_fewer_solves():
         lines = []
         res = M.solve({**payload, "seed": bad}, on_log=lines.append)
         assert res["ok"] and any("tax paid in the year it arises" in line["msg"] for line in lines)
+
+
+def _formula_delivered(d: dict, y: dict, sizes: dict, fin: dict, bess: dict) -> tuple[float, float, float]:
+    """Delivered MWh, shortfall MWh and the lowest battery level of a modelled year, worked out as the
+    workbook's dispatch sheet works them out (web/lib/dispatchSheets.js) from the optimiser's choices."""
+    f = M.year_factors(y["year"], fin, bess)
+    solar = np.asarray(d["solarCf"]) * f["solarFactor"] * sizes["solarMw"]
+    wind = np.asarray(d["windCf"]) * f["windFactor"] * sizes["windMw"]
+    ch, dis = np.asarray(y["charge"]), np.asarray(y["discharge"])
+    sold = np.asarray(y["sold"]) if d["sell"] else 0.0
+    direct = np.minimum(d["contract"] / d["poi"] - dis, solar + wind - ch - sold)
+    delivered = (direct + dis) * d["poi"]
+    level = min(max(d["initSoc"] - d["minSoc"], 0), d["maxSoc"] - d["minSoc"]) * sizes["bessMwh"] * y["bf"] + np.cumsum(ch * d["eta"] - dis / d["eta"])
+    short = 0.0
+    if d["blocks"]:
+        floor = d["contract"] * np.where(np.asarray(d["peak"]) == 1, d["peakFloor"], d["offFloor"])
+        short = float(np.maximum(0.0, floor - delivered).sum())
+    return float(delivered.sum()), short, float(level.min())
+
+
+@pytest.mark.slow  # a full solve: a minute or more
+@pytest.mark.skipif(M.highspy is None, reason="highspy not installed")
+def test_the_dispatch_sheets_formulas_give_the_lps_energy():
+    """The workbook's hour-by-hour sheets keep only the optimiser's choices (charge, discharge, sold)
+    and work the rest out: direct = MIN(contract - discharge, generation - charge - sold). The LP's
+    optimum always delivers what it can, so the sheets' energy is the LP's, year by year."""
+    solar, wind, demand = _case()
+    plant = 285
+    peak = (np.arange(M.HOURS) % 24 >= 18).astype(int)
+    payload = {
+        "ctx": {"demand": [plant] * M.HOURS, "solarCf": solar.tolist(), "windCf": wind.tolist(), "plantMw": plant, "trafoLossPct": 0.005, "lineLossPct": 0.01},
+        "bess": BESS, "costs": COSTS, "fin": FIN, "dfrTarget": 0, "dfrBasis": "annual",
+        "vars": {"solarMw": {"min": 0, "max": 1500}, "windMw": {"min": 0, "max": 900}, "bessMw": {"min": 0, "max": 600}},
+        "compliance": [{"id": "peak", "basis": "block", "hours": "peak", "target": 0.9, "penaltyMultiple": 1.5},
+                       {"id": "offpeak", "basis": "block", "hours": "offpeak", "target": 0.7, "penaltyMultiple": 1.5}],
+        "peakMask": peak.tolist(), "tariffGuess": 6.0, "returnLifetime": True, "returnDispatch": True,
+    }
+    res = M.solve(payload)
+    assert res["ok"]
+    d = res["dispatch"]
+    assert d["blocks"] and len(d["byYear"]) == len(res["years"]) and len(d["weights"]) == FIN["years"]
+    life = {y["year"]: y for y in res["lifetime"]}
+    for y in d["byYear"]:
+        delivered, short, low = _formula_delivered(d, y, res["sizes"], FIN, BESS)
+        assert delivered == pytest.approx(life[y["year"]]["deliveredMwh"], rel=1e-5)
+        assert short == pytest.approx(life[y["year"]]["blockShortfallMwh"], rel=1e-4, abs=1.0)
+        assert low >= -1e-3, "the battery never goes below its minimum"

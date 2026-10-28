@@ -1263,4 +1263,31 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
             result["hourly"].update({k: r2(v) for k, v in site.items()})
         if price_series is not None:
             result["hourly"]["price"] = np.round(price_series, 3).tolist()
+    if payload.get("returnDispatch"):
+        # every modelled year hour by hour, for the workbook's dispatch sheets (web/lib/dispatchSheets.js):
+        # the inputs and the optimiser's three choices; the rest is formulas there. Solar, wind and a
+        # battery on one site, delivering a flat contract, with no other loss before the bus.
+        flat = bool(np.allclose(demand, plant)) and all(abs(year_factors(y, fin, bess)["demandFactor"] - 1) < 1e-12 for y in rep)
+        if has_bio or plants or split or not flat or abs(loss - 1) > 1e-12:
+            note("highs", "The workbook's hour-by-hour sheets are for solar, wind and a battery on one site with a flat contract: not written")
+        else:
+            peak_rule = next((r for r in block_rules if r["hours"] == "peak"), None)
+            off_rule = next((r for r in block_rules if r["hours"] == "offpeak"), None)
+            blocks = bool(peak_rule and off_rule)
+            r6 = lambda a: np.round(np.asarray(a, float), 6).tolist()  # noqa: E731
+            result["dispatch"] = {
+                "solar": bool(sizes_of(x)["solarMw"] > 1e-9), "wind": bool(sizes_of(x)["windMw"] > 1e-9), "sell": bool(sell), "blocks": blocks,
+                "contract": float(plant), "poi": float(poi), "eta": float(eta),
+                "minSoc": min_soc, "maxSoc": max_soc, "initSoc": init_soc,
+                "peakFloor": float(peak_rule["target"]) if blocks else 0.0, "offFloor": float(off_rule["target"]) if blocks else 0.0,
+                "solarCf": r6(solar_cf), "windCf": r6(wind_cf),
+                "peak": peak_mask.astype(int).tolist() if blocks else None,
+                "weights": np.round(weights, 9).tolist(),
+                "byYear": [
+                    {"year": int(y), "bf": float(year_factors(y, fin, bess)["bessFactor"]),
+                     "charge": r6(x[battery_cols[yi][0]]), "discharge": r6(x[battery_cols[yi][1]]),
+                     "sold": r6(x[ex_cols[yi]]) if sell else None}
+                    for yi, y in enumerate(rep)
+                ],
+            }
     return result

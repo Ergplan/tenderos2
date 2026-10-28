@@ -242,6 +242,62 @@ function GenDrill({ model, c, drill = null }) {
   );
 }
 
+/**
+ * A year total of a dispatch sheet ("Dispatch Y1"): any day's 24 hours, each column worked out as
+ * in the Excel sheet, the optimiser's choices (charge, discharge, sold) in green.
+ */
+function DispatchDrill({ model, c }) {
+  const [day, setDay] = useState(0);
+  const info = c.dispatch && model.dispatch ? model.dispatch : null;
+  if (!info) return null;
+  const d = info.data;
+  const y = d.byYear.find((b) => b.year === c.dispatch.year);
+  const v = info.years?.[c.dispatch.year]?.values;
+  if (!y || !v) return null;
+  const hours = Array.from({ length: 24 }, (_, h) => day * 24 + h);
+  const cols = [
+    ["gen", "Generation", (t) => v.gen[t]],
+    ["charge", "Charge", (t) => y.charge[t], true],
+    ["discharge", "Discharge", (t) => y.discharge[t], true],
+    ...(d.sell ? [["sold", "Sold", (t) => y.sold[t], true]] : []),
+    ["direct", "Direct", (t) => v.direct[t]],
+    ["delivered", "Delivered (meter)", (t) => v.delivered[t]],
+    ...(d.blocks ? [["floor", "Floor", (t) => v.floor[t]], ["short", "Short", (t) => v.short[t]]] : []),
+  ];
+  const sel = c.dispatch.key;
+  return (
+    <section className="gen-drill" data-testid="dispatch-drill">
+      <div className="trace-label">Year {y.year}, hour by hour (sheet Dispatch Y{y.year} of the Excel model)</div>
+      <p className="rtc-note">
+        Generation = MW × the hour&apos;s capacity factor × the year&apos;s degradation · direct = MIN(contract − discharge, generation − charge{d.sell ? " − sold" : ""}) ·
+        delivered = (direct + discharge) × {nf(d.poi * 100, 2)}% to the meter{d.blocks ? " · short = MAX(0, floor − delivered)" : ""}. Green: the optimiser&apos;s choice each hour.
+      </p>
+      <div className="gen-day">
+        <label>
+          Day
+          <select value={day} onChange={(e) => setDay(Number(e.target.value))} data-testid="dispatch-day">
+            {Array.from({ length: 365 }, (_, k) => <option key={k} value={k}>{dayLabel(k)}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="gen-blocks" data-testid="dispatch-hours">
+        <table className="gen-table">
+          <thead><tr><th>Hour</th>{cols.map(([k, label]) => <th key={k} className={k === sel ? "is-sel" : ""}>{label}</th>)}</tr></thead>
+          <tbody>
+            {hours.map((t) => (
+              <tr key={t} className={d.blocks && d.peak[t] ? "is-peak" : ""}>
+                <td>{String(t % 24).padStart(2, "0")}:00{d.blocks && d.peak[t] ? " ★" : ""}</td>
+                {cols.map(([k, , get, opt]) => <td key={k} className={`${k === sel ? "is-sel" : ""} ${opt ? "is-opt" : ""}`}>{nf(get(t), 1)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {d.blocks && <p className="rtc-note">★ a Peak Hour: its floor is {nf(d.peakFloor * 100, 0)}% of the contracted {nf(d.contract, 0)} MW; every other hour {nf(d.offFloor * 100, 0)}%.</p>}
+    </section>
+  );
+}
+
 function TracePanel({ model, addr, onPick, onBack, canBack, drill = null }) {
   const c = model.cells[addr];
   const [showInputs, setShowInputs] = useState(false);
@@ -269,6 +325,7 @@ function TracePanel({ model, addr, onPick, onBack, canBack, drill = null }) {
           : <p className="rtc-note">{c.kind === "input" ? "An input: change it in the inputs of this tab (or in the Excel model) and every number that uses it moves." : "A value, not a formula."}</p>
       )}
       <GenDrill model={model} c={c} drill={drill} />
+      <DispatchDrill model={model} c={c} />
       {c.refs.length > 0 && (
         <>
           <div className="trace-label">Reads ({c.refs.length})</div>

@@ -164,6 +164,50 @@ the following:
 
 `tools/check_bid_model.mjs` checks the seed's scaling.
 
+## Excel: every year's energy from hour-by-hour formulas
+
+The HiGHS sizing models a few years hour by hour: year 1, year 25, and any battery augmentation
+years. It interpolates the years between them. The bid workbook now carries those modelled years as
+sheets "Dispatch Y1" and "Dispatch Y25" (`web/lib/dispatchSheets.js`), 8,760 rows each. Every
+number on them is a formula except the following:
+* the inputs, in blue: each hour's solar and wind capacity factor at the 33 kV bus, and whether it
+  is a Peak Hour;
+* the optimiser's three choices each hour, in green: how much the battery charges and discharges,
+  and how much is sold.
+
+| Column | Formula |
+| --- | --- |
+| Solar, wind output (MW) | MW × the hour's capacity factor × the year's degradation factor |
+| Direct to the PPA | MIN(contract ÷ share to the meter − discharge, generation − charge − sold) |
+| Curtailed | generation − direct − charge − sold |
+| Battery energy | last hour's + charge × η − discharge ÷ η (η = √ round trip), from the year's start level |
+| Delivered, at the meter | (direct + discharge) × share reaching the meter |
+| Floor, short | contract × the hour's floor (90% peak, 70% off-peak); MAX(0, floor − delivered) |
+
+Each sheet's year totals are SUMs of its hours. In the Live model, "Contracted energy",
+"Delivered to the procurer", "Short of the time-block floors" and "Sold in the market" are formulas
+on those totals, weighted between the modelled years as the sizing interpolates. Only the hourly
+choices remain green.
+
+The LP always delivers what it can (each MWh earns the tariff), so the MIN formula gives its own
+direct supply. On the SECI 200 MW sizing the formulas give the LP's delivered energy and
+shortfall to the MWh, and the battery never goes below its minimum
+(`tests/engine/test_rtc_lp.py::test_the_dispatch_sheets_formulas_give_the_lps_energy`, slow).
+
+* **When the sheets are written.** The sizing returns the hours (`returnDispatch`, about 0.4 MB).
+  The browser keeps them beside the result for the session, not in the saved bid. A bid opened from
+  a save shows the yearly values until it is sized again.
+* **Which plants.** The sheets are written for solar, wind and a battery on one site with a flat
+  contract. Other plants keep the yearly values.
+* **In the traceable model.** "Delivered" reads "Year 1 hour by hour · Delivered … · 8,760 hours
+  summed". Opening it shows any day's 24 hours with each column worked out, the optimiser's choices
+  in green.
+
+`tools/check_dispatch_sheets.mjs` builds a workbook with the sheets and has LibreOffice
+recalculate every formula from no stored value: 159,751 formulas in about 6 s, a 2.8 MB file. All
+match the app. `tests/e2e/test_seci_tab.py` checks the SECI download and the trace's drill-down to
+the hours.
+
 ## Solar plant studio
 
 `web/src/plant/solar.js` and `SolarStudio.jsx`. Open it from the solar source in Supply sources,
@@ -302,6 +346,6 @@ A tab of its own (`web/src/market/`).
 
 | Command | Covers |
 | --- | --- |
-| `make check-web` | adds `check_trace`, `check_generation`, `check_peak_prices`, `check_plant`, `check_whatif` and `check_market` |
+| `make check-web` | adds `check_trace`, `check_generation`, `check_peak_prices`, `check_dispatch_sheets`, `check_plant`, `check_whatif` and `check_market` |
 | `make test` | adds `tests/engine/test_cerc_order.py` |
 | `make e2e` | adds `tests/e2e/test_demo2.py`: the traceable model from Round the clock, both studios writing into the SECI bid and the profile view, the What-if returns and checks, a dispatch number traced to its generation formula, months and 15-minute blocks, and a CERC order uploaded, read, checked and deleted |

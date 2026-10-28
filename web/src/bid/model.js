@@ -517,6 +517,15 @@ export function modelInputs(state, terms) {
 
 const round = (arr, d) => Array.from(arr, (v) => Math.round(v * 10 ** d) / 10 ** d);
 
+// the sizing's hour-by-hour dispatch of its modelled years (rtc_lp.solve returnDispatch), kept beside
+// the sizing result it belongs to and not in the saved bid (about 0.4 MB); the workbook's dispatch
+// sheets are written from it, and a bid opened from a save (no dispatch) gets the yearly values
+const DISPATCH = new WeakMap();
+export const dispatchFor = (lp) => (lp && typeof lp === "object" && DISPATCH.get(lp)) || null;
+export function keepDispatch(lp, dispatch) {
+  if (lp && typeof lp === "object" && dispatch) DISPATCH.set(lp, dispatch);
+}
+
 /**
  * What the next sizing starts from (rtc_lp.solve's seed): a sized design's tariff, sizes and energy
  * by year, per contracted MW so it scales to another bid size. Kept in the state as sizingSeed
@@ -577,6 +586,7 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
     compliance: rules.map(({ id, label, basis, hours, target, penaltyMultiple }) => ({ id, label, basis, hours, target, ...(penaltyMultiple != null ? { penaltyMultiple } : {}) })),
     returnLifetime: true,
     returnHourly: true,
+    returnDispatch: true, // every modelled year hour by hour, for the workbook's dispatch sheets
     tariffGuess: state.lp?.tariff || 5.5,
     timeLimitS: 1200, // HiGHS budget for all Dinkelbach iterations together
   };
@@ -612,7 +622,7 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
 
 /** Start the 15-minute dispatch of the sized plant for every PPA year (an engine job). */
 export function dispatch15Request(payload, lp) {
-  const { returnHourly, returnLifetime, tariffGuess, timeLimitS, seed, ...rest } = payload;
+  const { returnHourly, returnLifetime, returnDispatch, tariffGuess, timeLimitS, seed, ...rest } = payload;
   const sizes = Object.fromEntries(Object.entries(lp.sizes || {}).map(([k, v]) => [k, Math.max(0, Number(v) || 0)]));
   return { payload: rest, sizes, tariff: lp.tariff };
 }
