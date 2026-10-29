@@ -284,7 +284,7 @@ PURPOSE = {
     "users": "Sign-in accounts: email, scrypt password hash (`web/lib/auth.js` hashPassword), role (admin or user), the "
              "`session_epoch` that invalidates earlier session cookies when it changes, and `tab_access` (which workspace tabs "
              "the user may open; NULL means the deployment default in `app_settings.default_tabs`, see `web/lib/tabs.js` resolveTabs). "
-             "In demo mode (`DEMO_MODE=1`) one shared user `demo@tenderos.local` is upserted by `POST /api/auth/demo`.",
+             "In demo mode (`DEMO_MODE=1`) one shared user `demo@tenderos.local` is upserted by `GET /api/auth/demo`.",
     "scenarios": "A saved case in the scenario library: its name, description, module (`rtc` Round the clock, `bess` BESS tender, "
                  "`seci` SECI RTC tender; `fdre` is still allowed by the CHECK but `web/lib/scenarios.js` MODULES no longer accepts it), "
                  "who created it, and whether it is archived. The content lives in `scenario_versions`.",

@@ -1,7 +1,7 @@
 # TenderOS. Local runs need Postgres, Python 3.12 and Node 22; see README.
 PY ?= .venv/bin/python
 
-.PHONY: install build test test-slow check-web e2e demo lint dev stop up down
+.PHONY: install build test test-slow check-web e2e demo lint docs-check dev stop up down
 
 install:
 	python3.12 -m venv .venv && $(PY) -m pip install -r engine/requirements-dev.txt
@@ -29,7 +29,14 @@ demo:
 	$(PY) tools/demo_run.py && $(PY) tools/demo_report.py
 
 lint:
-	$(PY) -m ruff check engine tests tools/demo_run.py tools/demo_report.py
+	$(PY) -m ruff check engine tests tools/demo_run.py tools/demo_report.py tools/gen_db_doc.py tools/gen_screen_map.py
+	python3 tools/gen_screen_map.py --check
+
+# the generated developer documents are the code's: fails when docs/dev/DATABASE.md or
+# SCREEN-TO-DATA.md is stale (the database one needs DATABASE_URL)
+docs-check:
+	python3 tools/gen_db_doc.py --check
+	python3 tools/gen_screen_map.py --check
 
 dev:
 	bash tools/dev.sh

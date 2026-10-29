@@ -847,7 +847,7 @@ Created by `004_activity.sql`.
 
 ### `users`
 
-Sign-in accounts: email, scrypt password hash (`web/lib/auth.js` hashPassword), role (admin or user), the `session_epoch` that invalidates earlier session cookies when it changes, and `tab_access` (which workspace tabs the user may open; NULL means the deployment default in `app_settings.default_tabs`, see `web/lib/tabs.js` resolveTabs). In demo mode (`DEMO_MODE=1`) one shared user `demo@tenderos.local` is upserted by `POST /api/auth/demo`.
+Sign-in accounts: email, scrypt password hash (`web/lib/auth.js` hashPassword), role (admin or user), the `session_epoch` that invalidates earlier session cookies when it changes, and `tab_access` (which workspace tabs the user may open; NULL means the deployment default in `app_settings.default_tabs`, see `web/lib/tabs.js` resolveTabs). In demo mode (`DEMO_MODE=1`) one shared user `demo@tenderos.local` is upserted by `GET /api/auth/demo`.
 
 Created by `001_init.sql`; changed by `002_tab_access.sql`.
 

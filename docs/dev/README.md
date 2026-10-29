@@ -31,3 +31,4 @@ Related documents elsewhere in the repository:
 | Browser tests against a running stack | `make e2e` with `TENDEROS_URL`, `TENDEROS_DEMO=1` (and `MCP_TOKEN` for the connector test) | about 7 min, plus the sizing runs |
 | Click tour (every tab, step and button, no long jobs) | `pytest -m slow tests/e2e/test_click_tour.py` with the same variables | about 3 min |
 | Deploy tooling | `pytest tests/deploy` | seconds |
+| Generated documents still match the code and the schema | `make docs-check` (needs `DATABASE_URL`) | seconds |
