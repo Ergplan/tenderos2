@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronLeft, CircleDollarSign, ClipboardCheck, FileStack, FolderOpen, Gavel, Layers, ListChecks, RotateCcw, Save, Scale, Trophy, Users, Zap } from "lucide-react";
+import { ArrowRight, ChevronLeft, CircleDollarSign, ClipboardCheck, FileStack, FlaskConical, FolderOpen, Gavel, Landmark, Layers, ListChecks, RotateCcw, Save, Scale, Trophy, Users, Zap } from "lucide-react";
 import SaveDialog from "../scenarios/SaveDialog";
 import { scenarioApi } from "../scenarios/client";
 import useTeam, { TeamContext } from "../team/useTeam";
@@ -13,6 +13,9 @@ import useSizing from "../bid/useSizing";
 import SourcesStep from "../bid/SourcesStep";
 import SizeStep from "../bid/SizeStep";
 import FinanceStep from "../bid/FinanceStep";
+import FinanceInputsStep from "../bid/FinanceInputsStep";
+import WhatIfTab from "../whatif/WhatIfTab";
+import { whatIfFromBid } from "../whatif/model";
 import { DEFAULT_SETTINGS, PACK, seciTerms } from "./terms";
 import DocumentsStep from "./DocumentsStep";
 import ConditionsStep from "./ConditionsStep";
@@ -27,15 +30,18 @@ import { TENDER, defaultSeciState } from "./state";
 export { defaultSeciState };
 
 const STORAGE_KEY = "tenderos.seci.v1";
+// the steps, each with the team that owns it (docs/enterprise/ARCHITECTURE.md, section 3)
 export const SECI_STEPS = [
-  { id: "documents", title: "Tender & amendments", icon: FileStack, color: "#d4ff3f" },
-  { id: "conditions", title: "Bid conditions", icon: ListChecks, color: "#ff8a5f" },
-  { id: "bid", title: "What you bid", icon: Scale, color: "#4fd1c5" },
-  { id: "sources", title: "Supply sources", icon: Layers, color: "#3fa7d6" },
-  { id: "size", title: "Size", icon: Zap, color: "#f5b83d" },
-  { id: "finance", title: "Financials", icon: CircleDollarSign, color: "#7ddc9a" },
-  { id: "forms", title: "Bid forms", icon: ClipboardCheck, color: "#a98bff" },
-  { id: "winning", title: "Winning bid", icon: Trophy, color: "#ffd166" },
+  { id: "documents", title: "Tender & amendments", icon: FileStack, color: "#d4ff3f", team: "Tender / Legal" },
+  { id: "conditions", title: "Bid conditions", icon: ListChecks, color: "#ff8a5f", team: "Tender / Legal" },
+  { id: "bid", title: "Bid inputs", icon: Scale, color: "#4fd1c5", team: "Projects" },
+  { id: "sources", title: "Design", icon: Layers, color: "#3fa7d6", team: "Design" },
+  { id: "financeInputs", title: "Finance inputs", icon: Landmark, color: "#9ad7a0", team: "Finance" },
+  { id: "size", title: "Size", icon: Zap, color: "#f5b83d", team: "Projects" },
+  { id: "finance", title: "Financial model", icon: CircleDollarSign, color: "#7ddc9a", team: "Finance" },
+  { id: "whatif", title: "What-if", icon: FlaskConical, color: "#ff9fd0", team: "Finance" },
+  { id: "forms", title: "Bid forms", icon: ClipboardCheck, color: "#a98bff", team: "Tender / Legal" },
+  { id: "winning", title: "Winning bid", icon: Trophy, color: "#ffd166", team: "Projects" },
 ];
 
 /** A saved bid (this browser's, or one opened from the library) as the tab's state. */
@@ -170,22 +176,28 @@ export default function SeciTab({ initialScenario = null }) {
     setState(defaultSeciState());
   }
 
+  const designMissing = missing.filter((m) => !m.startsWith("Financing"));
+  const financeMissing = missing.filter((m) => m.startsWith("Financing"));
   const done = {
     documents: true,
     conditions: true,
     bid: state.bid.baseMw >= PACK.model.minBidMw && state.bid.baseMw <= PACK.model.maxBidMw,
-    sources: missing.length === 0,
+    sources: designMissing.length === 0,
+    financeInputs: missing.length === 0,
     size: Boolean(state.lp),
     finance: Boolean(state.lp),
+    whatif: Boolean(state.lp),
     forms: Boolean(state.lp) && formIssues(state).length === 0 && formatsSummary(state).reviewed === formatsSummary(state).needed,
   };
   const summary = {
     documents: `${PACK.documents.filter((d) => d.file).length} documents, ${PACK.changes.length} changes`,
     conditions: `${PACK.conditions.length} conditions`,
     bid: state.bid.baseMw ? `${nf(state.bid.baseMw, 0)} MW` : "Not entered",
-    sources: missing.length ? `${missing.length} input${missing.length > 1 ? "s" : ""} needed` : "Ready to size",
+    sources: designMissing.length ? `${designMissing.length} input${designMissing.length > 1 ? "s" : ""} needed` : "Design inputs in",
+    financeInputs: financeMissing.length ? `${financeMissing.length} input${financeMissing.length > 1 ? "s" : ""} needed` : missing.length ? "Design inputs pending" : "Ready to size",
     size: state.lp ? `₹${nf(state.lp.tariff, 3)}/kWh` : "Not sized",
     finance: state.lp ? "Tariff and returns" : "After sizing",
+    whatif: state.lp ? "Tariff levers" : "After sizing",
     forms: `${formatsSummary(state).reviewed} of ${formatsSummary(state).needed} formats reviewed`,
   };
   const index = SECI_STEPS.findIndex((s) => s.id === state.step);
@@ -235,6 +247,7 @@ export default function SeciTab({ initialScenario = null }) {
                 <small>{String(i + 1).padStart(2, "0")}</small>
                 <strong>{s.title}</strong>
                 <em>{summary[s.id]}</em>
+                <i className="bid-step-team" data-testid={`seci-step-team-${s.id}`}>{s.team}</i>
               </span>
             </button>
           );
@@ -245,7 +258,9 @@ export default function SeciTab({ initialScenario = null }) {
         {step.id === "documents" && <DocumentsStep />}
         {step.id === "conditions" && <ConditionsStep state={state} />}
         {step.id === "bid" && <BidStep {...props} />}
-        {step.id === "sources" && <SourcesStep {...props} startSizing={sizing.startSizing} hourly={sizing.hourly} />}
+        {step.id === "sources" && <SourcesStep {...props} startSizing={sizing.startSizing} hourly={sizing.hourly} withFinance={false} />}
+        {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={sizing.startSizing} />}
+        {step.id === "whatif" && <WhatIfTab embedded seed={state.lp ? whatIfFromBid(state, terms) : null} seedKey={state.lp ? `${JSON.stringify(state.lp.sizes)}|${state.lp.tariff}` : ""} onBack={() => goto("finance")} />}
         {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={sizing.startSizing} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} />}
         {step.id === "finance" && <FinanceStep {...props} traceRequest={traceAsk} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
         {step.id === "forms" && <BidForms {...props} />}

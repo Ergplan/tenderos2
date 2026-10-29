@@ -348,6 +348,30 @@ Each solar and wind source shows its hourly profile (`web/src/plant/ProfileView.
 
 It opens by itself when a profile has been uploaded.
 
+Two downloads, built in the browser (`web/src/plant/cufFile.js`, no server call):
+
+* **Download CUF file**: a CSV of the 8,760 hours with the hour of the year, month, day and hour,
+  the capacity factor as used in the bid (the profile scaled to the CUF entered) and, when a file
+  was uploaded, the file's own capacity factor. A header block of `#` lines names the source (the
+  uploaded file or the typical profile), the CUF entered, the CUF of the file, where the CUF is
+  measured, the degradation per year and the date.
+* **Download 25-year CUF table**: one row per PPA year (the tender's term, 25 by default) with
+  the degradation factor the model applies (`yearFactors` in `web/src/rtc/engine.js`:
+  `(1 − d)^(year − 1)`), the CUF that year, the energy per MW (CUF × 8,760) and the cumulative
+  energy.
+
+A **25-year justification** panel (`web/src/plant/justification.js`) explains, in plain words, why
+one year's hourly profile stands for the PPA: the typical meteorological year method (the profile
+is the shape, the CUF the level), the P50 level and what P75/P90 mean, with inputs for the P50
+CUF (prefilled with the bid's) and an optional P90 CUF from the assessor, the typical year-to-year
+variability of the technology (solar ±3–5%, wind ±8–12%, stated as typical ranges and not site
+data), the degradation the model applies and the CUF in the last year, the evidence to attach
+(data source, period, measuring point, independent assessor's report, degradation basis), and what
+the model does not capture (grid curtailment, availability). Every number comes from the bid's
+inputs. **Download justification (Word)** posts the paragraphs and the by-year table to
+`POST /api/plant/justification`, which writes the .docx with `web/lib/docx.js`.
+`tools/check_cuf_file.mjs` checks the CSVs and the text.
+
 ## What-if analysis
 
 A tab of its own (`web/src/whatif/model.js` and `WhatIfTab.jsx`).
@@ -387,6 +411,89 @@ A tab of its own (`web/src/whatif/model.js` and `WhatIfTab.jsx`).
 * that the checks refuse no storage and too small a bid;
 * that the traceable model reproduces the returns.
 
+## Enterprise financing: construction, repayment, working capital, refinancing
+
+The 25-year model (`web/src/rtc/engine.js` `cashflows`) and its Excel twin (`web/lib/liveModel.js`)
+carry the finance team's full set of terms. Every one of them is a formula in the workbook, and
+`tools/check_live_model.mjs` recalculates each case with LibreOffice to the app's numbers.
+
+* **Construction, month by month** (`constructionSchedule`). Construction months, a drawdown
+  profile (even, S-curve, front-loaded, back-loaded) and the funding order (debt and equity pro
+  rata, or equity first). The cost before IDC is spent month by month; the interest during
+  construction accrues on the debt drawn (on the balance at the start of the month plus the
+  month's draw) and is capitalised as debt. The debt share applies to the cost before IDC, so
+  there is no circularity: debt = share × cost + IDC. With 0 months the IDC stays inside the
+  pre-operative share, as before. The workbook gets a **Construction** sheet with the table, linked
+  to the Live model's inputs; the app shows it on the Financial model step (`ConstructionView.jsx`).
+* **Repayment methods** (`REPAYMENT_METHODS`, `principalOf`): equal principal, annuity (level debt
+  service), sculpted to a target DSCR (principal = CFADS ÷ target − interest; the last year clears
+  the balance), balloon (a share in the last year, the rest in equal parts), bullet, step-up (the
+  principal growing at a rate a year). A principal moratorium (years within the tenor, interest
+  paid). Instalments a year (1, 2, 4, 12): the balance is paid down through the year, so the
+  interest is on the average balance ((n − 1) ÷ 2n of the year's principal less); sculpting is
+  worked out yearly. The tenor is door to door.
+* **Refinancing**: at the end of a chosen year, a new rate and tenor; the fee on the balance is
+  expensed that year; the schedule continues under the same method with the years left.
+* **Working capital** per CERC norms: receivable days, O&M in hand (months), maintenance spares
+  (% of the year's O&M), interest on the working capital (expensed; 0 means equity funded); the
+  balance is released at the end of the term.
+* **Debt service reserve**: months of the next year's debt service, put aside from the equity
+  cash and released as the debt service falls and at the end; it does not touch the DSCR.
+* **The Excel sculpting trick.** The sculpted principal needs the tax, which needs the interest, so
+  the sheet carries a small tax chain of its own for sculpting (on the interest on the opening
+  balance), which keeps every method switchable in Excel without a circular reference.
+
+`tools/check_live_model.mjs` adds three cases: an 18-month S-curve build with IDC, a 1-year
+moratorium, sculpted repayment at 1.35×, CERC working capital with interest, a 6-month DSRA and
+DSM charges; a balloon repayment with quarterly instalments refinanced in year 6; and a step-up
+repayment with monthly instalments and an equity-first back-loaded build.
+
+## Deviation settlement (CERC DSM)
+
+`web/src/dsm/dsm.js` and `DsmPanel.jsx`. The sizing dispatches with perfect foresight, so the
+deviation comes from a forecast-error assumption: the error in a 15-minute block, as a share of
+the schedule, is normal with a standard deviation by category (solar 8%, wind 12%, hybrid 9%,
+editable), cut by a battery's firming share. Every MWh scheduled then carries the same expected
+charge, a line in the contract rate (a × tariff + b), so the financial model applies it to the
+tariff it solves for and the Excel model carries it as a formula. The norms follow the CERC
+(Deviation Settlement and Related Matters) Regulations, 2024 structure: a tolerance band (±10%
+solar and hybrid, ±15% wind; ±5% and ±10% from FY2026-27), the X factor (the in-band share settled
+at the contract rate: 100% in FY2026-27 winding down to 0 from FY2031-32), the rest of the in-band
+deviation at the normal rate (dear when the plant is short, cheap when long), and steps beyond the
+band charged at 110 / 150 / 200% of the contract rate for under-injection and paid at 90 / 50 / 0%
+for over-injection. The numbers are inputs: check them against the notified text and the orders of
+the day. The year's charge is an operating-cost line ("Deviation settlement charges").
+`tools/check_dsm.mjs` checks the block charge, the bands by year, the firming and the model line.
+
+## Steps by team, the site schematic and the What-if after sizing
+
+* The SECI flow runs **Tender & amendments → Bid conditions → Bid inputs (Projects) → Design →
+  Finance inputs → Size → Financial model → What-if → Bid forms → Winning bid**; each step chip names
+  its team. Design holds the sources, the losses and the sites; Finance inputs holds the financing
+  terms, repayment and refinancing, construction and IDC, working capital and reserves, and the DSM
+  norms, and ends with "Size the plant". The paperclip on every box (Evidence, docs/TEAM.md) carries
+  the evidence and the sign-off.
+* **Site schematic** (`web/src/bid/SiteSchematic.jsx`): one line diagram of the plant. One site:
+  solar, wind and the battery on one 33 kV bus, one pooling station (33/220 kV transformer) and one
+  220 kV line to the billing meter. Separate sites: a bus, a battery, a pooling station and a line
+  per site, each with its own losses (`siteFactors`). The sizing dispatches at one evacuation factor
+  (the wind site's) and the solar profile is scaled by the ratio of the two, so each site's energy
+  carries its own losses (`tools/check_bid_model.mjs`).
+* **What-if after sizing**: the What-if step starts from the plant HiGHS sized and every input of the
+  bid (`whatIfFromBid`); "Back to the sized bid" restores it. **Tariff levers** (`whatif/levers.js`,
+  `LeverPanel.jsx`, also on the What-if tab): set the tariff you want to quote, compute the levers,
+  and each row gives the tariff with that input one step up and one step down, the ₹/kWh per step,
+  and how far that lever alone would have to move to reach the tariff (Apply moves it). About a
+  second for twenty levers.
+
+## Zones
+
+`TENDEROS_ZONE` (docs/enterprise/ARCHITECTURE.md): `intake` reads tenders with cloud models, `core`
+is the bid workspace on the client's network, anything else is one installation with everything.
+In the core the engine pass-through refuses the tender-reading routes (`web/lib/zone.js`
+`zoneAllowsEngine`) and the voice agent is off; the sidebar shows the zone and the version
+(`/api/health`). `deploy/enterprise/` holds the signed bundle, the installer and `tenderos-patch`.
+
 ## Recent tenders
 
 A tab of its own (`web/src/market/`).
@@ -417,6 +524,6 @@ A tab of its own (`web/src/market/`).
 
 | Command | Covers |
 | --- | --- |
-| `make check-web` | adds `check_trace`, `check_generation`, `check_peak_prices`, `check_dispatch_sheets`, `check_plant`, `check_whatif` and `check_market` |
+| `make check-web` | adds `check_trace`, `check_generation`, `check_peak_prices`, `check_dispatch_sheets`, `check_plant`, `check_whatif`, `check_market`, `check_dsm`, `check_cuf_file` and `check_evidence`; `check_live_model` and `check_bid_model` cover the enterprise financing and the pooling stations |
 | `make test` | adds `tests/engine/test_cerc_order.py` |
 | `make e2e` | adds `tests/e2e/test_demo2.py`: the traceable model from Round the clock, both studios writing into the SECI bid and the profile view, the What-if returns and checks, a dispatch number traced to its generation formula, months and 15-minute blocks, and a CERC order uploaded, read, checked and deleted |

@@ -14,6 +14,7 @@ import SolarStudio from "../plant/SolarStudio";
 import WindStudio from "../plant/WindStudio";
 import ProfileView from "../plant/ProfileView";
 import { resourceProfiles } from "./model";
+import SiteSchematic from "./SiteSchematic";
 
 export const SOURCE_COLORS = { solar: DATA_COLORS.solar, wind: DATA_COLORS.wind, hydro: HYDRO_COLOR, biomass: BIOMASS_COLOR, thermal: THERMAL_COLOR, bess: DATA_COLORS.bess };
 const ICONS = { solar: Sun, wind: Wind, hydro: Droplets, biomass: Flame, thermal: Factory, bess: BatteryCharging };
@@ -173,7 +174,8 @@ function SourceCard({ id, state, setState, terms, set, lockProps, isLocked, user
           {profile && (
             <details className="bid-profile" open={Boolean(upload)}>
               <summary>Profile on screen: CUF {nf(s.cuf * 100, 2)}%{upload ? ` · ${upload.name}` : " · typical shape"}</summary>
-              <ProfileView cf={profile} raw={upload?.values || null} color={SOURCE_COLORS[id]} label={id === "solar" ? "Solar" : "Wind"} />
+              <ProfileView cf={profile} raw={upload?.values || null} color={SOURCE_COLORS[id]} label={id === "solar" ? "Solar" : "Wind"} kind={id} name={upload?.name || null}
+                cufAt={state.losses ? POINTS[id][state.losses[`${id}FileAt`] ?? POINTS[id].length - 1] : null} degradation={id === "solar" ? (isNum(s.degradation) ? s.degradation : 0) : 0} years={terms?.years || state.fin?.years || 25} />
             </details>
           )}
           {(id === "solar" || id === "wind") && (
@@ -203,7 +205,12 @@ function SourceCard({ id, state, setState, terms, set, lockProps, isLocked, user
 }
 
 /** Step 3: the sources the bidder has, each with its capacity, parameters and costs, and the financing. */
-export default function SourcesStep({ state, setState, terms, set, lockProps, isLocked, user, prices, goto, startSizing, hourly = null }) {
+/**
+ * withFinance: the financing section and "Size the plant" here (Tender to Bid); false when the
+ * Finance team's inputs are a step of their own (SECI: FinanceInputsStep), which then ends with
+ * "Continue to Finance inputs".
+ */
+export default function SourcesStep({ state, setState, terms, set, lockProps, isLocked, user, prices, goto, startSizing, hourly = null, withFinance = true }) {
   const missing = missingInputs(state, terms);
   const fill = () => setState((s) => fillBenchmarks(s, terms));
   const fillButton = (
@@ -241,6 +248,7 @@ export default function SourcesStep({ state, setState, terms, set, lockProps, is
         {splitSitesOn(state) && (
           <p className="rtc-note" data-testid="bid-sites-rule">Each battery charges only from its own site: solar cannot charge the wind-site battery and wind cannot charge the solar-site battery. HiGHS decides how much battery goes on each site. The battery size and duration you set apply to the two batteries together; each keeps the duration. Sizing two sites takes several minutes.</p>
         )}
+        {(state.sources.solar || state.sources.wind) && state.losses && <SiteSchematic state={state} setState={setState} />}
       </Section>
 
       {saleAllowed && (
@@ -267,33 +275,51 @@ export default function SourcesStep({ state, setState, terms, set, lockProps, is
         </Section>
       )}
 
-      <Section index={state.losses ? "3.4" : "3.3"} title="Financing and project costs" note="Your terms; they set the tariff the optimizer minimises">
-        <div className="rtc-grid rtc-grid-4" data-testid="bid-financing">
-          {FINANCE_FIELDS.map((f) => (
-            <div key={`${f.section}.${f.key}`} className="has-assign">
-            <Field label={f.label} unit={f.unit === "%" ? undefined : f.unit} pct={Boolean(f.pct)} value={state[f.section][f.key]}
-              onChange={(v) => setState((s) => ({ ...s, [f.section]: { ...s[f.section], [f.key]: v }, filled: unmark(s.filled, [`${f.section}.${f.key}`]), lp: null }))} step={f.step} min={f.min} max={f.max}
-              hint={state.filled?.[`${f.section}.${f.key}`] ? BENCHMARK_NOTE : f.hint} />
-            <AssignButton compact target={{ kind: "finance", key: `${f.section}.${f.key}`, label: f.label, context: { unit: f.unit, pct: Boolean(f.pct), type: "number" } }} />
-            </div>
-          ))}
-        </div>
-        <p className="rtc-note">PPA term {terms.years ? `${terms.years} years (${terms.yearsAssumed ? "assumed: not in the documents provided" : "from the tender"})` : "not stated"}. Repayment, depreciation, salvage and receivable days are on the Financials step.</p>
-      </Section>
+      {withFinance ? (
+        <>
+        <Section index={state.losses ? "3.4" : "3.3"} title="Financing and project costs" note="Your terms; they set the tariff the optimizer minimises">
+          <div className="rtc-grid rtc-grid-4" data-testid="bid-financing">
+            {FINANCE_FIELDS.map((f) => (
+              <div key={`${f.section}.${f.key}`} className="has-assign">
+              <Field label={f.label} unit={f.unit === "%" ? undefined : f.unit} pct={Boolean(f.pct)} value={state[f.section][f.key]}
+                onChange={(v) => setState((s) => ({ ...s, [f.section]: { ...s[f.section], [f.key]: v }, filled: unmark(s.filled, [`${f.section}.${f.key}`]), lp: null }))} step={f.step} min={f.min} max={f.max}
+                hint={state.filled?.[`${f.section}.${f.key}`] ? BENCHMARK_NOTE : f.hint} />
+              <AssignButton compact target={{ kind: "finance", key: `${f.section}.${f.key}`, label: f.label, context: { unit: f.unit, pct: Boolean(f.pct), type: "number" } }} />
+              </div>
+            ))}
+          </div>
+          <p className="rtc-note">PPA term {terms.years ? `${terms.years} years (${terms.yearsAssumed ? "assumed: not in the documents provided" : "from the tender"})` : "not stated"}. Repayment, depreciation, salvage and receivable days are on the Financials step.</p>
+        </Section>
 
-      <section className="optimize-bar">
-        <div>
-          <span className="rtc-index">{state.losses ? "3.5" : "3.4"}</span>
-          <h2>{missing.length ? `${missing.length} input${missing.length > 1 ? "s" : ""} still needed` : "Ready to size"}</h2>
-          {missing.length
-            ? <ul className="bid-warnings" data-testid="bid-missing">{missing.slice(0, 12).map((m) => <li key={m}><TriangleAlert size={12} /> {m}</li>)}{missing.length > 12 && <li>… and {missing.length - 12} more</li>}</ul>
-            : <p><CheckCircle2 size={13} /> Every source you switched on has its capacity, parameters and costs. The optimizer sizes them against the tender's requirements only.</p>}
-        </div>
-        <div className="optimize-bar-actions">
-          {missing.length > 0 && fillButton}
-          <button type="button" className="primary optimize-go" disabled={missing.length > 0} onClick={() => { goto("size"); startSizing(); }} data-testid="bid-size"><Zap size={16} /> Size the plant <ArrowRight size={14} /></button>
-        </div>
-      </section>
+        <section className="optimize-bar">
+          <div>
+            <span className="rtc-index">{state.losses ? "3.5" : "3.4"}</span>
+            <h2>{missing.length ? `${missing.length} input${missing.length > 1 ? "s" : ""} still needed` : "Ready to size"}</h2>
+            {missing.length
+              ? <ul className="bid-warnings" data-testid="bid-missing">{missing.slice(0, 12).map((m) => <li key={m}><TriangleAlert size={12} /> {m}</li>)}{missing.length > 12 && <li>… and {missing.length - 12} more</li>}</ul>
+              : <p><CheckCircle2 size={13} /> Every source you switched on has its capacity, parameters and costs. The optimizer sizes them against the tender's requirements only.</p>}
+          </div>
+          <div className="optimize-bar-actions">
+            {missing.length > 0 && fillButton}
+            <button type="button" className="primary optimize-go" disabled={missing.length > 0} onClick={() => { goto("size"); startSizing(); }} data-testid="bid-size"><Zap size={16} /> Size the plant <ArrowRight size={14} /></button>
+          </div>
+        </section>
+        </>
+      ) : (
+        <section className="optimize-bar">
+          <div>
+            <span className="rtc-index">{state.losses ? "3.4" : "3.3"}</span>
+            <h2>{missing.length ? `${missing.length} input${missing.length > 1 ? "s" : ""} still needed` : "Design inputs in"}</h2>
+            {missing.length
+              ? <ul className="bid-warnings" data-testid="bid-missing">{missing.slice(0, 12).map((m) => <li key={m}><TriangleAlert size={12} /> {m}</li>)}{missing.length > 12 && <li>… and {missing.length - 12} more</li>}</ul>
+              : <p><CheckCircle2 size={13} /> Every source you switched on has its capacity, parameters and costs. The Finance team's terms come next, then the sizing.</p>}
+          </div>
+          <div className="optimize-bar-actions">
+            {missing.some((m) => !m.startsWith("Financing")) && fillButton}
+            <button type="button" className="primary optimize-go" onClick={() => goto("financeInputs")} data-testid="bid-to-finance-inputs">Continue to Finance inputs <ArrowRight size={14} /></button>
+          </div>
+        </section>
+      )}
     </>
   );
 }

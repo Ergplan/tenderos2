@@ -11,7 +11,10 @@ export const LIVE_FIN_KEYS = [
   "tariffEscalation", "solarOmLakhPerMw", "windOmLakhPerMw", "bessOmLakhPerMwh", "biomassOmLakhPerMw", "omEscalation", "insurancePct", "otherFixedCr",
   "biomassFuelRsPerKwh", "biomassFuelEscalation", "sellSurplus", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple", "debtFraction", "interestRate",
   "tenorYears", "repayment", "targetEquityIrr", "discountRate", "taxRate", "taxDepreciation", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays",
+  "graceYears", "paymentsPerYear", "targetDscr", "balloonPct", "stepUpPct", "refiYear", "refiRate", "refiTenorYears", "refiFeePct", "omStockMonths", "sparesPctOm", "wcInterestRate", "dsraMonths",
 ];
+/** The cost keys the Live model reads (the construction schedule with them). */
+export const LIVE_COST_KEYS = ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "biomassCrPerMw", "evacuationCr", "preopPct", "constructionMonths", "drawdown", "drawOrder"];
 
 const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o?.[k]]));
 
@@ -189,7 +192,7 @@ export function rtcModelExport({ inputs, sizes, costs, fin, bess, sites, finance
       bessNote: split ? `both sites together; ${Math.round(share * 100)}% at the wind site` : null,
       on: { solar: true, wind: true, hydro: false, biomass: false, thermal: false, bess: true },
       sizes: pick(sizes, ["solarMw", "windMw", "bessMw", "bessMwh"]),
-      costs: { ...pick(costs, ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "evacuationCr", "preopPct"]), plants: [] },
+      costs: { ...pick(costs, LIVE_COST_KEYS), plants: [] },
       fin: pick(fin, LIVE_FIN_KEYS),
       bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
       // the year-by-year energy of the tab's hourly simulation, from the model's own rows

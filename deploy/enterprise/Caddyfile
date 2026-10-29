@@ -1,0 +1,38 @@
+# TenderOS Enterprise: HTTPS with the client's own certificate (no Let's Encrypt, no outbound
+# connection). SITE_ADDRESS is the host name users type; the certificate must be issued for it.
+# Files, mounted read-only from the install folder's certs/:
+#   /certs/tenderos.crt   the server certificate followed by the issuing chain (PEM)
+#   /certs/tenderos.key   its private key (PEM)
+# Port 80 only redirects to HTTPS.
+{
+	admin off
+	# never contact an ACME server; the certificate is given below
+	auto_https disable_certs
+}
+
+http://{$SITE_ADDRESS} {
+	redir https://{host}{uri} permanent
+}
+
+https://{$SITE_ADDRESS} {
+	tls /certs/tenderos.crt /certs/tenderos.key
+	encode zstd gzip
+	request_body {
+		max_size 100MB
+	}
+	reverse_proxy web:3000 {
+		# sizing streams progress lines; pass them on as they come
+		flush_interval -1
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+}

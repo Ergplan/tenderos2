@@ -124,6 +124,17 @@ def test_bid_on_screen(tmp_path):
         assert "WTG step-up transformers" in losses.inner_text()
         page.click("[data-testid=bid-loss-kind-bess]")
         assert "MV transformers" in losses.inner_text()
+        # the one-line schematic: solar, wind and the battery share one pooling station
+        assert page.locator("[data-testid=site-schematic]").get_attribute("data-split") == "0"
+        assert "One pooling station" in page.locator("[data-testid=site-schematic]").inner_text()
+        # the steps belong to teams: Design hands over to the Finance team's inputs, which end with the sizing
+        assert page.locator("[data-testid=seci-step-team-sources]").text_content() == "Design"
+        assert page.locator("[data-testid=seci-step-team-financeInputs]").text_content() == "Finance"
+        page.click("[data-testid=bid-to-finance-inputs]")
+        page.wait_for_selector("[data-testid=bid-financing]")
+        assert page.locator("[data-testid=bid-debt-terms]").count() == 1 and page.locator("[data-testid=bid-construction]").count() == 1
+        assert page.locator("[data-testid=dsm-stats]").count() == 1, "the DSM norms on the Finance inputs step"
+        assert page.locator("[data-testid=bid-missing]").count() == 0
         page.click("[data-testid=bid-size]")
         sizes = page.wait_for_selector("[data-testid=bid-sizes]", timeout=1_800_000)
         page.wait_for_timeout(1500)
@@ -327,6 +338,15 @@ def test_bid_on_screen(tmp_path):
         page.locator("[data-testid=trace-formula] .trace-ref", has_text="hour by hour").first.click()
         assert page.locator("[data-testid=dispatch-hours] tbody tr").count() == 24
         page.keyboard.press("Escape")
+
+        # the What-if step starts from the sized bid; the levers table says what moves the tariff
+        page.click("[data-testid=seci-step-whatif]")
+        page.wait_for_selector("[data-testid=whatif-seeded]")
+        assert "Starts from the plant HiGHS sized" in page.locator("[data-testid=whatif-seeded]").inner_text()
+        page.click("[data-testid=lever-compute]")
+        page.wait_for_selector("[data-testid=lever-table]", timeout=60_000)
+        assert page.locator("[data-testid=lever-table] tbody tr").count() >= 8
+        assert page.locator("[data-testid=lever-debt]").count() == 1 and page.locator("[data-testid=lever-solarCapex]").count() == 1
 
         # every PPA year dispatched in 15-minute blocks with the time-block floors, as one workbook
         page.click("[data-testid=seci-step-size]")

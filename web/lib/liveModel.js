@@ -10,6 +10,11 @@
 import { addDispatchSheet, dispatchRef } from "./dispatchSheets.js";
 
 export const LIVE_SHEET = "Live model";
+export const CONSTRUCTION_SHEET = "Construction";
+// the construction sheet has at least this many month rows, so the months can be changed in Excel
+const MIN_CONSTRUCTION_ROWS = 48;
+export const REPAYMENT_LIST = ["equal", "annuity", "sculpted", "balloon", "bullet", "stepUp"];
+export const DRAWDOWN_LIST = ["linear", "sCurve", "front", "back"];
 
 const INK = "FF111111";
 const ACCENT = "FFD4FF3F";
@@ -173,6 +178,109 @@ class Sheet {
 }
 
 /**
+ * The Construction sheet: the project cost before IDC spent month by month under the drawdown
+ * profile, funded by equity and debt (pro rata or equity first), the interest during construction
+ * on the debt drawn (on the balance at the start of the month plus the month's draw), and the IDC
+ * capitalised into the debt. Every cell is a formula on the Live model's inputs (linked at the top),
+ * with at least MIN_CONSTRUCTION_ROWS month rows so the months can be changed in Excel. Returns the
+ * IDC and the Live-model references to its total and to the cost spent.
+ * Mirrors web/src/rtc/engine.js constructionSchedule.
+ */
+function addConstructionSheet(wb, S, { base, months, profile, order, debtPct, rate }) {
+  const ws = wb.addWorksheet(CONSTRUCTION_SHEET, { properties: { tabColor: { argb: "FF00703C" } } });
+  const L = (key) => `'${LIVE_SHEET}'!${S.s(key)}`;
+  const rows = Math.max(MIN_CONSTRUCTION_ROWS, months);
+  let r = ws.getRow(1);
+  r.getCell(1).value = "Construction: the cost spent month by month, its funding and the interest during construction";
+  r.getCell(1).font = { bold: true, size: 14 };
+  r = ws.getRow(2);
+  r.getCell(1).value = "Linked from the Live model's inputs (change them there). Interest in a month is on the debt at its start plus the month's draw; the IDC is capitalised as debt. The debt share applies to the cost before IDC.";
+  r.getCell(1).font = { italic: true, color: { argb: "FF777777" } };
+  // the parameters, linked
+  const P = {};
+  const param = (row, key, text, liveKey, v, fmt) => {
+    const rr = ws.getRow(row);
+    rr.getCell(1).value = text;
+    S.put(rr.getCell(2), { f: L(liveKey), v, fmt });
+    P[key] = `$B$${row}`;
+  };
+  param(4, "base", "Project cost before IDC (₹ cr)", "base", base, "cr");
+  param(5, "months", "Construction months", "consMonths", months, "int");
+  param(6, "profile", "Drawdown profile", "drawdown", profile, "text");
+  param(7, "order", "Funding order", "drawOrder", order, "text");
+  param(8, "debtPct", "Debt share of the cost", "debtPct", debtPct, "pct");
+  param(9, "rate", "Interest rate (a year)", "rate", rate, "pct");
+  const equityTotal = base * (1 - debtPct);
+  param(10, "equity", "Equity to put in (₹ cr)", "base", equityTotal, "cr");
+  ws.getCell("B10").value = { formula: `${P.base}*(1-${P.debtPct})`, result: equityTotal };
+  // the table
+  const HEAD = 12;
+  const heads = ["Month", "Share of the cost", "Cost drawn", "Equity drawn", "Debt drawn", "Opening debt", "IDC", "Closing debt", "Equity so far"];
+  r = ws.getRow(HEAD);
+  heads.forEach((h, i) => {
+    const c = r.getCell(i + 1);
+    c.value = h;
+    c.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INK } };
+    c.alignment = { horizontal: i ? "right" : "left" };
+  });
+  const CUM = { linear: (t) => t, sCurve: (t) => (1 - Math.cos(Math.PI * t)) / 2, front: (t) => 1 - (1 - t) ** 2, back: (t) => t ** 2 }[profile] || ((t) => t);
+  const cumF = (t) => `IF(${P.profile}="linear",${t},IF(${P.profile}="sCurve",(1-COS(PI()*${t}))/2,IF(${P.profile}="front",1-(1-${t})^2,${t}^2)))`;
+  let cumEq = 0;
+  let bal = 0;
+  let idc = 0;
+  let spent = 0;
+  const first = HEAD + 1;
+  for (let m = 1; m <= rows; m += 1) {
+    const row = first + m - 1;
+    const on = m <= months;
+    const share = on ? CUM(m / months) - CUM((m - 1) / months) : 0;
+    const cost = base * share;
+    const equity = on ? (order === "equityFirst" ? Math.min(cost, Math.max(0, equityTotal - cumEq)) : cost * (1 - debtPct)) : 0;
+    const debt = cost - equity;
+    const opening = bal;
+    const i = on ? (opening + debt) * (rate / 12) : 0; // no interest after the construction ends: the debt is in operation
+    bal = opening + debt + i;
+    idc += i;
+    spent += cost;
+    const prevEq = cumEq;
+    cumEq += equity;
+    const rr = ws.getRow(row);
+    const A = `$A${row}`;
+    const t = (k) => `MIN(1,(${A}${k})/${P.months})`;
+    const fs = [
+      null,
+      `IF(OR(${P.months}<=0,${A}>${P.months}),0,${cumF(t("+0"))}-${cumF(t("-1"))})`,
+      `${P.base}*$B${row}`,
+      `IF(${P.order}="equityFirst",MIN($C${row},MAX(0,${P.equity}-${m === 1 ? "0" : `$I${row - 1}`})),$C${row}*(1-${P.debtPct}))`,
+      `$C${row}-$D${row}`,
+      m === 1 ? "0" : `$H${row - 1}`,
+      `IF(${A}>${P.months},0,($F${row}+$E${row})*${P.rate}/12)`,
+      `$F${row}+$E${row}+$G${row}`,
+      `${m === 1 ? "0" : `$I${row - 1}`}+$D${row}`,
+    ];
+    const vals = [m, share, cost, equity, debt, opening, i, bal, cumEq];
+    const fmts = ["int", "pct", "cr", "cr", "cr", "cr", "cr", "cr", "cr"];
+    vals.forEach((v, k) => S.put(rr.getCell(k + 1), { f: fs[k], v, fmt: fmts[k] }));
+    void prevEq;
+  }
+  const last = first + rows - 1;
+  const totRow = last + 1;
+  const tr = ws.getRow(totRow);
+  tr.getCell(1).value = "Total";
+  tr.getCell(1).font = { bold: true };
+  const totals = { 2: ["pct", spent / (base || 1)], 3: ["cr", spent], 4: ["cr", cumEq], 5: ["cr", spent - cumEq], 7: ["cr", idc] };
+  for (const [col, [fmt, v]] of Object.entries(totals)) {
+    const letter = colName(Number(col));
+    S.put(tr.getCell(Number(col)), { f: `SUM(${letter}${first}:${letter}${last})`, v, fmt, bold: true });
+  }
+  ws.getColumn(1).width = 34;
+  for (let c = 2; c <= 9; c += 1) ws.getColumn(c).width = 16;
+  ws.views = [{ state: "frozen", ySplit: HEAD, showGridLines: false }];
+  return { sheet: ws, idc, spent, idcRef: `'${CONSTRUCTION_SHEET}'!$G$${totRow}`, spentRef: `'${CONSTRUCTION_SHEET}'!$C$${totRow}`, headRow: HEAD, firstRow: first, lastRow: last, totalRow: totRow };
+}
+
+/**
  * Add the Live model sheet to an exceljs workbook. m is the request's `live` block (see
  * web/src/bid/exportModel.js liveModelRequest). Returns { sheet, cells } where cells maps the
  * key results (tariff, equityIrr, ...) to their 'Live model'!C.. addresses for other sheets.
@@ -299,7 +407,11 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
     S.one("bessPcs", "Battery power conversion", "₹ cr/MW", { v: co.bessPcsCrPerMw || 0, kind: "input", fmt: "num", source: src("costs.bessPcsCrPerMw", "Included in the energy price") });
   }
   S.one("evac", "Transmission / evacuation", "₹ cr", { v: co.evacuationCr || 0, kind: "input", fmt: "cr", source: src("costs.evacuationCr") });
-  S.one("preop", "Pre-operative and IDC", "% of hard cost", { v: co.preopPct || 0, kind: "input", fmt: "pct", source: src("costs.preopPct") });
+  const consM = Math.max(0, Math.round(co.constructionMonths || 0));
+  S.one("preop", consM > 0 ? "Pre-operative cost (IDC worked out below)" : "Pre-operative and IDC", "% of hard cost", { v: co.preopPct || 0, kind: "input", fmt: "pct", source: src("costs.preopPct") });
+  S.one("consMonths", "Construction months", "months", { v: consM, kind: "input", fmt: "int", source: src("costs.constructionMonths", "Model default"), note: "0: the IDC is inside the pre-operative share. Else the sheet Construction spends the cost month by month and works out the IDC" });
+  S.one("drawdown", "Drawdown profile", "linear / sCurve / front / back", { v: DRAWDOWN_LIST.includes(co.drawdown) ? co.drawdown : "linear", kind: "input", list: DRAWDOWN_LIST, source: src("costs.drawdown", "Model default") });
+  S.one("drawOrder", "Funding order", "proRata / equityFirst", { v: co.drawOrder === "equityFirst" ? "equityFirst" : "proRata", kind: "input", list: ["proRata", "equityFirst"], source: src("costs.drawOrder", "Model default") });
 
   S.group("Operating cost");
   if (on.solar) S.one("solarOm", "Solar O&M", "₹ lakh/MW/yr", { v: fi.solarOmLakhPerMw || 0, kind: "input", fmt: "num", source: src("solar.om") });
@@ -368,7 +480,17 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   S.one("debtPct", "Debt share", "% of project cost", { v: fi.debtFraction, kind: "input", fmt: "pct", source: src("fin.debtFraction") });
   S.one("rate", "Interest rate", "%/yr", { v: fi.interestRate, kind: "input", fmt: "pct", source: src("fin.interestRate") });
   S.one("tenor", "Loan tenor", "years", { v: fi.tenorYears, kind: "input", fmt: "int", source: src("fin.tenorYears") });
-  S.one("repay", "Repayment", "annuity / equal", { v: fi.repayment === "annuity" ? "annuity" : "equal", kind: "input", list: ["annuity", "equal"], source: src("fin.repayment", "Model default") });
+  S.one("repay", "Repayment", REPAYMENT_LIST.join(" / "), { v: REPAYMENT_LIST.includes(fi.repayment) ? fi.repayment : "equal", kind: "input", list: REPAYMENT_LIST, source: src("fin.repayment", "Model default"),
+    note: "equal: the balance in equal parts over the years left; annuity: level debt service; sculpted: the principal that keeps the DSCR at the target; balloon: a share in the last year; bullet: all in the last year; stepUp: principal growing at a rate" });
+  S.one("grace", "Principal moratorium", "years", { v: fi.graceYears || 0, kind: "input", fmt: "int", source: src("fin.graceYears", "Model default"), note: "Within the tenor; interest is paid" });
+  S.one("instalments", "Instalments a year", "1 / 2 / 4 / 12", { v: [1, 2, 4, 12].includes(fi.paymentsPerYear) ? fi.paymentsPerYear : 1, kind: "input", fmt: "int", list: ["1", "2", "4", "12"], source: src("fin.paymentsPerYear", "Model default"), note: "Instalments within the year pay the balance down earlier: the interest is on the average balance (not for sculpting)" });
+  S.one("targetDscr", "Target DSCR (sculpted)", "×", { v: fi.targetDscr || 1.3, kind: "input", fmt: "x", source: src("fin.targetDscr", "Model default") });
+  S.one("balloonPct", "Balloon share (balloon)", "% of the debt", { v: fi.balloonPct || 0, kind: "input", fmt: "pct", source: src("fin.balloonPct", "Model default") });
+  S.one("stepUp", "Principal step-up (stepUp)", "%/yr", { v: fi.stepUpPct || 0, kind: "input", fmt: "pct", source: src("fin.stepUpPct", "Model default") });
+  S.one("refiYear", "Refinance at the end of year", "year (0: never)", { v: fi.refiYear || 0, kind: "input", fmt: "int", source: src("fin.refiYear", "Model default") });
+  S.one("refiRate", "Refinanced interest rate", "%/yr", { v: fi.refiRate || 0, kind: "input", fmt: "pct", source: src("fin.refiRate", "Model default") });
+  S.one("refiTenor", "Refinanced tenor", "years from then", { v: fi.refiTenorYears || 0, kind: "input", fmt: "int", source: src("fin.refiTenorYears", "Model default") });
+  S.one("refiFee", "Refinancing fee", "% of the balance", { v: fi.refiFeePct || 0, kind: "input", fmt: "pct", source: src("fin.refiFeePct", "Model default") });
   S.one("targetIrr", "Target equity IRR", "%", { v: fi.targetEquityIrr, kind: "input", fmt: "pct", source: src("fin.targetEquityIrr") });
   S.one("disc", "Discount rate (LCOE, project NPV)", "%", { v: fi.discountRate, kind: "input", fmt: "pct", source: src("fin.discountRate", "Model default") });
 
@@ -378,7 +500,13 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   S.one("wdvRate", "WDV rate", "%/yr", { v: fi.wdvRate, kind: "input", fmt: "pct", source: src("fin.wdvRate", "Model default") });
   S.one("bookLife", "Book life", "years", { v: fi.bookLifeYears, kind: "input", fmt: "int", source: src("fin.bookLifeYears", "Model default") });
   S.one("salvage", "Salvage value", "% of project cost", { v: fi.salvagePct, kind: "input", fmt: "pct", source: src("fin.salvagePct", "Model default") });
+
+  S.group("Working capital and reserves");
   S.one("recvDays", "Receivable days", "days", { v: fi.receivableDays, kind: "input", fmt: "int", source: src("fin.receivableDays", "Model default") });
+  S.one("omMonths", "O&M in hand", "months", { v: fi.omStockMonths || 0, kind: "input", fmt: "num", source: src("fin.omStockMonths", "Model default"), note: "CERC norm: one month of O&M" });
+  S.one("sparesPct", "Maintenance spares", "% of the year's O&M", { v: fi.sparesPctOm || 0, kind: "input", fmt: "pct", source: src("fin.sparesPctOm", "Model default"), note: "CERC norm: 15%" });
+  S.one("wcRate", "Interest on working capital", "%/yr", { v: fi.wcInterestRate || 0, kind: "input", fmt: "pct", source: src("fin.wcInterestRate", "Model default"), note: "0: the working capital is funded from equity cash" });
+  S.one("dsraMonths", "Debt service reserve", "months of the next year's debt service", { v: fi.dsraMonths || 0, kind: "input", fmt: "num", source: src("fin.dsraMonths", "Model default"), note: "Held from the equity cash, released as the debt service falls and at the end" });
 
   // ---- project cost and funding
   S.section("Project cost and funding");
@@ -401,22 +529,32 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   hardTerms.push("evacCost");
   const hard = hardTerms.reduce((a, k) => a + S.v(k), 0);
   S.one("hard", "Hard cost", "₹ cr", { f: `SUM(${S.s(hardTerms[0])}:${S.s("evacCost")})`, v: hard, fmt: "cr", bold: true });
-  S.one("preopCost", "Pre-operative and IDC", "₹ cr", { f: `${S.s("hard")}*${S.s("preop")}`, v: hard * S.v("preop"), fmt: "cr" });
-  const total = hard * (1 + S.v("preop"));
-  S.one("total", "Total project cost", "₹ cr", { f: `${S.s("hard")}+${S.s("preopCost")}`, v: total, fmt: "cr", bold: true });
-  const debt0 = total * S.v("debtPct");
-  S.one("debt", "Debt", "₹ cr", { f: `${S.s("total")}*${S.s("debtPct")}`, v: debt0, fmt: "cr" });
+  S.one("preopCost", consM > 0 ? "Pre-operative cost" : "Pre-operative and IDC", "₹ cr", { f: `${S.s("hard")}*${S.s("preop")}`, v: hard * S.v("preop"), fmt: "cr" });
+  const base = hard * (1 + S.v("preop"));
+  S.one("base", "Project cost before IDC", "₹ cr", { f: `${S.s("hard")}+${S.s("preopCost")}`, v: base, fmt: "cr" });
+  // the construction sheet: the cost spent month by month, its funding and the IDC
+  const cons = addConstructionSheet(wb, S, { base, months: consM, profile: S.v("drawdown"), order: S.v("drawOrder"), debtPct: S.v("debtPct"), rate: S.v("rate") });
+  S.one("idc", "Interest during construction (sheet Construction)", "₹ cr", { f: cons.idcRef, v: cons.idc, fmt: "cr", note: consM > 0 ? `${consM} months, ${S.v("drawdown")} drawdown, ${S.v("drawOrder") === "equityFirst" ? "equity first" : "pro rata"} funding` : "No construction months: the IDC is inside the pre-operative share" });
+  const total = base + cons.idc;
+  S.one("total", "Total project cost", "₹ cr", { f: `${S.s("base")}+${S.s("idc")}`, v: total, fmt: "cr", bold: true });
+  const debt0 = base * S.v("debtPct") + cons.idc;
+  S.one("debt", "Debt", "₹ cr", { f: `${S.s("base")}*${S.s("debtPct")}+${S.s("idc")}`, v: debt0, fmt: "cr", note: "The debt share of the cost before IDC, plus the IDC (capitalised as debt)" });
   S.one("equity", "Equity", "₹ cr", { f: `${S.s("total")}-${S.s("debt")}`, v: total - debt0, fmt: "cr" });
   S.one("years", "Model years", "years", { f: `COUNT(${S.col(1)}${yearRow}:${S.last}${yearRow})`, v: N, fmt: "int", note: "The PPA term the optimiser dispatched; one column per year" });
   const tenorUsed = Math.min(N, Math.max(1, Math.round(S.v("tenor"))));
   S.one("tenorUsed", "Loan tenor used", "years", { f: `MIN(${S.s("years")},MAX(1,ROUND(${S.s("tenor")},0)))`, v: tenorUsed, fmt: "int" });
   const rt = S.v("rate");
-  const annuity = rt <= 0 ? debt0 / tenorUsed : (debt0 * rt * (1 + rt) ** tenorUsed) / ((1 + rt) ** tenorUsed - 1);
-  S.one("annuity", "Annuity (interest + principal) if annuity repayment", "₹ cr/yr", {
-    f: `IF(${S.s("rate")}<=0,${S.s("debt")}/${S.s("tenorUsed")},${S.s("debt")}*${S.s("rate")}*(1+${S.s("rate")})^${S.s("tenorUsed")}/((1+${S.s("rate")})^${S.s("tenorUsed")}-1))`,
-    v: annuity, fmt: "cr",
-  });
-  S.one("equalPrincipal", "Principal a year if equal repayment", "₹ cr/yr", { f: `${S.s("debt")}/${S.s("tenorUsed")}`, v: debt0 / tenorUsed, fmt: "cr" });
+  const graceUsed = Math.min(tenorUsed - 1, Math.max(0, Math.round(S.v("grace"))));
+  S.one("graceUsed", "Moratorium used", "years", { f: `MIN(${S.s("tenorUsed")}-1,MAX(0,ROUND(${S.s("grace")},0)))`, v: graceUsed, fmt: "int" });
+  const q = Number(S.v("instalments")) || 1;
+  const adj = S.v("repay") === "sculpted" ? 0 : (q - 1) / (2 * q);
+  S.one("adj", "Interest saved by instalments within the year", "× the year's principal", { f: `IF(${S.s("repay")}="sculpted",0,(VALUE(${S.s("instalments")})-1)/(2*VALUE(${S.s("instalments")})))`, v: adj, fmt: "factor", note: "(instalments − 1) ÷ (2 × instalments): the principal is paid through the year, so the interest is on the average balance" });
+  const refiOn = S.v("refiYear") > 0 && S.v("refiYear") < tenorUsed ? 1 : 0;
+  S.one("refiOn", "Refinancing applies", "1 / 0", { f: `IF(AND(${S.s("refiYear")}>0,${S.s("refiYear")}<${S.s("tenorUsed")}),1,0)`, v: refiOn, fmt: "int", note: "Only while there is a balance to refinance" });
+  const refiEnd = refiOn ? Math.min(N, S.v("refiYear") + Math.max(1, Math.round(S.v("refiTenor")))) : tenorUsed;
+  S.one("refiEnd", "Last year of the refinanced debt", "year", { f: `IF(${S.s("refiOn")}=1,MIN(${S.s("years")},${S.s("refiYear")}+MAX(1,ROUND(${S.s("refiTenor")},0))),${S.s("tenorUsed")})`, v: refiEnd, fmt: "int" });
+  const balloonShare = S.v("repay") === "bullet" ? 1 : Math.min(1, Math.max(0, S.v("balloonPct")));
+  S.one("balloonShare", "Share repaid in the last year", "% of the debt", { f: `IF(${S.s("repay")}="bullet",1,MIN(1,MAX(0,${S.s("balloonPct")})))`, v: balloonShare, fmt: "pct", note: "balloon: the balloon share; bullet: all of it" });
   const bookBase = total * (1 - S.v("salvage"));
   S.one("bookBase", "Depreciable value (less salvage)", "₹ cr", { f: `${S.s("total")}*(1-${S.s("salvage")})`, v: bookBase, fmt: "cr" });
   S.one("bookDepYr", "Book depreciation a year", "₹ cr/yr", { f: `${S.s("bookBase")}/${S.s("bookLife")}`, v: bookBase / S.v("bookLife"), fmt: "cr" });
@@ -652,6 +790,23 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   opexKeys.push("insuranceCr");
   S.series("otherCr", "Other fixed cost", "₹ cr", { f: (y) => `${S.s("otherFixed")}*${S.at("omF", y)}`, v: (y) => S.v("otherFixed") * S.v("omF", y), total: true });
   opexKeys.push("otherCr");
+  // O&M of the year (the working capital's O&M in hand and spares are on it)
+  const omKeys = opexKeys.filter((k) => k.endsWith("OmCr"));
+  S.series("omCr", "O&M of the year", "₹ cr", { f: (y) => (omKeys.length ? omKeys.map((k) => S.at(k, y)).join("+") : "0"), v: (y) => omKeys.reduce((a, k) => a + S.v(k, y), 0), total: true });
+  if (m.ops.some((o) => (o.dsmChargeCr || 0) > 0)) {
+    S.series("dsmCr", "Deviation settlement charges (CERC DSM)", "₹ cr", { v: (y) => m.ops[y - 1].dsmChargeCr || 0, kind: "opt", total: true, note: "The year's DSM charges on the forecast error, worked out block by block in TenderOS" });
+    opexKeys.push("dsmCr");
+  } else if (m.ops.some((o) => (o.dsmA || 0) !== 0 || (o.dsmB || 0) !== 0)) {
+    // the charge per MWh scheduled is a line in the year's tariff: a × tariff + b (web/src/dsm/dsm.js)
+    S.series("dsmA", "DSM charge per MWh scheduled, per ₹/kWh of tariff", "₹/MWh per ₹/kWh", { v: (y) => m.ops[y - 1].dsmA || 0, kind: "opt", fmt: "num", note: "From the forecast-error distribution, the tolerance band and the X factor of the year, and the steps beyond the band (TenderOS, DSM norms)" });
+    S.series("dsmB", "DSM charge per MWh scheduled, at the normal rates", "₹/MWh", { v: (y) => m.ops[y - 1].dsmB || 0, kind: "opt", fmt: "num", note: "The in-band deviation settled at the normal rate: dear when the plant is short, cheap when it is long" });
+    S.series("dsmCr", "Deviation settlement charges (CERC DSM)", "₹ cr", {
+      f: (y) => `(${S.at("delivered", y)}+${S.at("excess", y)})*(${S.at("dsmA", y)}*${S.at("trf", y)}+${S.at("dsmB", y)})/10000`,
+      v: (y) => ((S.v("delivered", y) + S.v("excess", y)) * ((m.ops[y - 1].dsmA || 0) * S.v("trf", y) + (m.ops[y - 1].dsmB || 0))) / 1e4,
+      total: true, note: "Energy scheduled (MU, what reaches the meter) × (a × tariff + b) ÷ 10,000",
+    });
+    opexKeys.push("dsmCr");
+  }
   if (on.biomass) {
     S.series("fuelCr", "Biomass fuel", "₹ cr", { f: (y) => `${S.at("biomassMu", y)}*${S.s("fuel")}*${S.at("fuelF", y)}/10`, v: (y) => (S.v("biomassMu", y) * S.v("fuel") * S.v("fuelF", y)) / 10, total: true });
     opexKeys.push("fuelCr");
@@ -670,7 +825,7 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
     opexKeys.push("thermalFixedCr", "thermalEnergyCr");
   }
   S.series("opex", "Total operating cost", "₹ cr", {
-    f: (y) => `SUM(${S.col(y)}${S.cell[opexKeys[0]]}:${S.col(y)}${S.cell[opexKeys[opexKeys.length - 1]]})`,
+    f: (y) => opexKeys.map((k) => S.at(k, y)).join("+"),
     v: (y) => opexKeys.reduce((a, k) => a + S.v(k, y), 0), total: true, bold: true,
   });
   S.series("ebitda", "EBITDA", "₹ cr", { f: (y) => `${S.at("revenue", y)}-${S.at("opex", y)}`, v: (y) => S.v("revenue", y) - S.v("opex", y), total: true, bold: true });
@@ -714,45 +869,19 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   });
   S.series("bookDep", "Book depreciation", "₹ cr", { f: (y) => `${S.at("baseDep", y)}+${S.at("augDep", y)}`, v: (y) => S.v("baseDep", y) + S.v("augDep", y), total: true, bold: true });
 
-  // ---- debt
-  S.section("Debt");
-  S.series("openDebt", "Opening debt", "₹ cr", {
-    f: (y) => (y === 1 ? S.s("debt") : null), v: (y) => (y === 1 ? debt0 : null),
+  // ---- working capital (before the debt: the sculpted principal reads the cash flow)
+  S.section("Working capital");
+  S.series("recv", "Receivables", "₹ cr", { f: (y) => `${S.at("revenue", y)}*${S.s("recvDays")}/365`, v: (y) => (S.v("revenue", y) * S.v("recvDays")) / 365, note: "Revenue × receivable days ÷ 365, held at the year end" });
+  S.series("omStock", "O&M in hand", "₹ cr", { f: (y) => `${S.at("omCr", y)}*${S.s("omMonths")}/12`, v: (y) => (S.v("omCr", y) * S.v("omMonths")) / 12 });
+  S.series("spares", "Maintenance spares", "₹ cr", { f: (y) => `${S.at("omCr", y)}*${S.s("sparesPct")}`, v: (y) => S.v("omCr", y) * S.v("sparesPct") });
+  S.series("wcBal", "Working capital", "₹ cr", { f: (y) => `${S.at("recv", y)}+${S.at("omStock", y)}+${S.at("spares", y)}`, v: (y) => S.v("recv", y) + S.v("omStock", y) + S.v("spares", y), bold: true });
+  S.series("dWc", "Increase in working capital", "₹ cr", {
+    f: (y) => (y === 1 ? S.at("wcBal", 1) : `${S.at("wcBal", y)}-${S.at("wcBal", y - 1)}`),
+    v: (y) => (y === 1 ? S.v("wcBal", 1) : S.v("wcBal", y) - S.v("wcBal", y - 1)), total: true,
   });
-  S.series("interest", "Interest", "₹ cr", { f: (y) => `${S.at("openDebt", y)}*${S.s("rate")}`, v: () => null, total: true });
-  S.series("principal", "Principal", "₹ cr", { f: () => null, v: () => null, total: true });
-  S.series("closeDebt", "Closing debt", "₹ cr", { f: () => null, v: () => null });
-  S.series("debtService", "Debt service", "₹ cr", { f: (y) => `${S.at("interest", y)}+${S.at("principal", y)}`, v: () => null, total: true, bold: true });
-  // the four rows feed each other year by year: fill values and formulas together
-  {
-    const rows = ["openDebt", "interest", "principal", "closeDebt", "debtService"];
-    let open = debt0;
-    for (let y = 1; y <= N; y += 1) {
-      const interest = open * rt;
-      let principal = 0;
-      if (y <= tenorUsed && open > 1e-9) principal = S.v("repay") === "annuity" ? Math.min(open, annuity - interest) : Math.min(open, debt0 / tenorUsed);
-      const close = open - principal;
-      const vals = { openDebt: open, interest, principal, closeDebt: close, debtService: interest + principal };
-      const fs = {
-        openDebt: y === 1 ? S.s("debt") : S.at("closeDebt", y - 1),
-        interest: `${S.at("openDebt", y)}*${S.s("rate")}`,
-        principal: `IF(AND(${S.yr(y)}<=${S.s("tenorUsed")},${S.at("openDebt", y)}>1E-9),IF(${S.s("repay")}="annuity",MIN(${S.at("openDebt", y)},${S.s("annuity")}-${S.at("interest", y)}),MIN(${S.at("openDebt", y)},${S.s("equalPrincipal")})),0)`,
-        closeDebt: `${S.at("openDebt", y)}-${S.at("principal", y)}`,
-        debtService: `${S.at("interest", y)}+${S.at("principal", y)}`,
-      };
-      for (const k of rows) {
-        S.val[k][y] = vals[k];
-        S.put(ws.getCell(`${S.col(y)}${S.cell[k]}`), { f: fs[k], v: vals[k], fmt: "cr", bold: k === "debtService" });
-      }
-      open = close;
-    }
-    for (const k of ["interest", "principal", "debtService"]) {
-      const sum = S.val[k].slice(1).reduce((a, x) => a + x, 0);
-      S.put(ws.getCell(`C${S.cell[k]}`), { f: `SUM(${S.span(k)})`, v: sum, fmt: "cr", bold: true });
-    }
-  }
+  S.series("wcInt", "Interest on working capital", "₹ cr", { f: (y) => `${S.at("wcBal", y)}*${S.s("wcRate")}`, v: (y) => S.v("wcBal", y) * S.v("wcRate"), total: true });
 
-  // ---- tax depreciation
+  // ---- tax depreciation (before the debt: the sculpted principal needs the tax)
   S.section("Tax depreciation");
   S.series("wdvOpen", "Tax block, opening", "₹ cr", { v: () => null });
   S.series("wdvAdd", "Added: augmentation", "₹ cr", { f: (y) => S.at("aug", y), v: (y) => S.v("aug", y), total: true });
@@ -781,20 +910,122 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
     S.put(ws.getCell(`C${S.cell.taxDep}`), { f: `SUM(${S.span("taxDep")})`, v: sum, fmt: "cr", bold: true });
   }
 
+  // ---- debt
+  S.section("Debt");
+  const debtRows = ["openDebt", "rateY", "endY", "intOpen", "balloonAmt", "preTaxS", "lossBfS", "lossUsedS", "taxableS", "lossCfS", "taxS", "cfadsS", "principal", "interest", "closeDebt", "debtService", "refiFeeCr"];
+  S.series("openDebt", "Opening debt", "₹ cr", { v: () => null });
+  S.series("rateY", "Interest rate of the year", "%", { v: () => null, fmt: "pct", note: "The refinanced rate from the year after the refinancing" });
+  S.series("endY", "Last year of the debt", "year", { v: () => null, fmt: "int" });
+  S.series("intOpen", "Interest on the opening balance", "₹ cr", { v: () => null });
+  S.series("balloonAmt", "Amount kept for the last year (balloon, bullet)", "₹ cr", { v: () => null, note: "The share of the debt, or of the balance refinanced" });
+  S.group("Sculpting: the cash flow after tax with the interest on the opening balance");
+  S.series("preTaxS", "Taxable profit before losses (sculpting)", "₹ cr", { v: () => null });
+  S.series("lossBfS", "Tax losses brought forward (sculpting)", "₹ cr", { v: () => null });
+  S.series("lossUsedS", "Losses set off (sculpting)", "₹ cr", { v: () => null });
+  S.series("taxableS", "Taxable income (sculpting)", "₹ cr", { v: () => null });
+  S.series("lossCfS", "Tax losses carried forward (sculpting)", "₹ cr", { v: () => null });
+  S.series("taxS", "Tax (sculpting)", "₹ cr", { v: () => null });
+  S.series("cfadsS", "Cash flow for debt service (sculpting)", "₹ cr", { v: () => null, note: "EBITDA − tax − working capital − augmentation − interest on working capital, the tax on the interest on the opening balance" });
+  S.group("Repayment");
+  S.series("principal", "Principal", "₹ cr", { v: () => null, total: true, note: "Under the repayment method, after the moratorium, until the last year of the debt (which clears it)" });
+  S.series("interest", "Interest", "₹ cr", { v: () => null, total: true, note: "On the opening balance, less the instalment saving on the year's principal" });
+  S.series("closeDebt", "Closing debt", "₹ cr", { v: () => null });
+  S.series("debtService", "Debt service", "₹ cr", { v: () => null, total: true, bold: true });
+  S.series("refiFeeCr", "Refinancing fee", "₹ cr", { v: () => null, total: true, note: "On the balance refinanced, in the refinancing year" });
+  {
+    let open = debt0;
+    let balloonBase = debt0;
+    let carriedS = 0;
+    const repay = S.v("repay");
+    const crfOf = (r, n) => (r <= 0 ? 1 / n : (r * (1 + r) ** n) / ((1 + r) ** n - 1));
+    for (let y = 1; y <= N; y += 1) {
+      const phase2 = refiOn && y > S.v("refiYear");
+      const rate = phase2 ? S.v("refiRate") : rt;
+      const end = phase2 ? refiEnd : tenorUsed;
+      const n = end - y + 1;
+      const intOpen = open * rate;
+      if (refiOn && y === S.v("refiYear") + 1) balloonBase = open;
+      const balloonAmt = balloonBase * balloonShare;
+      // sculpting's tax: on the interest on the opening balance, its own losses chain
+      const preS = S.v("ebitda", y) - intOpen - S.v("wcInt", y) - S.v("taxDep", y);
+      const bfS = carriedS;
+      const usedS = preS > 0 ? Math.min(bfS, preS) : 0;
+      const taxableS = Math.max(0, preS - usedS);
+      carriedS = bfS - usedS + Math.max(0, -preS);
+      const taxS = taxableS * S.v("taxRate");
+      const cfadsS = S.v("ebitda", y) - taxS - S.v("dWc", y) - S.v("aug", y) - S.v("wcInt", y);
+      const repaying = y > graceUsed && y <= end && open > 1e-9;
+      let principal = 0;
+      if (repaying) {
+        if (n <= 1) principal = open;
+        else if (repay === "annuity") principal = Math.min(open, open * crfOf(rate, n) - intOpen);
+        else if (repay === "sculpted") principal = Math.min(open, Math.max(0, cfadsS / S.v("targetDscr") - intOpen));
+        else if (repay === "balloon" || repay === "bullet") principal = Math.min(open, Math.max(0, (open - balloonAmt) / (n - 1)));
+        else if (repay === "stepUp") principal = Math.min(open, S.v("stepUp") > 0 ? (open * S.v("stepUp")) / ((1 + S.v("stepUp")) ** n - 1) : open / n);
+        else principal = open / n;
+      }
+      const interest = intOpen - adj * principal;
+      const close = open - principal;
+      const refiFee = refiOn && y === S.v("refiYear") ? close * S.v("refiFee") : 0;
+      const vals = { openDebt: open, rateY: rate, endY: end, intOpen, balloonAmt, preTaxS: preS, lossBfS: bfS, lossUsedS: usedS, taxableS, lossCfS: carriedS, taxS, cfadsS, principal, interest, closeDebt: close, debtService: interest + principal, refiFeeCr: refiFee };
+      const O = S.at("openDebt", y);
+      const R = S.at("rateY", y);
+      const NL = `(${S.at("endY", y)}-${S.yr(y)}+1)`;
+      const IO = S.at("intOpen", y);
+      const method = `IF(${NL}<=1,${O},`
+        + `IF(${S.s("repay")}="annuity",MIN(${O},IF(${R}<=0,${O}/${NL},${O}*${R}*(1+${R})^${NL}/((1+${R})^${NL}-1))-${IO}),`
+        + `IF(${S.s("repay")}="sculpted",MIN(${O},MAX(0,${S.at("cfadsS", y)}/${S.s("targetDscr")}-${IO})),`
+        + `IF(OR(${S.s("repay")}="balloon",${S.s("repay")}="bullet"),MIN(${O},MAX(0,(${O}-${S.at("balloonAmt", y)})/(${NL}-1))),`
+        + `IF(${S.s("repay")}="stepUp",MIN(${O},IF(${S.s("stepUp")}>0,${O}*${S.s("stepUp")}/((1+${S.s("stepUp")})^${NL}-1),${O}/${NL})),`
+        + `${O}/${NL})))))`;
+      const phase2F = `AND(${S.s("refiOn")}=1,${S.yr(y)}>${S.s("refiYear")})`;
+      const fs = {
+        openDebt: y === 1 ? S.s("debt") : S.at("closeDebt", y - 1),
+        rateY: `IF(${phase2F},${S.s("refiRate")},${S.s("rate")})`,
+        endY: `IF(${phase2F},${S.s("refiEnd")},${S.s("tenorUsed")})`,
+        intOpen: `${O}*${R}`,
+        balloonAmt: y === 1 ? `${S.s("debt")}*${S.s("balloonShare")}` : `IF(AND(${S.s("refiOn")}=1,${S.yr(y)}=${S.s("refiYear")}+1),${O}*${S.s("balloonShare")},${S.at("balloonAmt", y - 1)})`,
+        preTaxS: `${S.at("ebitda", y)}-${IO}-${S.at("wcInt", y)}-${S.at("taxDep", y)}`,
+        lossBfS: y === 1 ? "0" : S.at("lossCfS", y - 1),
+        lossUsedS: `IF(${S.at("preTaxS", y)}>0,MIN(${S.at("lossBfS", y)},${S.at("preTaxS", y)}),0)`,
+        taxableS: `MAX(0,${S.at("preTaxS", y)}-${S.at("lossUsedS", y)})`,
+        lossCfS: `${S.at("lossBfS", y)}-${S.at("lossUsedS", y)}+MAX(0,-${S.at("preTaxS", y)})`,
+        taxS: `${S.at("taxableS", y)}*${S.s("taxRate")}`,
+        cfadsS: `${S.at("ebitda", y)}-${S.at("taxS", y)}-${S.at("dWc", y)}-${S.at("aug", y)}-${S.at("wcInt", y)}`,
+        principal: `IF(AND(${S.yr(y)}>${S.s("graceUsed")},${S.yr(y)}<=${S.at("endY", y)},${O}>1E-9),${method},0)`,
+        interest: `${IO}-${S.s("adj")}*${S.at("principal", y)}`,
+        closeDebt: `${O}-${S.at("principal", y)}`,
+        debtService: `${S.at("interest", y)}+${S.at("principal", y)}`,
+        refiFeeCr: `IF(AND(${S.s("refiOn")}=1,${S.yr(y)}=${S.s("refiYear")}),${S.at("closeDebt", y)}*${S.s("refiFee")},0)`,
+      };
+      for (const k of debtRows) {
+        S.val[k][y] = vals[k];
+        S.put(ws.getCell(`${S.col(y)}${S.cell[k]}`), { f: fs[k], v: vals[k], fmt: k === "rateY" ? "pct" : k === "endY" ? "int" : "cr", bold: k === "debtService" });
+      }
+      open = close;
+    }
+    for (const k of ["principal", "interest", "debtService", "refiFeeCr"]) {
+      const sum = S.val[k].slice(1).reduce((a, x) => a + x, 0);
+      S.put(ws.getCell(`C${S.cell[k]}`), { f: `SUM(${S.span(k)})`, v: sum, fmt: "cr", bold: true });
+    }
+  }
+
   // ---- profit and loss
   S.section("Profit and loss");
   const link = (key, from, text) => S.series(key, text, "₹ cr", { f: (y) => S.at(from, y), v: (y) => S.v(from, y), total: true });
   link("plEbitda", "ebitda", "EBITDA");
   link("plBookDep", "bookDep", "Less: book depreciation");
   link("plInterest", "interest", "Less: interest");
+  link("plWcInt", "wcInt", "Less: interest on working capital");
+  link("plRefiFee", "refiFeeCr", "Less: refinancing fee");
   S.series("pbt", "Profit before tax", "₹ cr", {
-    f: (y) => `${S.at("plEbitda", y)}-${S.at("plBookDep", y)}-${S.at("plInterest", y)}`,
-    v: (y) => S.v("ebitda", y) - S.v("bookDep", y) - S.v("interest", y), total: true, bold: true,
+    f: (y) => `${S.at("plEbitda", y)}-${S.at("plBookDep", y)}-${S.at("plInterest", y)}-${S.at("plWcInt", y)}-${S.at("plRefiFee", y)}`,
+    v: (y) => S.v("ebitda", y) - S.v("bookDep", y) - S.v("interest", y) - S.v("wcInt", y) - S.v("refiFeeCr", y), total: true, bold: true,
   });
   S.series("preTaxable", "Taxable profit before losses brought forward", "₹ cr", {
-    f: (y) => `${S.at("ebitda", y)}-${S.at("interest", y)}-${S.at("taxDep", y)}`,
-    v: (y) => S.v("ebitda", y) - S.v("interest", y) - S.v("taxDep", y),
-    note: "EBITDA − interest − tax depreciation",
+    f: (y) => `${S.at("ebitda", y)}-${S.at("interest", y)}-${S.at("wcInt", y)}-${S.at("refiFeeCr", y)}-${S.at("taxDep", y)}`,
+    v: (y) => S.v("ebitda", y) - S.v("interest", y) - S.v("wcInt", y) - S.v("refiFeeCr", y) - S.v("taxDep", y),
+    note: "EBITDA − interest (on the debt and the working capital) − refinancing fee − tax depreciation",
   });
   S.series("lossBf", "Tax losses brought forward", "₹ cr", { v: () => null });
   S.series("lossUsed", "Losses set off", "₹ cr", { v: () => null, total: true });
@@ -831,32 +1062,38 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
 
   // ---- cash flow
   S.section("Cash flow");
-  S.series("recv", "Receivables", "₹ cr", { f: (y) => `${S.at("revenue", y)}*${S.s("recvDays")}/365`, v: (y) => (S.v("revenue", y) * S.v("recvDays")) / 365, note: "Revenue × receivable days ÷ 365, held at the year end" });
-  S.series("dWc", "Increase in working capital", "₹ cr", {
-    f: (y) => (y === 1 ? S.at("recv", 1) : `${S.at("recv", y)}-${S.at("recv", y - 1)}`),
-    v: (y) => (y === 1 ? S.v("recv", 1) : S.v("recv", y) - S.v("recv", y - 1)), total: true,
-  });
+  link("cfDWc", "dWc", "Less: increase in working capital");
+  link("cfWcInt", "wcInt", "Less: interest on working capital");
   S.series("cfads", "Cash flow available for debt service (CFADS)", "₹ cr", {
-    f: (y) => `${S.at("ebitda", y)}-${S.at("tax", y)}-${S.at("dWc", y)}-${S.at("aug", y)}`,
-    v: (y) => S.v("ebitda", y) - S.v("tax", y) - S.v("dWc", y) - S.v("aug", y), total: true, bold: true,
-    note: "EBITDA − tax − working capital − battery augmentation",
+    f: (y) => `${S.at("ebitda", y)}-${S.at("tax", y)}-${S.at("dWc", y)}-${S.at("aug", y)}-${S.at("wcInt", y)}`,
+    v: (y) => S.v("ebitda", y) - S.v("tax", y) - S.v("dWc", y) - S.v("aug", y) - S.v("wcInt", y), total: true, bold: true,
+    note: "EBITDA − tax − working capital − battery augmentation − interest on working capital",
   });
   link("cfDebtService", "debtService", "Less: debt service");
   S.series("dscr", "DSCR", "×", {
     f: (y) => `IF(${S.at("debtService", y)}>1E-9,${S.at("cfads", y)}/${S.at("debtService", y)},"")`,
     v: (y) => (S.v("debtService", y) > 1e-9 ? S.v("cfads", y) / S.v("debtService", y) : ""), fmt: "x",
   });
-  S.series("terminal", "Salvage and receivables released (final year)", "₹ cr", {
-    f: (y) => `IF(${S.yr(y)}=${S.s("years")},${S.s("total")}*${S.s("salvage")}+${S.at("recv", y)},0)`,
-    v: (y) => (y === N ? total * S.v("salvage") + S.v("recv", y) : 0), total: true,
+  S.series("dsra", "Debt service reserve held", "₹ cr", {
+    f: (y) => (y < N ? `${S.at("debtService", y + 1)}*${S.s("dsraMonths")}/12` : "0"),
+    v: (y) => (y < N ? (S.v("debtService", y + 1) * S.v("dsraMonths")) / 12 : 0), note: "Months of the next year's debt service; nothing after the last year",
+  });
+  S.series("dDsra", "Put into (released from) the reserve", "₹ cr", {
+    f: (y) => (y === 1 ? S.at("dsra", 1) : `${S.at("dsra", y)}-${S.at("dsra", y - 1)}`),
+    v: (y) => (y === 1 ? S.v("dsra", 1) : S.v("dsra", y) - S.v("dsra", y - 1)), total: true,
+  });
+  S.series("terminal", "Salvage and working capital released (final year)", "₹ cr", {
+    f: (y) => `IF(${S.yr(y)}=${S.s("years")},${S.s("total")}*${S.s("salvage")}+${S.at("wcBal", y)},0)`,
+    v: (y) => (y === N ? total * S.v("salvage") + S.v("wcBal", y) : 0), total: true,
   });
   S.series("debtEnd", "Debt still owed, repaid in the final year", "₹ cr", {
     f: (y) => `IF(${S.yr(y)}=${S.s("years")},${S.at("closeDebt", y)},0)`, v: (y) => (y === N ? S.v("closeDebt", y) : 0), total: true,
   });
   S.series("fcfe", "Equity cash flow (year 0: the equity put in)", "₹ cr", {
     y0: { f: `-${S.s("equity")}`, v: -(total - debt0) },
-    f: (y) => `${S.at("cfads", y)}-${S.at("debtService", y)}+${S.at("terminal", y)}-${S.at("debtEnd", y)}`,
-    v: (y) => S.v("cfads", y) - S.v("debtService", y) + S.v("terminal", y) - S.v("debtEnd", y), total: true, bold: true,
+    f: (y) => `${S.at("cfads", y)}-${S.at("debtService", y)}-${S.at("refiFeeCr", y)}-${S.at("dDsra", y)}+${S.at("terminal", y)}-${S.at("debtEnd", y)}`,
+    v: (y) => S.v("cfads", y) - S.v("debtService", y) - S.v("refiFeeCr", y) - S.v("dDsra", y) + S.v("terminal", y) - S.v("debtEnd", y), total: true, bold: true,
+    note: "CFADS − debt service − refinancing fee − reserve put aside + salvage and working capital released − debt still owed",
   });
   S.series("cumEq", "Cumulative equity cash", "₹ cr", {
     y0: { f: S.at("fcfe", 0), v: -(total - debt0) },
@@ -926,8 +1163,10 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
     checks.push(S.s(key));
   };
   check("chkFunding", "Debt + equity = project cost", `ABS(${S.s("debt")}+${S.s("equity")}-${S.s("total")})<0.001`, true);
-  const closeAtTenor = S.v("closeDebt", tenorUsed);
-  check("chkDebt", "Debt repaid by the end of the loan tenor", `ABS(INDEX(${S.span("closeDebt")},1,${S.s("tenorUsed")}))<0.01`, Math.abs(closeAtTenor) < 0.01);
+  const closeAtTenor = S.v("closeDebt", refiEnd);
+  check("chkDebt", "Debt repaid by its last year", `ABS(INDEX(${S.span("closeDebt")},1,${S.s("refiEnd")}))<0.01`, Math.abs(closeAtTenor) < 0.01);
+  const consOk = consM === 0 || Math.abs(cons.spent - base) < 0.01;
+  check("chkCons", "Construction spends the whole cost before IDC", `OR(${S.s("consMonths")}<=0,ABS(${cons.spentRef}-${S.s("base")})<0.01)`, consOk);
   const balanced = Math.abs(sum("revenue") - sum("opex") - sum("ebitda")) < 0.01;
   check("chkEbitda", "Revenue − operating cost = EBITDA over the term", `ABS(C${S.cell.revenue}-C${S.cell.opex}-C${S.cell.ebitda})<0.01`, balanced);
   const lossesOk = S.val.lossCf.slice(1).every((x) => x >= -1e-9);
@@ -1060,7 +1299,9 @@ export function liveModelInput(raw) {
     on: Object.fromEntries(["solar", "wind", "hydro", "biomass", "thermal", "bess"].map((k) => [k, Boolean(raw.on?.[k])])),
     sizes: nums(raw.sizes, ["solarMw", "windMw", "bessMw", "bessMwh", "biomassMw", "hydroMw", "thermalMw"]),
     costs: {
-      ...nums(raw.costs, ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "biomassCrPerMw", "evacuationCr", "preopPct"]),
+      ...nums(raw.costs, ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "biomassCrPerMw", "evacuationCr", "preopPct", "constructionMonths"]),
+      drawdown: DRAWDOWN_LIST.includes(raw.costs?.drawdown) ? raw.costs.drawdown : "linear",
+      drawOrder: raw.costs?.drawOrder === "equityFirst" ? "equityFirst" : "proRata",
       plants: (Array.isArray(raw.costs?.plants) ? raw.costs.plants : []).filter((p) => plantIds.includes(p?.id))
         .map((p) => ({ id: p.id, ...nums(p, ["capexCrPerMw", "fixedLakhPerMw", "energyRsPerKwh", "recRsPerKwh", "escalation"]) })),
     },
@@ -1069,9 +1310,11 @@ export function liveModelInput(raw) {
         "tariffEscalation", "solarOmLakhPerMw", "windOmLakhPerMw", "bessOmLakhPerMwh", "biomassOmLakhPerMw", "omEscalation", "insurancePct", "otherFixedCr",
         "biomassFuelRsPerKwh", "biomassFuelEscalation", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple", "debtFraction", "interestRate",
         "tenorYears", "targetEquityIrr", "discountRate", "taxRate", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays",
+        "graceYears", "targetDscr", "balloonPct", "stepUpPct", "refiYear", "refiRate", "refiTenorYears", "refiFeePct", "omStockMonths", "sparesPctOm", "wcInterestRate", "dsraMonths",
       ]),
+      paymentsPerYear: [1, 2, 4, 12].includes(fin.paymentsPerYear) ? fin.paymentsPerYear : 1,
       sellSurplus: Boolean(fin.sellSurplus),
-      repayment: fin.repayment === "annuity" ? "annuity" : "equal",
+      repayment: REPAYMENT_LIST.includes(fin.repayment) ? fin.repayment : "equal",
       taxDepreciation: fin.taxDepreciation === "wdv" ? "wdv" : "slm",
       bookLifeYears: n(fin.bookLifeYears) > 0 ? fin.bookLifeYears : 25,
       tenorYears: n(fin.tenorYears) > 0 ? fin.tenorYears : 1,
@@ -1081,7 +1324,8 @@ export function liveModelInput(raw) {
       augmentation: ["annual", "oneTime"].includes(raw.bess?.augmentation) ? raw.bess.augmentation : "none",
     },
     ops: raw.ops.slice(0, 60).map((o) => ({
-      ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"]),
+      ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh", "dsmA", "dsmB"]),
+      ...(finite(o?.dsmChargeCr) ? { dsmChargeCr: o.dsmChargeCr } : {}),
       ...(finite(o?.surplusRevenueCr) ? { surplusRevenueCr: o.surplusRevenueCr } : {}),
     })),
     dispatch: dispatchInput(raw.dispatch, raw.ops.length),

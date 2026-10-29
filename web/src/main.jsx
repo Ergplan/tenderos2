@@ -21,6 +21,7 @@ import { ALL_TAB_IDS } from "../lib/tabs";
 import { authApi } from "./scenarios/client";
 import useTeamModeState from "./team/useTeamMode";
 import FieldPings from "./team/FieldPings";
+import EvidenceLayer from "./evidence/EvidenceLayer";
 import Inbox from "./team/Inbox";
 import TeamSetup from "./team/TeamSetup";
 
@@ -34,10 +35,28 @@ const TABS = [
   ["recentTenders", Newspaper, "Recent tenders"],
 ];
 
+const ZONE_WORDS = { intake: ["Intake zone", "Tender reading with cloud models; the bid work is in the core zone"], core: ["Core zone", "The bid workspace on your network: no cloud model reaches it"], all: ["Single installation", "Tender reading and the bid workspace together"] };
+
+/** The installation's zone and version (docs/enterprise/ARCHITECTURE.md), from /api/health. */
+function ZoneBadge() {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    fetch("/api/health", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then(setInfo).catch(() => setInfo(null));
+  }, []);
+  if (!info) return null;
+  const [word, detail] = ZONE_WORDS[info.zone] || ZONE_WORDS.all;
+  return (
+    <div className={`zone-badge zone-${info.zone || "all"}`} title={detail} data-testid="zone-badge" data-zone={info.zone || "all"}>
+      <span>{word}</span><small>v{info.version || "dev"}{info.zone === "core" ? " · patched under AMC" : ""}</small>
+    </div>
+  );
+}
+
 function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox }) {
   return (
     <aside className="sidebar">
       <a href="/" className="brand sidebar-brand" aria-label="TenderOS home"><Brand /></a>
+      <ZoneBadge />
       <div className="side-section">
         <h3>Workspace</h3>
         <nav className="side-nav">
@@ -140,6 +159,7 @@ export default function App({ user = null, initialScenario = null }) {
       {canView && ALL_TAB_IDS.includes(activeTab) && (
         <FieldPings tab={activeTab} tabLabel={tabLabel} team={team} focus={focus} onFocused={(msg) => { setFocus(null); setNotice(msg || ""); }} />
       )}
+      {canView && ALL_TAB_IDS.includes(activeTab) && <EvidenceLayer tab={activeTab} tabLabel={tabLabel} team={team} />}
       {inboxOpen && (
         <Inbox team={team} onClose={() => setInboxOpen(false)}
           onOpen={(n) => { setInboxOpen(false); if (allowed.has(n.tab)) { setActiveTab(n.tab); setFocus({ tab: n.tab, key: n.thread_key, step: n.step, place: n.place }); } else setNotice(`You have no access to ${n.place || n.tab}.`); }} />

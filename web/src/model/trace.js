@@ -2,7 +2,7 @@
 // (web/lib/liveModel.js), written into an in-memory worksheet instead of an Excel file, so the app
 // can show every number with the formula that makes it, the numbers it reads (precedents) and the
 // numbers that read it (dependents). Plain JavaScript, used in Node by tools/check_trace.mjs.
-import { addLiveModel, liveModelInput, LIVE_SHEET } from "../../lib/liveModel.js";
+import { addLiveModel, liveModelInput, CONSTRUCTION_SHEET, LIVE_SHEET } from "../../lib/liveModel.js";
 import { HEAD_ROW, dispatchLetters } from "../../lib/dispatchSheets.js";
 
 const colNum = (letters) => [...letters].reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0);
@@ -211,10 +211,31 @@ export function traceModel(live) {
   // with the year's hours behind them (model.dispatch)
   const sheets = new Map(wb.sheets.map((sh) => [sh.name, sh]));
   const keyOf = m.dispatch ? Object.fromEntries(Object.entries(dispatchLetters(m.dispatch)).map(([k, l]) => [l, k])) : {};
+  // the Construction sheet (the cost spent month by month and the IDC): its cells are traced like
+  // the grid's, named by their row (the month) and column; its own references are qualified with
+  // the sheet, the ones to the Live model's inputs are the grid's own addresses
+  const consSheet = sheets.get(CONSTRUCTION_SHEET);
+  const consHead = consSheet ? [...consSheet.cells.values()].find((x) => x.col === 1 && x.v === "Month")?.row : 0;
+  const consRefs = (formula) => formulaRefs(formula).map((a) => (a.startsWith(`${LIVE_SHEET}!`) ? a.slice(LIVE_SHEET.length + 1) : a.includes("!") ? a : `${CONSTRUCTION_SHEET}!${a}`));
+  const addCons = (a) => {
+    if (cells[a]) return;
+    const rc = consSheet?.cells.get(a.split("!")[1]);
+    if (!rc) return;
+    const rowLabel = consSheet.cells.get(addrOf(rc.row, 1))?.v;
+    const head = rc.row > consHead ? consSheet.cells.get(addrOf(consHead, rc.col))?.v : null;
+    const label = typeof rowLabel === "number" ? `Construction month ${rowLabel}` : rc.col === 1 ? "Construction" : `Construction · ${rowLabel || ""}`;
+    cells[a] = {
+      addr: a, row: rc.row, col: rc.col, sheet: CONSTRUCTION_SHEET, label, unit: "", column: head || (rc.col === 2 ? "Value" : colName(rc.col)),
+      value: rc.v, formula: rc.formula, fmt: rc.numFmt, kind: rc.formula ? "calc" : KIND_OF_FONT[rc.font?.color?.argb] || "value", source: null,
+      refs: consRefs(rc.formula), usedBy: [],
+    };
+    for (const r of cells[a].refs) if (r.startsWith(`${CONSTRUCTION_SHEET}!`)) addCons(r);
+  };
   for (const c of Object.values(cells)) {
     for (const a of c.refs) {
       if (!a.includes("!") || cells[a]) continue;
       const [sheet, at] = a.split("!");
+      if (sheet === CONSTRUCTION_SHEET) { addCons(a); continue; }
       const rc = sheets.get(sheet)?.cells.get(at);
       if (!rc) continue;
       const year = Number(/Y(\d+)$/.exec(sheet)?.[1]);

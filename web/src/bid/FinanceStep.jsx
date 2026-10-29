@@ -5,7 +5,7 @@ import FinanceView from "../rtc/FinanceView";
 import { LiveChart } from "../rtc/charts";
 import { DATA_COLORS } from "../chartTheme";
 import { Section, Stat, nf, pf } from "../rtc/ui";
-import { SOURCES, capexBySource, modelInputs, opsFromLp, plantMw } from "./model";
+import { SOURCES, capexBySource, modelInputs, opsFromLp, plantMw, dsmFor } from "./model";
 import { SourceChip } from "./RequirementsStep";
 import Checklist from "./Checklist";
 import QuoteCheck from "./QuoteCheck";
@@ -57,7 +57,7 @@ export default function FinanceStep({ state, patch, set, lockProps, goto, terms,
   const sizes = lp?.sizes;
   const { costs, fin, bess } = useMemo(() => modelInputs(state, terms), [state, terms]);
   const annualTarget = terms.rules.find((r) => r.id === "annual")?.target ?? 0;
-  const ops = useMemo(() => (lp ? opsFromLp(lp, fin, bess) : null), [lp, fin, bess]);
+  const ops = useMemo(() => (lp ? opsFromLp(lp, fin, bess, dsmFor(state)) : null), [lp, fin, bess, state.dsm, state.sources]);
   const finance = useMemo(
     () => (lp ? E.runFinancialModel(null, sizes, { costs, fin, bess, dfrTarget: annualTarget, tariffLocked: state.tariffLocked, ops, solveBy: "npv" }) : null),
     [lp, sizes, costs, fin, bess, annualTarget, state.tariffLocked, ops],

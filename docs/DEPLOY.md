@@ -290,3 +290,14 @@ Not yet run:
 * `gcp-create-vm.sh` on a real project;
 * a real Let's Encrypt issuance;
 * the Docker install step on a fresh Ubuntu VM.
+
+## Enterprise installation and patches
+
+The enterprise edition (two zones, the core air-gapped; `docs/enterprise/ARCHITECTURE.md`) is not
+installed from git. jouleWise builds a signed offline bundle with `deploy/enterprise/build-bundle.sh`
+(images, compose files, Caddyfile for the client's own certificate, migrations, changelog, signed
+manifest); the client's IT installs it with the `install.sh` inside the bundle and applies later
+releases with `tenderos-patch apply`, which verifies the signature and checksums, backs up, loads
+the images, restarts, checks health and rolls back on failure. The zone is a flag
+(`TENDEROS_ZONE=intake|core`, shown with the version in `/api/health`). The whole procedure, the
+release keypair, the rollback and the firewall rules per zone: `deploy/enterprise/README.md`.

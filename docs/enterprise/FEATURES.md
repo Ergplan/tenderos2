@@ -28,9 +28,9 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 
 | ID | Feature | What it does | Team | Zone | Status | Priority | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| BW-01 | Step-wise bid navigation | One tender, one bid, steps in order with sign-off per step: Tender → Bid inputs → Design → Finance inputs → Sizing → Results → Financial model → What-if → Bid forms → Submission | All | Core | Extend | P1 | Today: tabs per product (Tender to Bid, SECI RTC) with their own steps |
-| BW-02 | Team-wise input tabs | Projects (bid inputs and assumptions), Design and Finance each get their own input tab; each box shows who owns it and whether it is filled, evidenced and signed off | All | Core | Build | P1 |  |
-| BW-03 | Bid inputs and assumptions (Projects) | Contracted MW, dates, supply profile and planning choices (Peak Hours, shortfall), market sale, assumptions register | Projects | Core | Extend | P1 | Today: What you bid step |
+| BW-01 | Step-wise bid navigation | One tender, one bid, steps in order with sign-off per step: Tender → Bid inputs → Design → Finance inputs → Sizing → Results → Financial model → What-if → Bid forms → Submission | All | Core | Live | P1 | SECI RTC tab: Tender → Conditions → Bid inputs (Projects) → Design → Finance inputs → Size → Financial model → What-if → Bid forms → Winning bid, each step labelled with its team; sign-off is per box (Evidence) |
+| BW-02 | Team-wise input tabs | Projects (bid inputs and assumptions), Design and Finance each get their own input tab; each box shows who owns it and whether it is filled, evidenced and signed off | All | Core | Live | P1 | Bid inputs (Projects), Design, Finance inputs as steps of their own; the paperclip on every box shows evidence and sign-off |
+| BW-03 | Bid inputs and assumptions (Projects) | Contracted MW, dates, supply profile and planning choices (Peak Hours, shortfall), market sale, assumptions register | Projects | Core | Live | P1 | The Bid inputs step; the assumptions register is the evidence register |
 | BW-04 | Benchmarks | Industry benchmarks (CERC norms, market prices) fill empty inputs, marked as benchmarks until changed | All | Core | Live | P1 |  |
 | BW-05 | Tender conditions checklist | Every condition against the bid: met, failed, pending; with page and quote | Legal | Core | Live | P1 |  |
 | BW-06 | Saved bids with versions | A bid saved to the library with versions; opened later; compared | Management | Core | Live | P1 | Scenario library |
@@ -46,13 +46,13 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 | D-02 | Solar plant studio | Layout from modules, mounting, string or central inverters; cost in ₹/Wp; writes the cost into the bid | Design | Core | Live | P2 |  |
 | D-03 | Wind farm studio | Turbines by make, CUF at the site's wind, farm cost; writes the cost into the bid | Design | Core | Live | P2 |  |
 | D-04 | Profiles: upload and view | Hourly solar and wind profiles uploaded; CUF, month × hour heat map, monthly CUF, a week | Design | Core | Live | P1 |  |
-| D-05 | CUF file download | Download the profile used in the bid (as uploaded, and as scaled to the CUF entered) with its statistics | Design | Core | Build | P1 |  |
-| D-06 | 25-year CUF justification | Why one year's profile stands for 25: the source and period of the data, P50/P90, degradation per year, inter-annual variability, the typical year method; a note in the bid pack | Design | Core | Build | P1 |  |
+| D-05 | CUF file download | Download the profile used in the bid (as uploaded, and as scaled to the CUF entered) with its statistics | Design | Core | Live | P1 | CSV built in the browser; tools/check_cuf_file.mjs |
+| D-06 | 25-year CUF justification | Why one year's profile stands for 25: the source and period of the data, P50/P90, degradation per year, inter-annual variability, the typical year method; a note in the bid pack | Design | Core | Live | P1 | Panel on the profile with P50/P90 inputs; Word file from POST /api/plant/justification |
 | D-07 | Losses to the billing meter | Each technology's stages to the 33 kV bus with where its CUF is measured; the 33/220 kV transformer and the line | Design | Core | Live | P1 |  |
 | D-08 | Separate sites | Solar and wind on different sites, each with its own battery; no energy between them | Design | Core | Live | P1 |  |
-| D-09 | Co-located solar + BESS and wind + BESS | Which site each battery sits on and charges from; one or two pooling stations | Design | Core | Extend | P1 | Today: one site, or separate sites with a battery each |
-| D-10 | Site schematic (single-line) | A drawing of the chosen layout: solar, wind and battery blocks, their transformers, the pooling station(s), the line to the billing meter; losses shown at each stage and summed at the pooling station | Design | Core | Build | P1 |  |
-| D-11 | Deviation settlement (DSM) per CERC | Forecast error on solar and wind by block, the DSM charges under the CERC DSM Regulations (bands by % deviation, the RE schedule revision allowance), a forecasting accuracy input, the cost in the model | Design | Core | Build | P1 | CERC (Deviation Settlement Mechanism and Related Matters) Regulations, as amended |
+| D-09 | Co-located solar + BESS and wind + BESS | Which site each battery sits on and charges from; one or two pooling stations | Design | Core | Live | P1 | One site (shared pooling station) or separate sites, each with its own battery and pooling station; the losses of each reach the sizing |
+| D-10 | Site schematic (single-line) | A drawing of the chosen layout: solar, wind and battery blocks, their transformers, the pooling station(s), the line to the billing meter; losses shown at each stage and summed at the pooling station | Design | Core | Live | P1 | bid/SiteSchematic.jsx: one or two pooling stations with their transformer and line losses; inputs beside the drawing |
+| D-11 | Deviation settlement (DSM) per CERC | Forecast error on solar and wind by block, the DSM charges under the CERC DSM Regulations (bands by % deviation, the RE schedule revision allowance), a forecasting accuracy input, the cost in the model | Design | Core | Live | P1 | src/dsm: forecast-error distribution, tolerance band by year, X factor trajectory, steps beyond the band; norms editable; verify against the notified text |
 | D-12 | Degradation and augmentation | Solar, wind and battery degradation; battery augmentation annual or one-time with price decline | Design | Core | Live | P1 |  |
 
 ## Sizing
@@ -70,28 +70,28 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 
 | ID | Feature | What it does | Team | Zone | Status | Priority | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F-01 | Financing inputs (Finance tab) | Target equity IRR, debt share, rate, tenor, repayment, tax, depreciation, O&M escalation, insurance, receivables, discount rate | Finance | Core | Extend | P1 | Today: part of the Supply sources step |
+| F-01 | Financing inputs (Finance tab) | Target equity IRR, debt share, rate, tenor, repayment, tax, depreciation, O&M escalation, insurance, receivables, discount rate | Finance | Core | Live | P1 | The Finance inputs step of the SECI flow (and the Financials step of every tab) |
 | F-02 | 25-year financial model | Revenue, penalties, O&M, insurance, augmentation, depreciation (WDV/SLM), tax with loss carry-forward, debt, DSCR, IRRs, LCOE, payback | Finance | Core | Live | P1 |  |
 | F-03 | Tariff for the target IRR | The tariff that gives the target equity IRR; a quoted tariff's equity and project IRR with a warning below target | Finance | Core | Live | P1 |  |
 | F-04 | Traceable model | Every number's formula, precedents, dependents and the inputs it rests on, in the app | Finance | Core | Live | P1 |  |
 | F-05 | Excel model with live formulas | The whole model as Excel formulas (Live model sheet), recalculated by LibreOffice in tests to the app's numbers | Finance | Core | Live | P1 |  |
-| F-06 | Construction phase, monthly | Monthly model from financial closure to commissioning: drawdown schedule, equity first or pro rata, capex phasing by package, commissioning in parts | Finance | Core | Build | P1 |  |
-| F-07 | Interest during construction (IDC) | IDC computed month by month from the drawdowns and the rate, capitalised into the project cost (today a % of hard cost) | Finance | Core | Build | P1 | Replaces the pre-operative % input |
-| F-08 | Operations phase, yearly | The yearly model starts at commissioning (COD) with the construction balances carried in | Finance | Core | Extend | P1 |  |
-| F-09 | Working capital | Receivables (days), O&M stock, maintenance spares, DSM and penalty reserve; working capital loan with its own rate and margin; letter of credit cost | Finance | Core | Build | P1 | Today: receivables days only |
-| F-10 | Repayment methods | Equal principal, annuity, sculpted to a target DSCR, balloon / bullet, step-up; grace period / moratorium; quarterly or yearly instalments | Finance | Core | Build | P1 | Today: equal and annuity |
-| F-11 | Debt sculpting | Principal shaped to hold a target DSCR each year given CFADS; minimum and average DSCR reported | Finance | Core | Build | P1 |  |
-| F-12 | Refinancing | Refinance in a chosen year at a new rate and tenor, with fees and prepayment cost; before/after returns | Finance | Core | Build | P1 |  |
-| F-13 | DSCR and lender's view | Minimum and average DSCR, lender's IRR, DSRA, covenants flagged | Finance | Core | Extend | P1 | Today: min/avg DSCR, lender IRR in What-if |
-| F-14 | Deviation settlement cost in the model | The DSM charges from the Design tab as an operating cost line | Finance | Core | Build | P1 |  |
+| F-06 | Construction phase, monthly | Monthly model from financial closure to commissioning: drawdown schedule, equity first or pro rata, capex phasing by package, commissioning in parts | Finance | Core | Live | P1 | Months, drawdown profile (even, S-curve, front, back), equity first or pro rata; Construction sheet in Excel. Phasing by package and commissioning in parts: not built |
+| F-07 | Interest during construction (IDC) | IDC computed month by month from the drawdowns and the rate, capitalised into the project cost (today a % of hard cost) | Finance | Core | Live | P1 | Month by month on the debt drawn, capitalised as debt; 0 months keeps the pre-operative % as before |
+| F-08 | Operations phase, yearly | The yearly model starts at commissioning (COD) with the construction balances carried in | Finance | Core | Live | P1 | Year 1 starts at COD with the debt (incl. IDC) and equity from the construction schedule |
+| F-09 | Working capital | Receivables (days), O&M stock, maintenance spares, DSM and penalty reserve; working capital loan with its own rate and margin; letter of credit cost | Finance | Core | Live | P1 | Receivable days, O&M in hand (months), spares (% of O&M), interest on the working capital, DSRA. DSM/penalty reserve and letter-of-credit cost: not built |
+| F-10 | Repayment methods | Equal principal, annuity, sculpted to a target DSCR, balloon / bullet, step-up; grace period / moratorium; quarterly or yearly instalments | Finance | Core | Live | P1 | Equal, annuity, sculpted, balloon, bullet, step-up; moratorium; yearly, half-yearly, quarterly or monthly instalments; all as Excel formulas |
+| F-11 | Debt sculpting | Principal shaped to hold a target DSCR each year given CFADS; minimum and average DSCR reported | Finance | Core | Live | P1 | Principal = CFADS ÷ target DSCR − interest each year; the last year clears the balance |
+| F-12 | Refinancing | Refinance in a chosen year at a new rate and tenor, with fees and prepayment cost; before/after returns | Finance | Core | Live | P1 | Year, new rate, new tenor, fee on the balance; the schedule continues under the same method. Prepayment cost: use the fee |
+| F-13 | DSCR and lender's view | Minimum and average DSCR, lender's IRR, DSRA, covenants flagged | Finance | Core | Live | P1 | Min/avg DSCR, DSRA, lender's IRR (What-if); DSCR below 1.1 flagged red. Covenant list: not built |
+| F-14 | Deviation settlement cost in the model | The DSM charges from the Design tab as an operating cost line | Finance | Core | Live | P1 | DSM charges as an operating-cost line, a line in the year's tariff; in the Excel model as formulas |
 | F-15 | Money at stake | EMD, PBG and net worth on the installed capacity | Finance | Core | Live | P1 | Per tender pack |
 
 ## What-if
 
 | ID | Feature | What it does | Team | Zone | Status | Priority | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| W-01 | What-if after sizing | Opens on the sized plant: the optimum as the base case, every input as a lever | All | Core | Extend | P1 | Today: a separate tab with its own defaults |
-| W-02 | Tariff levers on bid day | Set a tariff and see which levers reach it: cost, CUF, financing, IRR, storage, sale; each lever's effect on the tariff and the IRR; instant | Management | Core | Build | P1 |  |
+| W-01 | What-if after sizing | Opens on the sized plant: the optimum as the base case, every input as a lever | All | Core | Live | P1 | The What-if step of the SECI flow starts from the sized plant and every input of the bid |
+| W-02 | Tariff levers on bid day | Set a tariff and see which levers reach it: cost, CUF, financing, IRR, storage, sale; each lever's effect on the tariff and the IRR; instant | Management | Core | Live | P1 | whatif/levers.js: each lever's tariff a step up and down, ₹/kWh per step, the move of that lever alone to reach the tariff wanted; Apply |
 | W-03 | Sensitivity table | One-way and two-way sensitivities (tariff vs capex, CUF, rate) with the base case marked | Finance | Core | Build | P2 |  |
 | W-04 | Scenario compare | Saved what-if cases side by side with the base | All | Core | Extend | P2 | Scenario compare exists for saved bids |
 
@@ -99,8 +99,8 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 
 | ID | Feature | What it does | Team | Zone | Status | Priority | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| E-01 | Evidence upload per input | Any input (CUF, costs, financing, conditions) carries files or links as evidence: quotes, reports, data sheets; who uploaded it and when | All | Core | Build | P1 | Today: files on assignments and signed copies |
-| E-02 | Evidence status on every box | Each box shows filled / evidenced / signed off; the bid pack lists the evidence register | All | Core | Build | P1 |  |
+| E-01 | Evidence upload per input | Any input (CUF, costs, financing, conditions) carries files or links as evidence: quotes, reports, data sheets; who uploaded it and when | All | Core | Live | P1 | Paperclip on every box: files, links, notes with who and when; migration 012 |
+| E-02 | Evidence status on every box | Each box shows filled / evidenced / signed off; the bid pack lists the evidence register | All | Core | Live | P1 | Faint / with count / signed off at this value / signed at an older value; the register as CSV |
 | E-03 | Assignments | A data point assigned to a team or person; answer with a value, note or file; accept or return into the bid as a new version | All | Core | Live | P1 |  |
 | E-04 | Pings from any box (@mentions) | A thread on every input box; mention a teammate; reply with a value; Fill in | All | Core | Live | P1 |  |
 | E-05 | Team setup | People, teams, super admin, titles, the tabs they cover | Management | Core | Live | P1 |  |
@@ -113,8 +113,8 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | P-01 | Users, sign-in and tab access | Accounts, administrator, tabs granted per user | IT | Both | Live | P1 |  |
 | P-02 | Enterprise sign-in (SSO) | The client's directory (SAML/OIDC or LDAP) for sign-in | IT | Core | Build | P2 |  |
-| P-03 | Air-gapped installation | Everything as an offline bundle: images, database, no outbound traffic from the core; verified checksums | IT | Core | Build | P1 |  |
-| P-04 | Patches under AMC | Signed offline patch bundles from jouleWise, applied by the client's IT with one command, with health check and rollback; a changelog per patch | IT | Core | Build | P1 |  |
+| P-03 | Air-gapped installation | Everything as an offline bundle: images, database, no outbound traffic from the core; verified checksums | IT | Core | Live | P1 | deploy/enterprise: images.tar, compose overlay with internal networks, install.sh; not run against a Docker daemon in this session |
+| P-04 | Patches under AMC | Signed offline patch bundles from jouleWise, applied by the client's IT with one command, with health check and rollback; a changelog per patch | IT | Core | Live | P1 | tenderos-patch verify/apply/rollback/status on signed bundles (manifest + ECDSA signature); apply/rollback not exercised against a Docker daemon here |
 | P-05 | Backups and restore | Database and files backed up on a schedule; restore tested | IT | Core | Live | P1 | deploy/backup.sh today |
 | P-06 | HTTPS and firewall | TLS at the edge; allowlists | IT | Both | Live | P1 |  |
 | P-07 | Day and night mode | Both modes, remembered per browser | All | Both | Live | P3 |  |
@@ -124,7 +124,7 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 
 | Status | Features |
 | --- | --- |
-| Live | 45 |
-| Extend | 11 |
-| Build | 22 |
+| Live | 69 |
+| Extend | 4 |
+| Build | 5 |
 | Total | 78 |

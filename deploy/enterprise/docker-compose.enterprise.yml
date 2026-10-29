@@ -1,0 +1,87 @@
+# TenderOS Enterprise overlay (deploy/enterprise/README.md). Used with the base docker-compose.yml:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.enterprise.yml      (in the install folder's .env)
+# On the build machine (repo checkout) the same file tags the images for the bundle:
+#   TENDEROS_VERSION=1.2.0 docker compose -f docker-compose.yml -f deploy/enterprise/docker-compose.enterprise.yml build engine web
+#
+# Images are named tenderos-engine:<version> and tenderos-web:<version>; nothing is pulled, the
+# bundle's images.tar is loaded by install.sh / tenderos-patch. The web port is not published:
+# Caddy terminates TLS with the client's own certificate files (certs/) and is the only published
+# service.
+#
+# Networks and the zone flag (TENDEROS_ZONE=core or intake):
+#   backend   internal (no route out of the host): db, engine, web, docling. db and engine have no
+#             other network in the core zone, so they cannot reach anything outside the stack.
+#   frontend  the published side: caddy (443, 80) and web. web needs it to answer Caddy and to reach
+#             the client's SMTP server and directory. In the core zone the client's firewall allows
+#             the host only those destinations and nothing on the internet (README, "Firewall").
+#   egress    the engine's way out, intake zone only: TENDEROS_ENGINE_INTERNAL=false in .env puts the
+#             engine on a routable network so it can reach the model providers (Anthropic, LlamaParse).
+#             The default (true) keeps it internal, which is the core zone's setting.
+# Docling (table reader for tender sets) is an intake-zone service: COMPOSE_PROFILES=intake in .env.
+services:
+  db:
+    networks:
+      - backend
+
+  engine:
+    image: tenderos-engine:${TENDEROS_VERSION:-dev}
+    build:
+      labels:
+        org.opencontainers.image.title: tenderos-engine
+        org.opencontainers.image.version: ${TENDEROS_VERSION:-dev}
+    environment:
+      TENDEROS_ZONE: ${TENDEROS_ZONE:-all}
+      TENDEROS_VERSION: ${TENDEROS_VERSION:-dev}
+    networks:
+      - backend
+      - egress
+
+  docling:
+    profiles: ["intake"]
+    networks:
+      - backend
+
+  web:
+    image: tenderos-web:${TENDEROS_VERSION:-dev}
+    build:
+      labels:
+        org.opencontainers.image.title: tenderos-web
+        org.opencontainers.image.version: ${TENDEROS_VERSION:-dev}
+    ports: !reset []
+    environment:
+      COOKIE_SECURE: "true"
+      TENDEROS_ZONE: ${TENDEROS_ZONE:-all}
+      TENDEROS_VERSION: ${TENDEROS_VERSION:-dev}
+    networks:
+      - backend
+      - frontend
+
+  caddy:
+    image: caddy:2.8-alpine
+    depends_on:
+      - web
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
+    ports:
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ${TENDEROS_CADDYFILE:-./Caddyfile}:/etc/caddy/Caddyfile:ro
+      # the client's certificate: certs/tenderos.crt (full chain) and certs/tenderos.key
+      - ${TENDEROS_CERTS_DIR:-./certs}:/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - frontend
+    restart: unless-stopped
+
+networks:
+  backend:
+    internal: true
+  frontend:
+  egress:
+    internal: ${TENDEROS_ENGINE_INTERNAL:-true}
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,52 @@
+/* Evidence on every input: the paperclips on input boxes and a box's evidence popover. */
+.ev-layer { position: absolute; top: 0; left: 0; width: 0; height: 0; z-index: 40; }
+.ev-dot {
+  position: absolute; display: inline-flex; align-items: center; gap: 2px; height: 20px; min-width: 20px; padding: 0 4px;
+  justify-content: center; border-radius: 10px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--muted);
+  opacity: 0.42; cursor: pointer; transition: opacity 0.12s, transform 0.12s; font: 600 10px/1 var(--font-mono); pointer-events: none;
+}
+.ev-dot.hot, .ev-dot.has, .ev-dot.signed, .ev-dot.stale { pointer-events: auto; }
+.ev-dot:hover, .ev-dot.hot { opacity: 1; color: var(--ink); border-color: var(--line-3); transform: scale(1.08); }
+.ev-dot.has { opacity: 0.95; color: var(--ink); border-color: var(--line-3); }
+.ev-dot.signed { opacity: 1; border-color: var(--good); color: var(--good); }
+.ev-dot.stale { opacity: 1; border-color: var(--warn); color: var(--warn); }
+.ev-dot span { font-size: 9.5px; }
+.ev-tick { position: absolute; right: -5px; top: -5px; width: 12px; height: 12px; border-radius: 50%; display: inline-grid; place-items: center; background: var(--good); color: var(--bg); }
+.ev-dot.stale .ev-tick { background: var(--warn); }
+
+.ev-pop {
+  position: fixed; z-index: 60; width: min(420px, calc(100vw - 24px)); max-height: min(600px, calc(100vh - 24px)); display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line-2); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); color: var(--ink);
+}
+.ev-pop > header { display: flex; align-items: start; gap: 10px; padding: 12px 12px 8px; border-bottom: 1px solid var(--line); }
+.ev-pop > header > div { flex: 1; min-width: 0; }
+.ev-pop > header .rtc-index { display: inline-flex; align-items: center; gap: 5px; }
+.ev-pop > header small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.ev-register { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; white-space: nowrap; text-decoration: none; color: var(--muted); }
+.ev-register:hover { color: var(--ink); }
+.ev-now { padding: 6px 12px; font-size: 11.5px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.ev-now strong { color: var(--ink); }
+.ev-state { display: flex; gap: 8px; align-items: center; padding: 7px 12px; font-size: 12px; border-bottom: 1px solid var(--line); }
+.ev-state.signed { color: var(--good); background: color-mix(in srgb, var(--good) 10%, transparent); }
+.ev-state.stale { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+.ev-state span { display: grid; }
+.ev-state strong { color: inherit; }
+.ev-state small { color: var(--muted); font-size: 10.5px; }
+.ev-list { list-style: none; margin: 0; padding: 8px 12px; overflow-y: auto; display: grid; gap: 8px; min-height: 40px; }
+.ev-list li { display: grid; grid-template-columns: 20px 1fr auto; gap: 8px; align-items: start; font-size: 12.5px; }
+.ev-list li.rtc-note { display: block; }
+.ev-list li > div { min-width: 0; }
+.ev-list li a { color: var(--ink); overflow-wrap: anywhere; }
+.ev-list li p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+.ev-list li small { display: block; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+.ev-icon { color: var(--muted); display: inline-grid; place-items: center; height: 18px; }
+.ev-err { margin: 0 12px; font-size: 11.5px; }
+.ev-add { border-top: 1px solid var(--line); padding: 10px 12px; display: grid; gap: 8px; }
+.ev-kinds { display: flex; gap: 4px; }
+.ev-kinds button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; font-size: 11px; border: 1px solid var(--line-2); background: transparent; color: var(--muted); cursor: pointer; }
+.ev-kinds button.on { background: var(--surface-3); color: var(--ink); border-color: var(--line-3); }
+.ev-add textarea, .ev-add input[type="url"] { width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line-2); padding: 7px 8px; font: 12.5px/1.4 var(--font-sans); resize: vertical; }
+.ev-add input[type="file"] { font-size: 11.5px; color: var(--muted); }
+.ev-attach { min-height: 30px; padding: 0 12px; display: inline-flex; gap: 6px; align-items: center; justify-self: end; }
+.ev-sign { display: flex; gap: 10px; align-items: center; padding: 0 12px 12px; }
+.ev-sign .secondary { min-height: 30px; padding: 0 12px; font-size: 11.5px; display: inline-flex; gap: 6px; align-items: center; }

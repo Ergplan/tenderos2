@@ -6,6 +6,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, FlaskConical, LayoutGrid, RotateCcw, TriangleAlert, XCircle } from "lucide-react";
 import { Field, Section, SelectBox, Stat, SwitchBox, nf, pf } from "../rtc/ui";
+import LeverPanel from "./LeverPanel";
 import { LiveChart } from "../rtc/charts";
 import { DATA_COLORS } from "../chartTheme";
 import * as E from "../rtc/engine";
@@ -92,13 +93,21 @@ function irrCurve(res) {
   };
 }
 
-export default function WhatIfTab() {
-  const [state, setState] = useState(() => defaultWhatIf());
-  const [loaded, setLoaded] = useState(false);
+/**
+ * seed / seedKey: a case seeded from a sized bid (the SECI tab's What-if step, whatIfFromBid);
+ * the case reloads from it when the sizing changes, and "Back to the sized bid" restores it.
+ * embedded: inside another tab (no page hero, no browser storage).
+ */
+export default function WhatIfTab({ seed = null, seedKey = "", embedded = false, onBack = null }) {
+  const [state, setState] = useState(() => seed || defaultWhatIf());
+  const [loaded, setLoaded] = useState(Boolean(embedded));
   const [studio, setStudio] = useState(null); // "solar" | "wind"
   const [week, setWeek] = useState(28);
-  useEffect(() => { const v = load(); if (v) setState((s) => ({ ...s, ...v, bess: { ...s.bess, ...(v.bess || {}) }, costs: { ...s.costs, ...(v.costs || {}) }, om: { ...s.om, ...(v.om || {}) }, fin: { ...s.fin, ...(v.fin || {}) } })); setLoaded(true); }, []);
-  useEffect(() => { if (!loaded) return; try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage off: the case lasts for the page */ } }, [state, loaded]);
+  const [seededFrom, setSeededFrom] = useState(seedKey);
+  useEffect(() => { if (embedded) return; const v = load(); if (v) setState((s) => ({ ...s, ...v, bess: { ...s.bess, ...(v.bess || {}) }, costs: { ...s.costs, ...(v.costs || {}) }, om: { ...s.om, ...(v.om || {}) }, fin: { ...s.fin, ...(v.fin || {}) } })); setLoaded(true); }, [embedded]);
+  useEffect(() => { if (!loaded || embedded) return; try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* storage off: the case lasts for the page */ } }, [state, loaded, embedded]);
+  // a new sizing re-seeds the case
+  useEffect(() => { if (seed && seedKey !== seededFrom) { setState(seed); setSeededFrom(seedKey); } }, [seed, seedKey, seededFrom]);
   // the IEX prices pick the Peak Hours of the "costliest hours" plan
   const [prices, setPrices] = useState(null);
   useEffect(() => { loadMarketPrices().then(setPrices).catch(() => setPrices(null)); }, []);
@@ -119,17 +128,30 @@ export default function WhatIfTab() {
 
   return (
     <TraceProvider getLive={() => res.live}>
-      <div className="rtc story bid whatif">
-        <section className="story-hero">
-          <div>
-            <div className="eyebrow"><FlaskConical size={13} /> What-if analysis · SECI RTC-TM-V supply floors</div>
-            <h1>What if</h1>
-            <p>Enter a plant, its costs, the financing and the tariff you would bid. The model dispatches every PPA year against the tender&apos;s peak and off-peak floors, runs the 25-year financial model at your tariff and tells you the equity, project and lender&apos;s returns, and whether the size meets the tender.</p>
+      <div className={`rtc story bid whatif ${embedded ? "whatif-embedded" : ""}`}>
+        {!embedded ? (
+          <section className="story-hero">
+            <div>
+              <div className="eyebrow"><FlaskConical size={13} /> What-if analysis · SECI RTC-TM-V supply floors</div>
+              <h1>What if</h1>
+              <p>Enter a plant, its costs, the financing and the tariff you would bid. The model dispatches every PPA year against the tender&apos;s peak and off-peak floors, runs the 25-year financial model at your tariff and tells you the equity, project and lender&apos;s returns, and whether the size meets the tender.</p>
+            </div>
+            <div className="story-hero-tools">
+              <button type="button" className="rtc-reset" onClick={() => setState(defaultWhatIf())} data-testid="whatif-reset"><RotateCcw size={13} /> Reset inputs</button>
+            </div>
+          </section>
+        ) : (
+          <div className="whatif-seeded" data-testid="whatif-seeded">
+            <div>
+              <div className="eyebrow"><FlaskConical size={13} /> What-if on the sized bid</div>
+              <p>{seed ? `Starts from the plant HiGHS sized (${nf(seed.fromBid?.sizes?.solarMw || 0, 0)} MW solar, ${nf(seed.fromBid?.sizes?.windMw || 0, 0)} MW wind, ${nf(seed.fromBid?.sizes?.bessMw || 0, 0)} MW battery) and every input of the bid; the dispatch here is the instant rule-based one. Move a lever below and see the tariff you need; on bid day the levers table tells you which input to argue over.` : "Size the plant first: the What-if then starts from the sized bid."}</p>
+            </div>
+            <div className="story-hero-tools">
+              {seed && <button type="button" className="rtc-reset" onClick={() => setState(seed)} data-testid="whatif-reseed"><RotateCcw size={13} /> Back to the sized bid</button>}
+              {onBack && <button type="button" className="rtc-reset" onClick={onBack}>Financial model</button>}
+            </div>
           </div>
-          <div className="story-hero-tools">
-            <button type="button" className="rtc-reset" onClick={() => setState(defaultWhatIf())} data-testid="whatif-reset"><RotateCcw size={13} /> Reset inputs</button>
-          </div>
-        </section>
+        )}
 
         <div className={`whatif-verdict tone-${V.cls}`} data-testid="whatif-verdict" data-verdict={res.verdict}>
           <VIcon size={18} />
@@ -193,7 +215,9 @@ export default function WhatIfTab() {
           </div>
         </Section>
 
-        <Section index="3" title="Your case" note="Change any input: the results above follow at once">
+        <LeverPanel index="3" state={state} setState={setState} prices={prices} base={f.tariffNeeded} />
+
+        <Section index="4" title="Your case" note="Change any input: the results above follow at once">
           <div className="whatif-inputs">
             <div className="whatif-group">
               <div className="rtc-subhead">Tender and plan</div>
@@ -249,7 +273,11 @@ export default function WhatIfTab() {
                 <Field label="Debt share" pct value={state.fin.debtFraction} onChange={(v) => setIn("fin", { debtFraction: v })} step={1} min={0} max={95} />
                 <Field label="Interest rate" pct value={state.fin.interestRate} onChange={(v) => setIn("fin", { interestRate: v })} step={0.05} min={0} max={25} />
                 <Field label="Loan tenor" unit="years" value={state.fin.tenorYears} onChange={(v) => setIn("fin", { tenorYears: Math.max(1, Math.round(v)) })} step={1} min={1} max={25} />
-                <SelectBox label="Repayment" value={state.fin.repayment} onChange={(v) => setIn("fin", { repayment: v })} options={[["equal", "Equal principal"], ["annuity", "Annuity"]]} />
+                <SelectBox label="Repayment" value={state.fin.repayment} onChange={(v) => setIn("fin", { repayment: v })} options={Object.entries(E.REPAYMENT_METHODS).map(([k, m]) => [k, m.label])} hint={E.REPAYMENT_METHODS[state.fin.repayment]?.detail} />
+                <Field label="Principal moratorium" unit="years" value={state.fin.graceYears || 0} onChange={(v) => setIn("fin", { graceYears: Math.max(0, Math.round(v)) })} step={1} min={0} max={5} />
+                {state.fin.repayment === "sculpted" && <Field label="Target DSCR" unit="×" value={state.fin.targetDscr || 1.3} onChange={(v) => setIn("fin", { targetDscr: v })} step={0.05} min={1} max={3} />}
+                {state.fin.repayment === "balloon" && <Field label="Balloon share" pct value={state.fin.balloonPct || 0} onChange={(v) => setIn("fin", { balloonPct: v })} step={5} min={0} max={100} />}
+                {state.fin.repayment === "stepUp" && <Field label="Principal step-up" pct value={state.fin.stepUpPct || 0} onChange={(v) => setIn("fin", { stepUpPct: v })} step={0.5} min={0} max={25} />}
                 <Field label="Lender's minimum DSCR" unit="×" value={state.fin.minDscr} onChange={(v) => setIn("fin", { minDscr: v })} step={0.05} min={1} max={2} />
                 <Field label="Target equity IRR" pct value={state.fin.targetEquityIrr} onChange={(v) => setIn("fin", { targetEquityIrr: v })} step={0.25} min={0} max={40} />
                 <Field label="Discount rate (LCOE, NPV)" pct value={state.fin.discountRate} onChange={(v) => setIn("fin", { discountRate: v })} step={0.25} min={0} max={30} />

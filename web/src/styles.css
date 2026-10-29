@@ -1723,3 +1723,30 @@ tr.selected td { background: var(--surface-3); color: var(--ink); font-weight: 6
 .theme-toggle:hover { border-color: var(--line-3); color: var(--ink); }
 .theme-toggle.compact { width: auto; }
 .theme-toggle.auth-theme { position: fixed; top: 16px; right: 16px; z-index: 5; width: auto; background: var(--surface); }
+
+/* ---- site schematic (bid/SiteSchematic.jsx): one or two pooling stations */
+.site-schematic { margin-top: 14px; }
+.site-schematic svg { width: 100%; max-width: 760px; height: auto; display: block; }
+.site-schematic .ss-label { font-size: 9px; fill: var(--ink-3, #9a9a96); font-family: inherit; }
+.site-schematic .ss-loss { font-size: 9px; fill: #ff6b5f; font-family: inherit; font-weight: 600; }
+.site-schematic .ss-note { font-size: 9.5px; fill: var(--ink-2, #c8c8c4); font-family: inherit; }
+.site-schematic .site-losses { margin-top: 8px; }
+
+/* ---- steps by team (seci/SeciTab.jsx): the team that owns each step */
+.bid-step .bid-step-team { display: block; font-style: normal; font-size: 9.5px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--chapter); opacity: 0.85; margin-top: 2px; }
+
+/* ---- what-if levers (whatif/LeverPanel.jsx) and the seeded case */
+.lever-head { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.lever-head .rtc-field { min-width: 240px; }
+.lever-stale { color: var(--warn, #f5b83d); }
+.lever-table td.lever-big { font-weight: 600; color: var(--signal); }
+.lever-table td small { color: var(--ink-3, #9a9a96); margin-left: 4px; }
+.whatif-seeded { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; padding: 14px 18px; border: 1px solid var(--line-2); border-radius: 12px; margin-bottom: 14px; }
+.whatif-seeded p { margin: 6px 0 0; color: var(--ink-2); font-size: 13px; max-width: 760px; }
+
+/* ---- the installation's zone (main.jsx ZoneBadge) */
+.zone-badge { display: flex; flex-direction: column; gap: 2px; margin: -6px 0 14px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line-2); font-size: 11px; }
+.zone-badge span { font-weight: 600; letter-spacing: 0.02em; }
+.zone-badge small { color: var(--muted); font-family: var(--font-mono); font-size: 10px; }
+.zone-badge.zone-core { border-color: color-mix(in srgb, var(--signal) 50%, transparent); }
+.zone-badge.zone-intake { border-color: color-mix(in srgb, #ff8a5f 50%, transparent); }

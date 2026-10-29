@@ -241,7 +241,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
         <button type="button" className="rtc-icon-btn" onClick={() => { stop(); setOpen(false); }} aria-label="Close the agent"><X size={14} /></button>
       </header>
       <p className="rtc-note">Talk naturally: it explains the bid conditions, takes your inputs in order, changes anything on screen, runs the optimizer again and explains the results and the IRR at the tariff you quote. Every number comes from this screen; every tender fact from the documents, with the page.</p>
-      {info && !info.available && <p className="voice-note" data-testid="agent-unavailable">The voice agent is not set up on this server yet: add OPENAI_API_KEY to the server's .env and restart the web service (docs/DEPLOY.md).</p>}
+      {info && !info.available && <p className="voice-note" data-testid="agent-unavailable">{info.zone === "core" ? "The voice agent does not run in the core zone: no cloud model reaches the bid workspace. Use it in the intake zone, on the tender documents." : "The voice agent is not set up on this server yet: add OPENAI_API_KEY to the server's .env and restart the web service (docs/DEPLOY.md)."}</p>}
       {!secure && <p className="voice-note" data-testid="agent-insecure">The microphone needs an HTTPS address or localhost. Open the app over HTTPS, or through an SSH tunnel at http://localhost (docs/DEPLOY.md).</p>}
       <div className="voice-controls">
         {!live

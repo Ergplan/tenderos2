@@ -88,8 +88,21 @@ export const DEFAULT_FINANCE = {
   targetEquityIrr: 0.14,
   debtFraction: 0.7,
   interestRate: 0.09,
-  tenorYears: 15,
-  repayment: "equal", // 'equal' | 'annuity'
+  tenorYears: 15, // door to door, grace years included
+  repayment: "equal", // 'equal' | 'annuity' | 'sculpted' | 'balloon' | 'bullet' | 'stepUp' (REPAYMENT_METHODS)
+  graceYears: 0, // principal moratorium after COD; interest is paid
+  paymentsPerYear: 1, // 1 yearly, 2 half-yearly, 4 quarterly, 12 monthly instalments
+  targetDscr: 1.3, // sculpted: the principal each year is what keeps the DSCR at this
+  balloonPct: 0.3, // balloon: this share of the debt is repaid in the last year, the rest in equal parts
+  stepUpPct: 0.05, // stepUp: the principal grows at this rate a year
+  refiYear: 0, // refinance the balance at the end of this year (0: never)
+  refiRate: 0.085,
+  refiTenorYears: 12, // from the refinancing year
+  refiFeePct: 0.005, // of the balance refinanced, expensed that year
+  omStockMonths: 0, // working capital: O&M in hand (CERC norm: 1 month)
+  sparesPctOm: 0, // working capital: maintenance spares as a share of the year's O&M (CERC norm: 15%)
+  wcInterestRate: 0, // interest on the working capital, expensed (0: working capital is equity funded)
+  dsraMonths: 0, // debt service reserve: months of the next year's debt service, held from equity cash
   taxRate: 0.2517,
   taxDepreciation: "wdv", // 'wdv' | 'slm'
   wdvRate: 0.4,
@@ -867,7 +880,67 @@ export function withDuration(sizes, bess) {
   return dur > 0 ? { ...sizes, bessMwh: sizes.bessMw * dur } : sizes;
 }
 
-export function capexCr(sizes, costs) {
+/** Repayment methods standard in Indian project finance, with the rule for each year's principal. */
+export const REPAYMENT_METHODS = {
+  equal: { label: "Equal principal", detail: "The balance in equal parts over the years left" },
+  annuity: { label: "Annuity", detail: "Level debt service: interest falls, principal rises" },
+  sculpted: { label: "Sculpted to a DSCR", detail: "Each year's principal is what keeps the DSCR at the target; the rest in the last year" },
+  balloon: { label: "Balloon", detail: "A share of the debt in the last year, the rest in equal parts" },
+  bullet: { label: "Bullet", detail: "Interest only; the whole debt in the last year" },
+  stepUp: { label: "Step-up", detail: "The principal grows at a rate a year" },
+};
+
+/** How the project cost is spent over the construction months (cumulative share at t = m / M). */
+export const DRAWDOWN_PROFILES = {
+  linear: { label: "Even", detail: "The same amount every month", cum: (t) => t },
+  sCurve: { label: "S-curve", detail: "Slow start, fast middle, slow finish", cum: (t) => (1 - Math.cos(Math.PI * t)) / 2 },
+  front: { label: "Front-loaded", detail: "Most of it early (equipment advances)", cum: (t) => 1 - (1 - t) ** 2 },
+  back: { label: "Back-loaded", detail: "Most of it late (milestone payments)", cum: (t) => t ** 2 },
+};
+
+/**
+ * The construction phase month by month: the cost drawn in each month under the drawdown profile,
+ * funded by equity and debt (pro rata, or equity first), the interest during construction (IDC)
+ * on the debt drawn, and the IDC itself capitalised as debt. The debt share applies to the cost
+ * before IDC, so there is no circularity: debt = share × cost + IDC, equity = (1 − share) × cost.
+ * Interest in a month is on the balance at its start plus the month's draw.
+ * Null when there is no construction schedule (constructionMonths 0): IDC is then inside the
+ * pre-operative percentage, as before.
+ */
+export function constructionSchedule(baseCostCr, costs, fin) {
+  const M = Math.max(0, Math.round(costs?.constructionMonths || 0));
+  if (!(M > 0) || !fin) return null;
+  const d = Math.min(1, Math.max(0, fin.debtFraction || 0));
+  const r = (fin.interestRate || 0) / 12;
+  const prof = DRAWDOWN_PROFILES[costs.drawdown] || DRAWDOWN_PROFILES.linear;
+  const equityFirst = costs.drawOrder === "equityFirst";
+  const equityTotal = baseCostCr * (1 - d);
+  const rows = [];
+  let cumEq = 0;
+  let bal = 0;
+  let idcTotal = 0;
+  for (let m = 1; m <= M; m += 1) {
+    const share = prof.cum(m / M) - prof.cum((m - 1) / M);
+    const cost = baseCostCr * share;
+    const equity = equityFirst ? Math.min(cost, Math.max(0, equityTotal - cumEq)) : cost * (1 - d);
+    const debt = cost - equity;
+    cumEq += equity;
+    const opening = bal;
+    const idc = (opening + debt) * r;
+    bal = opening + debt + idc;
+    idcTotal += idc;
+    rows.push({ month: m, share, cost, equity, debt, openingDebt: opening, idc, closingDebt: bal });
+  }
+  return { months: M, profile: costs.drawdown || "linear", order: equityFirst ? "equityFirst" : "proRata", rows, idc: idcTotal, debtDrawn: baseCostCr * d, equity: equityTotal };
+}
+
+/**
+ * The project cost: the hard cost, the pre-operative cost (a share of it) and, when a construction
+ * schedule is set and the financing is given, the IDC worked out month by month; else the
+ * pre-operative share stands for both. With a schedule the debt is the debt share of the cost
+ * before IDC plus the IDC (debt0 / equity0 are then set; without one the caller applies the share).
+ */
+export function capexCr(sizes, costs, fin = null) {
   const hard = sizes.solarMw * costs.solarCrPerMw
     + sizes.windMw * costs.windCrPerMw
     + sizes.bessMwh * costs.bessCrPerMwh
@@ -876,7 +949,15 @@ export function capexCr(sizes, costs) {
     // Tender to Bid dispatchable plants (hydro, thermal): capex per MW; none for Round the clock
     + (costs.plants || []).reduce((sum, pl) => sum + (sizes[`${pl.id}Mw`] || 0) * (pl.capexCrPerMw || 0), 0)
     + (costs.evacuationCr || 0);
-  return { hard, preop: hard * (costs.preopPct || 0), total: hard * (1 + (costs.preopPct || 0)) };
+  const preop = hard * (costs.preopPct || 0);
+  const construction = constructionSchedule(hard + preop, costs, fin);
+  const idc = construction ? construction.idc : 0;
+  const total = hard + preop + idc;
+  return {
+    hard, preop, idc, total, construction,
+    debt0: construction ? construction.debtDrawn + idc : null,
+    equity0: construction ? construction.equity : null,
+  };
 }
 
 function crf(rate, n) {
@@ -917,7 +998,7 @@ export function evaluateDesign(ctx, sizes, model) {
   const dfrY1 = dfrBasis === "monthly" ? y1.minMonthlyDfr : y1.dfr;
   const dfrWorst = worst ? (dfrBasis === "monthly" ? worst.minMonthlyDfr : worst.dfr) : dfrY1;
   const dfrCheck = Math.min(dfrY1, dfrWorst);
-  const capex = capexCr(sizes, costs);
+  const capex = capexCr(sizes, costs, fin);
   const years = fin.years || 25;
   const r = fin.discountRate || 0.1;
   const f = crf(r, years);
@@ -1484,19 +1565,57 @@ export function simulateLifetime(ctx, sizes, fin, bess) {
   return out;
 }
 
+/** The debt schedule's settings, checked: the method, grace, instalments, refinancing. */
+export function debtTerms(fin, years) {
+  const tenor = Math.min(years, Math.max(1, Math.round(fin.tenorYears)));
+  const grace = Math.min(tenor - 1, Math.max(0, Math.round(fin.graceYears || 0)));
+  const q = [1, 2, 4, 12].includes(Number(fin.paymentsPerYear)) ? Number(fin.paymentsPerYear) : 1;
+  const method = REPAYMENT_METHODS[fin.repayment] ? fin.repayment : "equal";
+  const refiYear = Math.round(fin.refiYear || 0);
+  const refi = refiYear > 0 && refiYear < tenor;
+  const refiEnd = refi ? Math.min(years, refiYear + Math.max(1, Math.round(fin.refiTenorYears || 1))) : tenor;
+  return {
+    tenor, grace, q, method,
+    // instalments within the year pay down the balance before the year end: the interest is on the
+    // average balance, (q − 1) / 2q of the year's principal less (not for sculpting: the sculpted
+    // principal is set from the cash flow after tax, which the interest feeds)
+    adj: method === "sculpted" ? 0 : (q - 1) / (2 * q),
+    refi, refiYear, refiEnd,
+    refiRate: refi ? fin.refiRate || 0 : fin.interestRate,
+    refiFeePct: refi ? fin.refiFeePct || 0 : 0,
+    targetDscr: Math.max(1, fin.targetDscr || 1.3),
+    balloonPct: method === "bullet" ? 1 : Math.min(1, Math.max(0, fin.balloonPct || 0)),
+    stepUp: Math.max(0, fin.stepUpPct || 0),
+    dsraMonths: Math.max(0, fin.dsraMonths || 0),
+  };
+}
+
+/** The principal of year y under the method, from the opening balance and the years left (n). */
+export function principalOf(method, opening, n, rate, interestOpen, { balloon = 0, stepUp = 0, cfads = 0, targetDscr = 1.3 } = {}) {
+  if (!(opening > 1e-9) || n < 1) return 0;
+  if (n === 1) return opening; // the last year clears the balance under every method
+  switch (method) {
+    case "annuity": return Math.min(opening, opening * crf(rate, n) - interestOpen);
+    case "sculpted": return Math.min(opening, Math.max(0, cfads / targetDscr - interestOpen));
+    case "balloon": case "bullet": return Math.min(opening, Math.max(0, (opening - balloon) / (n - 1)));
+    case "stepUp": return Math.min(opening, stepUp > 0 ? (opening * stepUp) / ((1 + stepUp) ** n - 1) : opening / n);
+    default: return opening / n;
+  }
+}
+
 function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
   const years = fin.years || 25;
-  const capex = capexCr(sizes, costs);
-  const debt0 = capex.total * fin.debtFraction;
+  const capex = capexCr(sizes, costs, fin);
+  const debt0 = capex.debt0 ?? capex.total * fin.debtFraction;
   const equity0 = capex.total - debt0;
   const aug = augmentationScheduleCr(sizes, costs, bess, years);
-  const tenor = Math.min(years, Math.max(1, Math.round(fin.tenorYears)));
-  const annuity = debt0 * crf(fin.interestRate, tenor);
+  const dt = debtTerms(fin, years);
   const bookBase = capex.total * (1 - fin.salvagePct);
   let debt = debt0;
+  let balloonBase = debt0; // the balance the balloon share applies to: the debt, or the balance refinanced
   let wdvBlock = capex.total;
   let lossCf = 0;
-  let prevRecv = 0;
+  let prevWc = 0;
   let augBookDep = 0;
   const rows = [];
   const equityFlows = [-equity0];
@@ -1538,19 +1657,38 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       plantCost[`${pl.id}Mu`] = (op[`${pl.id}MWh`] || 0) / 1000;
       plantsTotal += fixed + energy;
     }
-    const opex = om + insurance + other + fuel + plantsTotal;
+    // DSM (CERC deviation settlement, web/src/dsm/dsm.js): the year's charges on the forecast
+    // error, a line in the year's tariff on the energy scheduled (what reaches the meter); a cost
+    // of operation. op.dsmChargeCr: given outright
+    const scheduledMWh = op.deliveredMWh + (op.excessMWh || 0) + (op.buyerExcessMWh || 0);
+    const dsm = op.dsmChargeCr ?? (scheduledMWh * ((op.dsmA || 0) * trf + (op.dsmB || 0))) / 1e7;
+    const opex = om + insurance + other + fuel + plantsTotal + dsm;
     const ebitda = revenue - opex;
     // book depreciation (SLM), augmentation depreciated over remaining life
     if (aug[y] > 0) augBookDep += aug[y] / Math.max(1, years - y + 1);
     const bookDep = (y <= fin.bookLifeYears ? bookBase / fin.bookLifeYears : 0) + augBookDep;
-    // debt
+    // working capital: receivables, O&M in hand and spares, held at the year end; interest on it
+    const recv = (revenue * fin.receivableDays) / 365;
+    const omStock = (om * (fin.omStockMonths || 0)) / 12;
+    const spares = om * (fin.sparesPctOm || 0);
+    const wcBalance = recv + omStock + spares;
+    const dWc = wcBalance - prevWc;
+    prevWc = wcBalance;
+    const wcInterest = wcBalance * (fin.wcInterestRate || 0);
+    // debt: the balance at the start of the year, this year's terms (refinanced from the year
+    // after the refinancing), the principal under the method, and the interest
     const opening = debt;
-    const interest = opening * fin.interestRate;
+    const phase2 = dt.refi && y > dt.refiYear;
+    const rate = phase2 ? dt.refiRate : fin.interestRate;
+    const end = phase2 ? dt.refiEnd : dt.tenor;
+    const n = end - y + 1;
+    const repaying = y > dt.grace && y <= end && opening > 1e-9;
+    const interestOpen = opening * rate;
+    const sculpt = dt.method === "sculpted";
     let principal = 0;
-    if (y <= tenor && opening > 1e-9) {
-      principal = fin.repayment === "annuity" ? Math.min(opening, annuity - interest) : Math.min(opening, debt0 / tenor);
-    }
-    debt = opening - principal;
+    if (repaying && !sculpt) principal = principalOf(dt.method, opening, n, rate, interestOpen, { balloon: dt.balloonPct * balloonBase, stepUp: dt.stepUp });
+    let interest = interestOpen - dt.adj * principal;
+    // the refinancing fee: on the balance refinanced, expensed in that year
     // tax depreciation
     wdvBlock += aug[y];
     let taxDep;
@@ -1560,35 +1698,46 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
     } else {
       taxDep = bookDep;
     }
-    const pbt = ebitda - bookDep - interest;
-    let taxable = ebitda - interest - taxDep;
-    if (taxable > 0 && lossCf > 0) {
-      const use = Math.min(lossCf, taxable);
-      taxable -= use;
-      lossCf -= use;
-    } else if (taxable < 0) {
-      lossCf += -taxable;
-      taxable = 0;
+    // the sculpted principal needs the tax, which needs the interest: worked out first, on the
+    // opening balance (no instalment adjustment for sculpting)
+    const refiFeeOn = dt.refi && y === dt.refiYear;
+    const taxOf = (intr, fee) => {
+      let taxable = ebitda - intr - wcInterest - fee - taxDep;
+      let carried = lossCf;
+      if (taxable > 0 && carried > 0) {
+        const use = Math.min(carried, taxable);
+        taxable -= use;
+        carried -= use;
+      } else if (taxable < 0) {
+        carried += -taxable;
+        taxable = 0;
+      }
+      return { tax: taxable * fin.taxRate, carried, taxable };
+    };
+    let refiFee = 0;
+    if (sculpt && repaying) {
+      const t0 = taxOf(interestOpen, 0);
+      const cfads0 = ebitda - t0.tax - dWc - aug[y] - wcInterest;
+      principal = principalOf("sculpted", opening, n, rate, interestOpen, { cfads: cfads0, targetDscr: dt.targetDscr });
+      interest = interestOpen;
     }
-    const tax = taxable * fin.taxRate;
+    debt = opening - principal;
+    if (refiFeeOn) { refiFee = debt * dt.refiFeePct; balloonBase = debt; }
+    const t = taxOf(interest, refiFee);
+    lossCf = t.carried;
+    const tax = t.tax;
+    const pbt = ebitda - bookDep - interest - wcInterest - refiFee;
     const pat = pbt - tax;
-    const recv = (revenue * fin.receivableDays) / 365;
-    const dWc = recv - prevRecv;
-    prevRecv = recv;
-    const cfads = ebitda - tax - dWc - aug[y];
+    const cfads = ebitda - tax - dWc - aug[y] - wcInterest;
     const debtService = interest + principal;
     const dscr = debtService > 1e-9 ? cfads / debtService : null;
-    let fcfe = cfads - debtService;
+    let fcfe = cfads - debtService - refiFee;
     let projectCf = ebitda - Math.max(0, (ebitda - taxDep) * fin.taxRate) - dWc - aug[y];
     if (y === years) {
-      const terminal = capex.total * fin.salvagePct + recv;
+      const terminal = capex.total * fin.salvagePct + wcBalance;
       fcfe += terminal - debt;
       projectCf += terminal;
     }
-    equityFlows.push(fcfe);
-    projectFlows.push(projectCf);
-    cumEquity += fcfe;
-    if (payback === null && cumEquity >= 0) payback = y;
     rows.push({
       year: y,
       tariff: trf,
@@ -1623,18 +1772,25 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       fuel,
       biomassMu: (op.biomassMWh || 0) / 1000,
       ...plantCost,
+      dsm,
       opex,
       ebitda,
       bookDep,
       interest,
+      wcInterest,
+      refiFee,
       pbt,
       taxDep,
       tax,
       pat,
       receivables: recv,
+      omStock,
+      spares,
+      wcBalance,
       dWc,
       augCapex: aug[y],
       cfads,
+      debtRate: rate,
       openingDebt: opening,
       principal,
       closingDebt: debt,
@@ -1645,7 +1801,23 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       projectCf,
     });
   }
-  return { rows, equityFlows, projectFlows, capex, debt0, equity0, payback };
+  // the debt service reserve: months of the next year's debt service, built and released from
+  // the equity cash (it does not touch the DSCR)
+  let prevDsra = 0;
+  for (let y = 1; y <= years; y += 1) {
+    const row = rows[y - 1];
+    const dsra = y < years ? (rows[y].debtService * dt.dsraMonths) / 12 : 0;
+    row.dsraBalance = dsra;
+    row.dDsra = dsra - prevDsra;
+    prevDsra = dsra;
+    row.fcfe -= row.dDsra;
+    equityFlows.push(row.fcfe);
+    projectFlows.push(row.projectCf);
+    cumEquity += row.fcfe;
+    row.cumEquity = cumEquity;
+    if (payback === null && cumEquity >= 0) payback = y;
+  }
+  return { rows, equityFlows, projectFlows, capex, debt0, equity0, payback, debtTerms: dt };
 }
 
 export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tariffLocked, ops: givenOps = null, solveBy = "irr" }) {
@@ -1702,6 +1874,8 @@ export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tar
     avgDscr: dscrs.length ? dscrs.reduce((a, b) => a + b, 0) / dscrs.length : null,
     payback: cf.payback,
     capex: cf.capex,
+    construction: cf.capex.construction,
+    debtTerms: cf.debtTerms,
     debt: cf.debt0,
     equity: cf.equity0,
     rows: cf.rows,
@@ -1715,6 +1889,8 @@ export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tar
       tax: sum("tax"),
       augCapex: sum("augCapex"),
       penalty: sum("penalty"),
+      interest: sum("interest"),
+      dsm: sum("dsm"),
     },
     minLifetimeDfr: Math.min(...cf.rows.map((row) => row.dfr)),
   };

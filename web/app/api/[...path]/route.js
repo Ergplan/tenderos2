@@ -6,6 +6,7 @@ import https from "node:https";
 import { Readable } from "node:stream";
 import { currentUserWithAccess, handler, HttpError } from "@/lib/auth";
 import { mayCallEngine } from "@/lib/tabs";
+import { ZONE, zoneAllowsEngine } from "@/lib/zone";
 import { logEvent } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,8 @@ async function forward(req, { params }) {
   // each tab may call only its own engine routes: Tender to Bid /api/bid/* and /api/rtc/*, Round
   // the Clock /api/rtc/*, BESS Tender /api/bess/*; /api/health for any signed-in user
   if (!mayCallEngine(user.allowedTabs, path[0])) throw new HttpError(403, "Contact Administrator: no access to this part of the engine.");
+  // the core zone has no cloud client: tender reading happens in the intake zone and arrives as a signed package
+  if (!zoneAllowsEngine(path.join("/"))) throw new HttpError(403, `Not in the ${ZONE} zone: tender documents are read in the intake zone and imported here as a signed package (docs/enterprise/ARCHITECTURE.md).`);
   const incoming = new URL(req.url);
   const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}${incoming.search}`, ENGINE_URL);
   const body = req.method === "GET" || req.method === "HEAD" ? null : Buffer.from(await req.arrayBuffer());

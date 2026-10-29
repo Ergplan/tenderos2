@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUserWithAccess, handler, HttpError } from "@/lib/auth";
+import { CLOUD_AGENTS, ZONE } from "@/lib/zone";
 import { logEvent } from "@/lib/activity";
 import { LIVE_MODEL, liveSessionConfig } from "@/src/seci/agent";
 
@@ -29,11 +30,12 @@ async function allowed() {
 /** Whether the agent can run here (a key on the server), so the tab says how to set it up if not. */
 export const GET = handler(async () => {
   await allowed();
-  return NextResponse.json({ available: Boolean(process.env.OPENAI_API_KEY), model: LIVE_MODEL, backendModel: BACKEND(), voice: VOICE() });
+  return NextResponse.json({ available: CLOUD_AGENTS && Boolean(process.env.OPENAI_API_KEY), zone: ZONE, model: LIVE_MODEL, backendModel: BACKEND(), voice: VOICE() });
 });
 
 export const POST = handler(async (req) => {
   const user = await allowed();
+  if (!CLOUD_AGENTS) throw new HttpError(403, "The voice agent does not run in the core zone: no cloud model reaches the bid workspace.");
   if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "The voice agent is not set up on this server (OPENAI_API_KEY).");
   const body = await req.json().catch(() => null);
   const sdp = body?.sdp;

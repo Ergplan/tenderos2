@@ -8,7 +8,7 @@
 // Facts come only from the tools: the tender from its pack (each with document and page), the
 // numbers from the sizing and the financial model. Nothing the agent says is written into the
 // tender pack or used to change a rule.
-import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, missingInputs, modelInputs, opsFromLp } from "../bid/model.js";
+import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, missingInputs, modelInputs, opsFromLp, dsmFor } from "../bid/model.js";
 import { liveModelRequest } from "../bid/liveModelRequest.js";
 import { explainGeneration } from "../model/explainGeneration.js";
 import { quotedReturns } from "../bid/quote.js";
@@ -263,7 +263,7 @@ export const AGENT_TOOLS = [
 /** The traceable model's request for the sized plant, as the Financials step builds it. */
 function liveOf(state, terms) {
   const { costs, fin, bess } = modelInputs(state, terms);
-  const ops = opsFromLp(state.lp, fin, bess);
+  const ops = opsFromLp(state.lp, fin, bess, dsmFor(state));
   const finance = financeOf(state, terms);
   return liveModelRequest({ state, lp: state.lp, finance, costs, fin, bess, ops, dfrTarget: 0 });
 }

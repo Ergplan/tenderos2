@@ -3,7 +3,7 @@
 // model put into words. Plain JavaScript with no browser APIs, used by agent.js and checked in Node
 // by tools/check_seci.mjs and tools/check_seci_agent.mjs.
 import * as E from "../rtc/engine.js";
-import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, modelInputs, opsFromLp } from "../bid/model.js";
+import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, modelInputs, opsFromLp, dsmFor } from "../bid/model.js";
 import { PACK, keyDates, moneyAtStake } from "./terms.js";
 
 // ---------------------------------------------------------------- understanding answers
@@ -215,7 +215,7 @@ export function buildScript(state) {
 export function financeOf(state, terms) {
   if (!state.lp) return null;
   const { costs, fin, bess } = modelInputs(state, terms);
-  const ops = opsFromLp(state.lp, fin, bess);
+  const ops = opsFromLp(state.lp, fin, bess, dsmFor(state));
   return E.runFinancialModel(null, state.lp.sizes, { costs, fin, bess, dfrTarget: 0, tariffLocked: state.tariffLocked, ops, solveBy: "npv" });
 }
 

@@ -19,7 +19,7 @@ import path from "node:path";
 import * as E from "../web/src/rtc/engine.js";
 import { defaultBidState, modelInputs, opsFromLp } from "../web/src/bid/model.js";
 import { liveModelRequest } from "../web/src/bid/liveModelRequest.js";
-import { LIVE_SHEET, addLiveModel, liveModelInput } from "../web/lib/liveModel.js";
+import { CONSTRUCTION_SHEET, LIVE_SHEET, addLiveModel, liveModelInput } from "../web/lib/liveModel.js";
 import { buildModelWorkbook } from "../web/lib/modelWorkbook.js";
 import { rtcModelExport } from "../web/src/rtc/exportModel.js";
 
@@ -29,7 +29,7 @@ const ExcelJS = require("exceljs");
 const close = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
 
 // ---- three bids
-function bid({ sources, src = {}, fin = {}, market, sites, years = 25, lifetime, sizes, tariffLocked = false, tariff, rules = [], lpExtra = {} }) {
+function bid({ sources, src = {}, fin = {}, costs = {}, market, sites, years = 25, lifetime, sizes, tariffLocked = false, tariff, rules = [], lpExtra = {} }) {
   const s = defaultBidState();
   s.bid = { baseMw: 1000, greenshoe: false };
   s.sources = { solar: false, wind: false, hydro: false, biomass: false, thermal: false, bess: false, ...sources };
@@ -41,7 +41,7 @@ function bid({ sources, src = {}, fin = {}, market, sites, years = 25, lifetime,
   s.src.bess = { capacity: { mode: "optimise", mw: 3000 }, duration: "4", rte: 0.87, minSoc: 0.05, maxSoc: 0.95, degradation: 0.02, augmentation: "annual", capex: 1.2, om: 1.2 };
   for (const [id, v] of Object.entries(src)) s.src[id] = { ...s.src[id], ...v };
   s.fin = { ...s.fin, targetEquityIrr: 0.14, debtFraction: 0.7, interestRate: 0.09, tenorYears: 15, taxRate: 0.2517, omEscalation: 0.05, insurancePct: 0.003, tariffEscalation: 0, ...fin };
-  s.costs = { preopPct: 0.05, evacuationCr: 120 };
+  s.costs = { preopPct: 0.05, evacuationCr: 120, ...costs };
   s.market = market || { sell: false, source: "flat", escalation: 0, flatPrice: 0 };
   if (sites) s.sites = sites;
   if (tariffLocked) { s.tariffLocked = true; s.fin.tariff = tariff; }
@@ -92,6 +92,31 @@ const CASES = [
     lifetime: yearsOf(25, (y) => ({ demandMwh: 300 * 8760, deliveredMwh: 0.74 * 300 * 8760, exportMwh: 1.2e5, exportRevenueCr: 1.2e5 * 4.1e-4, buyerExcessMwh: 9e4 - 500 * y, blockShortfallMwh: 4000 + 100 * y })),
     lpExtra: { buyerExcessShare: 0.5 },
   })],
+  // the enterprise financing: a construction schedule with IDC, working capital per CERC norms with
+  // interest on it, a principal moratorium, sculpted repayment, a debt service reserve and DSM charges
+  ["18-month S-curve construction with IDC, sculpted repayment after a 1-year moratorium, CERC working capital, DSRA, DSM", bid({
+    sources: { solar: true, wind: true, bess: true },
+    fin: { repayment: "sculpted", targetDscr: 1.35, graceYears: 1, tenorYears: 18, omStockMonths: 1, sparesPctOm: 0.15, wcInterestRate: 0.11, dsraMonths: 6, tariffEscalation: 0.01 },
+    costs: { constructionMonths: 18, drawdown: "sCurve", drawOrder: "proRata", preopPct: 0.03 },
+    sizes: { solarMw: 900, windMw: 600, bessMw: 400, bessMwh: 1600 },
+    lifetime: yearsOf(25, (y) => ({ demandMwh: 300 * 8760, deliveredMwh: 0.82 * 300 * 8760, exportMwh: 2e4, dsmChargeCr: 1.5 + 0.05 * y })),
+  })],
+  // balloon repayment with quarterly instalments, refinanced at the end of year 6 at a lower rate
+  ["balloon repayment, quarterly instalments, refinanced in year 6", bid({
+    sources: { solar: true, bess: true },
+    fin: { repayment: "balloon", balloonPct: 0.35, paymentsPerYear: 4, tenorYears: 12, refiYear: 6, refiRate: 0.08, refiTenorYears: 10, refiFeePct: 0.01, taxDepreciation: "slm" },
+    costs: { constructionMonths: 12, drawdown: "front", drawOrder: "equityFirst" },
+    sizes: { solarMw: 1200, windMw: 0, bessMw: 300, bessMwh: 1200 },
+    lifetime: yearsOf(25, (y) => ({ demandMwh: 300 * 8760, deliveredMwh: (0.6 - 0.001 * y) * 300 * 8760, exportMwh: 0 })),
+  })],
+  // the principal stepping up 6% a year, monthly instalments, equity put in first over a back-loaded build
+  ["step-up repayment, monthly instalments, equity-first back-loaded construction", bid({
+    sources: { solar: true, wind: true, bess: true },
+    fin: { repayment: "stepUp", stepUpPct: 0.06, paymentsPerYear: 12, tenorYears: 15, graceYears: 2 },
+    costs: { constructionMonths: 24, drawdown: "back", drawOrder: "equityFirst" },
+    sizes: { solarMw: 700, windMw: 500, bessMw: 350, bessMwh: 1400 },
+    lifetime: yearsOf(25, () => ({ demandMwh: 300 * 8760, deliveredMwh: 0.8 * 300 * 8760, exportMwh: 0 })),
+  })],
   ["solar alone, no debt", bid({
     sources: { solar: true },
     fin: { debtFraction: 0, tenorYears: 10 },
@@ -117,6 +142,7 @@ const SAME = {
   pbt: "pbt", tax: "tax", pat: "pat", recv: "receivables", dWc: "dWc", cfads: "cfads", debtService: "debtService", dscr: "dscr",
   fcfe: "fcfe", cumEq: "cumEquity", projCf: "projectCf", trf: "tariff", delivered: "deliveredMu", demand: "demandMu", excess: "excessMu", dfr: "dfr",
   buyerRev: "buyerRevenue", buyerMu: "buyerExcessMu",
+  wcBal: "wcBalance", omStock: "omStock", spares: "spares", wcInt: "wcInterest", refiFeeCr: "refiFee", dsra: "dsraBalance", dDsra: "dDsra", rateY: "debtRate", dsmCr: "dsm",
 };
 const RESULTS = ["tariff", "equityIrr", "projectIrr", "equityNpv", "projectNpv", "minDscr", "avgDscr", "lcoe", "levelisedTariff", "capexTotal", "debt", "equity", "revenueTotal"];
 
@@ -127,9 +153,11 @@ async function build(c, { bare = false } = {}) {
   const input = liveModelInput(JSON.parse(JSON.stringify(c.req)));
   const live = addLiveModel(wb, { ...input, title: "Check" });
   if (bare) {
-    wb.getWorksheet(LIVE_SHEET).eachRow((row) => row.eachCell((cell) => {
-      if (cell.formula) cell._value.model.result = undefined;
-    }));
+    for (const name of [LIVE_SHEET, CONSTRUCTION_SHEET]) {
+      wb.getWorksheet(name).eachRow((row) => row.eachCell((cell) => {
+        if (cell.formula) cell._value.model.result = undefined;
+      }));
+    }
   }
   return { wb, live, buffer: Buffer.from(await wb.xlsx.writeBuffer()) };
 }
@@ -161,7 +189,39 @@ assert.ok(CASES[1][1].finance.rows.filter((r) => r.augCapex > 0).map((r) => r.ye
 assert.ok(CASES[1][1].finance.rows.some((r) => r.penalty > 0), "a shortfall penalty");
 assert.ok(CASES[1][1].finance.rows[0].tax === 0 && CASES[1][1].finance.rows.some((r) => r.tax > 0), "tax losses carried, then tax");
 assert.ok(CASES[1][1].finance.rows[0].surplusRevenue > 0);
-assert.ok(CASES[4][1].finance.rows.every((r) => r.dscr === null), "no debt: no DSCR");
+assert.ok(CASES[CASES.length - 1][1].finance.rows.every((r) => r.dscr === null), "no debt: no DSCR");
+{
+  // the enterprise financing branches
+  const a = CASES[4][1].finance;
+  assert.ok(a.construction && a.construction.months === 18 && a.capex.idc > 0, "IDC from the construction schedule");
+  assert.ok(Math.abs(a.construction.rows.reduce((t, r) => t + r.cost, 0) - (a.capex.hard + a.capex.preop)) < 1e-6, "the whole cost is spent");
+  assert.ok(Math.abs(a.debt - (0.7 * (a.capex.hard + a.capex.preop) + a.capex.idc)) < 1e-9, "debt = share of the cost before IDC + IDC");
+  assert.equal(a.rows[0].principal, 0, "moratorium: no principal in year 1");
+  // the DSCR sits at the target while the balance lasts; the year that clears it (early, when the
+  // cash flow allows) covers more, and nothing is owed by the tenor
+  const sculpted = a.rows.filter((r) => r.openingDebt > 1e-6 && r.closingDebt > 1e-6 && r.year > 1);
+  assert.ok(sculpted.length >= 8, "years of sculpted repayment");
+  for (const r of sculpted) assert.ok(r.principal > 0 && Math.abs(r.dscr - 1.35) < 1e-6, `sculpted: DSCR 1.35 in year ${r.year} (${r.dscr})`);
+  assert.ok(Math.abs(a.rows[17].closingDebt) < 1e-6 && a.rows[18].principal === 0, "the debt is cleared by the tenor");
+  assert.ok(a.rows[0].wcInterest > 0 && a.rows[0].omStock > 0 && a.rows[0].spares > 0, "working capital per CERC norms with interest");
+  assert.ok(a.rows[0].dsraBalance > 0 && Math.abs(a.rows[0].dsraBalance - (a.rows[1].debtService * 6) / 12) < 1e-9 && a.rows[24].dsraBalance === 0, "DSRA from the next year's debt service, released at the end");
+  assert.ok(a.rows[2].dsm > 0 && Math.abs(a.rows[2].opex - (a.rows[2].om + a.rows[2].insurance + a.rows[2].other + a.rows[2].dsm)) < 1e-9, "DSM charges in the operating cost");
+  const b = CASES[5][1].finance;
+  const refi = b.rows[5];
+  assert.ok(refi.refiFee > 0 && Math.abs(refi.refiFee - refi.closingDebt * 0.01) < 1e-9, "the refinancing fee on the balance refinanced");
+  assert.ok(b.rows[6].debtRate === 0.08 && b.rows[5].debtRate === 0.09, "the refinanced rate from the year after");
+  assert.ok(Math.abs(b.rows[15].closingDebt) < 1e-6 && b.rows[15].principal > 3 * b.rows[14].principal, "the balloon in the refinanced debt's last year (6 + 10)");
+  assert.ok(b.rows[0].interest < b.rows[0].openingDebt * 0.09 - 1e-9, "quarterly instalments save interest within the year");
+  assert.ok(b.construction.rows[0].debt === 0 && b.construction.rows[11].debt > 0, "equity first: the first month is all equity");
+  const c = CASES[6][1].finance;
+  assert.ok(c.rows[0].principal === 0 && c.rows[1].principal === 0 && c.rows[2].principal > 0, "two years' moratorium");
+  for (let y = 4; y <= 14; y += 1) assert.ok(Math.abs(c.rows[y - 1].principal / c.rows[y - 2].principal - 1.06) < 1e-9, `step-up 6% in year ${y}`);
+  assert.ok(Math.abs(c.rows[14].closingDebt) < 1e-6, "cleared by the tenor");
+  // bullet: interest only, then everything
+  const bullet = E.principalOf("bullet", 100, 5, 0.09, 9, { balloon: 100 });
+  assert.equal(bullet, 0);
+  assert.equal(E.principalOf("bullet", 100, 1, 0.09, 9, { balloon: 100 }), 100);
+}
 {
   // Amendment-03: the buyer pays half the year's (escalated) tariff for the Solar Hours excess
   const r3 = CASES[3][1].finance.rows[2];
@@ -234,23 +294,27 @@ const numberAt = (ws, addr) => {
 
 for (const [name, c] of CASES) {
   const { wb, live } = await build(c);
-  const mine = wb.getWorksheet(LIVE_SHEET);
-  const ws = await recalc((await build(c, { bare: true })).buffer);
+  const bare = await recalcBook((await build(c, { bare: true })).buffer, mkdtempSync(path.join(tmpdir(), "live-model-")));
+  const ws = bare.getWorksheet(LIVE_SHEET);
   let formulas = 0;
+  for (const sheetName of [LIVE_SHEET, CONSTRUCTION_SHEET]) {
+  const mine = wb.getWorksheet(sheetName);
+  const theirs = bare.getWorksheet(sheetName);
   mine.eachRow((row) => row.eachCell((cell) => {
     const v = cell.value;
     if (!v || typeof v !== "object" || !("formula" in v)) return;
     formulas += 1;
-    const got = resultOf(ws.getCell(cell.address));
+    const got = resultOf(theirs.getCell(cell.address));
     assert.ok(!(got && typeof got === "object" && "error" in got), `${name}: ${cell.address} ${v.formula} → ${JSON.stringify(got)}`);
     const want = cell.result;
     if (typeof want === "number") {
       assert.ok(typeof got === "number" && close(got, want, cell.address.startsWith("C") && /IRR/.test(v.formula) ? 1e-6 : 1e-7),
         `${name}: ${cell.address} ${v.formula}: LibreOffice ${got}, carried ${want}`);
     } else if (want !== undefined) {
-      assert.equal(got ?? "", want, `${name}: ${cell.address} ${v.formula}`);
+      assert.equal(got ?? "", want, `${name}: ${sheetName} ${cell.address} ${v.formula}`);
     }
   }));
+  }
   for (const key of RESULTS) {
     const app = c.req.app[key];
     if (typeof app !== "number") continue;

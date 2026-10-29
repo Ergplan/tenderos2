@@ -13,6 +13,7 @@
 import * as E from "../rtc/engine.js";
 import { scaleToCuf, peakHours } from "../bid/model.js";
 import { PACK, PEAK_PLANS, seciTerms } from "../seci/terms.js";
+import { DSM_DEFAULTS, dsmLines } from "../dsm/dsm.js";
 import { genSource } from "../model/generation.js";
 import { costliestHours } from "../seci/peakPrices.js";
 
@@ -35,6 +36,7 @@ export function defaultWhatIf() {
     lineLossPct: 0.005,
     bess: { rte: 0.87, minSoc: 0.05, maxSoc: 0.95, annualDegradation: 0.02, augmentation: "annual", augmentationYear: 12, costDeclinePct: 0.03 },
     costs: { solarCrPerMwac: 4.0, windCrPerMw: 6.5, bessCrPerMwh: 1.2, bessPcsCrPerMw: 0, evacuationCr: 150, preopPct: 0.05 },
+    dsm: { ...DSM_DEFAULTS }, // deviation settlement (CERC DSM) norms and the forecast-error assumption
     om: { solarLakhPerMwac: 4.0, windLakhPerMw: 9.0, bessLakhPerMwh: 1.2 },
     fin: {
       tariff: 7.0,
@@ -229,6 +231,9 @@ const costsOf = (input) => ({
   bessPcsCrPerMw: input.costs.bessPcsCrPerMw,
   evacuationCr: input.costs.evacuationCr,
   preopPct: input.costs.preopPct,
+  constructionMonths: input.costs.constructionMonths || 0,
+  drawdown: input.costs.drawdown || "linear",
+  drawOrder: input.costs.drawOrder || "proRata",
 });
 
 /** IRR of the lender's flows: the loan out in year 0, interest and principal back each year. */
@@ -254,6 +259,7 @@ export function runWhatIf(raw, { prices = null } = {}) {
   const years = fin.years;
   const ops = [];
   let year1 = null;
+  const dsmYears = dsmLines({ dsm: input.dsm || DSM_DEFAULTS, sources: { solar: input.solarMwac > 0, wind: input.windMw > 0, bess: input.bessMw > 0 }, years });
   for (let y = 1; y <= years; y += 1) {
     const f = E.yearFactors(y, fin, bess);
     const r = dispatchYear(input, prof, f, { hourly: y === 1, peak });
@@ -262,7 +268,7 @@ export function runWhatIf(raw, { prices = null } = {}) {
     // (flat) market price is higher; otherwise they go to the market
     const share = terms.rules.find((x) => x.hours === "solar")?.excessTariffShare;
     const toBuyer = share != null && fin.surplusPrice > share * fin.tariff * (1 + (fin.tariffEscalation || 0)) ** (y - 1) ? r.solarExcessMWh : 0;
-    ops.push({ year: y, ...f, ...r, excessMWh: r.excessMWh - toBuyer, buyerExcessMWh: toBuyer, buyerExcessShare: share || 0, hourly: undefined });
+    ops.push({ year: y, ...f, ...r, excessMWh: r.excessMWh - toBuyer, buyerExcessMWh: toBuyer, buyerExcessShare: share || 0, ...dsmYears[y - 1], hourly: undefined });
   }
   const run = (locked, tariff = fin.tariff) => E.runFinancialModel(null, sizes, { costs, fin: { ...fin, tariff }, bess, dfrTarget: 0, tariffLocked: locked, ops, solveBy: "npv" });
   const atBid = run(true);
@@ -321,7 +327,7 @@ function liveRequest(input, terms, sizes, costs, fin, bess, ops, finance, prof) 
     costs: { ...costs, plants: [] },
     fin: pick(fin, ["tariffEscalation", "solarOmLakhPerMw", "windOmLakhPerMw", "bessOmLakhPerMwh", "omEscalation", "insurancePct", "otherFixedCr", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple", "debtFraction", "interestRate", "tenorYears", "targetEquityIrr", "discountRate", "taxRate", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays", "sellSurplus", "repayment", "taxDepreciation"]),
     bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
-    ops: ops.map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "blockShortfallMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh"])).map((o) => ({ ...o, genBusMWh: o.injectedMWh })),
+    ops: ops.map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "blockShortfallMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh", "dsmA", "dsmB"])).map((o) => ({ ...o, genBusMWh: o.injectedMWh })),
     // the generation build-up: the profiles the dispatch ran, at the CUFs entered (at the 33 kV bus)
     gen: {
       solar: sizes.solarMw > 0 ? genSource({ cf: prof.solarCf, degradation: fin.solarDegradation, cufAt: "33 kV bus", profile: input.solarUpload?.name ? `Uploaded solar profile ${input.solarUpload.name}` : "Typical solar profile" }) : null,
@@ -333,3 +339,51 @@ function liveRequest(input, terms, sizes, costs, fin, bess, ops, finance, prof) 
 
 /** Sizes the tender allows: the SECI pack's bid range and its tendered capacity. */
 export const SECI_LIMITS = { minBidMw: PACK.model.minBidMw, maxBidMw: PACK.model.maxBidMw, tenderedMw: PACK.tenderedMw };
+
+/**
+ * A What-if case seeded from a sized bid (the SECI tab): the sized plant, the bidder's CUFs,
+ * losses, costs, financing, DSM norms and the tariff the model solved, so the levers start from
+ * the bid itself. lf: the losses to the meter (lossFactorsOf) and the pooling stations.
+ */
+export function whatIfFromBid(state, terms) {
+  const lp = state.lp;
+  if (!lp?.sizes) return null;
+  const d = defaultWhatIf();
+  const src = state.src;
+  const sz = lp.sizes;
+  const l = state.losses || {};
+  const flat = state.market?.sell && state.market.source === "flat" ? state.market.flatPrice : null;
+  return {
+    ...d,
+    peakPlan: state.seci?.peakPlan || d.peakPlan,
+    shortfall: state.seci?.shortfall || d.shortfall,
+    profile: state.seci?.profile || d.profile,
+    solarHours: state.seci?.solarHours || null,
+    contractedMw: state.bid?.baseMw || d.contractedMw,
+    solarMwac: sz.solarMw || 0,
+    dcAc: src.solar?.dcAc || d.dcAc,
+    windMw: sz.windMw || 0,
+    bessMw: sz.bessMw || 0,
+    bessHours: sz.bessMw > 0 ? (sz.bessMwh || 0) / sz.bessMw : Number(src.bess?.duration) || d.bessHours,
+    solarCuf: src.solar?.cuf ?? d.solarCuf,
+    windCuf: src.wind?.cuf ?? d.windCuf,
+    solarUpload: state.solarUpload || null,
+    windUpload: state.windUpload || null,
+    trafoLossPct: l.trafoLossPct ?? d.trafoLossPct,
+    lineLossPct: l.lineLossPct ?? d.lineLossPct,
+    bess: { ...d.bess, rte: src.bess?.rte ?? d.bess.rte, minSoc: src.bess?.minSoc ?? d.bess.minSoc, maxSoc: src.bess?.maxSoc ?? d.bess.maxSoc, annualDegradation: src.bess?.degradation ?? d.bess.annualDegradation, augmentation: src.bess?.augmentation || d.bess.augmentation },
+    costs: { ...d.costs, solarCrPerMwac: src.solar?.capex ?? d.costs.solarCrPerMwac, windCrPerMw: src.wind?.capex ?? d.costs.windCrPerMw, bessCrPerMwh: src.bess?.capex ?? d.costs.bessCrPerMwh, bessPcsCrPerMw: 0,
+      evacuationCr: state.costs?.evacuationCr ?? d.costs.evacuationCr, preopPct: state.costs?.preopPct ?? d.costs.preopPct,
+      constructionMonths: state.costs?.constructionMonths || 0, drawdown: state.costs?.drawdown || "linear", drawOrder: state.costs?.drawOrder || "proRata" },
+    dsm: { ...DSM_DEFAULTS, ...(state.dsm || {}) },
+    om: { solarLakhPerMwac: src.solar?.om ?? d.om.solarLakhPerMwac, windLakhPerMw: src.wind?.om ?? d.om.windLakhPerMw, bessLakhPerMwh: src.bess?.om ?? d.om.bessLakhPerMwh },
+    fin: {
+      ...d.fin,
+      ...Object.fromEntries(Object.entries(state.fin || {}).filter(([k, v]) => k !== "tariff" && k !== "years" && v !== null && v !== undefined)),
+      tariff: Number((state.forms?.tariff ?? lp.tariff ?? d.fin.tariff).toFixed(3)),
+      sellSurplus: Boolean(state.market?.sell),
+      surplusPrice: flat ?? d.fin.surplusPrice,
+    },
+    fromBid: { sizes: sz, tariff: lp.tariff, years: terms?.years || 25 },
+  };
+}

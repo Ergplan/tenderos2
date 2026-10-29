@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import * as E from "../web/src/rtc/engine.js";
 import {
   BENCHMARKS, SOURCE_FIELDS, capacityIssues, capacityWarnings, defaultBidState, dispatch15Request, energyMix, fillBenchmarks, lpPayload, missingInputs,
-  mergeBidState, modelInputs, opsFromLp, plantMw, resourceProfiles, scaleToCuf, solarMinMw,
+  mergeBidState, modelInputs, opsFromLp, plantMw, resourceProfiles, scaleToCuf, siteFactors, solarMinMw,
 } from "../web/src/bid/model.js";
 import { buildProposals, isUsed, mergeReadings, tenderDates, tenderTerms } from "../web/src/bid/tenderMap.js";
 import { PREBID_QUERIES, PREBID_TENDER, PREBID_TITLE, queriesForWord, queriesText, queriesToSend } from "../web/src/bid/preBidQueries.js";
@@ -148,6 +148,24 @@ assert.equal(payload.vars.solarMw.max, 8000);
 assert.deepEqual(payload.vars.hydroMw, { locked: true, value: 300 });
 assert.equal(payload.vars.bessMwh.max, 3000 * 4);
 assert.equal(payload.greenShareMin, 0.51, "non-RE in the bid: the tender's green share applies");
+{
+  // separate sites: each pooling station's losses; the dispatch runs at one evacuation factor
+  // (the wind site's) and the solar profile is scaled so its energy carries the solar site's
+  const one = { ...filled, losses: { ...filled.losses, trafoLossPct: 0.005, lineLossPct: 0.01 }, sites: { split: false } };
+  const sfOne = siteFactors(one);
+  assert.ok(!sfOne.split && Math.abs(sfOne.solar - 0.995 * 0.99) < 1e-12 && sfOne.wind === sfOne.solar, "one pooling station");
+  const two = { ...one, sources: { ...one.sources, solar: true, wind: true, bess: true }, sites: { split: true, solarSite: { trafoLossPct: 0.006, lineLossPct: 0.02 }, windSite: { trafoLossPct: 0.004, lineLossPct: 0.005 } } };
+  const sf = siteFactors(two);
+  assert.ok(sf.split && Math.abs(sf.solar - 0.994 * 0.98) < 1e-12 && Math.abs(sf.wind - 0.996 * 0.995) < 1e-12 && sf.common === sf.wind, "two pooling stations");
+  const pOne = lpPayload({ ...two, sites: { ...two.sites, split: false } }, terms, profiles);
+  const pTwo = lpPayload(two, terms, profiles);
+  assert.equal(pTwo.ctx.trafoLossPct, 0.004);
+  assert.equal(pTwo.ctx.lineLossPct, 0.005);
+  const ratio = pTwo.ctx.solarCf[12] / pOne.ctx.solarCf[12];
+  assert.ok(Math.abs(ratio - sf.solar / sf.wind) < 1e-4, `solar scaled by the sites' ratio: ${ratio}`);
+  assert.ok(Math.abs(pTwo.ctx.windCf[12] - pOne.ctx.windCf[12]) < 1e-12, "wind untouched");
+  assert.deepEqual(pTwo.sites, { split: true });
+}
 assert.deepEqual(payload.plants.map((p) => [p.id, p.green, p.cuf, p.recRsPerKwh]), [["hydro", true, 0.45, 0], ["thermal", false, 0.85, 0.15]]);
 assert.equal(payload.biomass.maxPlf, 0.8);
 assert.ok(Math.abs(payload.biomass.rampPerHour - 0.3) < 1e-9, "0.5%/min = 30% per hour");

@@ -62,6 +62,54 @@ has a title and the tabs it covers.
   The Finance desk sees it unread, opens the field and replies with 320. The manager fills it in,
   and a title change is saved on Team setup.
 
+## Evidence on every input
+
+Every input box also carries a small **paperclip**, left of the send icon (E-01 and E-02 in
+`docs/enterprise/FEATURES.md`). It is faint while the box has no evidence and solid, with a count,
+when it has. Click it and the box's evidence opens:
+
+* the box's label, where it is (tab › step › section) and its value now;
+* the evidence attached to it: a **file** (download it from the name), a **link** or a **note**,
+  each with who attached it, when, and the value the box held at the time;
+* a form to attach more: a note, a link (`http://` or `https://`) or a file (PDF, PNG, JPEG, Word
+  or Excel, up to 25 MB, the same checks as the assignments' uploads);
+* for a super admin, **Sign off this value** and **Clear sign-off**;
+* **Register (CSV)**: the tab's evidence register.
+
+Anyone on the team attaches evidence and removes their own; a super admin removes any.
+
+**Sign-off.** A super admin signs off a box's value: the sign-off keeps the value, who and when.
+The paperclip gets a green tick while the box holds that value. When the value changes, the tick
+turns amber and the popover says "signed off at an older value" and shows it; the super admin
+signs off the new value or clears the sign-off. A sign-off needs no evidence, and evidence needs no
+sign-off. A box has one sign-off at a time.
+
+**The register.** `Register (CSV)` downloads one line per piece of evidence of the tab: tab, box,
+place, the value at attach, kind, name / URL / note, by, when, and the sign-off (whether the box
+was signed off at the value the item was attached at — `current`, `older value` or `no` — with
+the signed value, who and when). The register does not see the boxes, only what was saved.
+`GET /api/evidence/register` without `?tab=` gives every tab.
+
+| Part | Where |
+| --- | --- |
+| Tables: `evidence` (one row per item, with `file_id` into `team_files`), `field_signoff` (one per box: `tab`, `field_key`, `value_at`, `signed_by`, `signed_at`) | `web/db/migrations/012_evidence.sql` |
+| Server | `web/lib/evidence.js`; `GET /api/evidence?tab=` (items, sign-offs, counts by box), `POST /api/evidence` (JSON, or multipart with `file`), `DELETE /api/evidence/[id]`, `POST /api/evidence/signoff` (`{ tab, fieldKey, fieldLabel, valueAt, signed }`), `GET /api/evidence/register?tab=` (CSV) |
+| Browser | `web/src/evidence/`: `EvidenceLayer.jsx` (the paperclips and the popover, mounted beside `FieldPings` in `main.jsx`), `useEvidence.js` (the tab's evidence, refreshed every 20 s), `register.js` (the register and its CSV, plain JavaScript), `evidence.css` |
+
+Boxes are named as in team mode (`web/src/team/fields.js`): the `data-testid`, else the section
+and label. The evidence of a box whose label or section is renamed stays in the register under the
+old name. Access is as for messages: anyone on the tender team (`requireMember`); in demo mode,
+the seat chosen with **View as**.
+
+**Tests:**
+
+* `node tools/check_evidence.mjs` (in `make check-web`): the register's grouping, names, sign-off
+  states and CSV.
+* `tests/e2e/test_evidence.py` (in `make e2e`, demo mode). The manager attaches a note and a link
+  to the What-if "Contracted capacity (bid)" box, sees the count, signs off the value (green),
+  changes the value (amber), removes the note, downloads the register and leaves the demo as it
+  was.
+
 ## The team
 
 | Team | Usually answers |

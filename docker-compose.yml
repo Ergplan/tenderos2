@@ -67,6 +67,9 @@ services:
       SMTP_SECURE: ${SMTP_SECURE:-}
       MAIL_FROM: ${MAIL_FROM:-}
       APP_URL: ${APP_URL:-}
+      # enterprise zone flag and release version (docs/enterprise/ARCHITECTURE.md); shown by /api/health
+      TENDEROS_ZONE: ${TENDEROS_ZONE:-all}
+      TENDEROS_VERSION: ${TENDEROS_VERSION:-dev}
     volumes:
       - team_files:/data/files
     ports:

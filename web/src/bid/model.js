@@ -3,6 +3,7 @@
 // every plant parameter and cost comes from the bidder. Nothing is filled in for the bidder:
 // sizing is refused until each source switched on has all of its inputs.
 import * as E from "../rtc/engine.js";
+import { DSM_DEFAULTS, dsmLines } from "../dsm/dsm.js";
 
 export const BIOMASS_COLOR = "#c08552";
 export const HYDRO_COLOR = "#3fa7d6";
@@ -182,12 +183,15 @@ export function defaultBidState() {
     windMonthScale: new Array(12).fill(1),
     // financing: the terms asked for before sizing are empty; the rest are shown and editable on Financials
     fin: { ...E.DEFAULT_FINANCE, ...FIN_REQUIRED, sellSurplus: false },
-    costs: { preopPct: null, evacuationCr: null },
+    costs: { preopPct: null, evacuationCr: null, constructionMonths: 0, drawdown: "linear", drawOrder: "proRata" },
+    dsm: { ...DSM_DEFAULTS }, // deviation settlement (CERC DSM) norms and the forecast-error assumption
     // sale of what the tender lets the supplier sell (asked only when it allows a sale)
     market: { sell: null, source: "GDAM", escalation: 0, flatPrice: null },
     // solar and wind on separate sites, each with its own battery that charges from its own site
     // only; HiGHS decides how much battery goes on each site
-    sites: { split: false },
+    // sites.split: separate sites, each with its own pooling station (33/220 kV transformer and
+    // 220 kV line); one site shares the pooling station in state.losses
+    sites: { split: false, solarSite: { trafoLossPct: E.DEFAULT_RTC_INPUTS.trafoLossPct, lineLossPct: E.DEFAULT_RTC_INPUTS.lineLossPct }, windSite: { trafoLossPct: E.DEFAULT_RTC_INPUTS.trafoLossPct, lineLossPct: E.DEFAULT_RTC_INPUTS.lineLossPct } },
     tariffLocked: false,
     quoteTariff: null, // the tariff the bidder will quote, checked against the target IRR on Financials
     locks: {},
@@ -200,7 +204,8 @@ export function mergeBidState(saved) {
   const base = defaultBidState();
   if (!saved || saved.version !== 4) return base;
   const merged = { ...base, ...saved };
-  for (const k of ["bid", "sources", "fin", "costs", "market", "sites", "locks", "accepted", "filled", "prebid"]) merged[k] = { ...base[k], ...(saved[k] || {}) };
+  for (const k of ["bid", "sources", "fin", "costs", "market", "sites", "locks", "accepted", "filled", "prebid", "dsm"]) merged[k] = { ...base[k], ...(saved[k] || {}) };
+  for (const k of ["solarSite", "windSite"]) merged.sites[k] = { ...base.sites[k], ...(saved.sites?.[k] || {}) };
   merged.src = Object.fromEntries(SOURCE_IDS.map((id) => [id, { ...base.src[id], ...(saved.src?.[id] || {}), capacity: { ...base.src[id].capacity, ...(saved.src?.[id]?.capacity || {}) } }]));
   if (!STEP_IDS.includes(merged.step)) merged.step = "tender";
   return merged;
@@ -294,6 +299,28 @@ export function sourceIssues(state, id, terms) {
 }
 
 /** Everything that stops the sizing, as messages (empty when it can run). */
+/**
+ * The pooling stations: the share of the 33 kV bus energy that reaches the 220 kV billing meter
+ * from each site. One site: the shared transformer and line in state.losses for both. Separate
+ * sites: each site's own transformer and line (state.sites.solarSite / windSite). The sizing
+ * dispatches at one bus with one evacuation factor (the wind site's); the solar site's energy is
+ * scaled by the ratio of the two on the way in, so each site's energy carries its own losses.
+ */
+export function siteFactors(state) {
+  const lf = lossFactorsOf(state);
+  const shared = (1 - lf.trafo) * (1 - lf.line);
+  if (!splitSitesOn(state)) return { split: false, solar: shared, wind: shared, common: shared, trafo: lf.trafo, line: lf.line, solarSite: null, windSite: null };
+  const site = (k) => {
+    const x = state.sites?.[k] || {};
+    const trafo = x.trafoLossPct ?? lf.trafo;
+    const line = x.lineLossPct ?? lf.line;
+    return { trafo, line, poi: (1 - trafo) * (1 - line) };
+  };
+  const a = site("solarSite");
+  const b = site("windSite");
+  return { split: true, solar: a.poi, wind: b.poi, common: b.poi, trafo: b.trafo, line: b.line, solarSite: a, windSite: b };
+}
+
 /** Separate sites apply when the bid has solar, wind and a battery. */
 export function splitSitesOn(state) {
   return Boolean(state.sites?.split && state.sources.solar && state.sources.wind && state.sources.bess);
@@ -434,6 +461,10 @@ export function modelInputs(state, terms) {
     biomassCrPerMw: on("biomass") ? s.biomass.capex : 0,
     evacuationCr: state.costs.evacuationCr || 0,
     preopPct: state.costs.preopPct || 0,
+    // the construction schedule (0 months: the IDC is inside the pre-operative share)
+    constructionMonths: state.costs.constructionMonths || 0,
+    drawdown: state.costs.drawdown || "linear",
+    drawOrder: state.costs.drawOrder || "proRata",
     plants: ["hydro", "thermal"].filter(on).map((id) => ({
       id,
       capexCrPerMw: s[id].capex,
@@ -565,15 +596,20 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
   const selling = Boolean(state.market.sell) && Boolean(terms.sale) && terms.sale !== "not_allowed";
   // the profiles at the 33 kV bus: the CUF less the stages after its measuring point
   const lf = lossFactorsOf(state);
+  // the pooling stations (siteFactors): separate sites carry their own transformer and line
+  // losses; the solar site's energy is scaled by its factor against the wind site's, which the
+  // dispatch applies to everything
+  const sf = siteFactors(state);
+  const solarScale = sf.split && sf.common > 0 ? sf.solar / sf.common : 1;
   const payload = {
     ctx: {
       demand: new Array(E.HOURS).fill(m.plantMw), // round-the-clock supply at the contracted capacity (at the meter)
-      solarCf: round(Array.from(solarCf, (v) => v * lf.solar), 6),
+      solarCf: round(Array.from(solarCf, (v) => v * lf.solar * solarScale), 6),
       windCf: round(Array.from(windCf, (v) => v * lf.wind), 6),
       plantMw: m.plantMw,
       lossPct: 0,
-      trafoLossPct: lf.trafo, // 33/220 kV power transformer
-      lineLossPct: lf.line, // 220 kV line to the GSS billing meter
+      trafoLossPct: sf.trafo, // 33/220 kV power transformer (separate sites: the wind site's)
+      lineLossPct: sf.line, // 220 kV line to the GSS billing meter
       sellSurplus: selling,
       extraExportMw: 0,
     },
@@ -713,9 +749,15 @@ export function fillBenchmarks(state, terms) {
 }
 
 /** Year-by-year operations for runFinancialModel, from the LP's lifetime energy. */
-export function opsFromLp(lp, fin, bess) {
+/** The DSM settings and sources of a bid state, for opsFromLp. */
+export const dsmFor = (state) => ({ settings: state.dsm || DSM_DEFAULTS, sources: state.sources });
+
+export function opsFromLp(lp, fin, bess, dsm = null) {
   const years = fin.years || 25;
   const life = lp.lifetime || [];
+  // dsm: { settings, sources } → the DSM unit-charge line of every year (the charge itself is
+  // worked out in the financial model from the year's tariff); none when not given
+  const dsmYears = dsm ? dsmLines({ dsm: dsm.settings, sources: dsm.sources, years }) : null;
   const reps = [...(lp.perYear || [])].sort((a, b) => a.year - b.year);
   const repFor = (y) => reps.filter((r) => r.year <= y).pop() || reps[0] || {};
   return Array.from({ length: years }, (_, i) => {
@@ -740,6 +782,8 @@ export function opsFromLp(lp, fin, bess) {
       hydroMWh: row.hydroMwh || 0,
       thermalMWh: row.thermalMwh || 0,
       blockShortfallMWh: row.blockShortfallMwh || 0, // short of the time-block floors (SECI RTC-TM)
+      // CERC deviation settlement: the year's charge given outright, or its line in the tariff
+      ...(row.dsmChargeCr !== undefined ? { dsmChargeCr: row.dsmChargeCr } : dsmYears ? dsmYears[i] : {}),
       // surplus sale revenue at the hourly market price, when the sizing used one
       ...(lp.market && row.exportRevenueCr !== undefined ? { surplusRevenueCr: row.exportRevenueCr } : {}),
     };

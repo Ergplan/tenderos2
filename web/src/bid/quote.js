@@ -3,7 +3,7 @@
 // the Tender to Bid and SECI RTC tabs (Financials, the bid forms, the voice agent); plain JavaScript,
 // checked in Node by tools/check_seci.mjs.
 import * as E from "../rtc/engine.js";
-import { modelInputs, opsFromLp } from "./model.js";
+import { modelInputs, opsFromLp, dsmFor } from "./model.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -20,7 +20,7 @@ export function quotedReturns(state, terms, tariff) {
   if (!state?.lp || !isNum(tariff) || tariff <= 0) return null;
   const { costs, fin, bess } = modelInputs(state, terms);
   const annual = terms?.rules?.find((r) => r.id === "annual")?.target ?? 0;
-  const ops = opsFromLp(state.lp, fin, bess);
+  const ops = opsFromLp(state.lp, fin, bess, dsmFor(state));
   const run = (locked, t) => E.runFinancialModel(null, state.lp.sizes, { costs, fin: { ...fin, tariff: t }, bess, dfrTarget: annual, tariffLocked: locked, ops, solveBy: "npv" });
   const target = run(false, fin.tariff);
   const quoted = run(true, tariff);
@@ -55,7 +55,7 @@ export function irrCurve(state, terms, tariffs) {
   if (!state?.lp) return null;
   const { costs, fin, bess } = modelInputs(state, terms);
   const annual = terms?.rules?.find((r) => r.id === "annual")?.target ?? 0;
-  const ops = opsFromLp(state.lp, fin, bess);
+  const ops = opsFromLp(state.lp, fin, bess, dsmFor(state));
   const run = (locked, t) => E.runFinancialModel(null, state.lp.sizes, { costs, fin: { ...fin, tariff: t }, bess, dfrTarget: annual, tariffLocked: locked, ops, solveBy: "npv" });
   const target = run(false, fin.tariff);
   return {

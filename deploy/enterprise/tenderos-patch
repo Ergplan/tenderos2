@@ -1,0 +1,362 @@
+#!/usr/bin/env bash
+# tenderos-patch: install and patch TenderOS Enterprise from signed offline bundles.
+#
+#   tenderos-patch verify  <tenderos-X.bundle.tar>   check the signature and every checksum; print the version
+#   tenderos-patch apply   <tenderos-X.bundle.tar>   verify, back up, load the images, restart, health check;
+#                                                    on a failed health check roll back
+#   tenderos-patch rollback                          back to the images and database of before the last apply
+#   tenderos-patch status                            the running version, health and the last patch log lines
+#
+# Runs in the install folder (the one with docker-compose.yml and .env), or set TENDEROS_HOME.
+# The release public key is TENDEROS_RELEASE_PUB, else <install folder>/release.pub, else the
+# release.pub beside this script. It never uses a key found inside the bundle.
+# Needs: bash, docker (compose v2), openssl, tar, sha256sum, and python3 or jq to read manifest.json
+# (without both it falls back to a plain-text scan of the manifest). No internet is used.
+#
+# State, in the install folder:
+#   .tenderos/previous.json   images, version and backup folder of before the last apply (for rollback)
+#   .tenderos/patch-log       one line per apply/rollback: when, version, who, result
+#   backups/<timestamp>/      db.sql.gz, files.tar.gz, the previous compose files
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HOME_DIR="${TENDEROS_HOME:-}"
+if [ -z "$HOME_DIR" ]; then
+  if [ -f "$PWD/docker-compose.yml" ] && [ -f "$PWD/.env" ]; then HOME_DIR="$PWD"
+  elif [ -f "$SCRIPT_DIR/docker-compose.yml" ]; then HOME_DIR="$SCRIPT_DIR"
+  else HOME_DIR="$PWD"; fi
+fi
+STATE_DIR="$HOME_DIR/.tenderos"
+LOG_FILE="$STATE_DIR/patch-log"
+HEALTH_WAIT="${TENDEROS_HEALTH_WAIT:-300}"   # seconds; migrations run on the web app's start
+WORK=""
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'tenderos-patch: %s\n' "$*" >&2; exit 1; }
+cleanup() { [ -n "$WORK" ] && [ -d "$WORK" ] && rm -rf -- "${WORK:?}"; return 0; }
+trap cleanup EXIT
+
+need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required"; }
+
+release_pub() {
+  if [ -n "${TENDEROS_RELEASE_PUB:-}" ]; then echo "$TENDEROS_RELEASE_PUB"
+  elif [ -f "$HOME_DIR/release.pub" ]; then echo "$HOME_DIR/release.pub"
+  elif [ -f "$SCRIPT_DIR/release.pub" ]; then echo "$SCRIPT_DIR/release.pub"
+  else die "release.pub not found (set TENDEROS_RELEASE_PUB or put it in $HOME_DIR)"; fi
+}
+
+# json_get <file> <key>: a top-level string value
+json_get() {
+  local file="$1" key="$2"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -I -c 'import json,sys; v=json.load(open(sys.argv[1])).get(sys.argv[2],""); print(v if isinstance(v,str) else json.dumps(v))' "$file" "$key"
+  elif command -v jq >/dev/null 2>&1; then
+    jq -r --arg k "$key" '.[$k] // ""' "$file"
+  else
+    grep -oE "\"$key\": *\"[^\"]*\"" "$file" | head -1 | sed -E 's/^"[^"]+": *"//; s/"$//'
+  fi
+}
+
+# json_files <manifest>: "path sha256" per line
+json_files() {
+  local file="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -I -c 'import json,sys
+for k,v in sorted(json.load(open(sys.argv[1]))["files"].items()): print(k, v)' "$file"
+  elif command -v jq >/dev/null 2>&1; then
+    jq -r '.files | to_entries[] | "\(.key) \(.value)"' "$file"
+  else
+    # plain scan: file entries are the only "name": "<64 hex>" pairs in the manifest
+    grep -oE '"[^"]+": *"[0-9a-f]{64}"' "$file" | sed -E 's/^"([^"]+)": *"([0-9a-f]{64})"$/\1 \2/'
+  fi
+}
+
+# json_images <manifest>: "name tag id" per line
+json_images() {
+  local file="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -I -c 'import json,sys
+for k,v in sorted(json.load(open(sys.argv[1])).get("images",{}).items()): print(k, v["tag"], v["id"])' "$file"
+  elif command -v jq >/dev/null 2>&1; then
+    jq -r '.images | to_entries[] | "\(.key) \(.value.tag) \(.value.id)"' "$file"
+  else
+    grep -oE '"tag": *"[^"]+", *"id": *"[^"]+"' "$file" | sed -E 's/"tag": *"([^"]+)", *"id": *"([^"]+)"/image \1 \2/' || true
+  fi
+}
+
+# extract <bundle.tar>: unpack to a temp folder; prints the bundle folder path
+extract() {
+  local tarball="$1"
+  [ -f "$tarball" ] || die "no such bundle: $tarball"
+  WORK="$(mktemp -d "${TMPDIR:-/tmp}/tenderos-patch.XXXXXX")"
+  tar -xf "$tarball" -C "$WORK"
+  local dirs
+  dirs="$(find "$WORK" -mindepth 1 -maxdepth 1 -type d -name '*.bundle' | head -1)"
+  [ -n "$dirs" ] || die "the archive holds no tenderos-<version>.bundle folder"
+  echo "$dirs"
+}
+
+# verify_dir <bundle folder>: signature, then every sha256, then no stray files. Prints the version.
+verify_dir() {
+  local dir="$1" pub manifest sig
+  manifest="$dir/manifest.json"; sig="$dir/manifest.sig"
+  [ -f "$manifest" ] || die "manifest.json missing"
+  [ -f "$sig" ] || die "manifest.sig missing"
+  pub="$(release_pub)"
+  if ! openssl dgst -sha256 -verify "$pub" -signature "$sig" "$manifest" >/dev/null 2>&1; then
+    die "SIGNATURE INVALID: manifest.json is not signed by the key in $pub"
+  fi
+  local product; product="$(json_get "$manifest" product)"
+  [ "$product" = "tenderos" ] || die "manifest is not a tenderos bundle (product=$product)"
+  local bad=0 n=0 path sum actual
+  while read -r path sum; do
+    [ -n "$path" ] || continue
+    n=$((n+1))
+    if [ ! -f "$dir/$path" ]; then say "  MISSING   $path" >&2; bad=1; continue; fi
+    actual="$(sha256sum "$dir/$path" | cut -d' ' -f1)"
+    if [ "$actual" != "$sum" ]; then say "  TAMPERED  $path (sha256 differs from the manifest)" >&2; bad=1; fi
+  done < <(json_files "$manifest")
+  [ "$n" -gt 0 ] || die "manifest lists no files"
+  # every file in the folder must be in the manifest, so nothing rides along unsigned
+  local rel
+  while IFS= read -r rel; do
+    case "$rel" in manifest.json|manifest.sig) continue;; esac
+    if ! json_files "$manifest" | cut -d' ' -f1 | grep -qxF "$rel"; then say "  UNSIGNED  $rel (not in the manifest)" >&2; bad=1; fi
+  done < <(cd "$dir" && find . -type f | sed 's|^\./||' | sort)
+  [ "$bad" -eq 0 ] || die "checksum verification FAILED"
+  json_get "$manifest" version
+}
+
+cmd_verify() {
+  local tarball="${1:-}"; [ -n "$tarball" ] || die "usage: tenderos-patch verify <bundle.tar>"
+  need openssl; need tar; need sha256sum
+  local dir version
+  dir="$(extract "$tarball")"
+  version="$(verify_dir "$dir")"
+  say "bundle OK: tenderos $version (built $(json_get "$dir/manifest.json" built_at), commit $(json_get "$dir/manifest.json" commit))"
+  json_images "$dir/manifest.json" | while read -r name tag id; do say "  image $name: $tag ($id)"; done
+  say "  files: $(json_files "$dir/manifest.json" | wc -l | tr -d ' ') verified against the signed manifest"
+}
+
+current_version() {
+  local v=""
+  if [ -f "$HOME_DIR/.env" ]; then v="$(grep -E '^TENDEROS_VERSION=' "$HOME_DIR/.env" | tail -1 | cut -d= -f2- | tr -d '"' || true)"; fi
+  if [ -z "$v" ] && [ -f "$HOME_DIR/VERSION" ]; then v="$(head -1 "$HOME_DIR/VERSION" | tr -d ' \r')"; fi
+  if [ -z "$v" ]; then
+    v="$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$(compose ps -q web 2>/dev/null | head -1)" 2>/dev/null || true)"
+  fi
+  echo "${v:-unknown}"
+}
+
+compose() { (cd "$HOME_DIR" && docker compose "$@"); }
+
+set_env_version() {
+  local v="$1" env="$HOME_DIR/.env"
+  if grep -qE '^TENDEROS_VERSION=' "$env"; then
+    sed -i.bak -E "s/^TENDEROS_VERSION=.*/TENDEROS_VERSION=$v/" "$env" && rm -f "$env.bak"
+  else
+    printf '\nTENDEROS_VERSION=%s\n' "$v" >> "$env"
+  fi
+}
+
+image_id() { docker image inspect --format '{{.Id}}' "$1" 2>/dev/null || true; }
+
+# wait_healthy <expected version>: /api/health answers 200 from inside the web container and reports the version
+wait_healthy() {
+  local expected="$1" deadline=$(( $(date +%s) + HEALTH_WAIT )) body
+  say "Waiting for the web app (up to ${HEALTH_WAIT}s; migrations run on start)..."
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if body="$(compose exec -T web wget -qO- http://127.0.0.1:3000/api/health 2>/dev/null)"; then
+      if printf '%s' "$body" | grep -q "\"version\":\"$expected\""; then
+        say "healthy: $body"; return 0
+      fi
+      say "health answered but not with version $expected: $body"
+      return 1
+    fi
+    sleep 3
+  done
+  say "health check timed out after ${HEALTH_WAIT}s"
+  compose logs --tail 40 web 2>/dev/null || true
+  return 1
+}
+
+log_line() { # <version> <result> [<note>]
+  mkdir -p "$STATE_DIR"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "${USER:-$(id -un)}" "$2" "${3:-}" >> "$LOG_FILE"
+}
+
+backup_all() { # <backup dir>
+  local b="$1"; mkdir -p "$b"; chmod 700 "$b"
+  if compose ps --status running db 2>/dev/null | grep -q db; then
+    say "Backing up the database to $b/db.sql.gz"
+    compose exec -T db pg_dump -U tenderos -d tenderos | gzip > "$b/db.sql.gz"
+  else
+    say "database not running: no database backup"
+  fi
+  if compose ps --status running web 2>/dev/null | grep -q web; then
+    say "Backing up the files volume to $b/files.tar.gz"
+    compose exec -T web tar -czf - -C /data files 2>/dev/null > "$b/files.tar.gz" || say "files backup skipped (no /data/files yet)"
+  fi
+  for f in docker-compose.yml docker-compose.enterprise.yml Caddyfile .env.example tenderos-patch install.sh CHANGELOG.md VERSION; do
+    [ -f "$HOME_DIR/$f" ] && cp -p "$HOME_DIR/$f" "$b/" || true
+  done
+}
+
+restore_db() { # <backup dir>
+  local b="$1"
+  [ -f "$b/db.sql.gz" ] || { say "no database dump in $b: database left as it is"; return 0; }
+  say "Restoring the database from $b/db.sql.gz"
+  compose up -d db >/dev/null
+  for _ in $(seq 1 30); do compose exec -T db pg_isready -U tenderos -d tenderos >/dev/null 2>&1 && break; sleep 2; done
+  compose stop web >/dev/null 2>&1 || true
+  compose exec -T db psql -q -U tenderos -d postgres -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='tenderos' AND pid <> pg_backend_pid()" >/dev/null
+  compose exec -T db dropdb -U tenderos tenderos
+  compose exec -T db createdb -U tenderos tenderos
+  gunzip -c "$b/db.sql.gz" | compose exec -T db psql -q -U tenderos -d tenderos >/dev/null
+}
+
+write_previous() { # <version> <backup dir> <web id> <engine id>
+  mkdir -p "$STATE_DIR"
+  cat > "$STATE_DIR/previous.json" <<EOT
+{
+  "version": "$1",
+  "backup_dir": "$2",
+  "recorded_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "images": {
+    "web": {"tag": "tenderos-web:$1", "id": "$3"},
+    "engine": {"tag": "tenderos-engine:$1", "id": "$4"}
+  }
+}
+EOT
+}
+
+# install_files <bundle folder>: the compose files, Caddyfile, tool and notes into the install folder
+install_files() {
+  local dir="$1" f
+  for f in docker-compose.yml docker-compose.enterprise.yml Caddyfile .env.example release.pub CHANGELOG.md VERSION install.sh; do
+    [ -f "$dir/$f" ] && cp -p "$dir/$f" "$HOME_DIR/$f" || true
+  done
+  if [ -d "$dir/migrations" ]; then rm -rf -- "${HOME_DIR:?}/migrations"; cp -pr "$dir/migrations" "$HOME_DIR/migrations"; fi
+  # this script may be the one running: replace by rename, never by writing into it
+  if [ -f "$dir/tenderos-patch" ]; then
+    cp -p "$dir/tenderos-patch" "$HOME_DIR/tenderos-patch.new" && chmod +x "$HOME_DIR/tenderos-patch.new"
+    mv -f "$HOME_DIR/tenderos-patch.new" "$HOME_DIR/tenderos-patch"
+  fi
+}
+
+cmd_apply() {
+  local tarball="${1:-}"; [ -n "$tarball" ] || die "usage: tenderos-patch apply <bundle.tar>"
+  need openssl; need tar; need sha256sum; need docker
+  [ -f "$HOME_DIR/.env" ] || die "no .env in $HOME_DIR: this is not an installed TenderOS folder (run install.sh first)"
+  [ -f "$HOME_DIR/docker-compose.yml" ] || die "no docker-compose.yml in $HOME_DIR"
+  local dir version current ts backup web_id engine_id
+  dir="$(extract "$tarball")"
+  version="$(verify_dir "$dir")"
+  current="$(current_version)"
+  say "Patching TenderOS $current -> $version in $HOME_DIR"
+  ts="$(date -u +%Y%m%dT%H%M%SZ)"
+  backup="$HOME_DIR/backups/$ts"
+  backup_all "$backup"
+  web_id="$(image_id "tenderos-web:$current")"
+  engine_id="$(image_id "tenderos-engine:$current")"
+  write_previous "$current" "$backup" "$web_id" "$engine_id"
+
+  say "Loading the images from the bundle (no pull)"
+  docker load -i "$dir/images.tar"
+  local name tag id
+  while read -r name tag id; do
+    [ -n "$tag" ] || continue
+    [ -n "$(image_id "$tag")" ] || die "image $tag was not loaded from images.tar"
+  done < <(json_images "$dir/manifest.json")
+  install_files "$dir"
+  set_env_version "$version"
+
+  say "Starting TenderOS $version"
+  if compose up -d --remove-orphans && wait_healthy "$version"; then
+    log_line "$version" "ok" "from $current"
+    say "Patched to TenderOS $version. Backup kept in $backup."
+    docker image prune -f >/dev/null 2>&1 || true
+    return 0
+  fi
+  say "Patch to $version FAILED the health check: rolling back to $current" >&2
+  log_line "$version" "failed" "from $current; rolling back"
+  if do_rollback; then
+    log_line "$current" "rolled-back" "after failed $version"
+    die "rolled back to $current (see backups/$ts and docker compose logs web)"
+  fi
+  log_line "$current" "rollback-failed" "after failed $version; restore backups/$ts by hand"
+  die "ROLLBACK FAILED: restore from $backup by hand (deploy/enterprise/README.md, Rollback)"
+}
+
+do_rollback() {
+  local prev="$STATE_DIR/previous.json" version backup web_id engine_id
+  [ -f "$prev" ] || { say "nothing to roll back to: $prev missing" >&2; return 1; }
+  version="$(json_get "$prev" version)"
+  backup="$(json_get "$prev" backup_dir)"
+  web_id="$(json_images "$prev" | awk '$1=="web"{print $3}')"
+  engine_id="$(json_images "$prev" | awk '$1=="engine"{print $3}')"
+  [ -n "$version" ] && [ "$version" != "unknown" ] || { say "previous version unknown: cannot roll back" >&2; return 1; }
+  say "Rolling back to TenderOS $version"
+  # the previous tags normally still exist; re-tag from the recorded ids if they were pruned
+  [ -n "$(image_id "tenderos-web:$version")" ] || { [ -n "$web_id" ] && docker tag "$web_id" "tenderos-web:$version"; } || { say "previous web image is gone" >&2; return 1; }
+  [ -n "$(image_id "tenderos-engine:$version")" ] || { [ -n "$engine_id" ] && docker tag "$engine_id" "tenderos-engine:$version"; } || { say "previous engine image is gone" >&2; return 1; }
+  compose stop web engine >/dev/null 2>&1 || true
+  for f in docker-compose.yml docker-compose.enterprise.yml Caddyfile .env.example CHANGELOG.md VERSION install.sh; do
+    [ -f "$backup/$f" ] && cp -p "$backup/$f" "$HOME_DIR/$f" || true
+  done
+  if [ -f "$backup/tenderos-patch" ]; then cp -p "$backup/tenderos-patch" "$HOME_DIR/tenderos-patch.new" && mv -f "$HOME_DIR/tenderos-patch.new" "$HOME_DIR/tenderos-patch"; fi
+  restore_db "$backup"
+  set_env_version "$version"
+  compose up -d --remove-orphans
+  if wait_healthy "$version"; then
+    if [ -f "$backup/files.tar.gz" ]; then
+      say "Restoring the files volume from $backup/files.tar.gz"
+      compose exec -T web tar -xzf - -C /data < "$backup/files.tar.gz" || say "files restore failed; the tarball stays in $backup" >&2
+    fi
+    say "Back on TenderOS $version."
+    return 0
+  fi
+  return 1
+}
+
+cmd_rollback() {
+  need docker
+  [ -f "$HOME_DIR/.env" ] || die "no .env in $HOME_DIR"
+  local from; from="$(current_version)"
+  if do_rollback; then
+    log_line "$(current_version)" "rolled-back" "by request, from $from"
+  else
+    log_line "$from" "rollback-failed" "by request"
+    die "rollback failed"
+  fi
+}
+
+cmd_status() {
+  local v; v="$(current_version)"
+  say "TenderOS Enterprise in $HOME_DIR"
+  say "version: $v"
+  if command -v docker >/dev/null 2>&1 && [ -f "$HOME_DIR/.env" ]; then
+    local running
+    running="$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$(compose ps -q web 2>/dev/null | head -1)" 2>/dev/null || true)"
+    [ -n "$running" ] && say "web image label: $running"
+    say "zone: $(grep -E '^TENDEROS_ZONE=' "$HOME_DIR/.env" | cut -d= -f2- || echo all)"
+    local body
+    if body="$(compose exec -T web wget -qO- http://127.0.0.1:3000/api/health 2>/dev/null)"; then say "health: $body"; else say "health: web app not answering"; fi
+    compose ps 2>/dev/null || true
+  fi
+  if [ -f "$STATE_DIR/previous.json" ]; then say "rollback target: $(json_get "$STATE_DIR/previous.json" version) (backup $(json_get "$STATE_DIR/previous.json" backup_dir))"; fi
+  if [ -f "$LOG_FILE" ]; then
+    say "patch log (when  version  who  result  note):"
+    tail -n "${2:-10}" "$LOG_FILE" | sed 's/^/  /'
+  else
+    say "patch log: empty"
+  fi
+}
+
+case "${1:-}" in
+  verify)   cmd_verify "${2:-}";;
+  apply)    cmd_apply "${2:-}";;
+  rollback) cmd_rollback;;
+  status)   cmd_status "$@";;
+  *) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2;;
+esac
