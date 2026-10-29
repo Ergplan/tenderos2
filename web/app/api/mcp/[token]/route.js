@@ -5,11 +5,13 @@
 // event stream (405), DELETE ends the session.
 import { timingSafeEqual } from "node:crypto";
 import { dropSession, handlePost } from "@/lib/mcp";
+import { ZONE } from "@/lib/zone";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 function authorised(token) {
+  if (ZONE === "core") return false; // no connector in the core zone: nothing of the bid leaves it
   const want = process.env.MCP_TOKEN || "";
   if (want.length < 16) return false; // off unless a long token is set
   const a = Buffer.from(String(token || ""));

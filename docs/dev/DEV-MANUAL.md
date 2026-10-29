@@ -739,7 +739,7 @@ From `docs/enterprise/FEATURES.md` (status Build or Extend) and the "not yet" no
 | W-03 Sensitivity table | One-way and two-way sensitivities | Build, P2 |
 | P-02 Enterprise sign-in (SSO) | SAML/OIDC or LDAP; today local accounts only | Build, P2 |
 | TI-13 Tender questions by voice | The GPT-Live agent also drives the bid; a tender-only mode for the DMZ | Extend, P2 |
-| TI-15 Claude connector | Limit to the tender (no bid data) or off in the enterprise edition; the route has no zone check | Extend, P3 |
+| TI-15 Claude connector | Limit to the tender (no bid data) in the enterprise edition; off (404) in the core zone (`web/app/api/mcp/[token]/route.js` checks `ZONE`) | Extend, P3 |
 | W-04 Scenario compare | Compare exists for saved bids, not for What-if cases | Extend, P2 |
 | E-06 Audit log export | Activity log exists; export to build | Extend, P2 |
 | F-06, F-09, F-12, F-13 notes | Capex phasing by package and commissioning in parts; DSM/penalty reserve and letter-of-credit cost; prepayment cost (use the fee); covenant list | notes in the Live rows |
