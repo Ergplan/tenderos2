@@ -22,7 +22,7 @@ check-web:
 
 # Needs a running stack: TENDEROS_URL and TENDEROS_EMAIL, TENDEROS_PASSWORD (or TENDEROS_DEMO=1)
 e2e:
-	$(PY) -m pytest -q -m slow tests/e2e/test_tender_to_bid.py tests/e2e/test_mcp.py tests/e2e/test_round_the_clock.py tests/e2e/test_seci_tab.py tests/e2e/test_team.py tests/e2e/test_team_mode.py tests/e2e/test_evidence.py tests/e2e/test_theme.py tests/e2e/test_demo2.py
+	$(PY) -m pytest -q -m slow tests/e2e/test_tender_to_bid.py tests/e2e/test_mcp.py tests/e2e/test_round_the_clock.py tests/e2e/test_seci_tab.py tests/e2e/test_team.py tests/e2e/test_team_mode.py tests/e2e/test_evidence.py tests/e2e/test_theme.py tests/e2e/test_demo2.py tests/e2e/test_click_tour.py
 
 # the whole demo, clicked through once, with the PDF report (needs a running stack; see demo/README.md)
 demo:
