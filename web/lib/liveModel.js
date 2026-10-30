@@ -14,8 +14,11 @@ export const CONSTRUCTION_SHEET = "Construction";
 export const DEBT_SHEET = "Debt schedule";
 export const DEPRECIATION_SHEET = "Depreciation and tax";
 export const WORKING_CAPITAL_SHEET = "Working capital";
+export const PL_SHEET = "Profit and loss";
+export const CASH_FLOW_SHEET = "Cash flow";
+export const BALANCE_SHEET = "Balance sheet";
 /** The schedule sheets beside the Live model (every cell a formula on it). */
-export const SCHEDULE_SHEETS = [CONSTRUCTION_SHEET, DEBT_SHEET, DEPRECIATION_SHEET, WORKING_CAPITAL_SHEET];
+export const SCHEDULE_SHEETS = [CONSTRUCTION_SHEET, PL_SHEET, CASH_FLOW_SHEET, BALANCE_SHEET, DEBT_SHEET, DEPRECIATION_SHEET, WORKING_CAPITAL_SHEET];
 export const REPAYMENT_LIST = ["equal", "annuity", "sculpted", "balloon", "bullet", "stepUp"];
 export const DRAWDOWN_LIST = ["linear", "sCurve", "front", "back"];
 
@@ -357,6 +360,153 @@ function addScheduleSheets(wb, S, { N, yearRow, refiOn, tenorUsed, refiEnd, debt
     T.cell[key] = `$C$${T.row}`;
     T.val[key] = v;
   };
+
+  const has = (key) => S.cell[key] !== undefined;
+  const cum = (T, key, from, text, unit = "₹ cr") => own(T, key, text, unit, {
+    f: (y) => (y === 1 ? T.at(from, 1) : `${T.at(key, y - 1)}+${T.at(from, y)}`),
+    v: (y) => (y === 1 ? T.v(from, 1) : T.v(key, y - 1) + T.v(from, y)),
+  });
+
+  // ---- profit and loss
+  {
+    const { T } = open(PL_SHEET, "Profit and loss", "The statement of each year: revenue by stream, operating costs by line, EBITDA, depreciation, interest, the refinancing fee, tax and the profit after tax. Linked to the Live model.", "FF2E75B6");
+    T.section("Revenue");
+    linked(T, "ppaRev", "PPA supply revenue", "₹ cr");
+    linked(T, "mktRev", "Market sale revenue", "₹ cr");
+    if (has("buyerRev")) linked(T, "buyerRev", "Solar Hours excess sold to the buyer", "₹ cr");
+    linked(T, "penaltyCr", "Less: shortfall penalty", "₹ cr");
+    if (has("blockPenCr")) linked(T, "blockPenCr", "Less: time-block shortfall penalty", "₹ cr");
+    linked(T, "revenue", "Total revenue", "₹ cr", { bold: true });
+    T.section("Operating costs");
+    const opexLines = [["solarOmCr", "Solar O&M"], ["windOmCr", "Wind O&M"], ["bessOmCr", "Battery O&M"], ["biomassOmCr", "Biomass O&M"], ["insuranceCr", "Insurance"], ["otherCr", "Other fixed cost"],
+      ["fuelCr", "Biomass fuel"], ["hydroFixedCr", "Hydro capacity charge"], ["hydroEnergyCr", "Hydro energy charge"], ["thermalFixedCr", "Thermal capacity charge"], ["thermalEnergyCr", "Thermal energy charge and RECs"], ["dsmCr", "Deviation settlement charges (CERC DSM)"]];
+    for (const [key, text] of opexLines) if (has(key)) linked(T, key, text, "₹ cr");
+    linked(T, "opex", "Total operating cost", "₹ cr", { bold: true });
+    T.section("Earnings");
+    linked(T, "ebitda", "EBITDA", "₹ cr", { bold: true });
+    linked(T, "margin", "EBITDA margin", "%", { fmt: "pct", total: false });
+    linked(T, "bookDep", "Less: depreciation", "₹ cr");
+    own(T, "ebit", "EBIT", "₹ cr", { f: (y) => `${T.at("ebitda", y)}-${T.at("bookDep", y)}`, v: (y) => S.v("ebitda", y) - S.v("bookDep", y), total: true, bold: true });
+    linked(T, "interest", "Less: interest on the debt", "₹ cr");
+    linked(T, "wcInt", "Less: interest on working capital", "₹ cr");
+    linked(T, "refiFeeCr", "Less: refinancing fee", "₹ cr");
+    linked(T, "pbt", "Profit before tax", "₹ cr", { bold: true });
+    linked(T, "tax", "Less: tax", "₹ cr");
+    linked(T, "pat", "Profit after tax", "₹ cr", { bold: true });
+    own(T, "patMargin", "Profit after tax, share of revenue", "%", {
+      f: (y) => `IF(${T.at("revenue", y)}<>0,${T.at("pat", y)}/${T.at("revenue", y)},"")`, v: (y) => (S.v("revenue", y) !== 0 ? S.v("pat", y) / S.v("revenue", y) : ""), fmt: "pct",
+    });
+    cum(T, "cumPat", "pat", "Cumulative profit after tax");
+  }
+
+  // ---- cash flow
+  {
+    const { T } = open(CASH_FLOW_SHEET, "Cash flow", "Cash from operations, investing and financing each year; the cash available for debt service, the equity cash flow and the unlevered project cash flow. Year 0 is the investment. Linked to the Live model.", "FF548235");
+    T.section("Operations");
+    linked(T, "ebitda", "EBITDA", "₹ cr");
+    own(T, "taxPaid", "Less: tax paid", "₹ cr", { f: (y) => `-${link("tax", y)}`, v: (y) => -S.v("tax", y), total: true });
+    own(T, "wcCash", "Less: increase in working capital", "₹ cr", { f: (y) => `-${link("dWc", y)}`, v: (y) => -S.v("dWc", y), total: true });
+    own(T, "wcIntCash", "Less: interest on working capital", "₹ cr", { f: (y) => `-${link("wcInt", y)}`, v: (y) => -S.v("wcInt", y), total: true });
+    own(T, "cfo", "Cash from operations", "₹ cr", {
+      f: (y) => `${T.at("ebitda", y)}+${T.at("taxPaid", y)}+${T.at("wcCash", y)}+${T.at("wcIntCash", y)}`,
+      v: (y) => S.v("ebitda", y) - S.v("tax", y) - S.v("dWc", y) - S.v("wcInt", y), total: true, bold: true,
+    });
+    T.section("Investing");
+    own(T, "capexCash", "Project cost (year 0) and battery augmentation", "₹ cr", {
+      y0: { f: `-${one("total")}`, v: -total }, f: (y) => `-${link("aug", y)}`, v: (y) => -S.v("aug", y), total: true,
+    });
+    own(T, "salvageCash", "Salvage and working capital released (final year)", "₹ cr", { f: (y) => link("terminal", y), v: (y) => S.v("terminal", y), total: true });
+    own(T, "cfi", "Cash from investing", "₹ cr", {
+      y0: { f: T.at("capexCash", 0), v: -total },
+      f: (y) => `${T.at("capexCash", y)}+${T.at("salvageCash", y)}`, v: (y) => -S.v("aug", y) + S.v("terminal", y), total: true, bold: true,
+    });
+    own(T, "cfads", "Cash flow available for debt service (operations less augmentation)", "₹ cr", {
+      f: (y) => link("cfads", y), v: (y) => S.v("cfads", y), total: true, bold: true, note: "As on the Live model: EBITDA − tax − working capital − augmentation − interest on working capital",
+    });
+    T.section("Financing");
+    own(T, "debtIn", "Debt drawn (year 0, incl. IDC)", "₹ cr", { y0: { f: one("debt"), v: debt0 }, f: () => "0", v: () => 0, total: true });
+    own(T, "equityIn", "Equity put in (year 0)", "₹ cr", { y0: { f: one("equity"), v: total - debt0 }, f: () => "0", v: () => 0, total: true });
+    own(T, "interestCash", "Less: interest paid", "₹ cr", { f: (y) => `-${link("interest", y)}`, v: (y) => -S.v("interest", y), total: true });
+    own(T, "principalCash", "Less: principal repaid", "₹ cr", { f: (y) => `-${link("principal", y)}`, v: (y) => -S.v("principal", y), total: true });
+    own(T, "debtEndCash", "Less: debt still owed, repaid in the final year", "₹ cr", { f: (y) => `-${link("debtEnd", y)}`, v: (y) => -S.v("debtEnd", y), total: true });
+    own(T, "refiCash", "Less: refinancing fee", "₹ cr", { f: (y) => `-${link("refiFeeCr", y)}`, v: (y) => -S.v("refiFeeCr", y), total: true });
+    own(T, "dsraCash", "Less: put into the debt service reserve (released: positive)", "₹ cr", { f: (y) => `-${link("dDsra", y)}`, v: (y) => -S.v("dDsra", y), total: true });
+    own(T, "cffDebt", "Cash from financing (before equity)", "₹ cr", {
+      y0: { f: T.at("debtIn", 0), v: debt0 },
+      f: (y) => `${T.at("debtIn", y)}+${T.at("equityIn", y)}+${T.at("interestCash", y)}+${T.at("principalCash", y)}+${T.at("debtEndCash", y)}+${T.at("refiCash", y)}+${T.at("dsraCash", y)}`,
+      v: (y) => -S.v("interest", y) - S.v("principal", y) - S.v("debtEnd", y) - S.v("refiFeeCr", y) - S.v("dDsra", y), total: true, bold: true,
+    });
+    T.section("To equity");
+    own(T, "fcfe", "Cash to equity (year 0: the equity put in); the model's equity cash flow", "₹ cr", {
+      y0: { f: link("fcfe", 0), v: -(total - debt0) }, f: (y) => link("fcfe", y), v: (y) => S.v("fcfe", y), total: true, bold: true,
+      note: "Every rupee of free cash is paid out to equity, so no cash builds up on the balance sheet",
+    });
+    own(T, "cfCheck", "Check: operations + investing + financing − cash to equity (0 every year)", "₹ cr", {
+      y0: { f: `${T.at("cfi", 0)}+${T.at("cffDebt", 0)}-${T.at("fcfe", 0)}`, v: 0 },
+      f: (y) => `${T.at("cfo", y)}+${T.at("cfi", y)}+${T.at("cffDebt", y)}-${T.at("fcfe", y)}`,
+      v: (y) => S.v("ebitda", y) - S.v("tax", y) - S.v("dWc", y) - S.v("wcInt", y) - S.v("aug", y) + S.v("terminal", y) - S.v("interest", y) - S.v("principal", y) - S.v("debtEnd", y) - S.v("refiFeeCr", y) - S.v("dDsra", y) - S.v("fcfe", y),
+    });
+    own(T, "cumEq", "Cumulative equity cash", "₹ cr", { y0: { f: link("cumEq", 0), v: -(total - debt0) }, f: (y) => link("cumEq", y), v: (y) => S.v("cumEq", y) });
+    T.section("Unlevered");
+    own(T, "projCf", "Project cash flow (unlevered, after the project's own tax)", "₹ cr", { y0: { f: link("projCf", 0), v: -total }, f: (y) => link("projCf", y), v: (y) => S.v("projCf", y), total: true, bold: true });
+  }
+
+  // ---- balance sheet
+  {
+    const { T } = open(BALANCE_SHEET, "Balance sheet", "At each year end: fixed assets at cost less accumulated depreciation, working capital and the reserve against the debt, the share capital and the retained earnings. Free cash is paid out to equity each year, so there is no cash build-up; the final year's realisation is shown below the statement. Linked to the Live model.", "FFBF8F00");
+    const eq0 = total - debt0;
+    const n = (k, y) => S.v(k, y);
+    // cumulative additions, depreciation, profit and the operating cash paid to equity (the terminal
+    // realisation of the final year is shown separately)
+    const cumAug = [0]; const cumDep = [0]; const cumPat = [0]; const cumDist = [0]; const dsra = [0]; const wc = [0]; const debt = [debt0];
+    for (let y = 1; y <= N; y += 1) {
+      cumAug[y] = cumAug[y - 1] + n("aug", y);
+      cumDep[y] = cumDep[y - 1] + n("bookDep", y);
+      cumPat[y] = cumPat[y - 1] + n("pat", y);
+      cumDist[y] = cumDist[y - 1] + n("fcfe", y) - (n("terminal", y) - n("debtEnd", y));
+      dsra[y] = n("dsra", y); wc[y] = n("wcBal", y); debt[y] = n("closeDebt", y);
+    }
+    T.section("Assets");
+    own(T, "gross", "Fixed assets at cost (project cost incl. IDC, plus augmentation)", "₹ cr", {
+      y0: { f: one("total"), v: total }, f: (y) => `${T.at("gross", y - 1)}+${link("aug", y)}`, v: (y) => total + cumAug[y],
+    });
+    own(T, "accDep", "Less: accumulated depreciation", "₹ cr", {
+      y0: { f: "0", v: 0 }, f: (y) => `${T.at("accDep", y - 1)}+${link("bookDep", y)}`, v: (y) => cumDep[y],
+    });
+    own(T, "nfa", "Net fixed assets", "₹ cr", { y0: { f: `${T.at("gross", 0)}-${T.at("accDep", 0)}`, v: total }, f: (y) => `${T.at("gross", y)}-${T.at("accDep", y)}`, v: (y) => total + cumAug[y] - cumDep[y], bold: true });
+    own(T, "wcAsset", "Working capital (receivables, O&M in hand, spares)", "₹ cr", { y0: { f: "0", v: 0 }, f: (y) => link("wcBal", y), v: (y) => wc[y] });
+    own(T, "dsraAsset", "Debt service reserve (cash held)", "₹ cr", { y0: { f: "0", v: 0 }, f: (y) => link("dsra", y), v: (y) => dsra[y] });
+    own(T, "assets", "Total assets", "₹ cr", {
+      y0: { f: `${T.at("nfa", 0)}+${T.at("wcAsset", 0)}+${T.at("dsraAsset", 0)}`, v: total },
+      f: (y) => `${T.at("nfa", y)}+${T.at("wcAsset", y)}+${T.at("dsraAsset", y)}`, v: (y) => total + cumAug[y] - cumDep[y] + wc[y] + dsra[y], bold: true,
+    });
+    T.section("Equity and liabilities");
+    own(T, "shareCap", "Share capital (the equity put in)", "₹ cr", { y0: { f: one("equity"), v: eq0 }, f: (y) => T.at("shareCap", y - 1), v: () => eq0 });
+    own(T, "cumPatBs", "Cumulative profit after tax", "₹ cr", { y0: { f: "0", v: 0 }, f: (y) => `${T.at("cumPatBs", y - 1)}+${link("pat", y)}`, v: (y) => cumPat[y] });
+    own(T, "cumDistBs", "Less: cumulative cash paid to equity from operations", "₹ cr", {
+      y0: { f: "0", v: 0 }, f: (y) => `${T.at("cumDistBs", y - 1)}+${link("fcfe", y)}-(${link("terminal", y)}-${link("debtEnd", y)})`, v: (y) => cumDist[y],
+      note: "The equity cash flow of each year, without the final year's realisation of the assets (shown below)",
+    });
+    own(T, "retained", "Retained earnings", "₹ cr", { y0: { f: "0", v: 0 }, f: (y) => `${T.at("cumPatBs", y)}-${T.at("cumDistBs", y)}`, v: (y) => cumPat[y] - cumDist[y] });
+    own(T, "equityBs", "Total equity", "₹ cr", { y0: { f: `${T.at("shareCap", 0)}+${T.at("retained", 0)}`, v: eq0 }, f: (y) => `${T.at("shareCap", y)}+${T.at("retained", y)}`, v: (y) => eq0 + cumPat[y] - cumDist[y], bold: true });
+    own(T, "debtBs", "Debt (closing balance)", "₹ cr", { y0: { f: one("debt"), v: debt0 }, f: (y) => link("closeDebt", y), v: (y) => debt[y] });
+    own(T, "liab", "Total equity and liabilities", "₹ cr", {
+      y0: { f: `${T.at("equityBs", 0)}+${T.at("debtBs", 0)}`, v: total }, f: (y) => `${T.at("equityBs", y)}+${T.at("debtBs", y)}`, v: (y) => eq0 + cumPat[y] - cumDist[y] + debt[y], bold: true,
+    });
+    own(T, "bsCheck", "Check: assets − equity and liabilities (0 every year)", "₹ cr", {
+      y0: { f: `${T.at("assets", 0)}-${T.at("liab", 0)}`, v: 0 }, f: (y) => `${T.at("assets", y)}-${T.at("liab", y)}`,
+      v: (y) => total + cumAug[y] - cumDep[y] + wc[y] + dsra[y] - (eq0 + cumPat[y] - cumDist[y] + debt[y]),
+    });
+    own(T, "gearing", "Debt, share of equity and debt", "%", {
+      y0: { f: `IF(${T.at("liab", 0)}>0,${T.at("debtBs", 0)}/${T.at("liab", 0)},"")`, v: total > 0 ? debt0 / total : "" },
+      f: (y) => `IF(${T.at("liab", y)}>0,${T.at("debtBs", y)}/${T.at("liab", y)},"")`, v: (y) => { const l = eq0 + cumPat[y] - cumDist[y] + debt[y]; return l > 0 ? debt[y] / l : ""; }, fmt: "pct",
+    });
+    T.section("Realisation at the end of the term (final year)");
+    own(T, "realised", "Fixed assets sold at salvage and working capital released", "₹ cr", { f: (y) => link("terminal", y), v: (y) => n("terminal", y), total: true });
+    own(T, "repaidEnd", "Less: debt repaid", "₹ cr", { f: (y) => `-${link("debtEnd", y)}`, v: (y) => -n("debtEnd", y), total: true });
+    own(T, "toEquityEnd", "Returned to equity", "₹ cr", { f: (y) => `${T.at("realised", y)}+${T.at("repaidEnd", y)}`, v: (y) => n("terminal", y) - n("debtEnd", y), total: true, bold: true,
+      note: "Equal to the final year's total equity when the salvage value is the net book value, which the straight-line schedule makes it" });
+  }
 
   // ---- debt schedule
   {

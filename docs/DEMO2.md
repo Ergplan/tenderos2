@@ -439,6 +439,7 @@ carry the finance team's full set of terms. Every one of them is a formula in th
   balance is released at the end of the term.
 * **Debt service reserve**: months of the next year's debt service, put aside from the equity
   cash and released as the debt service falls and at the end; it does not touch the DSCR.
+* **Statement sheets.** **Profit and loss** (revenue by stream, operating costs by line, EBITDA and margin, EBIT, interest, fee, PBT, tax, PAT, cumulative), **Cash flow** (operations, investing, financing, CFADS, cash to equity with a zero check, cumulative, unlevered project cash flow) and **Balance sheet** (fixed assets at cost less accumulated depreciation, working capital, the reserve; share capital, retained earnings, debt; a balance check that is 0 every year; gearing; the realisation at the end of the term). Free cash is paid out to equity each year, so no cash builds up and the balance sheet closes to zero after the final realisation.
 * **Schedule sheets.** Beside the Live model the workbook carries **Construction** (one row per
   construction month: draws, equity and debt, IDC, closing debt), **Debt schedule** (the terms;
   opening, drawdown, rate of the year, interest on the opening balance and after the instalment
