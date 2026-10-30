@@ -400,6 +400,14 @@ the request. `addDispatchSheet` writes a modelled year's 8,760 hours as formulas
 energy lines sum them. `buildModelWorkbook` composes the file. Checks: `tools/check_live_model.mjs`
 and `check_dispatch_sheets.mjs` recalculate every formula with LibreOffice and compare with the app.
 
+
+Beside the Live model, `addScheduleSheets` (called at the end of `addLiveModel`) writes the
+**Debt schedule**, **Depreciation and tax** and **Working capital** sheets, and
+`addConstructionSheet` the **Construction** sheet: every cell there is a formula on the Live model
+(`'Live model'!E120`) or on the sheet's own rows, so the Live model stays the single place the
+model is computed. `SCHEDULE_SHEETS` lists them; `tools/check_live_model.mjs` recalculates them
+with LibreOffice like the Live model.
+
 ### 6.4 The traceable model: `web/src/model/trace.js`
 
 `traceModel(live)` runs the same Live model builder into an in-memory grid; `formulaRefs`,

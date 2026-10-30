@@ -19,7 +19,7 @@ import path from "node:path";
 import * as E from "../web/src/rtc/engine.js";
 import { defaultBidState, modelInputs, opsFromLp } from "../web/src/bid/model.js";
 import { liveModelRequest } from "../web/src/bid/liveModelRequest.js";
-import { CONSTRUCTION_SHEET, LIVE_SHEET, addLiveModel, liveModelInput } from "../web/lib/liveModel.js";
+import { LIVE_SHEET, SCHEDULE_SHEETS, addLiveModel, liveModelInput } from "../web/lib/liveModel.js";
 import { buildModelWorkbook } from "../web/lib/modelWorkbook.js";
 import { rtcModelExport } from "../web/src/rtc/exportModel.js";
 
@@ -153,7 +153,7 @@ async function build(c, { bare = false } = {}) {
   const input = liveModelInput(JSON.parse(JSON.stringify(c.req)));
   const live = addLiveModel(wb, { ...input, title: "Check" });
   if (bare) {
-    for (const name of [LIVE_SHEET, CONSTRUCTION_SHEET]) {
+    for (const name of [LIVE_SHEET, ...SCHEDULE_SHEETS]) {
       wb.getWorksheet(name).eachRow((row) => row.eachCell((cell) => {
         if (cell.formula) cell._value.model.result = undefined;
       }));
@@ -297,7 +297,7 @@ for (const [name, c] of CASES) {
   const bare = await recalcBook((await build(c, { bare: true })).buffer, mkdtempSync(path.join(tmpdir(), "live-model-")));
   const ws = bare.getWorksheet(LIVE_SHEET);
   let formulas = 0;
-  for (const sheetName of [LIVE_SHEET, CONSTRUCTION_SHEET]) {
+  for (const sheetName of [LIVE_SHEET, ...SCHEDULE_SHEETS]) {
   const mine = wb.getWorksheet(sheetName);
   const theirs = bare.getWorksheet(sheetName);
   mine.eachRow((row) => row.eachCell((cell) => {

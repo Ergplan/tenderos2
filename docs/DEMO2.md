@@ -439,6 +439,18 @@ carry the finance team's full set of terms. Every one of them is a formula in th
   balance is released at the end of the term.
 * **Debt service reserve**: months of the next year's debt service, put aside from the equity
   cash and released as the debt service falls and at the end; it does not touch the DSCR.
+* **Schedule sheets.** Beside the Live model the workbook carries **Construction** (one row per
+  construction month: draws, equity and debt, IDC, closing debt), **Debt schedule** (the terms;
+  opening, drawdown, rate of the year, interest on the opening balance and after the instalment
+  saving, principal, closing, debt service, refinancing fee, cumulative repaid, average balance;
+  CFADS, DSCR, min/avg DSCR, LLCR, the lender's IRR from the lender's own flows; the reserve),
+  **Depreciation and tax** (net book value opening/additions/depreciation/closing, cumulative;
+  the tax block and tax depreciation, the timing difference and the deferred tax on it; the tax
+  computation with losses carried and the effective rate) and **Working capital** (the norms;
+  revenue and O&M, receivables, O&M in hand, spares, the balance and its days of revenue; the cash
+  taken or released, the interest, the release at the end). Every cell is a formula on the Live
+  model or on the sheet's own rows, so the Live model stays the one place the model is computed
+  (the trace and Goal Seek keep working) and LibreOffice recalculates these sheets in the check too.
 * **The Excel sculpting trick.** The sculpted principal needs the tax, which needs the interest, so
   the sheet carries a small tax chain of its own for sculpting (on the interest on the opening
   balance), which keeps every method switchable in Excel without a circular reference.

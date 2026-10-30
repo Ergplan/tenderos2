@@ -11,8 +11,11 @@ import { addDispatchSheet, dispatchRef } from "./dispatchSheets.js";
 
 export const LIVE_SHEET = "Live model";
 export const CONSTRUCTION_SHEET = "Construction";
-// the construction sheet has at least this many month rows, so the months can be changed in Excel
-const MIN_CONSTRUCTION_ROWS = 48;
+export const DEBT_SHEET = "Debt schedule";
+export const DEPRECIATION_SHEET = "Depreciation and tax";
+export const WORKING_CAPITAL_SHEET = "Working capital";
+/** The schedule sheets beside the Live model (every cell a formula on it). */
+export const SCHEDULE_SHEETS = [CONSTRUCTION_SHEET, DEBT_SHEET, DEPRECIATION_SHEET, WORKING_CAPITAL_SHEET];
 export const REPAYMENT_LIST = ["equal", "annuity", "sculpted", "balloon", "bullet", "stepUp"];
 export const DRAWDOWN_LIST = ["linear", "sCurve", "front", "back"];
 
@@ -182,19 +185,23 @@ class Sheet {
  * profile, funded by equity and debt (pro rata or equity first), the interest during construction
  * on the debt drawn (on the balance at the start of the month plus the month's draw), and the IDC
  * capitalised into the debt. Every cell is a formula on the Live model's inputs (linked at the top),
- * with at least MIN_CONSTRUCTION_ROWS month rows so the months can be changed in Excel. Returns the
- * IDC and the Live-model references to its total and to the cost spent.
+ * one row per construction month (none when there is no construction schedule: the IDC is then in
+ * the pre-operative share; to model more months, set them in TenderOS and download again — the
+ * check "Construction spends the whole cost" catches months set in Excel beyond the rows). Returns
+ * the IDC and the Live-model references to its total and to the cost spent.
  * Mirrors web/src/rtc/engine.js constructionSchedule.
  */
 function addConstructionSheet(wb, S, { base, months, profile, order, debtPct, rate }) {
   const ws = wb.addWorksheet(CONSTRUCTION_SHEET, { properties: { tabColor: { argb: "FF00703C" } } });
   const L = (key) => `'${LIVE_SHEET}'!${S.s(key)}`;
-  const rows = Math.max(MIN_CONSTRUCTION_ROWS, months);
+  const rows = Math.max(1, months);
   let r = ws.getRow(1);
   r.getCell(1).value = "Construction: the cost spent month by month, its funding and the interest during construction";
   r.getCell(1).font = { bold: true, size: 14 };
   r = ws.getRow(2);
-  r.getCell(1).value = "Linked from the Live model's inputs (change them there). Interest in a month is on the debt at its start plus the month's draw; the IDC is capitalised as debt. The debt share applies to the cost before IDC.";
+  r.getCell(1).value = months > 0
+    ? `${months} months, one row each, linked from the Live model's inputs (change them there). Interest in a month is on the debt at its start plus the month's draw; the IDC is capitalised as debt. The debt share applies to the cost before IDC. To model more months, set them in TenderOS and download again.`
+    : "No construction months set in TenderOS: the IDC is inside the pre-operative share of the hard cost. Set the months on the Finance inputs step and download again for the month-by-month schedule.";
   r.getCell(1).font = { italic: true, color: { argb: "FF777777" } };
   // the parameters, linked
   const P = {};
@@ -278,6 +285,246 @@ function addConstructionSheet(wb, S, { base, months, profile, order, debtPct, ra
   for (let c = 2; c <= 9; c += 1) ws.getColumn(c).width = 16;
   ws.views = [{ state: "frozen", ySplit: HEAD, showGridLines: false }];
   return { sheet: ws, idc, spent, idcRef: `'${CONSTRUCTION_SHEET}'!$G$${totRow}`, spentRef: `'${CONSTRUCTION_SHEET}'!$C$${totRow}`, headRow: HEAD, firstRow: first, lastRow: last, totalRow: totRow };
+}
+
+/**
+ * The schedule sheets beside the Live model: the debt schedule, the depreciation and tax
+ * schedules and the working capital, each laid out in full, year by year, with its parameters at
+ * the top. Every cell is a formula on the Live model (the one place the model is computed, so the
+ * trace, the checks and Goal Seek keep working) or on the sheet's own rows; each carries its
+ * value for viewers that do not recalculate.
+ */
+function addScheduleSheets(wb, S, { N, yearRow, refiOn, tenorUsed, refiEnd, debt0, total }) {
+  const L = `'${LIVE_SHEET}'!`;
+  const link = (key, y) => `${L}${S.at(key, y)}`; // a year cell of the Live model
+  const one = (key) => `${L}${S.s(key)}`; // a single value of the Live model
+  const sum = (vals) => vals.slice(1).reduce((a, x) => a + (finite(x) ? x : 0), 0);
+
+  /** A sheet with the Live model's year layout: labels in A, unit in B, total in C, year 0 in D, years from E. */
+  const open = (name, title, intro, colour) => {
+    const ws = wb.addWorksheet(name, { properties: { tabColor: { argb: colour } } });
+    const T = new Sheet(ws, N);
+    let r = T.next();
+    r.getCell(1).value = title;
+    r.getCell(1).font = { bold: true, size: 14 };
+    r = T.next();
+    r.getCell(1).value = intro;
+    r.getCell(1).font = { italic: true, color: { argb: "FF777777" } };
+    r = T.next();
+    T.yearRow = T.row;
+    ["₹ crore unless stated", "Unit", "Total / value", "Year 0"].forEach((t, i) => { r.getCell(i + 1).value = t; });
+    for (let y = 1; y <= N; y += 1) {
+      const c = r.getCell(4 + y);
+      c.value = { formula: `${L}${S.col(y)}${yearRow}`, result: y };
+      c.numFmt = FMT.year;
+    }
+    for (let c = 1; c <= 4 + N; c += 1) {
+      const cell = r.getCell(c);
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INK } };
+      cell.alignment = { horizontal: c > 2 ? "right" : "left" };
+    }
+    ws.getColumn(1).width = 50;
+    ws.getColumn(2).width = 14;
+    ws.getColumn(3).width = 16;
+    ws.getColumn(4).width = 12;
+    for (let y = 1; y <= N; y += 1) ws.getColumn(4 + y).width = 12;
+    ws.views = [{ state: "frozen", xSplit: 3, ySplit: T.row, topLeftCell: `D${T.row + 1}`, showGridLines: false }];
+    ws.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: `${T.row}:${T.row}` };
+    return { ws, T };
+  };
+  /** A parameter linked from the Live model (its input or result), in column C. */
+  const param = (T, key, text, unit, { fmt = "cr", live = key } = {}) => {
+    const r = T.next();
+    T.label(r, text, unit, { indent: 1 });
+    const v = S.v(live);
+    T.put(r.getCell(3), { f: one(live), v, fmt });
+    T.cell[key] = `$C$${T.row}`;
+    T.val[key] = v;
+  };
+  /** A year row linked from the Live model (year 0 optional), with its total. */
+  const linked = (T, key, text, unit, { live = key, fmt = "cr", total = true, bold = false, y0 = null, note } = {}) => {
+    const vals = S.val[live];
+    T.series(key, text, unit, { f: (y) => link(live, y), v: (y) => vals[y], fmt, total, bold, note, y0: y0 ? { f: y0.f, v: y0.v } : undefined });
+  };
+  /** A row worked out on the sheet itself. */
+  const own = (T, key, text, unit, { f, v, fmt = "cr", total = false, bold = false, y0, note } = {}) => T.series(key, text, unit, { f, v, fmt, total, bold, y0, note });
+  /** One value worked out on the sheet itself, in column C. */
+  const single = (T, key, text, unit, { f, v, fmt = "cr", bold = false, note } = {}) => {
+    const r = T.next();
+    T.label(r, text, unit, { indent: 1, note });
+    T.put(r.getCell(3), { f, v, fmt, bold });
+    T.cell[key] = `$C$${T.row}`;
+    T.val[key] = v;
+  };
+
+  // ---- debt schedule
+  {
+    const { T } = open(DEBT_SHEET, "Debt schedule", "The senior debt year by year: the terms, the drawdown, interest and principal under the repayment method, the refinancing, the cover and the reserve. Linked to the Live model; change the terms there (blue cells).", "FF1F3864");
+    T.section("Terms");
+    param(T, "debt", "Debt at COD (incl. IDC)", "₹ cr");
+    param(T, "equity", "Equity", "₹ cr");
+    param(T, "total", "Project cost", "₹ cr");
+    param(T, "rate", "Interest rate", "%/yr", { fmt: "pct" });
+    param(T, "tenorUsed", "Tenor (door to door)", "years", { fmt: "int" });
+    param(T, "graceUsed", "Principal moratorium", "years", { fmt: "int" });
+    param(T, "repay", "Repayment method", "", { fmt: "text" });
+    param(T, "instalments", "Instalments a year", "", { fmt: "text" });
+    param(T, "targetDscr", "Target DSCR (sculpted)", "×", { fmt: "x" });
+    param(T, "balloonShare", "Share repaid in the last year (balloon / bullet)", "%", { fmt: "pct" });
+    param(T, "refiOn", "Refinancing applies (1 / 0)", "", { fmt: "int" });
+    param(T, "refiYear", "Refinanced at the end of year", "year", { fmt: "int" });
+    param(T, "refiRate", "Refinanced rate", "%/yr", { fmt: "pct" });
+    param(T, "refiEnd", "Last year of the debt", "year", { fmt: "int" });
+    param(T, "refiFee", "Refinancing fee", "% of the balance", { fmt: "pct" });
+    param(T, "dsraMonths", "Debt service reserve", "months", { fmt: "num" });
+
+    T.section("Schedule");
+    linked(T, "openDebt", "Opening balance", "₹ cr", { total: false });
+    own(T, "drawdown", "Drawdown (at COD, incl. IDC)", "₹ cr", { y0: { f: one("debt"), v: debt0 }, f: () => "0", v: () => 0, total: true, note: "The construction sheet has the month-by-month draws" });
+    linked(T, "rateY", "Interest rate of the year", "%", { fmt: "pct", total: false });
+    linked(T, "intOpen", "Interest on the opening balance", "₹ cr", { total: true });
+    linked(T, "interest", "Interest paid (after the instalment saving)", "₹ cr", { total: true });
+    linked(T, "principal", "Principal repaid", "₹ cr", { total: true });
+    linked(T, "closeDebt", "Closing balance", "₹ cr", { total: false, bold: true });
+    linked(T, "debtService", "Debt service", "₹ cr", { total: true, bold: true });
+    linked(T, "refiFeeCr", "Refinancing fee", "₹ cr", { total: true });
+    own(T, "cumPrincipal", "Cumulative principal repaid", "₹ cr", {
+      f: (y) => (y === 1 ? T.at("principal", 1) : `${T.at("cumPrincipal", y - 1)}+${T.at("principal", y)}`),
+      v: (y) => (y === 1 ? S.v("principal", 1) : T.v("cumPrincipal", y - 1) + S.v("principal", y)),
+    });
+    own(T, "repaidPct", "Repaid, share of the debt", "%", {
+      f: (y) => `IF(${T.s("debt")}>0,${T.at("cumPrincipal", y)}/${T.s("debt")},0)`,
+      v: (y) => (debt0 > 0 ? T.v("cumPrincipal", y) / debt0 : 0), fmt: "pct",
+    });
+    own(T, "avgBalance", "Average balance (interest ÷ rate)", "₹ cr", {
+      f: (y) => `IF(${T.at("rateY", y)}>0,${T.at("interest", y)}/${T.at("rateY", y)},0)`,
+      v: (y) => (S.v("rateY", y) > 0 ? S.v("interest", y) / S.v("rateY", y) : 0),
+    });
+
+    T.section("Cover");
+    linked(T, "cfads", "Cash flow available for debt service (CFADS)", "₹ cr", { total: true });
+    linked(T, "dscr", "DSCR", "×", { fmt: "x", total: false, bold: true });
+    {
+      const d = S.val.dscr.slice(1).filter(finite);
+      single(T, "minDscr", "Minimum DSCR", "×", { f: `IF(COUNT(${T.span("dscr")})=0,"",MIN(${T.span("dscr")}))`, v: d.length ? Math.min(...d) : "", fmt: "x", bold: true });
+      single(T, "avgDscr", "Average DSCR", "×", { f: `IF(COUNT(${T.span("dscr")})=0,"",AVERAGE(${T.span("dscr")}))`, v: d.length ? d.reduce((a, b) => a + b, 0) / d.length : "", fmt: "x" });
+    }
+    own(T, "llcr", "Loan life cover ratio (PV of CFADS over the debt life ÷ opening balance)", "×", {
+      f: (y) => `IF(AND(${T.at("openDebt", y)}>1E-9,${T.yr(y)}<=${T.s("refiEnd")}),NPV(${T.at("rateY", y)},${T.col(y)}${T.cell.cfads}:INDEX(${T.span("cfads")},1,${T.s("refiEnd")}))/${T.at("openDebt", y)},"")`,
+      v: (y) => {
+        const end = refiOn ? refiEnd : tenorUsed;
+        if (!(S.v("openDebt", y) > 1e-9) || y > end) return "";
+        const r = S.v("rateY", y);
+        let pv = 0;
+        for (let k = y; k <= end; k += 1) pv += S.v("cfads", k) / (1 + r) ** (k - y + 1);
+        return pv / S.v("openDebt", y);
+      }, fmt: "x", note: "Discounted at the year's rate, from this year to the last year of the debt",
+    });
+    own(T, "lenderFlows", "Lender's cash flows (the debt out at year 0; debt service and fees back)", "₹ cr", {
+      y0: { f: `-${T.s("debt")}`, v: -debt0 },
+      f: (y) => `${T.at("debtService", y)}+${T.at("refiFeeCr", y)}`,
+      v: (y) => S.v("debtService", y) + S.v("refiFeeCr", y), total: true,
+    });
+    {
+      const flows = [-debt0, ...S.val.debtService.slice(1).map((d, i) => d + S.val.refiFeeCr[i + 1])];
+      const v = debt0 > 0 ? irr(flows) : null;
+      single(T, "lenderIrr", "Lender's IRR", "%", { f: `IFERROR(IRR(${T.span("lenderFlows", 0)}),"")`, v: v ?? "", fmt: "pct", bold: true });
+    }
+
+    T.section("Debt service reserve");
+    linked(T, "dsra", "Reserve held (months of the next year's debt service)", "₹ cr", { total: false });
+    linked(T, "dDsra", "Put into (released from) the reserve", "₹ cr", { total: true });
+  }
+
+  // ---- depreciation and tax
+  {
+    const { T } = open(DEPRECIATION_SHEET, "Depreciation and tax", "Book depreciation (straight line on the project cost less salvage, augmentation over the years left), the tax block (WDV or straight line), the tax losses carried and the tax of each year. Linked to the Live model.", "FF7F6000");
+    T.section("Terms");
+    param(T, "total", "Project cost (incl. IDC)", "₹ cr");
+    param(T, "salvage", "Salvage value", "% of project cost", { fmt: "pct" });
+    param(T, "bookBase", "Depreciable value (less salvage)", "₹ cr");
+    param(T, "bookLife", "Book life", "years", { fmt: "int" });
+    param(T, "bookDepYr", "Book depreciation a year (on the project cost)", "₹ cr/yr");
+    param(T, "taxMethod", "Tax depreciation method", "wdv / slm", { fmt: "text" });
+    param(T, "wdvRate", "WDV rate", "%/yr", { fmt: "pct" });
+    param(T, "taxRate", "Corporate tax", "%", { fmt: "pct" });
+
+    T.section("Book depreciation");
+    // opening and closing book values feed each other year by year: the opening row is filled
+    // once the closing row exists
+    const nbv = [null, total];
+    for (let y = 2; y <= N; y += 1) nbv[y] = nbv[y - 1] + S.v("aug", y - 1) - S.v("bookDep", y - 1);
+    own(T, "nbvOpen", "Net book value, opening", "₹ cr", { f: (y) => (y === 1 ? T.s("total") : null), v: (y) => nbv[y] });
+    linked(T, "augAdd", "Additions: battery augmentation", "₹ cr", { live: "aug", total: true });
+    linked(T, "baseDep", "Depreciation on the project cost (straight line)", "₹ cr", { total: true });
+    linked(T, "augDepAdd", "Depreciation added for this year's augmentation", "₹ cr", { total: false });
+    linked(T, "augDep", "Depreciation on augmentation", "₹ cr", { total: true });
+    linked(T, "bookDep", "Book depreciation", "₹ cr", { total: true, bold: true });
+    own(T, "nbvClose", "Net book value, closing", "₹ cr", {
+      f: (y) => `${T.at("nbvOpen", y)}+${T.at("augAdd", y)}-${T.at("bookDep", y)}`,
+      v: (y) => T.v("nbvOpen", y) + S.v("aug", y) - S.v("bookDep", y), bold: true,
+    });
+    for (let y = 2; y <= N; y += 1) T.put(T.ws.getCell(`${T.col(y)}${T.cell.nbvOpen}`), { f: T.at("nbvClose", y - 1), v: nbv[y], fmt: "cr" });
+    own(T, "cumBookDep", "Cumulative book depreciation", "₹ cr", {
+      f: (y) => (y === 1 ? T.at("bookDep", 1) : `${T.at("cumBookDep", y - 1)}+${T.at("bookDep", y)}`),
+      v: (y) => (y === 1 ? S.v("bookDep", 1) : T.v("cumBookDep", y - 1) + S.v("bookDep", y)),
+    });
+
+    T.section("Tax depreciation");
+    linked(T, "wdvOpen", "Tax block, opening", "₹ cr", { total: false });
+    linked(T, "wdvAdd", "Added: augmentation", "₹ cr", { total: true });
+    linked(T, "taxDep", "Tax depreciation", "₹ cr", { total: true, bold: true });
+    linked(T, "wdvClose", "Tax block, closing", "₹ cr", { total: false });
+    own(T, "depDiff", "Tax depreciation less book depreciation (timing difference)", "₹ cr", {
+      f: (y) => `${T.at("taxDep", y)}-${T.at("bookDep", y)}`, v: (y) => S.v("taxDep", y) - S.v("bookDep", y), total: true,
+    });
+    own(T, "deferredTax", "Deferred tax on the difference (at the tax rate)", "₹ cr", {
+      f: (y) => `${T.at("depDiff", y)}*${T.s("taxRate")}`, v: (y) => (S.v("taxDep", y) - S.v("bookDep", y)) * S.v("taxRate"), total: true,
+      note: "Positive: tax deferred this year; negative: earlier deferrals reversing",
+    });
+
+    T.section("Tax computation");
+    linked(T, "preTaxable", "Taxable profit before losses brought forward", "₹ cr", { total: false });
+    linked(T, "lossBf", "Tax losses brought forward", "₹ cr", { total: false });
+    linked(T, "lossUsed", "Losses set off", "₹ cr", { total: true });
+    linked(T, "taxable", "Taxable income", "₹ cr", { total: true });
+    linked(T, "lossCf", "Tax losses carried forward", "₹ cr", { total: false });
+    linked(T, "tax", "Tax", "₹ cr", { total: true, bold: true });
+    own(T, "effRate", "Effective tax rate on profit before tax", "%", {
+      f: (y) => `IF(${link("pbt", y)}>0,${T.at("tax", y)}/${link("pbt", y)},"")`,
+      v: (y) => (S.v("pbt", y) > 0 ? S.v("tax", y) / S.v("pbt", y) : ""), fmt: "pct",
+    });
+  }
+
+  // ---- working capital
+  {
+    const { T } = open(WORKING_CAPITAL_SHEET, "Working capital", "The working capital held at each year end per the CERC norms (receivables, O&M in hand, maintenance spares), the cash it takes or releases, and the interest on it. Linked to the Live model.", "FF375623");
+    T.section("Norms");
+    param(T, "recvDays", "Receivable days", "days", { fmt: "int" });
+    param(T, "omMonths", "O&M in hand", "months", { fmt: "num" });
+    param(T, "sparesPct", "Maintenance spares", "% of the year's O&M", { fmt: "pct" });
+    param(T, "wcRate", "Interest on working capital", "%/yr", { fmt: "pct" });
+
+    T.section("Working capital held at the year end");
+    linked(T, "revenue", "Revenue of the year", "₹ cr", { total: true });
+    linked(T, "omCr", "O&M of the year", "₹ cr", { total: true });
+    linked(T, "recv", "Receivables", "₹ cr", { total: false });
+    linked(T, "omStock", "O&M in hand", "₹ cr", { total: false });
+    linked(T, "spares", "Maintenance spares", "₹ cr", { total: false });
+    linked(T, "wcBal", "Working capital", "₹ cr", { total: false, bold: true });
+    own(T, "wcDays", "Working capital in days of revenue", "days", {
+      f: (y) => `IF(${T.at("revenue", y)}>0,${T.at("wcBal", y)}/${T.at("revenue", y)}*365,"")`,
+      v: (y) => (S.v("revenue", y) > 0 ? (S.v("wcBal", y) / S.v("revenue", y)) * 365 : ""), fmt: "num",
+    });
+
+    T.section("Cash and cost");
+    linked(T, "dWc", "Increase in working capital (cash out; negative: released)", "₹ cr", { total: true });
+    linked(T, "wcInt", "Interest on working capital (expensed)", "₹ cr", { total: true });
+    own(T, "released", "Released at the end of the term", "₹ cr", {
+      f: (y) => `IF(${T.yr(y)}=${one("years")},${T.at("wcBal", y)},0)`, v: (y) => (y === N ? S.v("wcBal", y) : 0), total: true,
+    });
+  }
 }
 
 /**
@@ -1229,6 +1476,8 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   ws.views = [{ state: "frozen", xSplit: 3, ySplit: yearRow, topLeftCell: `D${yearRow + 1}`, activeCell: "C1", showGridLines: false }];
   ws.pageSetup = { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: `${yearRow}:${yearRow}` };
   ws.headerFooter = { oddFooter: "&L&A&R&P / &N" };
+
+  addScheduleSheets(wb, S, { N, yearRow, refiOn, tenorUsed, refiEnd, debt0, total });
 
   const cells = Object.fromEntries(KEYS.map(([key]) => [key, `'${LIVE_SHEET}'!${S.cell[`key_${key}`]}`]));
   // addr: every row's key → its address ("$C$12" for one value, the row number for a year series)
