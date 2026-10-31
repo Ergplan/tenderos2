@@ -1,0 +1,39 @@
+/* Feedback on any section (feedback/FeedbackMode.jsx) and the Change requests tab. */
+.fb-on main { cursor: crosshair; }
+.fb-banner {
+  position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 70; display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; background: var(--signal); color: #111; font: 600 12px/1 var(--font-sans); border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+}
+.fb-banner button { border: 1px solid rgba(0,0,0,0.3); background: rgba(255,255,255,0.35); color: #111; padding: 3px 10px; border-radius: 999px; font: 600 11px/1 var(--font-sans); cursor: pointer; }
+.fb-outline { position: fixed; z-index: 65; border: 2px dashed var(--signal); border-radius: 8px; pointer-events: none; background: color-mix(in srgb, var(--signal) 6%, transparent); }
+.fb-pop {
+  position: fixed; z-index: 75; width: min(460px, calc(100vw - 24px)); display: grid; gap: 8px; padding: 0 0 10px;
+  background: var(--surface); border: 1px solid var(--line-2); box-shadow: 0 18px 50px rgba(0,0,0,0.45); color: var(--ink); cursor: auto;
+}
+.fb-pop > header { display: flex; align-items: start; gap: 10px; padding: 12px 12px 8px; border-bottom: 1px solid var(--line); }
+.fb-pop > header > div { flex: 1; min-width: 0; }
+.fb-pop > header .rtc-index { display: inline-flex; align-items: center; gap: 5px; }
+.fb-pop > header small { display: block; color: var(--muted); font-size: 11px; margin-top: 3px; }
+.fb-pop textarea { margin: 0 12px; background: var(--bg); color: var(--ink); border: 1px solid var(--line-2); padding: 8px; font: 12.5px/1.45 var(--font-sans); resize: vertical; }
+.fb-boxes { margin: 0 12px; color: var(--muted); font-size: 10.5px; }
+.fb-pop .seci-flag { margin: 0 12px; }
+.fb-pop footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 12px; }
+.fb-pop footer small { color: var(--muted); font-size: 10.5px; }
+.fb-pop footer .primary { min-height: 30px; padding: 0 12px; display: inline-flex; gap: 6px; align-items: center; }
+.side-nav button.fb-nav-on { color: var(--signal); }
+.cr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.cr-table th { text-align: left; font: 500 10px/1.2 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line-2); }
+.cr-table td { padding: 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.cr-table td small { display: block; color: var(--muted); font-size: 10.5px; margin-top: 2px; }
+.cr-table .cr-comment p { margin: 0; white-space: pre-wrap; max-width: 46ch; line-height: 1.45; }
+.cr-table .cr-actions { white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+.cr-table .cr-actions .primary, .cr-table .cr-actions .secondary { min-height: 28px; padding: 0 10px; font-size: 11px; display: inline-flex; gap: 5px; align-items: center; }
+.cr-status { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 600 10.5px/1.6 var(--font-mono); border: 1px solid var(--line-2); }
+.cr-status-approved { color: var(--good); border-color: var(--good); }
+.cr-status-rejected { color: var(--muted); text-decoration: line-through; }
+.cr-status-exported { color: var(--signal); border-color: var(--signal); }
+.cr-status-done { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.cr-steps { display: grid; gap: 8px; margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.5; max-width: 820px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); }
+.seg button { border: 0; background: transparent; color: var(--muted); padding: 5px 10px; font: 500 11px/1 var(--font-mono); cursor: pointer; }
+.seg button.active { background: var(--surface-3); color: var(--ink); }

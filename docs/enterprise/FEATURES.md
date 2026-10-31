@@ -100,12 +100,13 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 | ID | Feature | What it does | Team | Zone | Status | Priority | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | E-01 | Evidence upload per input | Any input (CUF, costs, financing, conditions) carries files or links as evidence: quotes, reports, data sheets; who uploaded it and when | All | Core | Live | P1 | Paperclip on every box: files, links, notes with who and when; migration 012 |
-| E-02 | Evidence status on every box | Each box shows filled / evidenced / signed off; the bid pack lists the evidence register | All | Core | Live | P1 | Faint / with count / signed off at this value / signed at an older value; the register as CSV |
-| E-03 | Assignments | A data point assigned to a team or person; answer with a value, note or file; accept or return into the bid as a new version | All | Core | Live | P1 |  |
-| E-04 | Pings from any box (@mentions) | A thread on every input box; mention a teammate; reply with a value; Fill in | All | Core | Live | P1 |  |
-| E-05 | Team setup | People, teams, super admin, titles, the tabs they cover | Management | Core | Live | P1 |  |
-| E-06 | Activity and audit log | Every sizing, export and change logged with user and time; exportable | IT | Core | Extend | P2 | Activity log today; export to build |
-| E-07 | Email notifications | Assignments and pings by email through the client's SMTP | All | Core | Live | P2 |  |
+| E-02 | Feedback and change requests | Give feedback: click any section of any page and write what should change; the Change requests tab lists every request (when, where, comment, by which team) with approve / reject; the approved ones export as one Markdown prompt for jouleWise to apply with Claude Code under the AMC | All | Core | Live | P1 | web/src/feedback; tests/e2e/test_feedback.py |
+| E-03 | Evidence status on every box | Each box shows filled / evidenced / signed off; the bid pack lists the evidence register | All | Core | Live | P1 | Faint / with count / signed off at this value / signed at an older value; the register as CSV |
+| E-04 | Assignments | A data point assigned to a team or person; answer with a value, note or file; accept or return into the bid as a new version | All | Core | Live | P1 |  |
+| E-05 | Pings from any box (@mentions) | A thread on every input box; mention a teammate; reply with a value; Fill in | All | Core | Live | P1 |  |
+| E-06 | Team setup | People, teams, super admin, titles, the tabs they cover | Management | Core | Live | P1 |  |
+| E-07 | Activity and audit log | Every sizing, export and change logged with user and time; exportable | IT | Core | Extend | P2 | Activity log today; export to build |
+| E-08 | Email notifications | Assignments and pings by email through the client's SMTP | All | Core | Live | P2 |  |
 
 ## Platform
 
@@ -124,7 +125,7 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 
 | Status | Features |
 | --- | --- |
-| Live | 70 |
+| Live | 71 |
 | Extend | 4 |
 | Build | 4 |
-| Total | 78 |
+| Total | 79 |

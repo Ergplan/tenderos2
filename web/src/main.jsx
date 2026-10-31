@@ -4,7 +4,7 @@
 // signs out. The legacy FDRE tabs (yield assessment, EYA report, custom dispatch and the
 // rest) are not part of this application.
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, Newspaper, Lock, LogOut, Scale, UserRound, UserCog, Users } from "lucide-react";
+import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, Newspaper, Lock, LogOut, Scale, UserRound, UserCog, Users, ClipboardList, MessageSquarePlus } from "lucide-react";
 import { flushActivity, startActivityTracker, trackEvent } from "./activity";
 import "./styles.css";
 import "./chartTheme";
@@ -24,6 +24,9 @@ import FieldPings from "./team/FieldPings";
 import EvidenceLayer from "./evidence/EvidenceLayer";
 import Inbox from "./team/Inbox";
 import TeamSetup from "./team/TeamSetup";
+import FeedbackMode from "./feedback/FeedbackMode";
+import ChangeRequests from "./feedback/ChangeRequests";
+import useChangeRequests from "./feedback/useChangeRequests";
 
 const TABS = [
   ["tenderBid", Gavel, "Tender to Bid"],
@@ -52,7 +55,7 @@ function ZoneBadge() {
   );
 }
 
-function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox }) {
+function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox, feedbackOn, onFeedback, openRequests }) {
   return (
     <aside className="sidebar">
       <a href="/" className="brand sidebar-brand" aria-label="TenderOS home"><Brand /></a>
@@ -81,6 +84,18 @@ function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox }) {
           <button type="button" onClick={onInbox} data-testid="nav-messages">
             <InboxIcon size={15} /><span className="nav-label">Messages{team?.me ? <small>as {team.me.name}</small> : null}</span>
             {team?.box?.unread > 0 && <span className="side-badge" data-testid="messages-unread">{team.box.unread}</span>}
+          </button>
+        </nav>
+      </div>
+      <div className="side-section">
+        <h3>Feedback</h3>
+        <nav className="side-nav">
+          <button type="button" className={feedbackOn ? "fb-nav-on" : ""} onClick={onFeedback} data-testid="nav-feedback" aria-pressed={feedbackOn}>
+            <MessageSquarePlus size={15} /><span className="nav-label">{feedbackOn ? "Feedback on: click a section" : "Give feedback"}<small>comment on any section</small></span>
+          </button>
+          <button type="button" className={activeTab === "changeRequests" ? "active" : ""} onClick={() => setActiveTab("changeRequests")} data-testid="nav-change-requests">
+            <ClipboardList size={15} /><span className="nav-label">Change requests</span>
+            {openRequests > 0 && <span className="side-badge" data-testid="requests-open">{openRequests}</span>}
           </button>
         </nav>
       </div>
@@ -134,17 +149,21 @@ export default function App({ user = null, initialScenario = null }) {
   const [activeTab, setActiveTab] = useState(() => MODULE_TAB[initialScenario?.scenario?.module] || firstAllowed);
   useEffect(() => { startActivityTracker(); }, []);
   useEffect(() => { if (allowed.has(activeTab)) trackEvent("tab", { tab: activeTab }); }, [activeTab, allowed]);
-  const canView = activeTab === "teamSetup" || allowed.has(activeTab);
+  const canView = activeTab === "teamSetup" || activeTab === "changeRequests" || allowed.has(activeTab);
   // team mode: pings on every input box, the Messages drawer and Team setup
   const team = useTeamModeState(ALL_TAB_IDS.includes(activeTab) ? activeTab : null);
   const [inboxOpen, setInboxOpen] = useState(false);
   const [focus, setFocus] = useState(null);
   const [notice, setNotice] = useState("");
-  const tabLabel = TABS.find((t) => t[0] === activeTab)?.[2] || "";
+  const tabLabel = TABS.find((t) => t[0] === activeTab)?.[2] || (activeTab === "teamSetup" ? "Team setup" : activeTab === "changeRequests" ? "Change requests" : "");
+  // feedback on any section: the change requests, and whether feedback mode is on
+  const requests = useChangeRequests(Boolean(team?.me));
+  const [feedbackOn, setFeedbackOn] = useState(false);
   const opened = (module) => (initialScenario?.scenario?.module === module ? initialScenario : null);
   return (
     <div className="app-shell">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} allowed={allowed} team={team} onInbox={() => setInboxOpen((o) => !o)} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} allowed={allowed} team={team} onInbox={() => setInboxOpen((o) => !o)}
+        feedbackOn={feedbackOn} onFeedback={() => setFeedbackOn((o) => !o)} openRequests={requests.counts.open || 0} />
       <main>
         {!canView && <Restricted label={TABS.find((t) => t[0] === activeTab)?.[2] || "This tab"} contacts={user?.adminContacts} />}
         {canView && activeTab === "tenderBid" && <BidTab user={user} openTab={(id) => { if (allowed.has(id)) setActiveTab(id); }} />}
@@ -155,7 +174,10 @@ export default function App({ user = null, initialScenario = null }) {
         {canView && activeTab === "whatIf" && <WhatIfTab />}
         {canView && activeTab === "recentTenders" && <RecentTendersTab />}
         {activeTab === "teamSetup" && <TeamSetup team={team} />}
+        {activeTab === "changeRequests" && <ChangeRequests team={team} requests={requests} onFeedback={() => setFeedbackOn(true)} />}
       </main>
+      <FeedbackMode on={feedbackOn && canView} tab={activeTab} tabLabel={tabLabel} requests={requests} onOff={() => setFeedbackOn(false)}
+        onSaved={(item) => setNotice(`Recorded as CR-${item.seq} on Change requests.`)} />
       {canView && ALL_TAB_IDS.includes(activeTab) && (
         <FieldPings tab={activeTab} tabLabel={tabLabel} team={team} focus={focus} onFocused={(msg) => { setFocus(null); setNotice(msg || ""); }} />
       )}

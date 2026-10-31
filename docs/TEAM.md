@@ -234,3 +234,31 @@ Then rebuild or restart the web service.
 * Assignments are per saved bid; a bid that is not saved cannot be shared.
 * There are no reminders before a due date.
 * No e-signature: the signed copy is a scan of the paper the signatory signed.
+
+## Feedback and change requests
+
+Anyone on the team can say what should change, on the spot. **Give feedback** in the sidebar
+switches feedback on: a banner says so, the section under the mouse is outlined, and clicking it
+opens a note with the section's name, the step and the tab, and the boxes in the section. The note
+is saved as a **change request** with where it was raised, who raised it (name and team) and when;
+Escape or **Done** switches feedback off.
+
+**Change requests** (sidebar) lists every request, newest first: its number (CR-n), when, where
+(tab › step › section, with the boxes), the comment, who, and its status: Open → Approved or
+Rejected (the super admin decides) → Exported (the approved ones went out in a prompt file) → Done
+(the change shipped). The author can remove an open request; a super admin any.
+
+**Export approved as a prompt (.md)** downloads one Markdown file for jouleWise: instructions for
+Claude Code (read the developer manual, implement each request, keep the checks green, one commit
+per request), then every approved request with its context (tab, step, section, boxes, who, when,
+the comment as a quote, the code files that screen lives in), and a code map. The requests become
+Exported with the batch id. Mail the file to jouleWise; the change comes back as a patch under the
+AMC, and the super admin marks the requests Done.
+
+| Part | Where |
+| --- | --- |
+| Table `change_requests` (seq, tab, step, section key/index/title, boxes, page, comment, requested_by, status, decided_by/at, export batch) | `web/db/migrations/013_change_requests.sql` |
+| Server | `web/lib/changeRequests.js`; `GET/POST /api/change-requests`, `PATCH/DELETE /api/change-requests/[id]`, `GET /api/change-requests/export` (Markdown download; `?mark=0` leaves them approved) |
+| The prompt file | `web/src/feedback/prompt.js` (`changeRequestPrompt`, the tab and step code maps); `tools/check_change_requests.mjs` |
+| Browser | `web/src/feedback/FeedbackMode.jsx` (the outline and the note), `ChangeRequests.jsx` (the tab), `useChangeRequests.js`; wired in `web/src/main.jsx` |
+| Tests | `tests/e2e/test_feedback.py`: raise on the What-if tab, approve, export the prompt and read it back |
