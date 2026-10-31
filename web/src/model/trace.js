@@ -156,7 +156,7 @@ export function traceModel(live) {
   if (!m) return null;
   const wb = new RecBook();
   // the dispatch sheets with their parameters and totals only: the hours come from the data itself
-  const res = addLiveModel(wb, m, { dispatchRows: false });
+  const res = addLiveModel(wb, m, { dispatchRows: false, sensitivity: false });
   const ws = wb.sheets[0];
   const N = m.ops.length;
   // the year header row: "Year 0" in D, years in E onwards

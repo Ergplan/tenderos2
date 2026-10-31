@@ -92,7 +92,7 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | W-01 | What-if after sizing | Opens on the sized plant: the optimum as the base case, every input as a lever | All | Core | Live | P1 | The What-if step of the SECI flow starts from the sized plant and every input of the bid |
 | W-02 | Tariff levers on bid day | Set a tariff and see which levers reach it: cost, CUF, financing, IRR, storage, sale; each lever's effect on the tariff and the IRR; instant | Management | Core | Live | P1 | whatif/levers.js: each lever's tariff a step up and down, ₹/kWh per step, the move of that lever alone to reach the tariff wanted; Apply |
-| W-03 | Sensitivity table | One-way and two-way sensitivities (tariff vs capex, CUF, rate) with the base case marked | Finance | Core | Build | P2 |  |
+| W-03 | Sensitivity table | One-way and two-way sensitivities (tariff vs capex, CUF, rate) with the base case marked | Finance | Core | Live | P2 | The Sensitivity sheet of the Excel model: one-way tables and two-way grids (capex, CUF, interest rate) from full runs of the model |
 | W-04 | Scenario compare | Saved what-if cases side by side with the base | All | Core | Extend | P2 | Scenario compare exists for saved bids |
 
 ## Evidence
@@ -124,7 +124,7 @@ One row per feature. Live: in Demo 2 today. Extend: exists, changes for the ente
 
 | Status | Features |
 | --- | --- |
-| Live | 69 |
+| Live | 70 |
 | Extend | 4 |
-| Build | 5 |
+| Build | 4 |
 | Total | 78 |

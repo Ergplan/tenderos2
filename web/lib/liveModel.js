@@ -8,6 +8,7 @@
 // Units: energy in MU (million kWh), money in ₹ crore, prices in ₹/kWh. MU × ₹/kWh ÷ 10 = ₹ crore.
 
 import { addDispatchSheet, dispatchRef } from "./dispatchSheets.js";
+import { runFinancialModel } from "../src/rtc/engine.js";
 
 export const LIVE_SHEET = "Live model";
 export const CONSTRUCTION_SHEET = "Construction";
@@ -17,8 +18,71 @@ export const WORKING_CAPITAL_SHEET = "Working capital";
 export const PL_SHEET = "Profit and loss";
 export const CASH_FLOW_SHEET = "Cash flow";
 export const BALANCE_SHEET = "Balance sheet";
+export const SENSITIVITY_SHEET = "Sensitivity";
 /** The schedule sheets beside the Live model (every cell a formula on it). */
-export const SCHEDULE_SHEETS = [CONSTRUCTION_SHEET, PL_SHEET, CASH_FLOW_SHEET, BALANCE_SHEET, DEBT_SHEET, DEPRECIATION_SHEET, WORKING_CAPITAL_SHEET];
+export const SCHEDULE_SHEETS = [CONSTRUCTION_SHEET, PL_SHEET, CASH_FLOW_SHEET, BALANCE_SHEET, DEBT_SHEET, DEPRECIATION_SHEET, WORKING_CAPITAL_SHEET, SENSITIVITY_SHEET];
+
+// the sensitivity steps: capex and CUF relative, the interest rate in percentage points
+const SENS_CAPEX = [-0.2, -0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15, 0.2];
+const SENS_CUF = [-0.15, -0.1, -0.05, 0, 0.05, 0.1, 0.15];
+const SENS_RATE = [-0.02, -0.015, -0.01, -0.005, 0, 0.005, 0.01, 0.015, 0.02];
+
+/**
+ * The sensitivities of a Live model request: the tariff the target equity IRR needs and the equity
+ * IRR at the model's tariff, with the capex, the solar and wind CUFs and the interest rate moved
+ * one at a time, and three two-way grids. Each point is a full run of the app's financial model
+ * (web/src/rtc/engine.js runFinancialModel) on the request's inputs and yearly energy: a solved
+ * tariff cannot be one Excel formula, so the sheet carries the app's numbers. A CUF change scales
+ * the energy delivered and sold in proportion to that source's share of the generation; the
+ * dispatch, the floors and the storage are not rerun (TenderOS's What-if does that).
+ */
+export function sensitivityTables(m) {
+  const N = m.ops.length;
+  const fin = { ...m.fin, years: N, tariff: m.tariff };
+  const baseCosts = m.costs;
+  const sz = m.sizes;
+  const genOf = (k) => (m.gen?.[k]?.cuf > 0 ? (sz[`${k}Mw`] || 0) * m.gen[k].cuf : 0);
+  const genAll = genOf("solar") + genOf("wind");
+  const share = { solar: genAll > 0 ? genOf("solar") / genAll : 0, wind: genAll > 0 ? genOf("wind") / genAll : 0 };
+  const run = ({ capex = 0, rate = 0, solarCuf = 0, windCuf = 0 } = {}) => {
+    const k = 1 + capex;
+    const costs = {
+      ...baseCosts,
+      solarCrPerMw: baseCosts.solarCrPerMw * k, windCrPerMw: baseCosts.windCrPerMw * k, bessCrPerMwh: baseCosts.bessCrPerMwh * k, bessPcsCrPerMw: (baseCosts.bessPcsCrPerMw || 0) * k,
+      biomassCrPerMw: (baseCosts.biomassCrPerMw || 0) * k, evacuationCr: (baseCosts.evacuationCr || 0) * k,
+      plants: (baseCosts.plants || []).map((pl) => ({ ...pl, capexCrPerMw: (pl.capexCrPerMw || 0) * k })),
+    };
+    const f = { ...fin, interestRate: Math.max(0, fin.interestRate + rate) };
+    const e = 1 + solarCuf * share.solar + windCuf * share.wind;
+    const ops = e === 1 ? m.ops : m.ops.map((o) => ({
+      ...o, deliveredMWh: o.deliveredMWh * e, excessMWh: o.excessMWh * e, buyerExcessMWh: (o.buyerExcessMWh || 0) * e,
+      ...(finite(o.surplusRevenueCr) ? { surplusRevenueCr: o.surplusRevenueCr * e } : {}),
+    }));
+    const args = { costs, fin: f, bess: m.bess, dfrTarget: m.dfrTarget, ops, solveBy: "npv" };
+    const solved = runFinancialModel(null, sz, { ...args, tariffLocked: false });
+    const atTariff = runFinancialModel(null, sz, { ...args, tariffLocked: true });
+    return { tariff: solved.tariff, irr: atTariff.equityIrr, dscr: atTariff.minDscr };
+  };
+  const base = run();
+  const oneWay = [
+    { key: "capex", title: "Capital cost (every item)", unit: "change", fmt: "pct", steps: SENS_CAPEX, at: (d) => ({ capex: d }), value: (d) => d },
+    ...(share.solar > 0 ? [{ key: "solarCuf", title: `Solar CUF (${(m.gen.solar.cuf * 100).toFixed(2)}% in the bid)`, unit: "CUF", fmt: "pct", steps: SENS_CUF, at: (d) => ({ solarCuf: d }), value: (d) => m.gen.solar.cuf * (1 + d) }] : []),
+    ...(share.wind > 0 ? [{ key: "windCuf", title: `Wind CUF (${(m.gen.wind.cuf * 100).toFixed(2)}% in the bid)`, unit: "CUF", fmt: "pct", steps: SENS_CUF, at: (d) => ({ windCuf: d }), value: (d) => m.gen.wind.cuf * (1 + d) }] : []),
+    { key: "rate", title: `Interest rate (${(fin.interestRate * 100).toFixed(2)}% in the bid)`, unit: "rate", fmt: "pct", steps: SENS_RATE, at: (d) => ({ rate: d }), value: (d) => fin.interestRate + d },
+  ].map((t) => ({ ...t, points: t.steps.map((d) => ({ step: d, value: t.value(d), ...run(t.at(d)) })) }));
+  const grid = (rowsT, colsT, at) => ({
+    rows: rowsT, cols: colsT,
+    tariff: rowsT.steps.map((r) => colsT.steps.map((c) => run(at(r, c)).tariff)),
+  });
+  const T = Object.fromEntries(oneWay.map((t) => [t.key, t]));
+  const grids = [
+    { title: "Tariff for the target equity IRR: capital cost × interest rate", ...grid(T.capex, T.rate, (r, c) => ({ capex: r, rate: c })) },
+    ...(T.solarCuf ? [{ title: "Tariff for the target equity IRR: capital cost × solar CUF", ...grid(T.capex, T.solarCuf, (r, c) => ({ capex: r, solarCuf: c })) }] : []),
+    ...(T.windCuf ? [{ title: "Tariff for the target equity IRR: capital cost × wind CUF", ...grid(T.capex, T.windCuf, (r, c) => ({ capex: r, windCuf: c })) }] : []),
+    ...(T.solarCuf ? [{ title: "Tariff for the target equity IRR: interest rate × solar CUF", ...grid(T.rate, T.solarCuf, (r, c) => ({ rate: r, solarCuf: c })) }] : []),
+  ];
+  return { base, oneWay, grids, share, targetIrr: fin.targetEquityIrr, tariff: m.tariff, tariffLocked: Boolean(m.tariffLocked) };
+}
 export const REPAYMENT_LIST = ["equal", "annuity", "sculpted", "balloon", "bullet", "stepUp"];
 export const DRAWDOWN_LIST = ["linear", "sCurve", "front", "back"];
 
@@ -677,12 +741,88 @@ function addScheduleSheets(wb, S, { N, yearRow, refiOn, tenorUsed, refiEnd, debt
   }
 }
 
+/** The Sensitivity sheet: one-way tables and two-way grids of the app's runs (sensitivityTables). */
+function addSensitivitySheet(wb, S, m, sens) {
+  const ws = wb.addWorksheet(SENSITIVITY_SHEET, { properties: { tabColor: { argb: "FFC00000" } } });
+  const T = new Sheet(ws, 0);
+  const L = `'${LIVE_SHEET}'!`;
+  let r = T.next();
+  r.getCell(1).value = "Sensitivity";
+  r.getCell(1).font = { bold: true, size: 14 };
+  r = T.next();
+  r.getCell(1).value = `Each point is a full run of TenderOS's financial model on this bid's inputs and yearly energy with one input moved (grey italics: the app's numbers, not formulas, since a tariff solved for a target IRR is not one Excel formula). The base case is checked against the Live model. A CUF change scales the energy delivered and sold in proportion to that source's share of the generation (solar ${(sens.share.solar * 100).toFixed(0)}%, wind ${(sens.share.wind * 100).toFixed(0)}%); the dispatch, the floors and the storage are not rerun — for that, use the What-if in TenderOS. For any other point, change the blue inputs on the Live model and Goal Seek the tariff.`;
+  r.getCell(1).font = { italic: true, color: { argb: "FF777777" } };
+  r.getCell(1).alignment = { wrapText: true, vertical: "top" };
+  r.height = 64;
+  ws.mergeCells(`A${T.row}:J${T.row}`);
+  T.blank();
+
+  T.section("Base case");
+  const baseRow = (text, unit, f, v, app, fmt) => {
+    const rr = T.next();
+    T.label(rr, text, unit, { indent: 1 });
+    T.put(rr.getCell(3), { f, v, fmt });
+    T.put(rr.getCell(4), { v: app, fmt, kind: "app" });
+    T.put(rr.getCell(5), { f: `IF(ISNUMBER(C${T.row}),IF(ABS(C${T.row}-D${T.row})<=0.000001,"Yes","Changed"),"")`, v: Math.abs(v - app) <= 1e-6 ? "Yes" : "Changed", fmt: "text" });
+  };
+  r = T.next();
+  ["", "", "Live model", "App's run", "Same?"].forEach((t, i) => { const c = r.getCell(i + 1); c.value = t; c.font = { bold: true }; });
+  baseRow(sens.tariffLocked ? "Tariff (fixed in the bid)" : "Tariff for the target equity IRR", "₹/kWh", `${L}${S.s("tariff")}`, S.v("tariff"), sens.tariffLocked ? sens.tariff : sens.base.tariff, "tariff");
+  baseRow("Target equity IRR", "%", `${L}${S.s("targetIrr")}`, S.v("targetIrr"), sens.targetIrr, "pct");
+  if (sens.tariffLocked) {
+    const rr = T.next();
+    T.label(rr, "Tariff the target equity IRR would need", "₹/kWh", { indent: 1 });
+    T.put(rr.getCell(4), { v: sens.base.tariff, fmt: "tariff", kind: "app" });
+  }
+
+  for (const t of sens.oneWay) {
+    T.section(t.title);
+    r = T.next();
+    ["Change", t.unit === "change" ? "" : t.unit === "rate" ? "Rate" : "CUF", "Tariff for the target IRR (₹/kWh)", "Change vs base (₹/kWh)", "Equity IRR at the bid tariff", "Minimum DSCR at the bid tariff"].forEach((h, i) => { const c = r.getCell(i + 1); c.value = h; c.font = { bold: true }; c.alignment = { wrapText: true }; });
+    let baseCell = null;
+    for (const pt of t.points) {
+      const rr = T.next();
+      const isBase = pt.step === 0;
+      T.put(rr.getCell(1), { v: pt.step, fmt: t.key === "rate" ? '+0.00%;-0.00%;"base"' : '+0%;-0%;"base"', kind: "app", bold: isBase });
+      if (t.unit !== "change") T.put(rr.getCell(2), { v: pt.value, fmt: "pct", kind: "app" });
+      T.put(rr.getCell(3), { v: pt.tariff, fmt: "tariff", kind: "app", bold: isBase });
+      if (isBase) baseCell = `$C$${T.row}`;
+      T.put(rr.getCell(5), { v: finite(pt.irr) ? pt.irr : "", fmt: "pct", kind: "app" });
+      T.put(rr.getCell(6), { v: finite(pt.dscr) ? pt.dscr : "", fmt: "x", kind: "app" });
+      rr.getCell(7).value = T.row; // remember the row for the delta formulas
+    }
+    // the deltas as formulas against the base row
+    for (let k = 0; k < t.points.length; k += 1) {
+      const rowNo = T.row - t.points.length + 1 + k;
+      ws.getCell(`G${rowNo}`).value = null;
+      T.put(ws.getCell(`D${rowNo}`), { f: `C${rowNo}-${baseCell}`, v: t.points[k].tariff - sens.base.tariff, fmt: '+0.000;-0.000;"–"' });
+    }
+  }
+
+  for (const g of sens.grids) {
+    T.section(g.title);
+    r = T.next();
+    r.getCell(1).value = `${g.rows.title} ↓ · ${g.cols.title} →`;
+    r.getCell(1).font = { bold: true };
+    g.cols.steps.forEach((c, j) => T.put(r.getCell(2 + j), { v: c, fmt: g.cols.key === "rate" ? '+0.00%;-0.00%;"base"' : '+0%;-0%;"base"', kind: "app", bold: c === 0 }));
+    g.rows.steps.forEach((rs, i) => {
+      const rr = T.next();
+      T.put(rr.getCell(1), { v: rs, fmt: g.rows.key === "rate" ? '+0.00%;-0.00%;"base"' : '+0%;-0%;"base"', kind: "app", bold: rs === 0 });
+      g.cols.steps.forEach((c, j) => T.put(rr.getCell(2 + j), { v: g.tariff[i][j], fmt: "tariff", kind: "app", bold: rs === 0 && c === 0 }));
+    });
+  }
+  ws.getColumn(1).width = 44;
+  for (let c = 2; c <= 10; c += 1) ws.getColumn(c).width = 16;
+  ws.views = [{ state: "frozen", ySplit: 3, showGridLines: false }];
+  return ws;
+}
+
 /**
  * Add the Live model sheet to an exceljs workbook. m is the request's `live` block (see
  * web/src/bid/exportModel.js liveModelRequest). Returns { sheet, cells } where cells maps the
  * key results (tariff, equityIrr, ...) to their 'Live model'!C.. addresses for other sheets.
  */
-export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
+export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } = {}) {
   const N = m.ops.length;
   const ws = wb.addWorksheet(LIVE_SHEET, { properties: { tabColor: { argb: "FF0000FF" } } });
   const S = new Sheet(ws, N);
@@ -1628,6 +1768,8 @@ export function addLiveModel(wb, m, { dispatchRows = true } = {}) {
   ws.headerFooter = { oddFooter: "&L&A&R&P / &N" };
 
   addScheduleSheets(wb, S, { N, yearRow, refiOn, tenorUsed, refiEnd, debt0, total });
+  // the sensitivities: the app's model run at every point (not for the in-app trace, which has no use for them)
+  if (sensitivity) addSensitivitySheet(wb, S, m, sensitivityTables(m));
 
   const cells = Object.fromEntries(KEYS.map(([key]) => [key, `'${LIVE_SHEET}'!${S.cell[`key_${key}`]}`]));
   // addr: every row's key → its address ("$C$12" for one value, the row number for a year series)
