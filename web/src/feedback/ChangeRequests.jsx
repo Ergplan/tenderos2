@@ -53,7 +53,7 @@ export default function ChangeRequests({ team, requests, onFeedback }) {
         {items.length > 0 && (
           <div className="table-wrap">
             <table className="cr-table" data-testid="cr-table">
-              <thead><tr><th>#</th><th>When</th><th>Where</th><th>Comment</th><th>Requested by</th><th>Status</th><th /></tr></thead>
+              <thead><tr><th>#</th><th>When</th><th>Where</th><th>Comment</th><th>Requested by</th><th>For</th><th>Status</th><th /></tr></thead>
               <tbody>
                 {items.map((r) => (
                   <tr key={r.id} className={`cr-${r.status}`} data-testid="cr-row" data-status={r.status}>
@@ -63,10 +63,12 @@ export default function ChangeRequests({ team, requests, onFeedback }) {
                       <strong>{r.tab_label || r.tab}</strong>
                       {r.step_label && <span> › {r.step_label}</span>}
                       <small>{[r.section_index, r.section_title].filter(Boolean).join(" ")}</small>
+                      {r.element_label && <small className="cr-element"><b>{r.element_kind}</b> {r.element_label}{r.element_value ? ` · now: ${r.element_value}` : ""}</small>}
                       {Array.isArray(r.boxes) && r.boxes.length > 0 && <small className="cr-boxes">{r.boxes.slice(0, 6).join(" · ")}{r.boxes.length > 6 ? " · …" : ""}</small>}
                     </td>
                     <td className="cr-comment"><p>{r.comment}</p></td>
                     <td><strong>{r.by_name}</strong><small>{r.teamLabel}</small></td>
+                    <td><span className="cr-for" data-testid="cr-for">{r.forTeamLabel || "–"}</span></td>
                     <td>
                       <span className={`cr-status cr-status-${r.status}`}>{STATUS[r.status]}</span>
                       {r.export_batch && <small>batch {r.export_batch}</small>}

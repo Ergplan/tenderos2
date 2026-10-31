@@ -16,6 +16,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TABS = [...ALL_TAB_IDS, "teamSetup", "changeRequests"];
 
 const COLS = `r.id, r.seq, r.tab, r.tab_label, r.step, r.step_label, r.section_key, r.section_index, r.section_title, r.boxes, r.page_url, r.comment,
+  r.element_kind, r.element_label, r.element_value, r.element_key, r.for_team,
   r.requested_by, r.by_name, r.team, r.status, r.decided_by, r.decided_at, r.exported_at, r.export_batch, r.created_at, d.name AS decided_by_name`;
 const FROM = "FROM change_requests r LEFT JOIN team_members d ON d.id = r.decided_by";
 
@@ -33,7 +34,7 @@ export async function listChangeRequests(me, { status = "" } = {}) {
   if (all) for (const a of all) counts[a.status] = a.n;
   else for (const r of rows) counts[r.status] += 1;
   return {
-    items: rows.map((r) => ({ ...r, teamLabel: TEAMS[r.team] || r.team, canDecide: Boolean(me.super_admin), canDelete: Boolean(me.super_admin) || (r.requested_by === me.id && r.status === "open") })),
+    items: rows.map((r) => ({ ...r, teamLabel: TEAMS[r.team] || r.team, forTeamLabel: TEAMS[r.for_team] || r.for_team, canDecide: Boolean(me.super_admin), canDelete: Boolean(me.super_admin) || (r.requested_by === me.id && r.status === "open") })),
     counts,
   };
 }
@@ -46,11 +47,14 @@ export async function addChangeRequest(me, body) {
   if (!comment) throw new HttpError(400, "Write the comment.");
   const key = str(body.sectionKey, 200).trim() || `${tab}:page`;
   const boxes = (Array.isArray(body.boxes) ? body.boxes : []).map((b) => str(b, 120).trim()).filter(Boolean).slice(0, 40);
+  const el = body.element && typeof body.element === "object" ? body.element : {};
   const { rows } = await query(
-    `INSERT INTO change_requests (tab, tab_label, step, step_label, section_key, section_index, section_title, boxes, page_url, comment, requested_by, by_name, team)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13) RETURNING id`,
+    `INSERT INTO change_requests (tab, tab_label, step, step_label, section_key, section_index, section_title, boxes, page_url, comment, requested_by, by_name, team,
+       element_kind, element_label, element_value, element_key, for_team)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
     [tab, str(body.tabLabel, 80), str(body.step, 60), str(body.stepLabel, 120), key, str(body.sectionIndex, 20), str(body.sectionTitle, 200), JSON.stringify(boxes),
-      str(body.pageUrl, 500), comment, me.id, str(me.name, 120), str(me.team, 40)],
+      str(body.pageUrl, 500), comment, me.id, str(me.name, 120), str(me.team, 40),
+      str(el.kind, 20), str(el.label, 200), str(el.value, 200), str(el.testId, 120), TEAMS[body.forTeam] ? body.forTeam : str(me.team, 40)],
   );
   return (await listChangeRequests(me)).items.find((r) => r.id === rows[0].id);
 }
@@ -88,7 +92,7 @@ export async function exportChangeRequests(me, { mark = true, meta = {} } = {}) 
   if (!rows.length) throw new HttpError(400, "No approved requests to export: approve them first on Change requests.");
   const now = new Date();
   const batch = now.toISOString().replace(/[-:]/g, "").slice(0, 15).replace("T", "-");
-  const markdown = changeRequestPrompt(rows, { ...meta, batch, exportedAt: now.toISOString() });
+  const markdown = changeRequestPrompt(rows.map((r) => ({ ...r, teamLabel: TEAMS[r.team] || r.team, forTeamLabel: TEAMS[r.for_team] || r.for_team })), { ...meta, batch, exportedAt: now.toISOString() });
   if (mark) {
     await query("UPDATE change_requests SET status = 'exported', exported_at = $2, export_batch = $3 WHERE id = ANY($1::uuid[])", [rows.map((r) => r.id), now.toISOString(), batch]);
   }

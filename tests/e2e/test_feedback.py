@@ -36,11 +36,17 @@ def test_feedback_to_change_request_to_prompt(tmp_path):
         section.scroll_into_view_if_needed()
         section.hover()
         assert page.locator(".fb-outline").count() == 1, "the hovered section is outlined"
-        section.locator("header h2").click()
+        # down to the element: the Compute the levers button is outlined and named in the note
+        button = section.locator("[data-testid=lever-compute]")
+        button.hover()
+        assert page.locator(".fb-outline-el").count() == 1, "the element under the mouse is outlined"
+        button.click()
         page.wait_for_selector("[data-testid=fb-pop]")
         pop = page.locator("[data-testid=fb-pop]")
-        assert "Tariff levers for bid day" in pop.inner_text() and "What-if analysis" in pop.inner_text()
+        assert "button: Compute the levers" in pop.inner_text() and "Tariff levers for bid day" in pop.inner_text() and "What-if analysis" in pop.inner_text(), pop.inner_text()
         page.fill("[data-testid=fb-text]", f"Show the levers as a tornado chart too ({tag})")
+        # which department needs the change: the requester's own team is preselected; pick Finance
+        page.select_option("[data-testid=fb-for-team]", "finance")
         page.click("[data-testid=fb-send]")
         page.wait_for_selector("text=Recorded as CR-")
         page.click("[data-testid=fb-off]")
@@ -53,6 +59,8 @@ def test_feedback_to_change_request_to_prompt(tmp_path):
         row.wait_for()
         text = row.inner_text()
         assert "What-if analysis" in text and "Tariff levers for bid day" in text and "Tender manager" in text and "Open" in text, text
+        assert "Compute the levers" in text, "the element is named"
+        assert row.locator("[data-testid=cr-for]").inner_text() == "Finance", "the department that needs the change"
         assert row.get_attribute("data-status") == "open"
         row.locator("[data-testid=cr-approve]").click()
         page.wait_for_function("(tag) => [...document.querySelectorAll('[data-testid=cr-row]')].some((r) => r.textContent.includes(tag) && r.dataset.status === 'approved')", arg=tag)
@@ -64,6 +72,8 @@ def test_feedback_to_change_request_to_prompt(tmp_path):
         assert dl.value.suggested_filename.startswith("tenderos-change-requests-") and dl.value.suggested_filename.endswith(".md")
         assert "# TenderOS change requests" in md and "## Instructions for Claude Code" in md and "docs/dev/DEV-MANUAL.md" in md
         assert tag in md and "What-if analysis › 3 Tariff levers for bid day" in md and "web/src/whatif" in md and "Tender manager" in md, md[:2000]
+        assert '- Element: button "Compute the levers"' in md and "data-testid `lever-compute`" in md, md[:2000]
+        assert "- Department that needs the change: Finance" in md, md[:2000]
         page.wait_for_function("(tag) => [...document.querySelectorAll('[data-testid=cr-row]')].some((r) => r.textContent.includes(tag) && r.dataset.status === 'exported')", arg=tag)
         row = page.locator("[data-testid=cr-row]", has_text=tag).first
         assert "batch" in row.inner_text()

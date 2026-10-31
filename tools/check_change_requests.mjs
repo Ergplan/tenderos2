@@ -6,7 +6,8 @@ import { STEP_CODE, TAB_CODE, changeRequestPrompt, promptFileName } from "../web
 
 const reqs = [
   { seq: 7, tab: "seciRtc", tab_label: "SECI RTC tender", step: "financeInputs", step_label: "Finance inputs", section_key: "seciRtc:financeInputs:4-2-construction", section_index: "4.2", section_title: "Construction and interest during construction",
-    boxes: ["Construction", "Drawdown profile", "Funding order"], page_url: "https://example.test/", comment: "Add a quarterly drawdown table\nand show the IDC per quarter.", by_name: "Priya Sharma", team: "finance", created_at: "2026-10-31T09:12:00Z", decided_at: "2026-10-31T10:00:00Z", decided_by_name: "Tender manager" },
+    boxes: ["Construction", "Drawdown profile", "Funding order"], page_url: "https://example.test/", comment: "Add a quarterly drawdown table\nand show the IDC per quarter.", by_name: "Priya Sharma", team: "finance", created_at: "2026-10-31T09:12:00Z", decided_at: "2026-10-31T10:00:00Z", decided_by_name: "Tender manager",
+    element_kind: "box", element_label: "Construction", element_value: "18", element_key: "bid-construction-months", for_team: "finance", forTeamLabel: "Finance", teamLabel: "Finance" },
   { seq: 9, tab: "whatIf", tab_label: "What-if analysis", step: "", step_label: "", section_key: "whatIf:page:tariff-levers", section_index: "3", section_title: "Tariff levers for bid day", boxes: [], page_url: "", comment: "Show the levers as a chart too.", by_name: "Dev Patel", team: "projects", created_at: "2026-10-31T11:40:00Z" },
 ];
 const md = changeRequestPrompt(reqs, { site: "demo.test", version: "1.2.0", zone: "core", batch: "20261031-1200", exportedAt: "2026-10-31T12:00:00Z", branch: "main" });
@@ -14,9 +15,12 @@ assert.ok(md.startsWith("# TenderOS change requests · demo.test · batch 202610
 assert.ok(md.includes("2 approved requests"), "the count");
 assert.ok(md.includes("## Instructions for Claude Code") && md.includes("docs/dev/DEV-MANUAL.md") && md.includes("make check-web"), "the instructions");
 assert.ok(md.includes("### CR-7 · SECI RTC tender › Finance inputs › 4.2 Construction and interest during construction"), "the heading names where");
-assert.ok(md.includes("- Requested by: Priya Sharma (finance), 2026-10-31 09:12 UTC"), "who and when");
+assert.ok(md.includes("- Requested by: Priya Sharma (Finance), 2026-10-31 09:12 UTC"), "who and when");
+assert.ok(md.includes("- Department that needs the change: Finance"), "which department needs it");
 assert.ok(md.includes("- Approved: 2026-10-31 10:00 UTC by Tender manager"));
 assert.ok(md.includes("- Boxes in the section: Construction, Drawdown profile, Funding order"));
+assert.ok(md.includes('- Element: box "Construction" (now: 18) — data-testid `bid-construction-months`'), "the element the request was raised on");
+assert.ok(!md.includes("CR-9 ·") || !md.split("### CR-9")[1].includes("- Element:"), "no element line without one");
 assert.ok(md.includes("- Code: web/src/bid/FinanceInputsStep.jsx") && md.includes("web/src/seci (SeciTab.jsx"), "the code hints from the step and the tab");
 assert.ok(md.includes("> Add a quarterly drawdown table\n> and show the IDC per quarter."), "the comment as a quote, line by line");
 assert.ok(md.includes("### CR-9 · What-if analysis › 3 Tariff levers for bid day"), "no step: tab › section");

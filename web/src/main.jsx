@@ -176,7 +176,7 @@ export default function App({ user = null, initialScenario = null }) {
         {activeTab === "teamSetup" && <TeamSetup team={team} />}
         {activeTab === "changeRequests" && <ChangeRequests team={team} requests={requests} onFeedback={() => setFeedbackOn(true)} />}
       </main>
-      <FeedbackMode on={feedbackOn && canView} tab={activeTab} tabLabel={tabLabel} requests={requests} onOff={() => setFeedbackOn(false)}
+      <FeedbackMode on={feedbackOn && canView} tab={activeTab} tabLabel={tabLabel} requests={requests} team={team} onOff={() => setFeedbackOn(false)}
         onSaved={(item) => setNotice(`Recorded as CR-${item.seq} on Change requests.`)} />
       {canView && ALL_TAB_IDS.includes(activeTab) && (
         <FieldPings tab={activeTab} tabLabel={tabLabel} team={team} focus={focus} onFocused={(msg) => { setFocus(null); setNotice(msg || ""); }} />

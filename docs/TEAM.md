@@ -238,13 +238,17 @@ Then rebuild or restart the web service.
 ## Feedback and change requests
 
 Anyone on the team can say what should change, on the spot. **Give feedback** in the sidebar
-switches feedback on: a banner says so, the section under the mouse is outlined, and clicking it
-opens a note with the section's name, the step and the tab, and the boxes in the section. The note
-is saved as a **change request** with where it was raised, who raised it (name and team) and when;
-Escape or **Done** switches feedback off.
+switches feedback on: a banner says so, the section under the mouse is outlined (dotted) and, inside
+it, the element under the mouse (solid): a button, an input box or a select, a table cell (named by
+its row and column), a stat tile, a step chip, a link or a choice. Clicking opens a note headed by
+that element with its value now, under the section, the step and the tab, and the boxes in the
+section, and asks **which department needs the change** (the requester's own team is preselected);
+clicking plain space in a section raises it on the section. The note is saved as a
+**change request** with all of that (the element's data-testid too, so the code is found at once),
+who raised it (name and team) and when; Escape or **Done** switches feedback off.
 
 **Change requests** (sidebar) lists every request, newest first: its number (CR-n), when, where
-(tab › step › section, with the boxes), the comment, who, and its status: Open → Approved or
+(tab › step › section, with the boxes), the comment, who, the department that needs it, and its status: Open → Approved or
 Rejected (the super admin decides) → Exported (the approved ones went out in a prompt file) → Done
 (the change shipped). The author can remove an open request; a super admin any.
 
@@ -257,7 +261,7 @@ AMC, and the super admin marks the requests Done.
 
 | Part | Where |
 | --- | --- |
-| Table `change_requests` (seq, tab, step, section key/index/title, boxes, page, comment, requested_by, status, decided_by/at, export batch) | `web/db/migrations/013_change_requests.sql` |
+| Table `change_requests` (seq, tab, step, section key/index/title, boxes, element kind/label/value/key, page, comment, requested_by, status, decided_by/at, export batch) | `web/db/migrations/013_change_requests.sql`, `014_change_request_element.sql`, `015_change_request_for_team.sql` |
 | Server | `web/lib/changeRequests.js`; `GET/POST /api/change-requests`, `PATCH/DELETE /api/change-requests/[id]`, `GET /api/change-requests/export` (Markdown download; `?mark=0` leaves them approved) |
 | The prompt file | `web/src/feedback/prompt.js` (`changeRequestPrompt`, the tab and step code maps); `tools/check_change_requests.mjs` |
 | Browser | `web/src/feedback/FeedbackMode.jsx` (the outline and the note), `ChangeRequests.jsx` (the tab), `useChangeRequests.js`; wired in `web/src/main.jsx` |

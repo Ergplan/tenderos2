@@ -65,9 +65,11 @@ export function changeRequestPrompt(requests, meta = {}) {
   for (const r of requests) {
     lines.push(`### CR-${r.seq} · ${place(r)}`);
     lines.push("");
-    lines.push(`- Requested by: ${r.by_name || "a team member"}${r.team ? ` (${r.team})` : ""}, ${when(r.created_at)}`);
+    lines.push(`- Requested by: ${r.by_name || "a team member"}${r.team ? ` (${r.teamLabel || r.team})` : ""}, ${when(r.created_at)}`);
+    if (r.for_team) lines.push(`- Department that needs the change: ${r.forTeamLabel || r.for_team}`);
     if (r.decided_at) lines.push(`- Approved: ${when(r.decided_at)}${r.decided_by_name ? ` by ${r.decided_by_name}` : ""}`);
     lines.push(`- Screen: tab \`${r.tab}\`${r.step ? `, step \`${r.step}\`` : ""}, section \`${r.section_key}\``);
+    if (r.element_label) lines.push(`- Element: ${r.element_kind || "element"} "${r.element_label}"${r.element_value ? ` (now: ${r.element_value})` : ""}${r.element_key ? ` — data-testid \`${r.element_key}\`` : ""}`);
     const boxes = Array.isArray(r.boxes) ? r.boxes.filter(Boolean) : [];
     if (boxes.length) lines.push(`- Boxes in the section: ${boxes.slice(0, 20).join(", ")}${boxes.length > 20 ? ", …" : ""}`);
     const code = [STEP_CODE[r.step], TAB_CODE[r.tab]].filter(Boolean);
