@@ -21,6 +21,7 @@ import { PACK, PEAK_PLANS, PROFILES, SHORTFALL_MODES, seciTerms } from "../src/s
 import { hourlyAtMeter, lpPayload, missingInputs, resourceProfiles, sizingSeedOf } from "../src/bid/model.js";
 import { runWhatIf, SECI_LIMITS } from "../src/whatif/model.js";
 import { ANY_SIX, BRIDGE, COMPARABLE, DISCLOSED, LEVERS, NOT_VERIFIED, RESULT } from "../src/seci/winningBid.js";
+import { engineKeyHeaders } from "./secrets";
 
 export const SERVER_INFO = { name: "tenderos", title: "TenderOS bid model", version: "1.0.0" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
@@ -75,7 +76,7 @@ const SESSIONS = new Map();
 /** The engine's sizing (POST /api/rtc/lp, NDJSON), as the browser's runSizing reads it. */
 export async function sizeOnEngine(payload) {
   const res = await fetch(new URL("/api/rtc/lp", ENGINE_URL()), {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+    method: "POST", headers: { "content-type": "application/json", ...(await engineKeyHeaders()) }, body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`The engine answered ${res.status}`);
   const text = await res.text();

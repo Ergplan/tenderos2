@@ -142,6 +142,7 @@ Local development needs Python 3.12, Node 22 and a Postgres (`Makefile` header, 
 | `auth/demo` | GET | Demo mode only: sign in as the shared demo user and redirect |
 | `users`, `users/[id]` | GET, POST; PATCH, DELETE | Administration of users (admins); own name and password |
 | `settings/tabs` | GET, PUT | Default tabs for users without their own list |
+| `settings/api-keys` | GET, PUT, DELETE | Administration › API keys: list the provider keys without their values (set, source `app`/`env`/`none`, last four characters, who set it); PUT `{ name, value }` checks the key with the provider (a list-models request) and stores it encrypted (`web/lib/secrets.js`, table `app_secrets`); DELETE `{ name }` removes it. Administrators, or the tender's super admin on a demo |
 | `activity` | POST, GET | Browser heartbeat and events; admin usage summary (`format=csv`) |
 | `scenarios`, `scenarios/[id]`, `scenarios/[id]/restore`, `scenarios/export` | GET, POST; GET, PUT (new version), PATCH (meta), DELETE; POST; GET | The scenario library |
 | `tenders`, `tenders/[id]` | GET, POST; GET | Saved tender readings |
@@ -149,7 +150,7 @@ Local development needs Python 3.12, Node 22 and a Postgres (`Makefile` header, 
 | `bid/model`, `rtc/model`, `cfd/model` | POST | The Excel workbooks (Tender to Bid / SECI, Round the clock, CfD), built with exceljs |
 | `bid/queries` | POST | Pre-bid queries as a Word file |
 | `seci/forms`, `seci/letters` | POST | The SECI bid pack and the letters as Word files |
-| `seci/live` | GET, POST | Whether the voice agent is set up; create the GPT-Live session from the browser's WebRTC offer (`OPENAI_API_KEY` stays on the server) |
+| `seci/live` | GET, POST | Whether the voice agent is set up; create the GPT-Live session from the browser's WebRTC offer (the OpenAI key, from API keys or `OPENAI_API_KEY`, stays on the server) |
 | `plant/justification` | POST | The 25-year CUF justification as a Word file |
 | `team`, `team/members`, `team/members/[id]`, `team/act-as`, `team/assignments`, `team/assignments/[id]`, `team/files/[id]`, `team/outbox`, `team/messages`, `team/messages/read` | see `docs/TEAM.md` | Team state, members, demo "View as", assignments and actions, file download, outbox, pings and the inbox |
 | `evidence`, `evidence/[id]`, `evidence/signoff`, `evidence/register` | GET, POST; DELETE; POST; GET | Evidence on boxes, sign-off, the CSV register |
@@ -724,6 +725,7 @@ From `.env.example`, `docker-compose.yml`, the overlays and the code (`process.e
 | `LLAMA_CLOUD_API_KEY`, `LLAMA_CLOUD_BASE_URL`, `LLAMAPARSE_TIMEOUT_SECONDS` | engine | LlamaParse for scanned pages | no |
 | `DISPATCH15_JOBS_DIR` | engine | 15-minute dispatch job folder (default `<tmp>/tenderos_dispatch15`) | no |
 | `OPENAI_API_KEY`, `OPENAI_LIVE_BACKEND_MODEL`, `OPENAI_LIVE_VOICE`, `OPENAI_BASE_URL` | web | The SECI voice agent (defaults `gpt-6-luna`, `marin`, `https://api.openai.com/v1`) | no |
+| *(API keys in the application)* | web → engine | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and `LLAMA_CLOUD_API_KEY` can be entered once under Administration › API keys instead of `.env`. `web/lib/secrets.js` getSecret returns the stored key, else the variable. Every call from the web app to the engine (the proxy `web/app/api/[...path]/route.js`, `web/lib/market.js`, `web/lib/mcp.js`) carries `engineKeyHeaders()`: the marker `x-tenderos-keys: web` and the engine keys as `x-tenderos-key-anthropic` / `x-tenderos-key-llama`; the engine's middleware (`engine/extraction/keys.py`) keeps the latest it was given on a marked call, clears a key a marked call no longer carries (its own environment then applies), and ignores unmarked calls such as the health probe | no |
 | `MCP_TOKEN`, `MCP_SIZING_WAIT_MS`, `PUBLIC_URL` | web | The MCP server (off when empty or under 16 characters); how long `run_optimizer` waits (180000); the site address for page links | no |
 | `FILES_DIR` | web | Uploaded files (`/data/files`, the `team_files` volume) | default |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SECURE`, `MAIL_FROM`, `APP_URL` | web | Team email (off without a host); `APP_URL` links each mail to the bid | no |

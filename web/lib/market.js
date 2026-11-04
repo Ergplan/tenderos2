@@ -3,6 +3,7 @@
 import { query } from "./db";
 import { HttpError } from "./auth";
 import { saveUpload } from "./files";
+import { engineKeyHeaders } from "./secrets";
 
 const ENGINE_URL = process.env.ENGINE_URL || "http://127.0.0.1:8000";
 const num = (v) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -36,7 +37,7 @@ export async function addOrder(file, user) {
   const buf = Buffer.from(await file.arrayBuffer());
   const res = await fetch(`${ENGINE_URL}/api/bid/cerc-order`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(await engineKeyHeaders()) },
     body: JSON.stringify({ file: { name: file.name, content_base64: buf.toString("base64") } }),
   });
   const data = await res.json().catch(() => ({}));

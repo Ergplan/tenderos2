@@ -97,7 +97,7 @@ Every variable, from `.env.example` and the compose files:
 | `SITE_ADDRESS` | your domain, or `<ip-with-dashes>.sslip.io` (section 6) | VM |
 | `COOKIE_SECURE` | `true` behind HTTPS (the VM overlay sets it anyway) | |
 | `WEB_PORT` | the published port when not using the overlay (default 3000) | |
-| `ANTHROPIC_API_KEY` | model reading of tenders; empty = rules reader | no |
+| `ANTHROPIC_API_KEY` | model reading of tenders; empty = rules reader. This and the two other provider keys can instead be entered once in the application (sidebar › API keys, stored encrypted in `app_secrets`; wins over `.env`) | no |
 | `EXTRACTION_MODEL`, `EXTRACTION_REQUIRE_LLM` | leave empty | no |
 | `DOCLING_URL` | leave unset to use the compose `docling` service; set to empty (`DOCLING_URL=`) to run without it | no |
 | `LLAMA_CLOUD_API_KEY` | LlamaParse for scanned pages | no |
@@ -362,7 +362,7 @@ Removal: `docs/DEPLOY.md` §8.
 | "The file is larger than 60 MB" / "The set is larger than 120 MB" | The engine's upload limits (`engine/app.py`); Caddy's body limit is 100 MB per request |
 | The Tender step says the rules reader was used | No `ANTHROPIC_API_KEY` on the engine, or a DOCX/text upload; set the key in `.env` and run `deploy/update.sh` |
 | A tender set's warnings say PyMuPDF tables were used | Docling is down or `DOCLING_URL=`; its first conversion after a start loads models for a minute or two |
-| The voice agent panel says it is not set up / microphone does not start | `OPENAI_API_KEY` missing on the web service, or the page is plain HTTP (browsers allow the microphone on HTTPS or localhost only) |
+| The voice agent panel says it is not set up / microphone does not start | no OpenAI key (neither under API keys in the application nor `OPENAI_API_KEY` on the web service), or the page is plain HTTP (browsers allow the microphone on HTTPS or localhost only) |
 | `/api/mcp/<token>` answers 404 | `MCP_TOKEN` empty or shorter than 16 characters, or a wrong token; GET answers 405 by design |
 | `Too many attempts. Try again in 15 minutes.` (429) | The login brake: 10 failures per email and IP in 15 minutes (`web/app/api/auth/login/route.js`) |
 | `/setup` sends you to `/login` | A user already exists; sign in, or reset the database |

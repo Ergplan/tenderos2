@@ -5,7 +5,7 @@ financial-model line lists are read from `web/src` on every run; the computing f
 storage come from the curated map in the script, checked against the code it cites. Anything the
 script could not match is marked **to confirm**.
 
-158 headline numbers in 19 files, 56 entries in the 25-year table, 11 other calculated tables.
+159 headline numbers in 20 files, 56 entries in the 25-year table, 11 other calculated tables.
 
 Storage vocabulary: **computed** = worked out from the tab's state on every render and never stored; **localStorage `key`** = part of the tab's state the browser keeps under that key; **`scenarios.inputs.state.<path>`**, **`results.<path>`**, **`summary.<field>`** = the jsonb of the saved version (`scenario_versions`) when the tab is saved to the library (Round the clock, BESS, SECI only); a table name = a database row written by an API route.
 
@@ -212,6 +212,17 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | Blocks outside the band | `dsm/DsmPanel.jsx:24` | `pf(y1.outOfBand, 0)` | `dsmUnitCharge(...).outOfBand` from `sigma` (`sigmaOf`, firmed by the battery) and the tolerance band | dsm.sigmaPct, dsm.storageFirming, the category | see the file's note above |
 | X factor | `dsm/DsmPanel.jsx:25` | `pf(y1.x, 0)` | `xFactor(year, codFy)` (X_TRAJECTORY) | dsm.codFy | see the file's note above |
 | Year-1 charge | `dsm/DsmPanel.jsx:26` | `` d.on === false ? "₹0 cr" : `₹${nf((scheduledMu * y1.perMwh) / 1e4, 1)} cr` `` | `scheduledMu × y1.perMwh ÷ 1e4` (scheduledMu = year-1 delivered + sold) | the financial model's year 1 | computed; the model keeps it as the `dsm` row |
+
+### `web/src/feedback/ChangeRequests.jsx`
+
+**Screen:** Change requests (sidebar › Feedback): one tile per status  
+**Computed by:** `counts[status]` from `useChangeRequests` (`web/src/feedback/useChangeRequests.js`): the number of requests in each status, counted over the list `GET /api/change-requests` returns  
+**Rests on:** change_requests.status  
+**Stored:** `change_requests` rows (`web/lib/changeRequests.js`); the counts are computed on every render
+
+| Label as shown | Where | Value expression | Computed by | Inputs | Stored |
+| --- | --- | --- | --- | --- | --- |
+| <l> *(label is an expression)* | `feedback/ChangeRequests.jsx:37` | `String(counts[k] \|\| 0)` | `String(counts[k] || 0)`: the requests with that status (open, approved, rejected, exported, done) | change_requests.status | computed from the `change_requests` rows |
 
 ### `web/src/market/RecentTendersTab.jsx`
 

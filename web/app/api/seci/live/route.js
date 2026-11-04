@@ -3,12 +3,14 @@ import { currentUserWithAccess, handler, HttpError } from "@/lib/auth";
 import { CLOUD_AGENTS, ZONE } from "@/lib/zone";
 import { logEvent } from "@/lib/activity";
 import { LIVE_MODEL, liveSessionConfig } from "@/src/seci/agent";
+import { getSecret } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
 
 // The SECI RTC bid agent's voice session (GPT-Live, gpt-live-1). The browser sends its WebRTC
-// offer; this route creates the session with OpenAI (POST /v1/live/sessions) using the server's
-// OPENAI_API_KEY, which never reaches the browser, and returns the SDP answer. The session's
+// offer; this route creates the session with OpenAI (POST /v1/live/sessions) using the OpenAI
+// key entered under Administration › API keys (or OPENAI_API_KEY in .env), which never reaches
+// the browser, and returns the SDP answer. The session's
 // backend model works the bid through function tools the browser runs (web/src/seci/agent.js).
 //
 // Settings (environment): OPENAI_API_KEY (required for the agent), OPENAI_LIVE_BACKEND_MODEL
@@ -30,13 +32,14 @@ async function allowed() {
 /** Whether the agent can run here (a key on the server), so the tab says how to set it up if not. */
 export const GET = handler(async () => {
   await allowed();
-  return NextResponse.json({ available: CLOUD_AGENTS && Boolean(process.env.OPENAI_API_KEY), zone: ZONE, model: LIVE_MODEL, backendModel: BACKEND(), voice: VOICE() });
+  return NextResponse.json({ available: CLOUD_AGENTS && Boolean(await getSecret("OPENAI_API_KEY")), zone: ZONE, model: LIVE_MODEL, backendModel: BACKEND(), voice: VOICE() });
 });
 
 export const POST = handler(async (req) => {
   const user = await allowed();
   if (!CLOUD_AGENTS) throw new HttpError(403, "The voice agent does not run in the core zone: no cloud model reaches the bid workspace.");
-  if (!process.env.OPENAI_API_KEY) throw new HttpError(503, "The voice agent is not set up on this server (OPENAI_API_KEY).");
+  const apiKey = await getSecret("OPENAI_API_KEY");
+  if (!apiKey) throw new HttpError(503, "The voice agent is not set up on this server: add the OpenAI key under Administration › API keys (or OPENAI_API_KEY in .env).");
   const body = await req.json().catch(() => null);
   const sdp = body?.sdp;
   if (typeof sdp !== "string" || !sdp.startsWith("v=0") || sdp.length > 65536) throw new HttpError(400, "A WebRTC offer (SDP) is required.");
@@ -46,7 +49,7 @@ export const POST = handler(async (req) => {
 
   const res = await fetch(`${BASE()}/live/sessions`, {
     method: "POST",
-    headers: { authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
     body: JSON.stringify({ session: liveSessionConfig({ backendModel: BACKEND(), voice: VOICE(), greeting: GREETING }), transport: { type: "webrtc", sdp } }),
   });
   const text = await res.text();

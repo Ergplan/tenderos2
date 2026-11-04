@@ -443,6 +443,23 @@ approved as a prompt (.md)** downloads one file for jouleWise, who apply it and 
 
 ---
 
+## Setting up the API keys (administrator)
+
+![API keys](img/shell-api-keys.jpg)
+
+**API keys** (sidebar, under Library; shown to administrators and to the tender's super admin)
+holds the three provider keys the product can use: **Anthropic** (reading tender documents with
+the model), **OpenAI** (the voice bid agent on the SECI tab) and **LlamaParse** (scanned pages in
+a tender set). For each: click **Add key**, paste the key (it is typed hidden; the eye shows it
+while you type), click **Check and save**. The key is checked with the provider (one request that
+lists its models, nothing billed), stored encrypted on the server and never shown again: the row
+says *Set*, *ends …abcd*, who set it and when. **Replace** types a new one; **Remove** deletes it
+(a key in the server's `.env`, if any, then applies again). A refused key is not saved; a key
+whose provider cannot be reached is saved with a warning. No restart is needed: the voice agent
+and the tender reader use the new key on their next call.
+
+![Typing a key](img/shell-api-keys-typing.jpg)
+
 ## Quick reference: a bid in twelve clicks
 
 1. **SECI RTC tender** in the sidebar.

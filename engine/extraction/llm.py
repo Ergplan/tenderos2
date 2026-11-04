@@ -27,6 +27,8 @@ from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from engine.extraction import keys
+
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PROMPT_ROOTS: tuple[Path, ...] = (
     PACKAGE_ROOT / "prompts",
@@ -118,7 +120,8 @@ def provider() -> str:
 
 
 def api_key() -> str:
-    return (os.environ.get(KEY_ENV) or "").strip()
+    """The key the web app handed over (Administration › API keys), else ANTHROPIC_API_KEY."""
+    return keys.api_key(KEY_ENV)
 
 
 def model_id() -> str:
@@ -170,6 +173,7 @@ class LLMClient:
     provider = "anthropic"
 
     def __init__(self, sdk: Any | None = None) -> None:
+        self.key = ""
         if sdk is None:
             key = api_key()
             if not key:
@@ -177,6 +181,7 @@ class LLMClient:
             import anthropic
 
             sdk = anthropic.Anthropic(api_key=key, max_retries=MAX_RETRIES, timeout=timeout_seconds())
+            self.key = key
         self._sdk = sdk
 
     @property
@@ -215,10 +220,11 @@ class LLMClient:
 
 
 def default_client() -> LLMClient:
-    """The process-wide client built from ANTHROPIC_API_KEY."""
+    """The process-wide client, rebuilt when the key in use changes (a key entered or replaced in
+    the application)."""
     global _default_client
     with _client_lock:
-        if _default_client is None:
+        if _default_client is None or _default_client.key != api_key():
             _default_client = LLMClient()
         return _default_client
 

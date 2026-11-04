@@ -4,7 +4,7 @@
 // signs out. The legacy FDRE tabs (yield assessment, EYA report, custom dispatch and the
 // rest) are not part of this application.
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, Newspaper, Lock, LogOut, Scale, UserRound, UserCog, Users, ClipboardList, MessageSquarePlus } from "lucide-react";
+import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, KeyRound, Newspaper, Lock, LogOut, Scale, UserRound, UserCog, Users, ClipboardList, MessageSquarePlus } from "lucide-react";
 import { flushActivity, startActivityTracker, trackEvent } from "./activity";
 import "./styles.css";
 import "./chartTheme";
@@ -105,6 +105,7 @@ function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox, feedba
           <a href="/scenarios"><FolderOpen size={15} /> Saved scenarios</a>
           {user?.role === "admin" && <a href="/admin/users"><Users size={15} /> Users</a>}
           {user?.role === "admin" && <a href="/admin/activity"><Activity size={15} /> Activity</a>}
+          {(user?.role === "admin" || team?.me?.super_admin) && <a href="/admin/api-keys" data-testid="nav-api-keys"><KeyRound size={15} /> API keys</a>}
         </nav>
       </div>
       <div className="side-section side-theme"><ThemeToggle /></div>

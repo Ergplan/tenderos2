@@ -308,3 +308,16 @@ td.mono { font-family: var(--font-mono); font-size: 11.5px; }
 .req-table td:nth-child(3), .req-table td:nth-child(4) { white-space: nowrap; }
 .rtc-sites { display: grid; gap: 14px; margin-bottom: 18px; }
 .rtc-note.warn { color: var(--warn); }
+
+/* Administration › API keys */
+.api-keys-table { table-layout: fixed; width: 100%; }
+.api-keys-table th:nth-child(1), .api-keys-table td:nth-child(1) { width: 20%; }
+.api-keys-table th:nth-child(2), .api-keys-table td:nth-child(2) { width: 34%; }
+.api-keys-table th:nth-child(3), .api-keys-table td:nth-child(3) { width: 22%; }
+.api-keys-table td { vertical-align: top; white-space: normal; overflow-wrap: anywhere; }
+.api-keys-table td.lib-actions { white-space: normal; }
+.tag-key-app { border-color: var(--good, #3ddc97); color: var(--good, #3ddc97); }
+.tag-key-env { border-color: var(--signal); color: var(--signal); }
+.api-key-form { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+.api-key-input { display: flex; align-items: center; gap: 4px; }
+.api-key-input input { width: 260px; font-family: var(--font-mono); font-size: 12px; }

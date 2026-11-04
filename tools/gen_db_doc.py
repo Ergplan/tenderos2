@@ -294,6 +294,11 @@ PURPOSE = {
                          "(`web/lib/scenarios.js` restoreVersion). See the JSON documents section for the shape per module.",
     "app_settings": "Deployment-wide settings as key → jsonb. The only key the code writes is `default_tabs` "
                     "(`web/app/api/settings/tabs/route.js`, read by `web/lib/auth.js` currentUserWithAccess).",
+    "app_secrets": "Provider API keys entered once under Administration › API keys (`web/app/api/settings/api-keys/route.js`): "
+                   "`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `LLAMA_CLOUD_API_KEY`. `ciphertext` is the key under AES-256-GCM with a "
+                   "key derived from `SESSION_SECRET` (`web/lib/secretCodec.js`), `hint` its last four characters for the screen, "
+                   "`updated_by` who set it. Read by `web/lib/secrets.js` getSecret: the voice-agent route and the engine proxy "
+                   "(which hands the engine keys over as request headers). A key in `.env` applies when none is stored.",
     "resource_profiles": "The library of hourly wind and solar capacity-factor profiles (8,760 values in `vals`), built-in ones "
                          "(`seed_key`, loaded from `web/db/seed/profiles/*.json` on start by `web/lib/profiles.js` seedProfiles) and "
                          "uploads (`POST /api/profiles`), each with its CUF, monthly CUFs, quality and the issues found.",
@@ -351,7 +356,7 @@ closes. Everything is written by the Next.js web app (`web/lib/*.js`, server-onl
 
 | In Postgres | Tables |
 | --- | --- |
-| Sign-in and access | `users`, `user_sessions`, `app_settings` (default tabs), `schema_migrations` |
+| Sign-in and access | `users`, `user_sessions`, `app_settings` (default tabs), `app_secrets` (API keys, encrypted), `schema_migrations` |
 | The scenario library (saved cases with their versions) | `scenarios`, `scenario_versions` |
 | Usage | `activity_log` |
 | Reference data shared by the team | `resource_profiles` (wind and solar profiles), `tender_reads` (tender readings), `market_orders` (CERC orders) |

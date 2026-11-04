@@ -1,15 +1,17 @@
-import { Activity, FolderOpen, LayoutDashboard, UserRound, Users } from "lucide-react";
+import { Activity, FolderOpen, KeyRound, LayoutDashboard, UserRound, Users } from "lucide-react";
 import Brand from "@/src/Brand";
 import SignOutButton from "./SignOutButton";
 import ThemeToggle from "@/src/ThemeToggle";
 import ActivityPing from "./ActivityPing";
 
 /** Frame for the non-dashboard pages (library, compare, users, account). */
-export default function PageShell({ user, active, title, eyebrow, actions, children }) {
+/** keyAdmin: the user may manage API keys (an administrator, or the tender's super admin on a demo). */
+export default function PageShell({ user, active, title, eyebrow, actions, children, keyAdmin = false }) {
   const links = [
     ["dashboard", "/", LayoutDashboard, "Dashboard"],
     ["scenarios", "/scenarios", FolderOpen, "Saved scenarios"],
     ...(user?.role === "admin" ? [["users", "/admin/users", Users, "Users"], ["activity", "/admin/activity", Activity, "Activity"]] : []),
+    ...(user?.role === "admin" || keyAdmin ? [["apiKeys", "/admin/api-keys", KeyRound, "API keys"]] : []),
     ["account", "/account", UserRound, "Account"],
   ];
   return (

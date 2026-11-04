@@ -125,10 +125,14 @@ not touched. `deploy/shared-vm/install.sh` puts TenderOS beside the old app:
   * If the old app's own `deploy/update.sh` runs later, it re-publishes on port 8082. The
     router still finds it by container name.
 * Measured memory use is about 0.5 GB for TenderOS while sizing NHPC; the build needs about 2 GB.
-* The SECI RTC tab's voice bid agent (GPT-Live) needs `OPENAI_API_KEY` in TenderOS's `.env`.
-  * Add the key there, then re-run the install to restart the web service.
-  * The key stays on the server.
-  * Without the key, the agent's panel says it is not set up.
+* The SECI RTC tab's voice bid agent (GPT-Live) needs an OpenAI key.
+  * Enter it once in the application: sidebar › **API keys** (an administrator, or the demo's
+    super admin seat). It is checked with OpenAI, stored encrypted and shown masked from then on;
+    no restart. The same page takes the Anthropic key (tender reading) and the LlamaParse key.
+  * Or put `OPENAI_API_KEY` in TenderOS's `.env` and re-run the install to restart the web
+    service. A key entered in the application wins over `.env`.
+  * The key stays on the server either way.
+  * Without a key, the agent's panel says it is not set up.
 * Browsers allow the microphone only on HTTPS or localhost, and the 8081 address is plain HTTP.
   To talk to the agent there, either open an SSH tunnel and browse to `http://localhost:8081`
   (`gcloud compute ssh <vm> -- -L 8081:localhost:8081`), or serve the router over HTTPS (below).

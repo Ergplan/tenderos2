@@ -260,6 +260,12 @@ FILES = {
         "inputs": "state.tender, state.req, state.tech",
         "store": "state.tender / req / tech in localStorage `fdre.bess.v1` → `scenarios.inputs.state`; the derived figures computed",
     },
+    "feedback/ChangeRequests.jsx": {
+        "screen": "Change requests (sidebar › Feedback): one tile per status",
+        "fn": "`counts[status]` from `useChangeRequests` (`web/src/feedback/useChangeRequests.js`): the number of requests in each status, counted over the list `GET /api/change-requests` returns",
+        "inputs": "change_requests.status",
+        "store": "`change_requests` rows (`web/lib/changeRequests.js`); the counts are computed on every render",
+    },
     "dsm/DsmPanel.jsx": {
         "screen": "Finance inputs › Deviation settlement (Tender to Bid / SECI `FinanceInputsStep.jsx`) and Finance chapter › F.3a (FinanceView, all three tabs)",
         "fn": "`dsmUnitCharge({ dsm, category, hasStorage, year, contract: tariff })` for years 1–6 and 10, `sigmaOf`, `dsmCategory` (`web/src/dsm/dsm.js`)",
@@ -436,6 +442,7 @@ STATS = {
     # ---- DSM
     ("dsm/DsmPanel.jsx", "Charge per MWh scheduled"): {"fn": "`dsmUnitCharge(...).perMwh` = a × contract tariff + b for year 1 and year 6", "inputs": "dsm.steps, tolerance, X factor, the tariff"},
     ("dsm/DsmPanel.jsx", "Blocks outside the band"): {"fn": "`dsmUnitCharge(...).outOfBand` from `sigma` (`sigmaOf`, firmed by the battery) and the tolerance band", "inputs": "dsm.sigmaPct, dsm.storageFirming, the category"},
+    ("feedback/ChangeRequests.jsx", "<l>"): {"fn": "`String(counts[k] || 0)`: the requests with that status (open, approved, rejected, exported, done)", "inputs": "change_requests.status", "store": "computed from the `change_requests` rows"},
     ("dsm/DsmPanel.jsx", "X factor"): {"fn": "`xFactor(year, codFy)` (X_TRAJECTORY)", "inputs": "dsm.codFy"},
     ("dsm/DsmPanel.jsx", "Year-1 charge"): {"fn": "`scheduledMu × y1.perMwh ÷ 1e4` (scheduledMu = year-1 delivered + sold)", "inputs": "the financial model's year 1", "store": "computed; the model keeps it as the `dsm` row"},
     # ---- QuoteCheck

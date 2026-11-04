@@ -133,6 +133,16 @@ backups and restore · HTTPS and firewall allowlists.
 
 ---
 
+## Setting up the providers
+
+The three cloud keys TenderOS can use (Anthropic for reading tender documents, OpenAI for the
+SECI voice agent, LlamaParse for scanned pages) are entered once in the application, under
+**API keys** in the sidebar, by an administrator. Each key is checked with its provider when it
+is typed, stored encrypted on the server and shown masked from then on (only its last four
+characters, who set it and when). A key can be replaced or removed at any time without a
+restart. Installations may still set the keys in the server's `.env`; a key entered in the
+application wins. In the core zone the page holds no keys: they belong to the intake zone.
+
 ## Editions
 
 | | Demo / single installation | Enterprise |

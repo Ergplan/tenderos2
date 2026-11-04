@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 
+from engine.extraction import keys
 from engine.extraction.pages import CharBoxes
 from engine.extraction.resolver import PageText
 
@@ -30,7 +31,8 @@ class LlamaParseError(RuntimeError):
 
 
 def api_key() -> str:
-    return (os.environ.get("LLAMA_CLOUD_API_KEY") or "").strip()
+    """The key the web app handed over (Administration › API keys), else LLAMA_CLOUD_API_KEY."""
+    return keys.api_key("LLAMA_CLOUD_API_KEY")
 
 
 def llamaparse_available() -> bool:

@@ -8,6 +8,7 @@ import { currentUserWithAccess, handler, HttpError } from "@/lib/auth";
 import { mayCallEngine } from "@/lib/tabs";
 import { ZONE, zoneAllowsEngine } from "@/lib/zone";
 import { logEvent } from "@/lib/activity";
+import { engineKeyHeaders } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
 const ENGINE_URL = process.env.ENGINE_URL || "http://127.0.0.1:8000";
@@ -25,7 +26,9 @@ async function forward(req, { params }) {
   const incoming = new URL(req.url);
   const target = new URL(`/api/${path.map(encodeURIComponent).join("/")}${incoming.search}`, ENGINE_URL);
   const body = req.method === "GET" || req.method === "HEAD" ? null : Buffer.from(await req.arrayBuffer());
-  const headers = { accept: req.headers.get("accept") || "*/*" };
+  // the provider keys entered under Administration › API keys ride on every call: the engine keeps
+  // the latest it was given and falls back to its own environment when none is sent (engine/extraction/keys.py)
+  const headers = { accept: req.headers.get("accept") || "*/*", ...(await engineKeyHeaders()) };
   if (req.headers.get("content-type")) headers["content-type"] = req.headers.get("content-type");
   if (body) headers["content-length"] = String(body.length);
   const started = Date.now();

@@ -30,7 +30,7 @@ from pydantic import BaseModel
 
 from engine.bess import requirements as BESS
 from engine.documents.pdf import html_to_pdf
-from engine.extraction import TENDER_TYPES, catalog, jobs, llm_available, read_tender
+from engine.extraction import TENDER_TYPES, catalog, jobs, keys, llm_available, read_tender
 from engine.extraction.extract import MODES, require_llm, resolve_mode
 from engine.extraction.llm import model_id
 from engine.extraction.pages import UnreadableDocument, check_readable
@@ -47,6 +47,13 @@ TENDER_PREFIXES = ("/api/bid/tender", "/api/rtc/tender")
 _LP_SLOTS = threading.Semaphore(2)
 
 app = FastAPI(title="TenderOS engine", version="1.0.0")
+
+
+@app.middleware("http")
+async def provider_keys(request: Request, call_next):  # type: ignore[no-untyped-def]
+    """Keys entered in the application ride on every call from the web app (engine/extraction/keys.py)."""
+    keys.take_from_headers(request.headers)
+    return await call_next(request)
 
 
 class UploadFile(BaseModel):
@@ -97,6 +104,7 @@ def _status() -> dict[str, Any]:
     return {
         "llm_available": available,
         "provider": "anthropic" if available else None,
+        "key_source": keys.source("ANTHROPIC_API_KEY"),
         "model": model_id() if available else None,
         "default_mode": "llm" if available else "rules",
         "require_llm": require_llm(),
@@ -258,10 +266,21 @@ async def rtc_lp(request: Request) -> StreamingResponse:
     def work() -> None:
         try:
             if not _LP_SLOTS.acquire(blocking=False):
-                events.put({"type": "log", "t": 0, "stage": "highs", "msg": "Another HiGHS run is in progress on this server; waiting for a free slot"})
+                events.put(
+                    {
+                        "type": "log",
+                        "t": 0,
+                        "stage": "highs",
+                        "msg": "Another HiGHS run is in progress on this server; waiting for a free slot",
+                    }
+                )
                 _LP_SLOTS.acquire()
             try:
-                result = RLP.solve(payload, on_log=lambda line: events.put({"type": "log", **line}), on_progress=lambda p: events.put({"type": "progress", **p}))
+                result = RLP.solve(
+                    payload,
+                    on_log=lambda line: events.put({"type": "log", **line}),
+                    on_progress=lambda p: events.put({"type": "progress", **p}),
+                )
             finally:
                 _LP_SLOTS.release()
             result.pop("log", None)  # already streamed line by line
@@ -282,7 +301,9 @@ async def rtc_lp(request: Request) -> StreamingResponse:
                 break
             yield json.dumps(_finite(item), default=float) + "\n"
 
-    return StreamingResponse(stream(), media_type="application/x-ndjson", headers={"cache-control": "no-cache, no-transform", "x-accel-buffering": "no"})
+    return StreamingResponse(
+        stream(), media_type="application/x-ndjson", headers={"cache-control": "no-cache, no-transform", "x-accel-buffering": "no"}
+    )
 
 
 @app.post("/api/bid/dispatch15")
@@ -329,7 +350,9 @@ def dispatch15_xlsx(job_id: str) -> FileResponse:
     job = D15.get(job_id)
     if path is None or job is None or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="The 25-year dispatch workbook is not ready")
-    return FileResponse(path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="dispatch_25_years.xlsx")
+    return FileResponse(
+        path, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename="dispatch_25_years.xlsx"
+    )
 
 
 @app.post("/api/bid/document/pdf")

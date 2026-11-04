@@ -694,7 +694,7 @@ def test_api_status_catalog_and_read(client, tmp_path, monkeypatch):
     for prefix in ("/api/bid/tender", "/api/rtc/tender"):
         status = client.get(f"{prefix}/status").json()
         tender_set = status.pop("set")
-        assert status == {"llm_available": False, "provider": None, "model": None, "default_mode": "rules", "require_llm": False, "types": list(TENDER_TYPES), "extraction": "tender_engine 5c29b4e"}
+        assert status == {"llm_available": False, "provider": None, "key_source": None, "model": None, "default_mode": "rules", "require_llm": False, "types": list(TENDER_TYPES), "extraction": "tender_engine 5c29b4e"}
         assert tender_set["search"] == "haystack-bm25" and tender_set["max_files"] == 20
     cat = client.get("/api/bid/tender/catalog", params={"tender_type": "fdre"})
     assert cat.status_code == 200 and "fdre_profile" in [s["name"] for s in cat.json()["sections"]]
