@@ -24,6 +24,12 @@ export function QuoteLink({ quote, label = null }) {
 
 const FILTERS = [["all", "All"], ["amd1", "Amendment-01"], ["amd2", "Amendment-02"], ["amd3", "Amendment-03"]];
 
+/** A quote, or the parts of one that runs over a page break (each with its own page link). */
+function Quotes({ quote }) {
+  const parts = Array.isArray(quote) ? quote : [quote];
+  return <>{parts.map((q, i) => <QuoteLink key={i} quote={q} />)}</>;
+}
+
 /** Step: the tender's documents, how the bid goes, the amendment trail clause by clause, and the points to raise. */
 export default function DocumentsStep() {
   const [only, setOnly] = useState("all");
@@ -78,11 +84,11 @@ export default function DocumentsStep() {
               </div>
               <div className="seci-quote before">
                 <span className="seci-label">Was</span>
-                {c.before ? <QuoteLink quote={c.before} /> : <em className="rtc-note">{/addendum|new/i.test(c.clause) ? "New text: nothing stood before" : "The amendment rewrites the clause; the original is not quoted in it"}</em>}
+                {c.before ? <Quotes quote={c.before} /> : <em className="rtc-note">{/addendum|new/i.test(c.clause) ? "New text: nothing stood before" : c.document === "CfDA" ? "The amendment restates the whole article; the original is in the standard CfDA (not provided)" : "The amendment restates the whole clause"}</em>}
               </div>
               <div className="seci-quote after">
                 <span className="seci-label">Now</span>
-                <QuoteLink quote={c.after} />
+                <Quotes quote={c.after} />
               </div>
               <div className="seci-effect">{c.effect}</div>
             </div>

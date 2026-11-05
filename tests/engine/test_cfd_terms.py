@@ -84,7 +84,8 @@ def test_cfd_pack_quotes_the_amendments_and_the_rfs():
     by_doc = {d: sum(1 for c in data["changes"] if c["doc"] == d) for d in ("amd1", "amd2", "amd3")}
     assert by_doc == {"amd1": 4, "amd2": 11, "amd3": 22}, by_doc
     assert len({c["id"] for c in data["changes"]}) == len(data["changes"])
-    quotes = [(c["id"], q) for c in data["changes"] for q in (c["before"], c["after"]) if q]
+    # a quote that runs over a page break is a list of parts, each on its own page
+    quotes = [(c["id"], q) for c in data["changes"] for side in (c["before"], c["after"]) if side for q in (side if isinstance(side, list) else [side])]
     quotes += [(f"process {i + 1}", q) for i, p in enumerate(data["bidProcess"]) for q in p["sources"]]
     for where, q in quotes:
         assert q["doc"] in pages, (where, q["doc"])
