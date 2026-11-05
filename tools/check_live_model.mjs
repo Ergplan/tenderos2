@@ -264,7 +264,7 @@ assert.ok(CASES[CASES.length - 1][1].finance.rows.every((r) => r.dscr === null),
   const f = c.finance;
   assert.ok(f.rows.some((r) => r.cfdPenalty > 0) && f.rows.every((r) => Math.abs(r.penalty - r.cfdPenalty) < 1e-12), "weekly shortfall penalties in some years");
   assert.ok(f.rows[0].lcCost > 0 && Math.abs(f.rows[0].lcCost - (0.015 * 2000 * 100 * (10 - 7.5) * 30) / 1e7) < 1e-9, "the LC cost at ₹7.5/kWh");
-  assert.ok(f.rows[1].charging === 0 && f.rows[0].pxFees > 0, "no bought power; exchange fees on the energy sold");
+  assert.ok(f.rows.every((r) => r.charging === 0) && f.rows[2].pxFees > 0, "no bought power; exchange fees on the energy sold once the RE runs");
   assert.ok(f.capex.hard > c.m.costs.otherCapexCr && c.m.costs.otherCapexCr > 1, "SECI's charges in the hard cost");
   assert.ok(f.construction && f.capex.idc > 0 && f.rows[0].principal === 0 && f.rows[0].dsraBalance > 0, "IDC, moratorium and the reserve in a CfD bid");
   const high = c.run({ fin: { tariff: 11 }, tariffLocked: true });
