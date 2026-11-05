@@ -1,0 +1,4 @@
+/* CfD bid: the Financial model and What-if steps (the shared views carry their own styles) */
+.cfd .quote-check .rtc-field input { width: 100%; }
+.cfd .lever-table td small { color: var(--ink-3); margin-left: 4px; }
+.cfd .bid-mode.rules { border-color: var(--bad); }

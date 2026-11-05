@@ -156,26 +156,26 @@ const STEPS_TO_DO = [
   { when: "All term", text: "Sell anything else (surplus RE, other battery use) only after the day's peak supply is met, within the connection.", cites: ["essOtherUse", "thirdParty"] },
 ];
 
-/** Step 1: the tender as a picture: flows, dates, a day, and the bidder's obligations in order. */
+/** The tender as a picture: flows, dates, a day, and the bidder's obligations in order (part of the What is a CfD step). */
 export default function VisualModel({ state, prices }) {
   const X = state.inputs.contractedMw || 100;
   return (
     <>
-      <Section index="1" title="How SECI CfD-I works" note="Assured peak supply of 1000 MWh a day (500 MW × 2 h), settled against your strike price">
+      <Section index="2" title="How SECI CfD-I works" note="Assured peak supply of 1000 MWh a day (500 MW × 2 h), settled against your strike price">
         <div className="cfd-lead">
           <p>You build a battery with your own renewable generation, sell <strong>2 MWh per contracted MW every evening</strong> on a power exchange, and SECI's CfD Pool tops your price up to the <strong>strike price you bid</strong> (or takes the excess) on every kWh. Since Amendment-03 you keep no market gain and bear no market loss on that energy <Cite id="noRisk" compact />.</p>
-          <p>You need no plant to bid: you build the battery and your own solar or wind after you win, and until month 36 the battery may be charged entirely from the green market <Cite id="newProject" compact /> <Cite id="market75" compact />. Step 2, <strong>Worked example</strong>, walks a bid of your size through real evenings.</p>
+          <p>You need no plant to bid: you build the battery and your own solar or wind after you win, and until month 36 the battery may be charged entirely from the green market <Cite id="newProject" compact /> <Cite id="market75" compact />. The worked example below walks a bid of your size through real evenings.</p>
         </div>
         <FlowDiagram mw={X} />
       </Section>
-      <Section index="1.1" title="Timeline" note={state.inputs.effectiveDate ? `From the Effective Date you entered (${fmtDate(Date.parse(`${state.inputs.effectiveDate}T00:00:00Z`))})` : "Months from the Effective Date of the CfDA; enter the date on Plant and sourcing to see the calendar dates"}>
+      <Section index="2.1" title="Timeline" note={state.inputs.effectiveDate ? `From the Effective Date you entered (${fmtDate(Date.parse(`${state.inputs.effectiveDate}T00:00:00Z`))})` : "Months from the Effective Date of the CfDA; enter the date on Bid inputs to see the calendar dates"}>
         <Timeline effectiveDate={state.inputs.effectiveDate} />
         <p className="rtc-note">Dates: <Cites ids={["effectiveDate", "essScd", "reCod", "term", "finClose", "delay", "delayBeyond", "fmExtension"]} /></p>
       </Section>
-      <Section index="1.2" title="A day of supply" note="IEX prices, Sep 2025 – Sep 2026">
+      <Section index="2.2" title="A day of supply" note="IEX prices, Sep 2025 – Sep 2026">
         <TypicalDay prices={prices} mw={X} market={state.inputs.sellMarket || "DAM"} />
       </Section>
-      <Section index="1.3" title="What the winning bidder must do" note="In order, each with the clause it comes from">
+      <Section index="2.3" title="What the winning bidder must do" note="In order, each with the clause it comes from">
         <ol className="cfd-todo" data-testid="cfd-todo">
           {STEPS_TO_DO.map((s, i) => (
             <li key={i}>
@@ -186,11 +186,11 @@ export default function VisualModel({ state, prices }) {
           ))}
         </ol>
       </Section>
-      <Section index="1.4" title="Your money, in one line" note="What the financial model computes">
+      <Section index="2.4" title="Your money, in one line" note="What the financial model computes">
         <div className="cfd-money" data-testid="cfd-money">
           <div><span>Revenue</span><strong>SP × energy supplied</strong><small>up to 2 MWh/MW a day, cleared; + 50% of REC sales; + surplus RE sold after the day's supply</small></div>
           <div><span>Costs</span><strong>Battery + own RE + charging power</strong><small>capex, O&M, augmentation, green-market or group power, exchange fees, LC, EMD and PBG guarantees, SECI's charges, weekly penalties</small></div>
-          <div><span>Your bid</span><strong>The SP that earns your equity IRR</strong><small>solved on Bid and financials, rounded up to two decimals</small></div>
+          <div><span>Your bid</span><strong>The SP that earns your equity IRR</strong><small>solved on the Financial model step, rounded up to two decimals</small></div>
         </div>
       </Section>
     </>

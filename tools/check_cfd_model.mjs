@@ -20,9 +20,13 @@ for (const t of TERMS) {
   assert.ok(doc && Number.isInteger(t.page) && t.page >= 1 && t.page <= doc.pages, `${t.id}: page within ${t.doc}`);
   assert.ok(t.quote.split(" ").length >= 6 && t.display && t.label, `${t.id}: quote and display`);
 }
-assert.deepEqual(TERMS.filter((t) => t.status === "replaced").map((t) => t.id), ["ceiling", "slabs", "essThirdParty", "rfsTerm12"]);
-assert.deepEqual(TERMS.filter((t) => t.status === "conflict").map((t) => t.id), ["existingProjects", "essRemote"], "where the RfS and the CfDA still differ");
-assert.ok(TERMS.filter((t) => t.doc === "rfs").length >= 30, "the RfS is loaded");
+assert.deepEqual(TERMS.filter((t) => t.status === "replaced").map((t) => t.id), ["ceiling", "slabs", "essThirdParty", "rfsTerm12", "over10", "rfsSlabs", "rfsScd15", "emdShortfall"]);
+for (const t of TERMS.filter((t) => t.status === "replaced")) assert.ok(["amd2", "amd3"].includes(t.by), `${t.id}: which amendment replaced it`);
+assert.deepEqual(TERMS.filter((t) => t.status === "conflict").map((t) => t.id), ["existingProjects", "essRemote", "essRecognised"], "where the RfS and the CfDA (or the RfS and Amendment-02) still differ");
+assert.ok(TERMS.length >= 240, "the audit against the RfS and the three amendments");
+assert.ok(TERMS.filter((t) => t.doc === "amd1").length >= 2 && DOCUMENTS.some((d) => d.id === "amd1"), "Amendment-01 is in the pack");
+assert.equal(DOCUMENTS.find((d) => d.id === "cfda").file, null, "the CfDA is not provided with the build");
+assert.ok(TERMS.filter((t) => t.doc === "rfs").length >= 150, "the RfS is loaded");
 assert.equal(DOCUMENTS.find((d) => d.id === "rfs").pdfOffset, 1, "RfS pages are the printed numbers; the PDF has a cover first");
 assert.equal(termById.term.doc, "amd3", "the 15-year term is Amendment-03's");
 assert.equal(termById.settlement.doc, "amd3", "full CfD settlement is Amendment-03's");

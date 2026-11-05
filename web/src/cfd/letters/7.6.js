@@ -43,23 +43,23 @@ Name of Member: [Insert name of the Member]
 Net Worth Requirement to be met by Member: INR ------------- Crore
 For the above calculations, we have considered Net Worth by Member in Bidding Consortium and/ or its Affiliate(s) per following details:
 
-[if liquidityRoute=Annual turnover] Further, we certify that the Bidding Company/ Member in the Bidding Consortium, with the support of its Affiliates, (strike out if not applicable) is fulfilling the minimum Annual Turnover Criteria, by demonstrating an Annual Turnover of INR {{turnoverCr}} Crore as on the end of Financial Year {{netWorthYear}} or as on the day at least 7 days prior to the bid submission deadline (choose one). (Strike out if not applicable)
+[if liquidityRoute=Annual turnover (RfS 37.2.i)] Further, we certify that the Bidding Company/ Member in the Bidding Consortium, with the support of its Affiliates, (strike out if not applicable) is fulfilling the minimum Annual Turnover Criteria, by demonstrating an Annual Turnover of INR {{turnoverCr}} Crore as on the end of Financial Year {{netWorthYear}} or as on the day at least 7 days prior to the bid submission deadline (choose one). (Strike out if not applicable)
 
-[if liquidityRoute=Annual turnover] For the above calculations, we have considered the Annual Turnover by Bidding Company and/ or its Affiliate(s) as per following details:
+[if liquidityRoute=Annual turnover (RfS 37.2.i)] For the above calculations, we have considered the Annual Turnover by Bidding Company and/ or its Affiliate(s) as per following details:
 
 | Name of Bidding Company | Name of Affiliate(s) whose Annual Turnover is to be considered | Relationship with Bidding Company* | Annual Turnover (Rs. Crore) |
 | {{turnoverTable}} | | | |
 | Total | | | |
 
-[if liquidityRoute=PBDIT] Further, we certify that the Bidding Company/ Member in the Bidding Consortium, with the support of its Affiliates, (strike out if not applicable) is fulfilling the minimum Profit Before Depreciation Interest and Taxes (PBDIT) criteria as mentioned in the RfS, by demonstrating a PBDIT of INR {{pbditCr}} Crore as on the end of Financial Year {{netWorthYear}} or as on the day at least 7 days prior to the bid submission deadline. (Strike out if not applicable)
+[if liquidityRoute=PBDIT (37.2.ii)] Further, we certify that the Bidding Company/ Member in the Bidding Consortium, with the support of its Affiliates, (strike out if not applicable) is fulfilling the minimum Profit Before Depreciation Interest and Taxes (PBDIT) criteria as mentioned in the RfS, by demonstrating a PBDIT of INR {{pbditCr}} Crore as on the end of Financial Year {{netWorthYear}} or as on the day at least 7 days prior to the bid submission deadline. (Strike out if not applicable)
 
-[if liquidityRoute=PBDIT] For the above calculations, we have considered the PBDIT by Bidding Company and/ or its Affiliate(s) as per following details:
+[if liquidityRoute=PBDIT (37.2.ii)] For the above calculations, we have considered the PBDIT by Bidding Company and/ or its Affiliate(s) as per following details:
 
 | Name of Bidding Company | Name of Affiliate(s) whose PBDIT is to be considered | Relationship with Bidding Company* | PBDIT (Rs. Crore) |
 | {{pbditTable}} | | | |
 | Total | | | |
 
-[if liquidityRoute=Line of credit (sanction letter)] The Liquidity criteria is met through an In-principle sanction letter from our lending institution/ bank committing a Line of Credit as per Clause 37.2 (iii) of the RfS, submitted separately as part of this response to RfS.
+[if liquidityRoute=Line of credit sanction letter (37.2.iii)] The Liquidity criteria is met through an In-principle sanction letter from our lending institution/ bank committing a Line of Credit as per Clause 37.2 (iii) of the RfS, submitted separately as part of this response to RfS.
 
 {{signatory}}
 (Signature & Name of the Authorized Signatory)

@@ -38,7 +38,7 @@ export const SUMMARY_FIELDS = [
   { key: "lcos", label: "LCOS", unit: "₹/kWh", digits: 2 },
 ];
 
-export const MODULE_LABEL = { rtc: "Round the Clock", fdre: "FDRE", bess: "BESS Tender", seci: "SECI RTC tender" };
+export const MODULE_LABEL = { rtc: "Round the Clock", fdre: "FDRE", bess: "BESS Tender", seci: "SECI RTC tender", cfd: "CfD bid" };
 
 export function formatField(field, value) {
   if (value === null || value === undefined || value === "" || !Number.isFinite(Number(value))) return "–";

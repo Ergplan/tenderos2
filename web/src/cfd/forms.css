@@ -1,0 +1,3 @@
+/* CfD Bid · Bid forms: the step reuses the SECI forms layout (web/src/seci.css); only its own bits here */
+.cfd .seci-forms label small.warn { color: var(--warn); }
+.cfd .seci-forms label small.ok { color: var(--good); }

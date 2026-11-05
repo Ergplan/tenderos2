@@ -145,3 +145,27 @@ assert.ok(fin.totals.charging > 0 && fin.totals.cfdPenalty === 0, "the benchmark
   assert.ok(!/undefined|NaN/.test(JSON.stringify(exp.cover)), "nothing undefined on the cover");
 }
 console.log(`CfD finance checks passed: strike price ₹${fin.tariff.toFixed(4)}/kWh for a ${(i.targetEquityIrr * 100).toFixed(0)}% equity IRR (screening ₹${model.sp.toFixed(4)}), capex ₹${fin.capex.total.toFixed(1)} cr, min DSCR ${fin.minDscr.toFixed(2)}`);
+
+// ---- the strike-price levers (the What-if step)
+{
+  const { cfdLeverEffects, leversOf, withCfdLever } = await import("../web/src/cfd/levers.js");
+  const levers = leversOf(state, model);
+  assert.ok(levers.length >= 25 && levers.some((l) => l.operation) && levers.some((l) => !l.operation), "operation and finance levers");
+  assert.ok(!levers.some((l) => l.key === "windCuf"), "no wind: no wind levers");
+  const moved = withCfdLever(state, levers.find((l) => l.key === "essCrPerMwh"), 1.2);
+  assert.ok(moved.inputs.essCrPerMwh === 1.2 && !moved.filled.essCrPerMwh, "a lever applied clears the benchmark mark");
+  const fewer = { ...state, inputs: { ...state.inputs } };
+  const subset = ["essCrPerMwh", "targetEquityIrr", "solarCuf"];
+  let progress = 0;
+  const res = await cfdLeverEffects(fewer, model, prices, { target: fin.tariff - 1, onProgress: () => { progress += 1; }, tick: async () => {} });
+  near(res.base, fin.tariff, 1e-9, "the base is the solved strike price");
+  assert.ok(progress >= levers.length - 1);
+  const by = Object.fromEntries(res.levers.map((l) => [l.key, l]));
+  for (const k of subset) assert.ok(by[k], `lever ${k} computed`);
+  assert.ok(by.essCrPerMwh.priceUp > res.base && by.essCrPerMwh.priceDown < res.base, "dearer battery, higher strike price");
+  assert.ok(by.targetEquityIrr.slope > 0, "a higher target IRR needs a higher price");
+  assert.ok(by.solarCuf.priceUp < res.base, "a better solar resource lowers the price (re-simulated)");
+  assert.ok(by.essCrPerMwh.reach < state.inputs.essCrPerMwh && by.essCrPerMwh.reachable, "the battery price that alone reaches ₹1 less");
+  assert.ok(res.levers[0].perStep >= res.levers[res.levers.length - 1].perStep || Math.abs(res.levers[0].perStep) >= Math.abs(res.levers[res.levers.length - 1].perStep), "biggest movers first");
+}
+console.log("CfD lever checks passed");

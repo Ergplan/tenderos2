@@ -23,16 +23,16 @@ const ctx = (page, quote) => ({ doc: "rfs", page, quote });
 const F = (key, label, kind, maps, page, quote, extra = {}) => ({ key, label, kind, maps, context: ctx(page, quote), ...extra });
 
 // the particulars every letter head shares: name and address, the RfS reference, the date and signatory
-const HEAD = (page) => [
-  F("refNo", "Reference number", "text", null, page, "Ref. No. _________"),
+const HEAD = (page, { ref = "Ref. No. _________", from = "(Insert name and address of Bidding Company/ Lead Member of", tel = "Tel.#:", sub = "Sub: Response to RfS No." } = {}) => [
+  F("refNo", "Reference number", "text", null, page, ref),
   F("date", "Letter date", "date", "date", page, "Date: ___________"),
-  F("bidder", "Bidding Company / Lead Member name", "text", "bidder", page, "(Insert name and address of Bidding Company/ Lead Member of"),
-  F("address", "Bidder address", "textarea", "address", page, "(Insert name and address of Bidding Company/ Lead Member of"),
-  F("phone", "Telephone", "text", "phone", page, "Tel.#:"),
+  F("bidder", "Bidding Company / Lead Member name", "text", "bidder", page, from),
+  F("address", "Bidder address", "textarea", "address", page, from),
+  F("phone", "Telephone", "text", "phone", page, tel),
   F("email", "E-mail", "text", "email", page, "E-mail address#"),
-  F("rfsNo", "RfS number", "text", "rfsNo", page, "Sub: Response to RfS No."),
-  F("rfsDate", "RfS date", "date", "rfsDate", page, "Sub: Response to RfS No."),
-  F("title", "RfS title", "text", "title", page, "Sub: Response to RfS No."),
+  F("rfsNo", "RfS number", "text", "rfsNo", page, sub),
+  F("rfsDate", "RfS date", "date", "rfsDate", page, sub),
+  F("title", "RfS title", "text", "title", page, sub),
 ];
 const SIGN = (page) => [
   F("signatory", "Authorised signatory (name, designation)", "text", "signatory", page, "Name, Designation, Seal and Signature of Authorized Person in whose name Power of"),
@@ -55,10 +55,10 @@ export const FORMATS = [
       F("bessMw", "ESS component (MW)", "number", "bessMw", 65, "ESS component: __ MW/ ___ MWh"),
       F("bessMwh", "ESS component (MWh)", "number", "bessMwh", 65, "ESS component: __ MW/ ___ MWh"),
       F("location", "Location of the project (village, tehsil, district, state)", "text", "site", 65, "Location of Project (Village, Tehsil, Dist., State)"),
-      F("substation", "Interconnection point details (ISTS substation)", "text", "substation", 65, "Interconnection Point Details"),
-      F("preference", "Project preference", "text", null, 65, "Project Preference*"),
+      F("substation", "Interconnection point details (ISTS substation)", "text", "substation", 65, "Point Details"),
+      F("preference", "Project preference", "text", null, 65, "*The preferences of the Projects shall be considered only for the last successful bidder"),
       F("emdAmount", "EMD amount (INR)", "text", "emdAmount", 65, "We have enclosed EMD of INR …………. (Insert Amount)"),
-      F("emdForm", "EMD instrument", "choice", "emdForm", 65, "in the form of Bank Guarantee/ Surety Bond no", { options: ["Bank Guarantee", "Surety Bond"] }),
+      F("emdForm", "EMD instrument", "choice", "emdForm", 65, "in the form of Bank Guarantee/ Surety Bond no", { options: ["Bank Guarantee (Format 7.3A)", "Insurance Surety Bond (Format 7.3B)"] }),
       F("emdNumber", "Bank guarantee / surety bond number", "text", null, 65, "[Insert bank guarantee/Surety Bond number]"),
       F("emdDate", "Bank guarantee / surety bond date", "date", null, 65, "[Insert date of bank guarantee/Surety Bond]"),
       F("emdIssuer", "Issuing bank / surety issuer", "text", null, 65, "[Insert name of bank providing bank guarantee/Surety Bond issuing"),
@@ -100,7 +100,7 @@ export const FORMATS = [
     purpose: "The EMD as an unconditional bank guarantee: the amount of clause 17, valid 12 months from the bid deadline, claimable 30 days more",
     heading: { doc: "rfs", page: 70, quote: "Format 7.3A FORMAT FOR BANK GUARANTEE TOWARDS EARNEST MONEY DEPOSIT" },
     fields: [
-      F("reference", "Reference", "text", null, 70, "Reference: ……………………………."),
+      F("reference", "Reference", "text", null, 70, "Reference:"),
       F("bgNo", "Bank Guarantee number", "text", null, 70, "Bank Guarantee No.:"),
       F("bgDate", "Bank Guarantee date", "date", null, 70, "Date: ...................……..."),
       F("bidder", "Bidder's name", "text", "bidder", 70, "[Insert name of the Bidder]"),
@@ -149,7 +149,7 @@ export const FORMATS = [
     purpose: "The performance guarantee of clause 18: the amount on the installed capacity, valid until 6 months after the SCD",
     heading: { doc: "rfs", page: 74, quote: "Format 7.3 C FORMAT FOR PERFORMANCE BANK GUARANTEE (PBG)" },
     fields: [
-      F("reference", "Reference", "text", null, 74, "Reference: ……………………………."),
+      F("reference", "Reference", "text", null, 74, "Reference:"),
       F("bgNo", "Bank Guarantee number", "text", null, 74, "Bank Guarantee No.:"),
       F("bgDate", "Bank Guarantee date", "date", null, 74, "Date: ...................……..."),
       F("bidder", "Selected RE Power Developer", "text", "bidder", 74, "[Insert name of the Bidder] (hereinafter"),
@@ -248,7 +248,7 @@ export const FORMATS = [
       F("netWorthWords", "Net worth in words", "text", null, 86, "(………………… in words) as on the last date of Financial Year"),
       F("netWorthYear", "Financial year of the net worth", "text", "netWorthYear", 86, "as on the last date of Financial Year 2024-25/2025-26"),
       F("netWorthTable", "Net worth table: company, affiliate, relationship, net worth (one row per line)", "table", null, 86, "For the above calculations, we have considered the Net Worth by Bidding Company and/ or its"),
-      F("liquidityRoute", "Liquidity criterion met through", "choice", "liquidityRoute", 87, "is fulfilling the minimum Annual Turnover", { options: ["Annual turnover", "PBDIT", "Line of credit (sanction letter)"] }),
+      F("liquidityRoute", "Liquidity criterion met through", "choice", "liquidityRoute", 87, "is fulfilling the minimum Annual Turnover", { options: ["Annual turnover (RfS 37.2.i)", "PBDIT (37.2.ii)", "Line of credit sanction letter (37.2.iii)"] }),
       F("turnoverCr", "Annual turnover demonstrated (₹ crore)", "number", "turnoverCr", 87, "by demonstrating an Annual Turnover of INR _________"),
       F("turnoverTable", "Turnover table: company, affiliate, relationship, turnover (one row per line)", "table", null, 87, "we have considered the Annual Turnover by Bidding Company"),
       F("pbditCr", "PBDIT demonstrated (₹ crore)", "number", "pbditCr", 88, "by demonstrating a"),
@@ -267,7 +267,7 @@ export const FORMATS = [
       F("rfsDate", "RfS date", "date", "rfsDate", 90, "response to RfS vide RfS No."),
       F("bidDeadline", "Last date of bid submission", "date", "bidDeadline", 90, "[Insert last date of bid submission]"),
       F("bidder", "Bidder's name", "text", "bidder", 90, "(insert name of the Bidder)"),
-      ...SIGN(90),
+      F("signatory", "Authorised signatory (name, designation)", "text", "signatory", 90, "(Name, Signature, and Stamp of the Authorized Signatory)"),
     ],
   },
   {
@@ -276,7 +276,7 @@ export const FORMATS = [
     purpose: "That only this bidder of its group is bidding, who its promoters are, the land-border OM and the ALMM undertakings",
     heading: { doc: "rfs", page: 91, quote: "Format 7.8 FORMAT FOR DISCLOSURE" },
     fields: [
-      ...HEAD(91),
+      ...HEAD(91, { ref: "Ref.No. _________", tel: "Tel. #:" }),
       F("promoters", "Promoter(s) with direct or indirect control", "text", null, 91, "(enter name of the Promoter/Promoters) is/are our Promoter(s)"),
       ...SIGN(92),
     ],
@@ -287,7 +287,7 @@ export const FORMATS = [
     purpose: "Where one company holds more than 10% but less than 26% in this and another bidder: who it is and that it takes no part in the bid",
     heading: { doc: "rfs", page: 93, quote: "Format 7.8A FORMAT FOR DISCLOSURE" },
     fields: [
-      ...HEAD(93),
+      ...HEAD(93, { ref: "Ref.No. _________", tel: "Tel. #:" }),
       F("commonShareholder", "The common shareholder", "text", null, 93, "(enter name of the common shareholder) is our Group Company"),
       F("promoters", "Promoter(s) with direct or indirect control", "text", null, 93, "(enter name of the Promoter/Promoters) is/are our Promoter(s)"),
       ...SIGN(94),
@@ -298,7 +298,7 @@ export const FORMATS = [
     submittedBy: "The Bidding Company / each member of a Consortium (authorised signatory)", paper: "Letterhead of the Bidding Company/ Each Member of Consortium", envelope: "techno-commercial", when: "with the bid",
     purpose: "The declaration under the Ministry of Finance OM of 23.02.2023 on bidders from countries sharing a land border with India",
     heading: { doc: "rfs", page: 95, quote: "Annexure to Format 7.8/7.8A DECLARATION" },
-    fields: [...HEAD(95), ...SIGN(95)],
+    fields: [...HEAD(95, { from: "(Insert name and address of Bidding Company/Member of Consortium)", tel: "Tel#:", sub: "Sub: Response to RfS No" }), ...SIGN(95)],
     attachments: [{ label: "OM No. F.7/10/2021-PPD(1) dated 23.02.2023 (and the registration by the Competent Authority, where applicable)", context: ctx(95, "Encl: OM dated 23.02.2023, as referred above.") }],
   },
   {
@@ -379,13 +379,22 @@ const MODEL = new Set(["contractedMw", "solarMw", "windMw", "otherReMw", "bessMw
 /** Shared particulars a format blank maps to (state.forms keys); `date` is the letters' date. */
 const SHARED = { date: "letterDate", tariff: "tariff", netWorthCr: "netWorthCr", netWorthYear: "netWorthYear" };
 
-/** Whether a blank applies to this bid: a blank marked `when: "consortium"` is left out of a single company's format. */
+/**
+ * Whether a blank applies to this bid: a blank marked `when: "consortium"` is left out of a single
+ * company's format, and a blank that maps to a particular asked only on one route (the turnover,
+ * PBDIT or line-of-credit figure) is left out when another route is chosen.
+ */
 export function fieldApplies(state, field) {
-  if (field.when === "consortium") return state.forms?.bidderType === "consortium";
+  const f = state.forms || {};
+  if (field.when === "consortium") return f.bidderType === "consortium";
+  if (field.maps && !MODEL.has(field.maps)) {
+    const shared = FORM_FIELDS.find((x) => x.key === (SHARED[field.maps] || field.maps));
+    if (shared?.when && !shared.when(f)) return false;
+  }
   return true;
 }
 
-export const NOT_APPLICABLE = "Not applicable (single company)";
+export const NOT_APPLICABLE = "Not applicable to this bid";
 
 /** Where a blank's value comes from: { source: "model"|"shared"|"own"|"na", key, value }. */
 export function blankValue(state, format, field) {

@@ -75,13 +75,13 @@ function YearChart({ year, sp }) {
   );
 }
 
-/** Step 2: the tender worked through for one bid size, with real IEX evenings. */
+/** The tender worked through for one bid size, with real IEX evenings (part of the What is a CfD step). */
 export default function ExampleStep({ state, prices, model, setExample, goto }) {
   const ex = state.example || {};
   const i = state.inputs;
   const mw = exampleMw(state);
   const sp = isNum(ex.sp) ? ex.sp : model?.bid ?? EXAMPLE_DEFAULTS.sp;
-  const spSource = isNum(ex.sp) ? "your example" : model?.bid ? "your bid from Bid and financials" : "an example; yours is solved on Bid and financials";
+  const spSource = isNum(ex.sp) ? "your example" : model?.bid ? "your bid from the Financial model step" : "an example; yours is solved on the Financial model step";
   const market = i.sellMarket || "DAM";
   const rte = isNum(i.rte) ? i.rte : EXAMPLE_DEFAULTS.rte;
   const solarCuf = isNum(i.solarCuf) ? i.solarCuf : EXAMPLE_DEFAULTS.solarCuf;
@@ -99,7 +99,7 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
     </div>
   );
 
-  if (!x) return <><Section index="2" title="Worked example" note="Loading IEX prices">{controls}</Section></>;
+  if (!x) return <><Section index="3" title="Worked example" note="Loading IEX prices">{controls}</Section></>;
   const c = x.commit;
   const g = x.charging;
   const m = x.money;
@@ -109,7 +109,7 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
 
   return (
     <>
-      <Section index="2" title={`Worked example: a ${nf(mw)} MW bid`} note={`Step by step, on real IEX ${market} evenings · this does not change your inputs`}>
+      <Section index="3" title={`Worked example: a ${nf(mw)} MW bid`} note={`Step by step, on real IEX ${market} evenings · this does not change your inputs`}>
         {controls}
         <div className="cfd-answer" data-testid="cfd-answer">
           <div className="cfd-answer-head"><CircleCheck size={18} /><div><span>Do you need a solar or wind plant already?</span><strong>No. You build everything after you win.</strong></div></div>
@@ -124,7 +124,7 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
         </div>
       </Section>
 
-      <Section index="2.1" title="What you sign up for" note={`${nf(mw)} MW is ${pf(c.share, 0)} of the tender's 500 MW`}>
+      <Section index="3.1" title="What you sign up for" note={`${nf(mw)} MW is ${pf(c.share, 0)} of the tender's 500 MW`}>
         <div className="rtc-grid rtc-grid-4" data-testid="cfd-example-commit">
           <Stat label="Every evening" value={`${nf(c.dailyMwh)} MWh`} detail={`${nf(mw)} MW for 2 hours you pick between 18:00 and 24:00`} />
           <Stat label="Every Contract Week" value={`${nf(c.weeklyMwh)} MWh`} detail={`at least ${nf(c.weeklyMinMwh)} MWh (90%) or a penalty`} />
@@ -134,16 +134,16 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
         <p className="rtc-note"><Cites ids={["mandate", "tolerance", "contractWeek", "term", "ess"]} /></p>
       </Section>
 
-      <Section index="2.2" title="What you build, and how the battery is charged" note="Months from the Effective Date (the 30th day after the Letter of Award)">
+      <Section index="3.2" title="What you build, and how the battery is charged" note="Months from the Effective Date (the 30th day after the Letter of Award)">
         <div className="cfd-phases" data-testid="cfd-phases">
           <div><span>Months 0–15 · build</span><strong>Battery {nf(c.batteryMw)} MW / {nf(c.batteryMwh)} MWh and the line to an ISTS substation</strong><small>No supply yet. Financial closure 6 months before month 15.</small></div>
           <div><span>Months 15–36 · supply starts</span><strong>Charge from the green market, sell {nf(c.dailyMwh)} MWh each evening</strong><small>About {nf(g.perDayMwh, 0)} MWh a day bought in the day (at {pf(rte, 0)} round-trip efficiency); up to 100% may come from the market. Build your own RE meanwhile.</small></div>
           <div><span>Month 36 to the end of the term · own RE in</span><strong>Own RE gives at least {pf(g.ownShareWithGroup, 0)}–{pf(g.ownShareAlone, 0)} of the energy</strong><small>About {nf(g.solarWithGroup, 0)} MWac of solar with 50% group-company RE, or {nf(g.solarAlone, 0)} MWac without (at {pf(solarCuf, 0)} CUF). Market power at most 25%.</small></div>
         </div>
-        <p className="rtc-note">{assumed ? `Solar is sized on energy alone with an example ${pf(rte, 0)} battery efficiency and ${pf(solarCuf, 0)} solar CUF (your own figures on Plant and sourcing replace them). ` : "Solar is sized on energy alone with your efficiency and CUF. "}Optimise own RE on Plant and sourcing finds the size that meets every day, not just the year. <Cites ids={["essScd", "reCod", "finClose"]} /></p>
+        <p className="rtc-note">{assumed ? `Solar is sized on energy alone with an example ${pf(rte, 0)} battery efficiency and ${pf(solarCuf, 0)} solar CUF (your own figures on Design replace them). ` : "Solar is sized on energy alone with your efficiency and CUF. "}Optimise own RE on the Size step finds the size that meets every day, not just the year. <Cites ids={["essScd", "reCod", "finClose"]} /></p>
       </Section>
 
-      <Section index="2.3" title="Money you put up before you earn" note={`For ${nf(mw)} MW with ${nf(c.batteryMwh)} MWh of battery and ${nf(g.plantSolar)} MWac of solar`}>
+      <Section index="3.3" title="Money you put up before you earn" note={`For ${nf(mw)} MW with ${nf(c.batteryMwh)} MWh of battery and ${nf(g.plantSolar)} MWac of solar`}>
         <div className="rtc-grid rtc-grid-4" data-testid="cfd-example-money">
           <Stat label="EMD with the bid" value={cr(m.emdCr)} detail="bank guarantee, returned once the PBG is in" />
           <Stat label="PBG after the award" value={cr(m.pbgCr)} detail="bank guarantee, until 6 months after the SCD" />
@@ -153,7 +153,7 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
         <p className="rtc-note">You also need a net worth of {cr(m.netWorthCr)} for this plant. <Cites ids={["emd", "pbg", "cac", "bidFee", "lc", "netWorth"]} /></p>
       </Section>
 
-      <Section index="2.4" title="Three real evenings, settled" note={`At your strike price of ₹${nf(sp, 2)}/kWh, on IEX ${market} prices`}>
+      <Section index="3.4" title="Three real evenings, settled" note={`At your strike price of ₹${nf(sp, 2)}/kWh, on IEX ${market} prices`}>
         <div className="cfd-evenings">
           <Evening title="The cheapest evening of the year" e={x.evenings.low} sp={sp} scale={scale} />
           <Evening title="A middle evening" e={x.evenings.middle} sp={sp} scale={scale} />
@@ -162,7 +162,7 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
         <p className="rtc-note">Whatever the market pays, you end each evening with your strike price on every kWh you supplied. The market price only decides whether the money comes from the Pool or goes to it. Settled every 15-minute block and billed monthly. <Cites ids={["settlement", "noRisk", "blockSettle"]} /></p>
       </Section>
 
-      <Section index="2.5" title="A week with a missed evening" note={`Contract Week ${fmtDate(w.start)} – ${fmtDate(w.end)}`}>
+      <Section index="3.5" title="A week with a missed evening" note={`Contract Week ${fmtDate(w.start)} – ${fmtDate(w.end)}`}>
         <div className="cfd-week" data-testid="cfd-example-week">
           <p>Say the battery trips on <strong>{weekday(w.missedDate)} {fmtDate(w.missedDate)}</strong> and you supply nothing that evening.</p>
           <div className="cfd-week-rows">
@@ -179,7 +179,7 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
         </div>
       </Section>
 
-      <Section index="2.6" title="A year of evenings at your strike price" note={`IEX ${market}, ${fmtDate(Date.parse(`${y.from}T00:00:00Z`))} – ${fmtDate(Date.parse(`${y.to}T00:00:00Z`))}; every evening supplied in full`}>
+      <Section index="3.6" title="A year of evenings at your strike price" note={`IEX ${market}, ${fmtDate(Date.parse(`${y.from}T00:00:00Z`))} – ${fmtDate(Date.parse(`${y.to}T00:00:00Z`))}; every evening supplied in full`}>
         <div className="rtc-grid rtc-grid-4" data-testid="cfd-example-yearstats">
           <Stat label="Energy supplied" value={`${nf(y.energyMwh / 1000, 1)} GWh`} detail={`average evening price ₹${nf(y.avgPrice, 2)}/kWh`} />
           <Stat label="The exchanges pay you" value={cr(y.exchangeCr)} detail="market price × energy" />
@@ -190,11 +190,11 @@ export default function ExampleStep({ state, prices, model, setExample, goto }) 
         <p className="rtc-note">The highest evening price in these 12 months was ₹{nf(y.maxPrice, 2)}/kWh: at a strike price above it, the Pool pays you every evening and never receives. SECI's ₹{TENDER.poolCr} crore Pool is your payment security. <Cites ids={["pool", "poolSecurity", "seciLimited"]} /></p>
       </Section>
 
-      <Section index="2.7" title="Your bid" note="The strike price that covers your costs and return">
+      <Section index="3.7" title="Your bid" note="The strike price that covers your costs and return">
         <div className="cfd-bidline" data-testid="cfd-example-bid">
           <p>Your revenue is fixed by the strike price; the market price does not change it. So the strike price must pay for the battery, your own RE, the charging power, O&amp;M, the guarantees and the penalties, and earn your return over 15 years. In the e-Reverse Auction you then need to be within 2% of the lowest bid to win. <Cites ids={["spFixed", "range", "decrement"]} /></p>
           <div className="cfd-bidline-actions">
-            <button type="button" className="secondary" onClick={() => goto("plant")}>Your plant and sourcing <ArrowRight size={14} /></button>
+            <button type="button" className="secondary" onClick={() => goto("design")}>Your design <ArrowRight size={14} /></button>
             <button type="button" className="primary" onClick={() => goto("finance")}>Solve your strike price <ArrowRight size={14} /></button>
           </div>
         </div>

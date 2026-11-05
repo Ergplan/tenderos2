@@ -99,9 +99,29 @@
 .cfd-statements tr.band td { background: var(--bg-2); color: var(--signal); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; }
 /* worked example */
 @media (min-width: 1101px) {
-  .cfd-steps { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .cfd-steps { grid-template-columns: repeat(6, minmax(0, 1fr)); }
   .cfd-steps .bid-step { gap: 8px; padding: 12px 10px; }
 }
+@media (min-width: 1500px) {
+  .cfd-steps { grid-template-columns: repeat(11, minmax(0, 1fr)); }
+  .cfd-steps .bid-step { gap: 6px; padding: 12px 8px; }
+}
+/* the agent's panel and the team panel beside the page, as on the SECI tab */
+@media (min-width: 1101px) {
+  .cfd.agent-docked { margin-right: 440px; transition: margin-right 200ms ease; }
+  .cfd.agent-docked .cfd-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+/* Size: the tender's conditions on the modelled plant */
+.cfd-checks { display: grid; border: 1px solid var(--line); background: var(--surface); }
+.cfd-check { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13px; }
+.cfd-check:first-child { border-top: 0; }
+.cfd-check > span { display: grid; gap: 2px; }
+.cfd-check small { color: var(--ink-2); }
+.cfd-check.met > svg { color: var(--good); }
+.cfd-check.failed > svg { color: var(--bad); }
+.cfd-check.failed { background: rgba(255, 107, 95, 0.06); }
+.cfd-check.info > svg { color: var(--warn); }
+.cfd-rfs-grid .rtc-stat { padding: 0; border: 0; background: transparent; }
 .cfd-example-controls { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-end; margin-bottom: 16px; }
 .cfd-example-controls > div { min-width: 180px; }
 .cfd-chips { display: inline-flex; border: 1px solid var(--line-2); }

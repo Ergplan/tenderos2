@@ -1,0 +1,27 @@
+/* SECI CfD-I tender side: the documents, the amendment trail, the conditions and the explainer
+   (the layouts reuse the SECI tab's .seci-* classes from seci.css; these are the CfD-only parts) */
+.cfd-explain { display: grid; gap: 14px; max-width: 980px; }
+.cfd-explain p { margin: 0; font-size: 14.5px; line-height: 1.65; }
+.cfd-explain p strong { color: var(--ink); }
+.cfd-explain h3 { margin: 10px 0 0; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-family: var(--font-mono); font-weight: 600; }
+.cfd-settle-table { width: 100%; max-width: 760px; border-collapse: collapse; font-size: 13px; }
+.cfd-settle-table th, .cfd-settle-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.cfd-settle-table th { color: var(--muted); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; }
+.cfd-settle-table td b { color: var(--ink); }
+.cfd-settle-table td.pool { color: var(--good, #7ddc9a); }
+.cfd-settle-table td.you { color: var(--warn); }
+.cfd-explain-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.cfd-explain-card { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--line); background: var(--surface); font-size: 13px; line-height: 1.5; }
+.cfd-explain-card > span { color: var(--signal); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+.cfd-explain-card strong { font-size: 14px; color: var(--ink); }
+.cfd-explain-card .cfd-cites { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.cfd-cond-cite { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-family: var(--font-mono); font-size: 10.5px; }
+.cfd-cond-cite a { color: var(--signal); text-decoration: none; }
+.seci-badge.replaced { color: var(--muted); text-decoration: line-through; }
+.seci-badge.conflict { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, transparent); }
+.seci-badge.cfda { color: var(--wind, #3fa7d6); border-color: color-mix(in srgb, var(--wind, #3fa7d6) 45%, transparent); }
+.seci-cond.replaced .seci-cond-body > b { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--bad) 60%, transparent); }
+.seci-cond.conflict { box-shadow: inset 3px 0 0 var(--warn); }
+.cfd-cond-filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.cfd-cond-filter button { padding: 4px 10px; border: 1px solid var(--line-2, var(--line)); background: transparent; color: var(--muted); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
+.cfd-cond-filter button.active { color: var(--ink); border-color: var(--signal); }

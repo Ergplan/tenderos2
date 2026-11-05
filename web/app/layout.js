@@ -2,6 +2,7 @@ import "@/src/styles.css";
 import "@/src/app.css";
 import "@/src/bid.css";
 import "@/src/cfd.css";
+import "@/src/cfd/forms.css";
 import "@/src/meter.css";
 import "@/src/seci.css";
 import "@/src/team.css";
