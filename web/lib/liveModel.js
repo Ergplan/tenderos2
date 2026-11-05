@@ -843,6 +843,11 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   const sized = sim ? "Round the clock plant" : "HiGHS sizing";
   const meter = m.ops.some((o) => finite(o.meterMWh) && o.meterMWh > 0);
   const blocky = m.ops.some((o) => finite(o.blockShortfallMWh) && o.blockShortfallMWh > 0) || (fi.blockPenaltyMultiple || 0) > 0;
+  // SECI CfD-I (web/src/cfd/finance.js): charging power and exchange fees bought by year, the
+  // Letter of Credit and the weekly shortfall penalty, both moving with the strike price
+  const cfd = m.ops.some((o) => (o.lcMw || 0) > 0 || (o.penaltyWeeks || []).length > 0 || (o.chargingCostCr || 0) !== 0 || (o.pxFeesCr || 0) !== 0);
+  const penK = cfd ? Math.max(...m.ops.map((o) => (o.penaltyWeeks || []).length)) : 0;
+  const tariffText = m.tariffLabel || (sim ? "Tariff" : "Bid tariff");
   const ys = Array.from({ length: N }, (_, i) => i + 1);
 
   // ---- title, legend and the year header (frozen)
@@ -886,7 +891,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   // ---- key results: filled at the end, once every row they read exists
   S.section("Key results");
   const KEYS = [
-    ["tariff", sim ? "Tariff" : "Bid tariff", "₹/kWh", "tariff"],
+    ["tariff", tariffText, "₹/kWh", "tariff"],
     ["equityIrr", "Equity IRR", "%", "pct"],
     ["irrGap", "Equity IRR less the target", "%", "pct"],
     ["projectIrr", "Project IRR", "%", "pct"],
@@ -919,7 +924,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   // ---- inputs
   S.section("Inputs");
   S.group("Tariff");
-  S.one("tariff", sim ? "Tariff" : "Bid tariff", "₹/kWh", { v: m.tariff, kind: "input", fmt: "tariff", source: m.tariffLocked ? "Fixed by you" : "Solved in TenderOS for the target equity IRR" });
+  S.one("tariff", tariffText, "₹/kWh", { v: m.tariff, kind: "input", fmt: "tariff", source: m.tariffLocked ? "Fixed by you" : "Solved in TenderOS for the target equity IRR" });
   S.one("tariffEsc", "Tariff escalation", "%/yr", { v: fi.tariffEscalation || 0, kind: "input", fmt: "pct", source: src("fin.tariffEscalation") });
 
   S.group(sim ? "Plant (from the Round the clock tab)" : "Plant (sized by the optimiser)");
@@ -944,6 +949,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
     S.one("bessPcs", "Battery power conversion", "₹ cr/MW", { v: co.bessPcsCrPerMw || 0, kind: "input", fmt: "num", source: src("costs.bessPcsCrPerMw", "Included in the energy price") });
   }
   S.one("evac", "Transmission / evacuation", "₹ cr", { v: co.evacuationCr || 0, kind: "input", fmt: "cr", source: src("costs.evacuationCr") });
+  if (co.otherCapexCr) S.one("otherCapex", m.otherCapexLabel || "Other project cost", "₹ cr", { v: co.otherCapexCr, kind: "input", fmt: "cr", source: src("costs.otherCapexCr", "Given") });
   const consM = Math.max(0, Math.round(co.constructionMonths || 0));
   S.one("preop", consM > 0 ? "Pre-operative cost (IDC worked out below)" : "Pre-operative and IDC", "% of hard cost", { v: co.preopPct || 0, kind: "input", fmt: "pct", source: src("costs.preopPct") });
   S.one("consMonths", "Construction months", "months", { v: consM, kind: "input", fmt: "int", source: src("costs.constructionMonths", "Model default"), note: "0: the IDC is inside the pre-operative share. Else the sheet Construction spends the cost month by month and works out the IDC" });
@@ -983,6 +989,13 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   S.one("target", "Annual supply floor", "% of contracted", { v: m.dfrTarget || 0, kind: "input", fmt: "pct", source: src("target", "Tender") });
   S.one("penalty", "Shortfall penalty", "₹/kWh short", { v: fi.shortfallPenalty || 0, kind: "input", fmt: "tariff", source: src("fin.shortfallPenalty", "Model default") });
   if (blocky) S.one("blockMult", "Time-block shortfall penalty", "× tariff", { v: fi.blockPenaltyMultiple || 0, kind: "input", fmt: "x", source: src("fin.blockPenaltyMultiple", "Tender"), note: "On the energy short of each time-block's floor, at this multiple of the year's tariff (SECI RTC-TM: 1.5)" });
+  if (cfd) {
+    S.group("Letter of Credit and weekly shortfall penalty (SECI CfD-I)");
+    S.one("lcPct", "Letter of Credit cost", "% of the LC a year", { v: fi.lcCostPct || 0, kind: "input", fmt: "pct", source: src("fin.lcCostPct") });
+    S.one("lcC", "LC reference price (C)", "₹/kWh", { v: fi.lcMinPrice ?? 10, kind: "input", fmt: "tariff", source: "Tender (CfDA 10.4.2)", note: "LC = 2000 kWh × contracted MW × (C − strike price) × days; nothing when the strike price is above C" });
+    S.one("lcDays", "LC days", "days", { v: fi.lcDays ?? 30, kind: "input", fmt: "int", source: "Tender (CfDA 10.4.2)" });
+    S.one("cfdMult", "Weekly shortfall penalty", "× (reference − strike price)", { v: fi.cfdPenaltyMultiple || 0, kind: "input", fmt: "x", source: "Tender (CfDA 4.4.3)", note: "On the energy short beyond 10% of a Contract Week's 14 MWh/MW, at this multiple of the week's highest evening price across the exchanges less the strike price; nothing when that price is below the strike price" });
+  }
 
   if (on.bess) {
     S.group("Battery augmentation");
@@ -1064,8 +1077,12 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   }
   S.one("evacCost", "Transmission / evacuation", "₹ cr", { f: S.s("evac"), v: S.v("evac"), fmt: "cr" });
   hardTerms.push("evacCost");
+  if (co.otherCapexCr) {
+    S.one("otherCost", m.otherCapexLabel || "Other project cost", "₹ cr", { f: S.s("otherCapex"), v: S.v("otherCapex"), fmt: "cr" });
+    hardTerms.push("otherCost");
+  }
   const hard = hardTerms.reduce((a, k) => a + S.v(k), 0);
-  S.one("hard", "Hard cost", "₹ cr", { f: `SUM(${S.s(hardTerms[0])}:${S.s("evacCost")})`, v: hard, fmt: "cr", bold: true });
+  S.one("hard", "Hard cost", "₹ cr", { f: `SUM(${S.s(hardTerms[0])}:${S.s(hardTerms[hardTerms.length - 1])})`, v: hard, fmt: "cr", bold: true });
   S.one("preopCost", consM > 0 ? "Pre-operative cost" : "Pre-operative and IDC", "₹ cr", { f: `${S.s("hard")}*${S.s("preop")}`, v: hard * S.v("preop"), fmt: "cr" });
   const base = hard * (1 + S.v("preop"));
   S.one("base", "Project cost before IDC", "₹ cr", { f: `${S.s("hard")}+${S.s("preopCost")}`, v: base, fmt: "cr" });
@@ -1231,6 +1248,14 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   } else {
     S.series("price", "Market sale price", "₹/kWh", { f: () => S.s("flatPrice"), v: () => S.v("flatPrice"), fmt: "tariff" });
   }
+  if (cfd) {
+    S.group("Bought and owed by year (SECI CfD-I, from the day-by-day operation)");
+    S.series("chargingCr", "Charging power bought (green market, group RE)", "₹ cr", { v: (y) => op(y).chargingCostCr || 0, kind: "opt", total: true, note: "The power bought to charge the battery, at the hourly GDAM price plus charges and the group RE price plus charges, within each Contract Year's sourcing limits" });
+    S.series("pxFeesCr", "Exchange fees on the energy sold", "₹ cr", { v: (y) => op(y).pxFeesCr || 0, kind: "opt", total: true });
+    S.series("lcMw", "Contracted capacity under the Letter of Credit", "MW", { v: (y) => op(y).lcMw || 0, kind: "opt", fmt: "mw", note: "The contracted MW during the term; 0 in any market years after it" });
+    for (let k = 1; k <= penK; k += 1) S.series(`penRef${k}`, `Penalised week ${k}: reference price`, "₹/kWh", { v: (y) => op(y).penaltyWeeks?.[k - 1]?.ref || 0, kind: "opt", fmt: "tariff", note: k === 1 ? "The week's highest evening price across the exchanges and markets (CfDA 4.4.3.i); the weeks whose supply fell short beyond the tolerance, in order" : undefined });
+    for (let k = 1; k <= penK; k += 1) S.series(`penMwh${k}`, `Penalised week ${k}: energy short beyond the tolerance`, "MWh", { v: (y) => op(y).penaltyWeeks?.[k - 1]?.beyondMwh || 0, kind: "opt", fmt: "num", note: k === 1 ? "The shortfall beyond 10% of the Contract Week's 14 MWh/MW (CfDA 4.4.3.ii)" : undefined });
+  }
   if (on.biomass) S.series("biomassMu", "Biomass generation", "MU", { v: (y) => mu(op(y).biomassMWh), kind: "opt", fmt: "mu", total: true });
   if (hydro) S.series("hydroMu", "Hydro energy", "MU", { v: (y) => mu(op(y).hydroMWh), kind: "opt", fmt: "mu", total: true });
   if (thermal) S.series("thermalMu", "Thermal (non-RE) energy", "MU", { v: (y) => mu(op(y).thermalMWh), kind: "opt", fmt: "mu", total: true });
@@ -1303,10 +1328,19 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
       note: "Energy short of the block floors × multiple × the year's tariff",
     });
   }
-  const minusPenalties = (y) => `-${S.at("penaltyCr", y)}${blocky ? `-${S.at("blockPenCr", y)}` : ""}`;
+  if (cfd) {
+    const refs = (y) => (penK ? `${S.at("penRef1", y)}:${S.at(`penRef${penK}`, y)}` : null);
+    const mwhs = (y) => (penK ? `${S.at("penMwh1", y)}:${S.at(`penMwh${penK}`, y)}` : null);
+    S.series("cfdPenCr", "Weekly shortfall penalty (SECI CfD-I)", "₹ cr", {
+      f: (y) => (penK ? `SUMPRODUCT((${refs(y)}>${S.at("trf", y)})*(${refs(y)}-${S.at("trf", y)})*${mwhs(y)})*${S.s("cfdMult")}/10000` : "0"),
+      v: (y) => (op(y).penaltyWeeks || []).reduce((a, w) => a + Math.max(0, w.ref - S.v("trf", y)) * w.beyondMwh, 0) * S.v("cfdMult") / 1e4, total: true,
+      note: "Each penalised week: the multiple × (reference price − strike price, when positive) × the energy short, summed, MWh × ₹/kWh ÷ 10,000 = ₹ crore",
+    });
+  }
+  const minusPenalties = (y) => `-${S.at("penaltyCr", y)}${blocky ? `-${S.at("blockPenCr", y)}` : ""}${cfd ? `-${S.at("cfdPenCr", y)}` : ""}`;
   S.series("revenue", "Total revenue", "₹ cr", {
     f: (y) => `${S.at("ppaRev", y)}+${S.at("mktRev", y)}${buyer ? `+${S.at("buyerRev", y)}` : ""}${minusPenalties(y)}`,
-    v: (y) => S.v("ppaRev", y) + S.v("mktRev", y) + (buyer ? S.v("buyerRev", y) : 0) - S.v("penaltyCr", y) - (blocky ? S.v("blockPenCr", y) : 0), total: true, bold: true,
+    v: (y) => S.v("ppaRev", y) + S.v("mktRev", y) + (buyer ? S.v("buyerRev", y) : 0) - S.v("penaltyCr", y) - (blocky ? S.v("blockPenCr", y) : 0) - (cfd ? S.v("cfdPenCr", y) : 0), total: true, bold: true,
   });
 
   // ---- operating costs
@@ -1343,6 +1377,16 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
       total: true, note: "Energy scheduled (MU, what reaches the meter) × (a × tariff + b) ÷ 10,000",
     });
     opexKeys.push("dsmCr");
+  }
+  if (cfd) {
+    S.series("chargingCostCr", "Charging power (green market, group RE)", "₹ cr", { f: (y) => S.at("chargingCr", y), v: (y) => S.v("chargingCr", y), total: true });
+    S.series("pxFeeCostCr", "Exchange fees", "₹ cr", { f: (y) => S.at("pxFeesCr", y), v: (y) => S.v("pxFeesCr", y), total: true });
+    S.series("lcCostCr", "Letter of Credit to SECI", "₹ cr", {
+      f: (y) => `${S.s("lcPct")}*2000*${S.at("lcMw", y)}*MAX(0,${S.s("lcC")}-${S.at("trf", y)})*${S.s("lcDays")}/10000000`,
+      v: (y) => (S.v("lcPct") * 2000 * S.v("lcMw", y) * Math.max(0, S.v("lcC") - S.v("trf", y)) * S.v("lcDays")) / 1e7, total: true,
+      note: "The LC's cost a year: cost % × 2000 kWh × MW × (C − strike price) × days ÷ 1e7 = ₹ crore",
+    });
+    opexKeys.push("chargingCostCr", "pxFeeCostCr", "lcCostCr");
   }
   if (on.biomass) {
     S.series("fuelCr", "Biomass fuel", "₹ cr", { f: (y) => `${S.at("biomassMu", y)}*${S.s("fuel")}*${S.at("fuelF", y)}/10`, v: (y) => (S.v("biomassMu", y) * S.v("fuel") * S.v("fuelF", y)) / 10, total: true });
@@ -1829,6 +1873,8 @@ export function liveModelInput(raw) {
   const plantIds = ["hydro", "thermal"];
   return {
     title: String(raw.title || "").slice(0, 200),
+    tariffLabel: typeof raw.tariffLabel === "string" ? raw.tariffLabel.replace(/[^\w ()·,.%/-]/g, "").slice(0, 40) : null,
+    otherCapexLabel: typeof raw.otherCapexLabel === "string" ? raw.otherCapexLabel.replace(/[^\w ()·,.%/'-]/g, "").slice(0, 80) : null,
     engine: raw.engine === "simulation" ? "simulation" : "highs",
     bessNote: typeof raw.bessNote === "string" ? raw.bessNote.slice(0, 120) : null,
     sourceAll: typeof raw.sourceAll === "string" ? raw.sourceAll.slice(0, 80) : null,
@@ -1840,7 +1886,7 @@ export function liveModelInput(raw) {
     on: Object.fromEntries(["solar", "wind", "hydro", "biomass", "thermal", "bess"].map((k) => [k, Boolean(raw.on?.[k])])),
     sizes: nums(raw.sizes, ["solarMw", "windMw", "bessMw", "bessMwh", "biomassMw", "hydroMw", "thermalMw"]),
     costs: {
-      ...nums(raw.costs, ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "biomassCrPerMw", "evacuationCr", "preopPct", "constructionMonths"]),
+      ...nums(raw.costs, ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "biomassCrPerMw", "evacuationCr", "otherCapexCr", "preopPct", "constructionMonths"]),
       drawdown: DRAWDOWN_LIST.includes(raw.costs?.drawdown) ? raw.costs.drawdown : "linear",
       drawOrder: raw.costs?.drawOrder === "equityFirst" ? "equityFirst" : "proRata",
       plants: (Array.isArray(raw.costs?.plants) ? raw.costs.plants : []).filter((p) => plantIds.includes(p?.id))
@@ -1852,7 +1898,9 @@ export function liveModelInput(raw) {
         "biomassFuelRsPerKwh", "biomassFuelEscalation", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple", "debtFraction", "interestRate",
         "tenorYears", "targetEquityIrr", "discountRate", "taxRate", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays",
         "graceYears", "targetDscr", "balloonPct", "stepUpPct", "refiYear", "refiRate", "refiTenorYears", "refiFeePct", "omStockMonths", "sparesPctOm", "wcInterestRate", "dsraMonths",
+        "lcCostPct", "lcDays", "cfdPenaltyMultiple",
       ]),
+      lcMinPrice: finite(fin.lcMinPrice) ? fin.lcMinPrice : 10,
       paymentsPerYear: [1, 2, 4, 12].includes(fin.paymentsPerYear) ? fin.paymentsPerYear : 1,
       sellSurplus: Boolean(fin.sellSurplus),
       repayment: REPAYMENT_LIST.includes(fin.repayment) ? fin.repayment : "equal",
@@ -1865,8 +1913,11 @@ export function liveModelInput(raw) {
       augmentation: ["annual", "oneTime"].includes(raw.bess?.augmentation) ? raw.bess.augmentation : "none",
     },
     ops: raw.ops.slice(0, 60).map((o) => ({
-      ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh", "dsmA", "dsmB"]),
+      ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh", "dsmA", "dsmB", "chargingCostCr", "pxFeesCr", "lcMw"]),
       ...(finite(o?.dsmChargeCr) ? { dsmChargeCr: o.dsmChargeCr } : {}),
+      // SECI CfD-I: the penalised weeks, at most one per week of the year
+      penaltyWeeks: (Array.isArray(o?.penaltyWeeks) ? o.penaltyWeeks : []).slice(0, 54)
+        .filter((w) => finite(w?.ref) && finite(w?.beyondMwh) && w.beyondMwh > 0).map((w) => ({ ref: Math.max(0, w.ref), beyondMwh: w.beyondMwh })),
       ...(finite(o?.surplusRevenueCr) ? { surplusRevenueCr: o.surplusRevenueCr } : {}),
     })),
     dispatch: dispatchInput(raw.dispatch, raw.ops.length),

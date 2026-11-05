@@ -1,18 +1,22 @@
 // SECI CfD-I: assured peak supply of 1000 MWh (500 MW x 2 h) through the power exchanges under a
 // Contract for Difference. Every term below is taken from the tender documents: the RfS, the
-// standard CfD Agreement (CfDA) and Amendments 02 and 03 to both. Each cites its document, clause
+// standard CfD Agreement (CfDA) and Amendments 01, 02 and 03 to both. Each cites its document, clause
 // and page and quotes it word for word (tests/test_cfd_terms.py checks every quote against its page
-// when the PDFs are available). Pages are the page numbers printed on the document ("Page 16 of
-// 128"); the RfS PDF has a cover first, so its PDF page is the printed page + 1 (pdfOffset).
+// against its page; the RfS and the three amendments are in web/public/tenders/seci-cfd-i/).
+// Pages are the page numbers printed on the document ("Page 16 of 128"); the RfS PDF has a cover
+// first, so its PDF page is the printed page + 1 (pdfOffset).
 // Where an amendment changed a term, the amended term is the one used and the original is kept,
-// marked "replaced". Where the documents still differ, the term is marked "conflict" and the
-// model follows the CfDA, which prevails (CfDA 1.2.18).
+// marked "replaced" (with `by`: the document that replaced it). Where the documents still differ,
+// the term is marked "conflict" and the model follows the CfDA, which prevails (CfDA 1.2.18).
+// The PDFs are served from web/public/tenders/seci-cfd-i/ (the standard CfDA is not provided with
+// this build; its quotes were read in an earlier session and are kept as they were).
 
 export const DOCUMENTS = [
-  { id: "rfs", title: "RfS No. SECI/C&P/IPP/13/0002/26-27 dated 15.07.2026", short: "RfS", pages: 128, pdfOffset: 1, file: "rfp.pdf" },
-  { id: "cfda", title: "Standard CfD Agreement (CfDA), SECI-CfD-I", short: "CfDA", pages: 69, file: "Standard_SECI_CfDA_CfD-I-_final_upload.pdf" },
-  { id: "amd2", title: "Amendment-02 to the RfS and CfDA (03.08.2026)", short: "Amd-02", pages: 5, file: "Amendment-02-SECI-CfD-I-final_upload.pdf" },
-  { id: "amd3", title: "Amendment-03 to the RfS and CfDA (08.10.2026)", short: "Amd-03", pages: 5, file: "Amendment-03-SECI-CfD-I-final_upload.pdf" },
+  { id: "rfs", title: "RfS No. SECI/C&P/IPP/13/0002/26-27 dated 15.07.2026", short: "RfS", pages: 128, pdfOffset: 1, file: "RfS.pdf" },
+  { id: "cfda", title: "Standard CfD Agreement (CfDA), SECI-CfD-I", short: "CfDA", pages: 69, file: null },
+  { id: "amd1", title: "Amendment-01 to the RfS and CfDA (17.07.2026)", short: "Amd-01", pages: 2, file: "Amendment-01.pdf" },
+  { id: "amd2", title: "Amendment-02 to the RfS and CfDA (03.08.2026)", short: "Amd-02", pages: 5, file: "Amendment-02.pdf" },
+  { id: "amd3", title: "Amendment-03 to the RfS and CfDA (08.10.2026)", short: "Amd-03", pages: 5, file: "Amendment-03.pdf" },
 ];
 
 export const RFS = {
@@ -80,7 +84,7 @@ export const TERMS = [
   T("bid", "Scheme and bid", "What you bid", "One strike price in ₹/kWh for all projects applied for; digits after two decimals are ignored",
     "amd3", "RfS 40.3 (amended)", 4, "quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. If it is quoted with more than two digits after decimal, digits after first two decimal places shall be ignored."),
   T("ceiling", "Scheme and bid", "Ceiling tariff", "None: the ₹5.80/kWh ceiling of the RfS was removed by Amendment-03",
-    "amd3", "RfS 40.3 (original, removed)", 4, "The tariff has to be less than or equal to INR 5.80/kWh", { status: "replaced" }),
+    "amd3", "RfS 40.3 (original, removed)", 4, "The tariff has to be less than or equal to INR 5.80/kWh", { status: "replaced", by: "amd3" }),
   T("spDefinition", "Scheme and bid", "Strike price", "The tariff discovered in the e-Reverse Auction; every CfD settlement is against it",
     "cfda", "1.1 Tariff / Strike Price", 13, "shall mean the price/ tariff (INR/kWh) discovered after the e-RA, against which the CfD settlement will take place during the Term of CfDA"),
   T("precedence", "Scheme and bid", "If documents differ", "The CfDA prevails, then the RfS",
@@ -148,7 +152,7 @@ export const TERMS = [
   T("noRisk", "CfD settlement", "Market price risk", "None on the settled energy: you keep no gain and bear no loss",
     "amd3", "CfDA 9.2.iv (amended)", 5, "Accordingly, the RPD shall neither retain any profit/gain nor bear any loss on account of variation between the MCP and the SP."),
   T("slabs", "CfD settlement", "Gain/loss sharing by price slab", "Replaced: the draft CfDA's 70:30, 50:50 and 30:70 slab sharing no longer applies",
-    "cfda", "9.2.iv (original)", 40, "Profit/ Gains and losses shall be shared between the RPD and the CfD Stabilization Fund (“Pool”), in a dynamic grading as follows:", { status: "replaced" }),
+    "cfda", "9.2.iv (original)", 40, "Profit/ Gains and losses shall be shared between the RPD and the CfD Stabilization Fund (“Pool”), in a dynamic grading as follows:", { status: "replaced", by: "amd3" }),
   T("blockSettle", "CfD settlement", "How it is settled", "Every 15-minute block, settled monthly",
     "cfda", "9.2.vii", 42, "The calculations of gains and losses shall be carried out on a Time-Block basis, and settlement of the same shall be done on monthly basis."),
   T("pool", "CfD settlement", "CfD Pool", "₹76 crore, a revolving buffer for pay-ins and pay-outs",
@@ -190,7 +194,7 @@ export const TERMS = [
   T("lineCost", "Plant", "Line to the substation", "Yours: building it, its charges, losses and upkeep up to the Interconnection Point",
     "rfs", "8.4", 18, "The entire cost of transmission including cost of construction of line, wheeling charges, SLDC/Scheduling charges, SOC, MOC, maintenance, losses etc. and any other charges from the Project up to and including at the Interconnection Point will be borne by the RPD."),
   T("essThirdParty", "Plant", "Battery owned by a third party", "Replaced: Amendment-02 (which numbers this clause 4.3) requires the battery to be owned by you",
-    "rfs", "4.4 (original)", 16, "such ESS may be owned by the RPD or may be tied-up separately with a third party by the RPD", { status: "replaced" }),
+    "rfs", "4.4 (original)", 16, "such ESS may be owned by the RPD or may be tied-up separately with a third party by the RPD", { status: "replaced", by: "amd2" }),
   T("essRemote", "Plant", "Battery away from the RE", "The RfS allows it (you then pay the battery's own connectivity and charging charges); the CfDA says co-located and prevails. The model takes co-located",
     "rfs", "7.1", 17, "For a single Project, the RE Generating components, along with ESS (if any) may either be co-located or located at different locations.", { status: "conflict" }),
 
@@ -220,7 +224,7 @@ export const TERMS = [
   T("term", "Dates", "Term", "15 years from the SCD (the draft CfDA's 12 years was extended)",
     "amd3", "CfDA 1.1 Expiry Date (amended)", 4, "shall mean the date occurring as on fifteen (15) years from the Scheduled Commissioning Date (SCD)"),
   T("rfsTerm12", "Dates", "Term in the RfS as issued", "Replaced: 12 years became 15 (Amendment-03 to RfS 2.3, 21.2 and 21.7)",
-    "rfs", "21.2 (original)", 37, "The CfDAs shall be valid for a period of 12 years from the SCD.", { status: "replaced" }),
+    "rfs", "21.2 (original)", 37, "The CfDAs shall be valid for a period of 12 years from the SCD.", { status: "replaced", by: "amd3" }),
   T("afterExpiry", "Dates", "After the term", "You may keep operating; SECI does not settle beyond the Expiry Date",
     "cfda", "2.2.2", 16, "The RPD is free to operate its Project beyond the Expiry Date if other conditions such as land lease / Right to Use of Land (as applicable), permits, approvals and clearances etc. allow."),
   T("finClose", "Dates", "Financial closure", "6 months before the SCD",

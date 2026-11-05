@@ -43,20 +43,23 @@ async function post(path, body) {
   return res.blob();
 }
 
-export function letterFileName(letters, bidder) {
+export function letterFileName(letters, bidder, prefix = "SECI_RTC_TM_V") {
   const who = String(bidder || "Bidder").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40);
   const what = letters.length === 1 ? `Format_${letters[0].id.replace(/[^A-Za-z0-9.-]+/g, "_")}` : "Bid_letters";
-  return `SECI_RTC_TM_V_${what}_${who}`;
+  return `${prefix}_${what}_${who}`;
 }
 
-/** Download the letters as one Word file ("word") or one PDF ("pdf"), each letter from a new page. */
-export async function downloadLetters(letters, kind) {
-  const name = letterFileName(letters, letters[0]?.bidder);
+/**
+ * Download the letters as one Word file ("word") or one PDF ("pdf"), each letter from a new page.
+ * route: the Word route of the tender pack (the CfD tab's is /api/cfd/letters); prefix: the file name's.
+ */
+export async function downloadLetters(letters, kind, { route = "/api/seci/letters", prefix = "SECI_RTC_TM_V" } = {}) {
+  const name = letterFileName(letters, letters[0]?.bidder, prefix);
   if (kind === "pdf") {
     const blob = await post("/api/bid/document/pdf", { title: name.replace(/_/g, " "), css: LETTER_CSS, parts: letters.map(letterHtml) });
     save(blob, `${name}.pdf`);
     return;
   }
-  const blob = await post("/api/seci/letters", { fileName: name, letters: letters.map(letterPayload) });
+  const blob = await post(route, { fileName: name, letters: letters.map(letterPayload) });
   save(blob, `${name}.docx`);
 }

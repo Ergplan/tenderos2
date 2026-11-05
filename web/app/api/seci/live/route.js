@@ -3,6 +3,7 @@ import { currentUserWithAccess, handler, HttpError } from "@/lib/auth";
 import { CLOUD_AGENTS, ZONE } from "@/lib/zone";
 import { logEvent } from "@/lib/activity";
 import { LIVE_MODEL, liveSessionConfig } from "@/src/seci/agent";
+import { liveSessionConfig as cfdSessionConfig, CFD_GREETING } from "@/src/cfd/agent";
 import { getSecret } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ const lastStart = new Map(); // user id -> time of the last session started (one
 async function allowed() {
   const user = await currentUserWithAccess();
   if (!user) throw new HttpError(401, "Sign in required.");
-  if (user.role !== "admin" && !user.allowedTabs?.includes("seciRtc")) throw new HttpError(403, "No access to the SECI RTC tender tab.");
+  if (user.role !== "admin" && !user.allowedTabs?.includes("seciRtc") && !user.allowedTabs?.includes("cfd")) throw new HttpError(403, "No access to the SECI RTC tender or CfD bid tabs.");
   return user;
 }
 
@@ -42,6 +43,10 @@ export const POST = handler(async (req) => {
   if (!apiKey) throw new HttpError(503, "The voice agent is not set up on this server: add the OpenAI key under Administration › API keys (or OPENAI_API_KEY in .env).");
   const body = await req.json().catch(() => null);
   const sdp = body?.sdp;
+  // which tab's agent: the SECI RTC tender (default) or the CfD bid, each with its own instructions and tools
+  const cfd = body?.tab === "cfd";
+  const greeting = cfd ? CFD_GREETING : GREETING;
+  const sessionOf = cfd ? cfdSessionConfig : liveSessionConfig;
   if (typeof sdp !== "string" || !sdp.startsWith("v=0") || sdp.length > 65536) throw new HttpError(400, "A WebRTC offer (SDP) is required.");
   const key = user.id || user.email;
   if (Date.now() - (lastStart.get(key) || 0) < 10_000) throw new HttpError(429, "A voice session was started a moment ago; wait a few seconds.");
@@ -50,7 +55,7 @@ export const POST = handler(async (req) => {
   const res = await fetch(`${BASE()}/live/sessions`, {
     method: "POST",
     headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
-    body: JSON.stringify({ session: liveSessionConfig({ backendModel: BACKEND(), voice: VOICE(), greeting: GREETING }), transport: { type: "webrtc", sdp } }),
+    body: JSON.stringify({ session: sessionOf({ backendModel: BACKEND(), voice: VOICE(), greeting }), transport: { type: "webrtc", sdp } }),
   });
   const text = await res.text();
   let data = null;
@@ -60,6 +65,6 @@ export const POST = handler(async (req) => {
     throw new HttpError(res.status === 401 || res.status === 403 ? 502 : res.status >= 400 && res.status < 600 ? res.status : 502,
       `The voice service did not start the session (${res.status}${data?.error?.message ? `: ${String(data.error.message).slice(0, 200)}` : ""}).`);
   }
-  await logEvent({ user, kind: "voice", detail: { what: "seci-live-session", session: data.session?.id || null, backend: BACKEND() }, req });
-  return NextResponse.json({ session: { id: data.session?.id || null }, transport: { type: "webrtc", sdp: data.transport.sdp }, greeting: GREETING }, { status: 201 });
+  await logEvent({ user, kind: "voice", detail: { what: cfd ? "cfd-live-session" : "seci-live-session", session: data.session?.id || null, backend: BACKEND() }, req });
+  return NextResponse.json({ session: { id: data.session?.id || null }, transport: { type: "webrtc", sdp: data.transport.sdp }, greeting }, { status: 201 });
 });

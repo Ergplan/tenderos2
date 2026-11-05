@@ -4,6 +4,7 @@ import { LiveChart } from "../rtc/charts";
 import { LiveEvents, createToolRunner } from "./agent";
 import { agentChart } from "./charts";
 
+/** What the agent's log says for each SECI tool (a tab can pass its own words). */
 const TOOL_WORDS = {
   get_status: () => "Read the bid on screen",
   tender_brief: () => "Read the key conditions",
@@ -50,6 +51,7 @@ function iceGathered(pc) {
 }
 
 const CHART_BUTTONS = [["peak_window", "Peak Hours"], ["typical_day", "A day"], ["monthly_energy", "Months"], ["irr_vs_tariff", "IRR vs tariff"], ["cash_flows", "Cash flows"], ["money", "Money"]];
+const SECI_INTRO = "Talk naturally: it explains the bid conditions, takes your inputs in order, changes anything on screen, runs the optimizer again and explains the results and the IRR at the tariff you quote. Every number comes from this screen; every tender fact from the documents, with the page.";
 
 /** A chart the agent opened, in its column (charts.js draws it from the bid itself); it can be enlarged. */
 export function ChartWindow({ chart, onClose }) {
@@ -104,8 +106,15 @@ function EnergyCheck({ run, addTurn }) {
  * The bid agent: a GPT-Live voice conversation whose backend works this tab through the tools in
  * agent.js (setting inputs, running HiGHS, reading results, checking a tariff, the bid forms).
  * The server creates the session (/api/seci/live); audio flows over WebRTC; nothing is recorded.
+ *
+ * Another tab passes its own agent: `tab` (sent to the server, which picks that tab's session
+ * instructions and tools), `runner(ctx)` (its createToolRunner), `charts` (its agentChart, or null
+ * for no chart buttons), `chartButtons`, `toolWords`, `energyCheck` (the typed energy check) and
+ * `intro`. The defaults are the SECI RTC tab's.
  */
-export default function LiveAgent({ state, setState, terms, goto, sizing, info, onDock = () => {}, onTrace = () => {} }) {
+export default function LiveAgent({ state, setState, terms, goto, sizing, info, onDock = () => {}, onTrace = () => {},
+  tab = "seci", runner = null, charts = agentChart, chartButtons = CHART_BUTTONS, toolWords = TOOL_WORDS, energyCheck = true, intro = SECI_INTRO }) {
+  const makeRunner = runner || createToolRunner;
   const [open, setOpen] = useState(false);
   useEffect(() => { onDock(open); }, [open, onDock]);
   const [phase, setPhase] = useState("idle"); // idle | connecting | connected | working | closing
@@ -152,7 +161,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
     setError("");
     setTurns([]);
     setPhase("connecting");
-    const runTool = createToolRunner({
+    const runTool = makeRunner({
       getState: () => stateRef.current,
       apply: (fn) => { stateRef.current = fn(stateRef.current); setState(stateRef.current); },
       getTerms: () => termsRef.current,
@@ -191,7 +200,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
           },
           heard: (t) => addTurn("you", t),
           said: (t) => addTurn("agent", t),
-          tool: (name, args, result) => addTurn("tool", (TOOL_WORDS[name] || (() => name))(args, result), false),
+          tool: (name, args, result) => addTurn("tool", (toolWords[name] || (() => name))(args, result), false),
           error: (m) => setError(m),
           closed: () => cleanup(),
         },
@@ -201,7 +210,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
       await iceGathered(pc);
-      const res = await fetch("/api/seci/live", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ sdp: pc.localDescription.sdp }) });
+      const res = await fetch("/api/seci/live", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ sdp: pc.localDescription.sdp, tab }) });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `The voice agent could not start (${res.status}).`);
       greeting = body.greeting || "";
@@ -210,7 +219,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
       setError(err.name === "NotAllowedError" ? "The microphone is blocked: allow it for this site and try again." : err.message);
       cleanup();
     }
-  }, [addTurn, cleanup, goto, setState]);
+  }, [addTurn, cleanup, goto, setState, makeRunner, tab, toolWords]);
 
   const stop = useCallback(() => {
     const c = conn.current;
@@ -240,7 +249,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
         <strong><Bot size={14} /> Bid agent · GPT-Live</strong>
         <button type="button" className="rtc-icon-btn" onClick={() => { stop(); setOpen(false); }} aria-label="Close the agent"><X size={14} /></button>
       </header>
-      <p className="rtc-note">Talk naturally: it explains the bid conditions, takes your inputs in order, changes anything on screen, runs the optimizer again and explains the results and the IRR at the tariff you quote. Every number comes from this screen; every tender fact from the documents, with the page.</p>
+      <p className="rtc-note">{intro}</p>
       {info && !info.available && <p className="voice-note" data-testid="agent-unavailable">{info.zone === "core" ? "The voice agent does not run in the core zone: no cloud model reaches the bid workspace. Use it in the intake zone, on the tender documents." : "The voice agent is not set up on this server yet: an administrator adds the OpenAI key once under API keys (sidebar, Library), or OPENAI_API_KEY in the server's .env (docs/DEPLOY.md)."}</p>}
       {!secure && <p className="voice-note" data-testid="agent-insecure">The microphone needs an HTTPS address or localhost. Open the app over HTTPS, or through an SSH tunnel at http://localhost (docs/DEPLOY.md).</p>}
       <div className="voice-controls">
@@ -256,18 +265,20 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
         </span>
       </div>
       {error && <p className="voice-note" role="alert" data-testid="agent-error">{error}</p>}
-      <div className="agent-charts" role="group" aria-label="Charts">
-        {CHART_BUTTONS.map(([kind, label]) => (
-          <button key={kind} type="button" className={chart?.kind === kind ? "active" : ""} data-testid={`agent-chart-${kind}`}
-            onClick={() => {
-              try { setChart(agentChart(kind, { state: stateRef.current, terms: termsRef.current, hourly: sizingRef.current.hourly })); setError(""); } catch (err) { setError(err.message); }
-            }}>{label}</button>
-        ))}
-      </div>
+      {charts && (
+        <div className="agent-charts" role="group" aria-label="Charts">
+          {chartButtons.map(([kind, label]) => (
+            <button key={kind} type="button" className={chart?.kind === kind ? "active" : ""} data-testid={`agent-chart-${kind}`}
+              onClick={() => {
+                try { setChart(charts(kind, { state: stateRef.current, terms: termsRef.current, hourly: sizingRef.current.hourly })); setError(""); } catch (err) { setError(err.message); }
+              }}>{label}</button>
+          ))}
+        </div>
+      )}
       <ChartWindow chart={chart} onClose={() => setChart(null)} />
-      <EnergyCheck run={(args) => createToolRunner({
+      {energyCheck && <EnergyCheck run={(args) => makeRunner({
         getState: () => stateRef.current, apply: () => {}, getTerms: () => termsRef.current, goto, showTrace: onTrace,
-      })("explain_generation", args)} addTurn={addTurn} />
+      })("explain_generation", args)} addTurn={addTurn} />}
       <div className="voice-log agent-log" data-testid="agent-log" aria-live="polite">
         {turns.length === 0 && <p>{info?.backendModel ? `Voice ${info.model}; the bid work by ${info.backendModel}.` : ""}</p>}
         {turns.map((t, i) => <p key={i} className={t.who}>{t.text}</p>)}

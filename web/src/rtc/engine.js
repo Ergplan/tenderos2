@@ -948,7 +948,9 @@ export function capexCr(sizes, costs, fin = null) {
     + (sizes.biomassMw || 0) * (costs.biomassCrPerMw || 0) // Tender to Bid only; 0 for Round the clock
     // Tender to Bid dispatchable plants (hydro, thermal): capex per MW; none for Round the clock
     + (costs.plants || []).reduce((sum, pl) => sum + (sizes[`${pl.id}Mw`] || 0) * (pl.capexCrPerMw || 0), 0)
-    + (costs.evacuationCr || 0);
+    + (costs.evacuationCr || 0)
+    // other project cost given outright (SECI CfD-I: SECI's charges with GST and the bank guarantees' cost); 0 elsewhere
+    + (costs.otherCapexCr || 0);
   const preop = hard * (costs.preopPct || 0);
   const construction = constructionSchedule(hard + preop, costs, fin);
   const idc = construction ? construction.idc : 0;
@@ -1637,7 +1639,10 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
     // year's tariff (1.5x); 0 when the sizing has no block floors
     const blockShortfallMWh = op.blockShortfallMWh || 0;
     const blockPenalty = blockShortfallMWh * (fin.blockPenaltyMultiple || 0) * trf * RS_CR_PER_MWH_AT_1RS;
-    const penalty = annualPenalty + blockPenalty;
+    // SECI CfD-I (web/src/cfd/finance.js): the weekly shortfall penalty, 1.5 × (the week's reference
+    // price − the strike price) on the energy short beyond the tolerance, week by week; 0 elsewhere
+    const cfdPenalty = (op.penaltyWeeks || []).reduce((a, w) => a + (fin.cfdPenaltyMultiple || 0) * Math.max(0, w.ref - trf) * w.beyondMwh, 0) * RS_CR_PER_MWH_AT_1RS;
+    const penalty = annualPenalty + blockPenalty + cfdPenalty;
     const revenue = energyRev + surplusRev + buyerRev - penalty;
     const esc = (1 + fin.omEscalation) ** (y - 1);
     const om = omBase * esc;
@@ -1662,7 +1667,14 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
     // of operation. op.dsmChargeCr: given outright
     const scheduledMWh = op.deliveredMWh + (op.excessMWh || 0) + (op.buyerExcessMWh || 0);
     const dsm = op.dsmChargeCr ?? (scheduledMWh * ((op.dsmA || 0) * trf + (op.dsmB || 0))) / 1e7;
-    const opex = om + insurance + other + fuel + plantsTotal + dsm;
+    // SECI CfD-I: the power bought to charge the battery (green market, group RE), the exchange
+    // fees on the energy sold, and the cost of the Letter of Credit to SECI, which moves with the
+    // strike price: LC = 2000 kWh × MW × (C − SP) × 30 days, C at least ₹10/kWh; 0 elsewhere
+    const charging = op.chargingCostCr || 0;
+    const pxFees = op.pxFeesCr || 0;
+    const lcCost = (op.lcMw || 0) > 0 && (fin.lcCostPct || 0) > 0
+      ? (fin.lcCostPct * 2000 * op.lcMw * Math.max(0, (fin.lcMinPrice ?? 10) - trf) * (fin.lcDays ?? 30)) / 1e7 : 0;
+    const opex = om + insurance + other + fuel + plantsTotal + dsm + charging + pxFees + lcCost;
     const ebitda = revenue - opex;
     // book depreciation (SLM), augmentation depreciated over remaining life
     if (aug[y] > 0) augBookDep += aug[y] / Math.max(1, years - y + 1);
@@ -1764,6 +1776,7 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       penalty,
       annualPenalty,
       blockPenalty,
+      cfdPenalty,
       blockShortfallMu: blockShortfallMWh / 1000,
       revenue,
       om,
@@ -1773,6 +1786,9 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       biomassMu: (op.biomassMWh || 0) / 1000,
       ...plantCost,
       dsm,
+      charging,
+      pxFees,
+      lcCost,
       opex,
       ebitda,
       bookDep,
@@ -1891,6 +1907,9 @@ export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tar
       penalty: sum("penalty"),
       interest: sum("interest"),
       dsm: sum("dsm"),
+      charging: sum("charging"),
+      lcCost: sum("lcCost"),
+      cfdPenalty: sum("cfdPenalty"),
     },
     minLifetimeDfr: Math.min(...cf.rows.map((row) => row.dfr)),
   };

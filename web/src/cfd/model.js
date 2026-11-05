@@ -103,6 +103,24 @@ export const BENCHMARKS = {
 export const DEFAULT_CONTRACTED_MW = 100;
 export const STORAGE_KEY = "fdre.cfd.v1";
 
+/**
+ * The Finance team's terms the shared financial model prices beside the inputs above (the same
+ * keys and defaults as the RTC engine's DEFAULT_FINANCE): how the debt is repaid and refinanced,
+ * the working capital and reserves, tax depreciation, book life and salvage; `tariff` is the
+ * strike price when it is locked (state.tariffLocked), else the model solves it.
+ */
+export const CFD_FIN_DEFAULTS = {
+  tariff: null,
+  repayment: E.DEFAULT_FINANCE.repayment, graceYears: E.DEFAULT_FINANCE.graceYears, paymentsPerYear: E.DEFAULT_FINANCE.paymentsPerYear,
+  targetDscr: E.DEFAULT_FINANCE.targetDscr, balloonPct: E.DEFAULT_FINANCE.balloonPct, stepUpPct: E.DEFAULT_FINANCE.stepUpPct,
+  refiYear: E.DEFAULT_FINANCE.refiYear, refiRate: E.DEFAULT_FINANCE.refiRate, refiTenorYears: E.DEFAULT_FINANCE.refiTenorYears, refiFeePct: E.DEFAULT_FINANCE.refiFeePct,
+  omStockMonths: E.DEFAULT_FINANCE.omStockMonths, sparesPctOm: E.DEFAULT_FINANCE.sparesPctOm, wcInterestRate: E.DEFAULT_FINANCE.wcInterestRate, dsraMonths: E.DEFAULT_FINANCE.dsraMonths,
+  receivableDays: E.DEFAULT_FINANCE.receivableDays, taxDepreciation: E.DEFAULT_FINANCE.taxDepreciation, wdvRate: E.DEFAULT_FINANCE.wdvRate,
+  bookLifeYears: 15, salvagePct: E.DEFAULT_FINANCE.salvagePct,
+};
+/** The construction schedule (the IDC month by month when months are set; else inside the pre-operative share). */
+export const CFD_COST_DEFAULTS = { constructionMonths: 0, drawdown: "linear", drawOrder: "proRata" };
+
 export function defaultCfdState() {
   const inputs = Object.fromEntries(FIELDS.map((f) => [f.key, null]));
   return {
@@ -110,13 +128,22 @@ export function defaultCfdState() {
     step: "model",
     inputs: { ...inputs, contractedMw: DEFAULT_CONTRACTED_MW, effectiveDate: null, sellMarket: null, useMarket: null, useGroup: null, merchant: null, augmentation: null, afterTerm: null, merchantYears: null },
     filled: {}, // key -> true while the value is a benchmark
+    fin: { ...CFD_FIN_DEFAULTS },
+    costs: { ...CFD_COST_DEFAULTS },
+    locks: {}, // "fin.repayment" -> true: the box is frozen (no refill overwrites it)
+    tariffLocked: false, // true: the financial model computes the returns at fin.tariff instead of solving it
   };
 }
 
 export function mergeCfdState(saved) {
   const base = defaultCfdState();
   if (!saved || saved.version !== 1) return base;
-  return { ...base, ...saved, inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) } };
+  return {
+    ...base, ...saved,
+    inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) },
+    fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, locks: { ...(saved.locks || {}) },
+    tariffLocked: Boolean(saved.tariffLocked),
+  };
 }
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -281,6 +308,22 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
   const brown = inputs.sellMarket === "DAM" || inputs.sellMarket === "RTM";
   const keep = new Set(record);
   const days = {};
+  // the same totals per operating year: 365-day periods from the SCD (the last takes the term's
+  // few extra days), the shape the shared financial model prices year by year
+  const totalDays = Math.round((dates.end - dates.scd) / DAY_MS);
+  const nOp = Math.max(1, Math.floor(totalDays / 365));
+  const opIndex = (k) => Math.min(nOp - 1, Math.floor(k / 365));
+  const blank = () => ({
+    deliveredMwh: 0, windDirectMwh: 0, essOutMwh: 0, chargeOwnMwh: 0, chargeMarketMwh: 0, chargeGroupMwh: 0,
+    marketCostCr: 0, groupCostCr: 0, merchantMwh: 0, merchantRevCr: 0, curtailedMwh: 0, shortMwh: 0, shortDays: 0,
+    mcpDeliveredCr: 0, ownSuppliedMwh: 0, recMwh: 0, reDays: 0, solarMwh: 0, windMwh: 0, weeks: [],
+  });
+  const opYears = Array.from({ length: nOp }, (_, i) => {
+    const start = addDays(dates.scd, i * 365);
+    const end = i === nOp - 1 ? dates.end : addDays(dates.scd, (i + 1) * 365);
+    const d = Math.round((end - start) / DAY_MS);
+    return { index: i + 1, start, end, days: d, requiredMwh: X * TENDER.mwhPerMwDay * d, ...blank() };
+  });
   const out = cys.map((cy) => {
     // the Contract Year's sourcing limits, in MWh supplied (Amd-02: on the energy discharged)
     let extraDays = 0;
@@ -294,18 +337,17 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
       requiredMwh: daily * cy.days,
       marketCapMwh: inputs.useMarket ? daily * (TENDER.marketShare * cy.days + TENDER.extraMarketShare * extraDays) : 0,
       groupCapMwh: inputs.useGroup ? daily * TENDER.groupShare * groupDays : 0,
-      deliveredMwh: 0, windDirectMwh: 0, essOutMwh: 0, chargeOwnMwh: 0, chargeMarketMwh: 0, chargeGroupMwh: 0,
-      marketCostCr: 0, groupCostCr: 0, merchantMwh: 0, merchantRevCr: 0, curtailedMwh: 0, shortMwh: 0, shortDays: 0,
-      mcpDeliveredCr: 0, ownSuppliedMwh: 0, recMwh: 0, reDays: 0, solarMwh: 0, windMwh: 0, weeks: [],
+      ...blank(),
     };
   });
-  const weeks = new Map(); // Contract Week (Monday start) -> { required, supplied, ref, cy }
+  const weeks = new Map(); // Contract Week (Monday start) -> { required, supplied, ref, cy, oy }
   let cyIdx = 0;
   let marketUsed = 0;
   let groupUsed = 0;
   for (let t = dates.scd, k = 0; t < dates.end; t += DAY_MS, k += 1) {
     while (cyIdx < out.length - 1 && t >= out[cyIdx].end) { cyIdx += 1; marketUsed = 0; groupUsed = 0; }
     const cy = out[cyIdx];
+    const oy = opYears[opIndex(k)];
     const year = Math.floor(k / 365) + 1;
     const esc = (1 + inputs.priceEscalation) ** (year - 1);
     const solarF = (1 - inputs.solarDegradation) ** (year - 1);
@@ -322,6 +364,7 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
         wnd[h] = W * prof.wind[b + h];
       }
       cy.reDays += 1;
+      oy.reDays += 1;
     }
     // the day's two peak hours and what each must supply
     const chosen = book.peakOrder[d].slice(0, TENDER.peakHours);
@@ -336,6 +379,8 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     }
     essNeed = Math.min(essNeed, cap);
     let chargeLeft = essNeed / rte;
+    const cyMarketCost = cy.marketCostCr;
+    const cyGroupCost = cy.groupCostCr;
     const room = new Float64Array(TENDER.peakStart).fill(P);
     const own = new Float64Array(TENDER.peakStart);
     const mkt = new Float64Array(TENDER.peakStart);
@@ -390,18 +435,26 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     const ownSupplied = windDirect + ownCharged * rte * (charged > 0 ? Math.min(1, essOut / (charged * rte)) : 0);
     let mcp = 0;
     for (const h of chosen) mcp += book.sell[b + h] * esc * (direct[h] + essOut / chosen.length);
-    Object.assign(cy, {
-      deliveredMwh: cy.deliveredMwh + delivered, windDirectMwh: cy.windDirectMwh + windDirect, essOutMwh: cy.essOutMwh + essOut,
-      chargeOwnMwh: cy.chargeOwnMwh + ownCharged, chargeMarketMwh: cy.chargeMarketMwh + mkt.reduce((a, v) => a + v, 0), chargeGroupMwh: cy.chargeGroupMwh + grp.reduce((a, v) => a + v, 0),
-      merchantMwh: cy.merchantMwh + merchantMwh, merchantRevCr: cy.merchantRevCr + merchantRev, curtailedMwh: cy.curtailedMwh + curtailed,
-      shortMwh: cy.shortMwh + Math.max(0, chargeLeft) * rte, shortDays: cy.shortDays + (met ? 0 : 1),
-      mcpDeliveredCr: cy.mcpDeliveredCr + mcp * 1e-4, ownSuppliedMwh: cy.ownSuppliedMwh + ownSupplied,
-      recMwh: cy.recMwh + (brown ? ownSupplied : 0), solarMwh: cy.solarMwh + solarDay, windMwh: cy.windMwh + windDay,
-    });
+    const marketDay = mkt.reduce((a, v) => a + v, 0);
+    const groupDay = grp.reduce((a, v) => a + v, 0);
+    const marketCostDay = cy.marketCostCr - cyMarketCost;
+    const groupCostDay = cy.groupCostCr - cyGroupCost;
+    for (const row of [cy, oy]) {
+      Object.assign(row, {
+        deliveredMwh: row.deliveredMwh + delivered, windDirectMwh: row.windDirectMwh + windDirect, essOutMwh: row.essOutMwh + essOut,
+        chargeOwnMwh: row.chargeOwnMwh + ownCharged, chargeMarketMwh: row.chargeMarketMwh + marketDay, chargeGroupMwh: row.chargeGroupMwh + groupDay,
+        merchantMwh: row.merchantMwh + merchantMwh, merchantRevCr: row.merchantRevCr + merchantRev, curtailedMwh: row.curtailedMwh + curtailed,
+        shortMwh: row.shortMwh + Math.max(0, chargeLeft) * rte, shortDays: row.shortDays + (met ? 0 : 1),
+        mcpDeliveredCr: row.mcpDeliveredCr + mcp * 1e-4, ownSuppliedMwh: row.ownSuppliedMwh + ownSupplied,
+        recMwh: row.recMwh + (brown ? ownSupplied : 0), solarMwh: row.solarMwh + solarDay, windMwh: row.windMwh + windDay,
+      });
+    }
+    oy.marketCostCr += marketCostDay;
+    oy.groupCostCr += groupCostDay;
     // Contract Week (Monday to Sunday) for the weekly shortfall
     const dow = (new Date(t).getUTCDay() + 6) % 7; // 0 = Monday
     const wk = t - dow * DAY_MS;
-    const w = weeks.get(wk) || { start: wk, required: 0, supplied: 0, ref: 0, cy: cyIdx };
+    const w = weeks.get(wk) || { start: wk, required: 0, supplied: 0, ref: 0, cy: cyIdx, oy: opIndex(k) };
     w.required += X * TENDER.mwhPerMwDay;
     w.supplied += delivered;
     w.ref = Math.max(w.ref, book.peakRef[d] * esc);
@@ -414,16 +467,18 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
   }
   for (const w of weeks.values()) {
     const beyond = Math.max(0, w.required * (1 - TENDER.weeklyTolerance) - w.supplied);
-    out[w.cy].weeks.push({ start: w.start, required: w.required, supplied: w.supplied, beyondMwh: beyond, ref: w.ref });
+    const week = { start: w.start, required: w.required, supplied: w.supplied, beyondMwh: beyond, ref: w.ref };
+    out[w.cy].weeks.push(week);
+    opYears[w.oy].weeks.push(week);
   }
-  for (const cy of out) {
+  for (const cy of [...out, ...opYears]) {
     const supplied = Math.max(1e-9, cy.deliveredMwh);
     cy.shareOwn = cy.ownSuppliedMwh / supplied;
     cy.shareMarket = (cy.chargeMarketMwh * rte) / supplied;
     cy.shareGroup = (cy.chargeGroupMwh * rte) / supplied;
     cy.supplyShare = cy.deliveredMwh / cy.requiredMwh;
   }
-  return { years: out, dates: { ...dates, reCod }, days };
+  return { years: out, opYears, dates: { ...dates, reCod }, days };
 }
 
 // ---------------------------------------------------------------- finance
@@ -661,7 +716,7 @@ export function runModel(state, prices, opts = {}) {
   const prof = profiles(inputs);
   const sim = simulate(inputs, book, prof, opts);
   const solved = solveStrikePrice(inputs, sim);
-  return { inputs, sim, ...solved, book, prof };
+  return { inputs, sim, opYears: sim.opYears, ...solved, book, prof };
 }
 
 /** Feasible when no day after the RE is online falls short for lack of charging energy. */

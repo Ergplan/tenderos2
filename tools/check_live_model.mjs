@@ -22,6 +22,8 @@ import { liveModelRequest } from "../web/src/bid/liveModelRequest.js";
 import { LIVE_SHEET, SCHEDULE_SHEETS, addLiveModel, liveModelInput } from "../web/lib/liveModel.js";
 import { buildModelWorkbook } from "../web/lib/modelWorkbook.js";
 import { rtcModelExport } from "../web/src/rtc/exportModel.js";
+import { defaultCfdState, fillBenchmarks, runModel as runCfdModel } from "../web/src/cfd/model.js";
+import { cfdLiveRequest, runCfdFinance } from "../web/src/cfd/finance.js";
 
 const require = createRequire(new URL("../web/package.json", import.meta.url));
 const ExcelJS = require("exceljs");
@@ -117,6 +119,26 @@ const CASES = [
     sizes: { solarMw: 700, windMw: 500, bessMw: 350, bessMwh: 1400 },
     lifetime: yearsOf(25, () => ({ demandMwh: 300 * 8760, deliveredMwh: 0.8 * 300 * 8760, exportMwh: 0 })),
   })],
+  // SECI CfD-I through the same engine: the day-by-day operation's yearly totals, charging power
+  // and exchange fees, the Letter of Credit and the weekly shortfall penalty moving with the strike
+  // price, SECI's charges as other project cost, 15 operating years (web/src/cfd/finance.js)
+  ["SECI CfD-I: charging power, exchange fees, Letter of Credit and weekly penalty moving with the strike price", (() => {
+    const prices = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
+    const s = fillBenchmarks(defaultCfdState());
+    s.inputs.effectiveDate = "2027-02-01";
+    s.inputs.useMarket = false; // no bought power and little own RE: some weeks fall short, and the strike price below ₹10 holds an LC
+    s.inputs.solarMw = 60;
+    s.inputs.lcCostPct = 0.015;
+    s.fin = { ...s.fin, repayment: "annuity", graceYears: 1, omStockMonths: 1, sparesPctOm: 0.15, dsraMonths: 3 };
+    s.costs = { constructionMonths: 12, drawdown: "sCurve", drawOrder: "proRata" };
+    s.tariffLocked = true;
+    s.fin.tariff = 7.5;
+    const model = runCfdModel(s, prices);
+    const finance = runCfdFinance(s, model);
+    const req = cfdLiveRequest({ state: s, model, finance });
+    const run = (over = {}) => runCfdFinance({ ...s, fin: over.fin ? { ...s.fin, ...over.fin } : s.fin }, model, { tariffLocked: over.tariffLocked ?? true });
+    return { name: "", s, m: { fin: finance.engine.fin, costs: finance.engine.costs, bess: finance.engine.bess }, lp: { sizes: finance.engine.sizes }, ops: finance.engine.ops, finance, req, run, dfrTarget: 0 };
+  })()],
   ["solar alone, no debt", bid({
     sources: { solar: true },
     fin: { debtFraction: 0, tenorYears: 10 },
@@ -143,6 +165,7 @@ const SAME = {
   fcfe: "fcfe", cumEq: "cumEquity", projCf: "projectCf", trf: "tariff", delivered: "deliveredMu", demand: "demandMu", excess: "excessMu", dfr: "dfr",
   buyerRev: "buyerRevenue", buyerMu: "buyerExcessMu",
   wcBal: "wcBalance", omStock: "omStock", spares: "spares", wcInt: "wcInterest", refiFeeCr: "refiFee", dsra: "dsraBalance", dDsra: "dDsra", rateY: "debtRate", dsmCr: "dsm",
+  chargingCostCr: "charging", pxFeeCostCr: "pxFees", lcCostCr: "lcCost", cfdPenCr: "cfdPenalty",
 };
 const RESULTS = ["tariff", "equityIrr", "projectIrr", "equityNpv", "projectNpv", "minDscr", "avgDscr", "lcoe", "levelisedTariff", "capexTotal", "debt", "equity", "revenueTotal"];
 
@@ -233,6 +256,19 @@ assert.ok(CASES[CASES.length - 1][1].finance.rows.every((r) => r.dscr === null),
   const r5 = CASES[2][1].finance.rows[4];
   assert.ok(Math.abs(r5.blockPenalty - (r5.blockShortfallMu * 1000 * 1.5 * r5.tariff) / 1e4) < 1e-9, "1.5 x tariff on the energy short");
   assert.ok(r5.blockPenalty > 0 && Math.abs(r5.penalty - r5.annualPenalty - r5.blockPenalty) < 1e-9);
+}
+
+{
+  // SECI CfD-I: the penalty and the LC move with the strike price, SECI's charges are in the hard cost
+  const c = CASES[7][1];
+  const f = c.finance;
+  assert.ok(f.rows.some((r) => r.cfdPenalty > 0) && f.rows.every((r) => Math.abs(r.penalty - r.cfdPenalty) < 1e-12), "weekly shortfall penalties in some years");
+  assert.ok(f.rows[0].lcCost > 0 && Math.abs(f.rows[0].lcCost - (0.015 * 2000 * 100 * (10 - 7.5) * 30) / 1e7) < 1e-9, "the LC cost at ₹7.5/kWh");
+  assert.ok(f.rows[1].charging === 0 && f.rows[0].pxFees > 0, "no bought power; exchange fees on the energy sold");
+  assert.ok(f.capex.hard > c.m.costs.otherCapexCr && c.m.costs.otherCapexCr > 1, "SECI's charges in the hard cost");
+  assert.ok(f.construction && f.capex.idc > 0 && f.rows[0].principal === 0 && f.rows[0].dsraBalance > 0, "IDC, moratorium and the reserve in a CfD bid");
+  const high = c.run({ fin: { tariff: 11 }, tariffLocked: true });
+  assert.ok(high.rows.every((r) => r.lcCost === 0) && high.totals.cfdPenalty < f.totals.cfdPenalty, "above ₹10: no LC; a higher strike price lowers the penalty");
 }
 
 // ---- 2 and 3: LibreOffice

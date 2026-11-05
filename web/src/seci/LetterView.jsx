@@ -104,10 +104,11 @@ function Block({ block, onEdit }) {
 /**
  * A format as its letter: the RfS wording with the blanks filled, the alternatives not chosen
  * struck out, each paragraph editable in place (kept with the bid, marked, revertible), and the
- * letter as Word or PDF.
+ * letter as Word or PDF. letterOf and download default to the SECI RTC pack's; another pack (the
+ * CfD tab) passes its own.
  */
-export default function LetterView({ state, setState, format }) {
-  const letter = useMemo(() => letterOf(state, format), [state, format]);
+export default function LetterView({ state, setState, format, letterOf: letterFn = letterOf, download: downloadFn = downloadLetters, testid = "seci-letter" }) {
+  const letter = useMemo(() => letterFn(state, format), [state, format, letterFn]);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   if (!letter) return <p className="rtc-note">No letter for this format.</p>;
@@ -126,28 +127,28 @@ export default function LetterView({ state, setState, format }) {
   async function download(kind) {
     setBusy(kind);
     setError("");
-    try { await downloadLetters([letter], kind); } catch (err) { setError(err.message); } finally { setBusy(""); }
+    try { await downloadFn([letter], kind); } catch (err) { setError(err.message); } finally { setBusy(""); }
   }
 
   return (
-    <div className="letter-view" data-testid="seci-letter">
+    <div className="letter-view" data-testid={testid}>
       <div className="letter-tools">
         <span className="rtc-note">
           Click a paragraph to change its wording; values from the blanks stay linked. Headings, the RfS's notes and tables stay as printed.
           {letter.edited > 0 && <b> {letter.edited} paragraph{letter.edited > 1 ? "s" : ""} in your wording.</b>}
         </span>
         <span className="letter-buttons">
-          <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => download("word")} data-testid="seci-letter-word">
+          <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => download("word")} data-testid={`${testid}-word`}>
             {busy === "word" ? <Loader2 className="spin" size={13} /> : <FileText size={13} />} Word
           </button>
-          <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => download("pdf")} data-testid="seci-letter-pdf">
+          <button type="button" className="secondary" disabled={Boolean(busy)} onClick={() => download("pdf")} data-testid={`${testid}-pdf`}>
             {busy === "pdf" ? <Loader2 className="spin" size={13} /> : <Download size={13} />} PDF
           </button>
         </span>
       </div>
       {error && <div className="alert"><TriangleAlert size={14} /> {error}</div>}
       {letter.missing.length > 0 && (
-        <div className="alert warn" data-testid="seci-letter-missing"><TriangleAlert size={14} /> {letter.missing.length} blank{letter.missing.length > 1 ? "s" : ""} still empty: {letter.missing.join(", ")}</div>
+        <div className="alert warn" data-testid={`${testid}-missing`}><TriangleAlert size={14} /> {letter.missing.length} blank{letter.missing.length > 1 ? "s" : ""} still empty: {letter.missing.join(", ")}</div>
       )}
       <article className="letter-paper">
         {letter.letterhead ? (

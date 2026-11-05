@@ -196,7 +196,14 @@ export function letterValues(state, format) {
 export function letterOf(state, format) {
   const template = TEMPLATES[format.id];
   if (!template) return null;
-  const values = letterValues(state, format);
+  return letterFrom(state, format, template, letterValues(state, format));
+}
+
+/**
+ * A letter from any tender pack's template and blank values (the CfD tab's letters use this with
+ * their own formats): the same blocks, struck alternatives, omitted paragraphs and edits.
+ */
+export function letterFrom(state, format, template, values) {
   const edits = state.letters?.[format.id] || {};
   const kind = state.forms?.bidderType === "consortium" ? "consortium" : "company";
   const blocks = parseTemplate(template.text).map((b) => {
