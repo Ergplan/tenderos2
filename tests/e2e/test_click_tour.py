@@ -49,7 +49,7 @@ SECI_STEPS = ["documents", "conditions", "bid", "sources", "financeInputs", "siz
 BID_STEPS = ["tender", "dates", "capacity", "sources", "size", "finance"]
 RTC_CHAPTERS = ["Energy needed", "Supply type", "DFR", "Solar", "Wind", "Battery storage"]
 BESS_CHAPTERS = ["Tender", "Requirements", "Battery", "Costs", "Finance"]
-CFD_STEPS = ["model", "example", "terms", "plant", "costs", "operations", "finance"]
+CFD_STEPS = ["explain", "documents", "conditions", "bid", "design", "financeInputs", "size", "finance", "whatif", "forms", "reference"]
 
 
 def _shot(page, name):
@@ -140,7 +140,7 @@ def test_sidebar_tabs_theme_and_zone():
             "Round the Clock": ("[data-testid=rtc-finance-stats]", "Equity IRR"),
             "SECI RTC tender": ("[data-testid=seci-tab]", "RTC tender · SECI"),
             "BESS Tender": ("nav.story-rail", "BESS"),
-            "CfD Bid": ("[data-testid=cfd-step-model]", "How it works"),
+            "CfD Bid": ("[data-testid=cfd-step-explain]", "What is a CfD"),
             "What-if analysis": ("[data-testid=whatif-verdict]", "What-if"),
             "Recent tenders": ("[data-testid=seci-results]", "SECI"),
         }
@@ -468,23 +468,34 @@ def test_bess_cfd_recent_team():
         _shot(page, "bess")
 
         _tab(page, "CfD Bid")
-        page.wait_for_selector("[data-testid=cfd-step-model]")
+        page.wait_for_selector("[data-testid=cfd-step-explain]")
         for step in CFD_STEPS:
             _step(page, "cfd", step)
-        _step(page, "cfd", "example")
+            assert page.locator(f"[data-testid=cfd-step-team-{step}]").text_content().strip(), step
+        _step(page, "cfd", "explain")
         page.click("[data-testid=cfd-example-mw-100]")
         assert "active" in page.locator("[data-testid=cfd-example-mw-100]").get_attribute("class")
         assert page.locator("[data-testid=cfd-answer]").count() == 1
-        _step(page, "cfd", "terms")
-        assert page.locator("[data-testid^=cfd-term-]").count() >= 10
-        _step(page, "cfd", "plant")
+        _step(page, "cfd", "documents")
+        assert page.locator("[data-testid^=cfd-doc-]").count() == 5 and page.locator("[data-testid^=cfd-change-]").count() >= 35
+        page.click("[data-testid=cfd-changes-amd3]")
+        assert page.locator("[data-testid^=cfd-change-]").count() >= 20
+        _step(page, "cfd", "conditions")
+        assert page.locator("[data-testid^=cfd-term-]").count() >= 200
+        _step(page, "cfd", "design")
         page.click("[data-testid=cfd-fill]")
         assert page.locator("[data-testid=cfd-missing]").count() == 0
         assert page.locator("[data-testid=cfd-optimise]").is_enabled(), "offered, not clicked"
+        _step(page, "cfd", "financeInputs")
+        assert page.locator("[data-testid=cfd-debt-terms]").count() == 1 and page.locator("[data-testid=cfd-construction]").count() == 1
         _step(page, "cfd", "finance")
-        page.wait_for_selector("[data-testid=cfd-finance]", timeout=60_000)
+        page.wait_for_selector("[data-testid=cfd-finance]", timeout=120_000)
         assert "₹" in page.locator("[data-testid=cfd-finance]").inner_text()
         _shot(page, "cfd-finance")
+        _step(page, "cfd", "forms")
+        assert page.locator("[data-testid^=cfd-formsnav-7]").count() >= 10
+        _step(page, "cfd", "reference")
+        assert page.locator("[data-testid=cfd-reference-table]").count() == 1
 
         _tab(page, "Recent tenders")
         page.wait_for_selector("[data-testid=seci-results]")

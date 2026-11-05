@@ -3,7 +3,7 @@
 import { query } from "./db";
 import { HttpError } from "./auth";
 import { saveUpload } from "./files";
-import { engineKeyHeaders } from "./secrets";
+import { engineKeyHeaders } from "./secrets.js";
 
 const ENGINE_URL = process.env.ENGINE_URL || "http://127.0.0.1:8000";
 const num = (v) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));

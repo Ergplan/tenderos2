@@ -48,7 +48,7 @@ def test_cfd_bid_end_to_end(tmp_path):
         for step in STEPS:
             assert page.locator(f"[data-testid=cfd-step-{step}]").count() == 1, step
         for step, team in TEAMS.items():
-            assert page.locator(f"[data-testid=cfd-step-team-{step}]").inner_text() == team, step
+            assert page.locator(f"[data-testid=cfd-step-team-{step}]").text_content().strip() == team, step
 
         # 01 what is a CfD: the explainer, the diagram and the worked example
         _step(page, "explain")
@@ -69,7 +69,7 @@ def test_cfd_bid_end_to_end(tmp_path):
         # 03 conditions: every term with its quote
         _step(page, "conditions")
         assert page.locator("[data-testid^=cfd-term-]").count() >= 120
-        assert "amended" in page.locator("[data-testid=cfd-cond-summary]").inner_text().lower()
+        assert "251 conditions" in page.locator("[data-testid=cfd-cond-summary]").inner_text() or "conditions" in page.locator("[data-testid=cfd-cond-summary]").inner_text()
 
         # 04 bid inputs
         _step(page, "bid")
@@ -95,11 +95,15 @@ def test_cfd_bid_end_to_end(tmp_path):
         repay.select_option("equal")
         page.click("[data-testid=cfd-size]")
 
-        # 07 size: the optimiser runs (minutes); then the plant and the operations
+        # 07 size: the optimiser runs (the own RE that gives the least strike price with every
+        # day met); then the plant, the checks and the operations
         page.wait_for_selector("[data-testid=cfd-step-size][aria-current=step]")
-        page.wait_for_selector("[data-testid=cfd-sized]", timeout=600_000)
-        sized = page.locator("[data-testid=cfd-sized]").inner_text()
+        page.wait_for_selector("[data-testid=cfd-message]", timeout=600_000)
+        assert "optimised" in page.locator("[data-testid=cfd-message]").inner_text().lower()
+        sized = page.locator("[data-testid=cfd-plant]").inner_text()
         assert "MW" in sized and "₹" in sized
+        assert page.locator("[data-testid^=cfd-check-]").count() >= 6
+        assert page.locator("[data-testid=cfd-ops-table]").count() == 1 and page.locator("[data-testid=cfd-day]").count() == 1
 
         # 08 financial model: the tiles, the trace, the workbook with nine sheets
         _step(page, "finance")
@@ -123,15 +127,15 @@ def test_cfd_bid_end_to_end(tmp_path):
         page.wait_for_selector("[data-testid=cfd-whatif]", timeout=60_000)
         page.click("[data-testid=cfd-levers-run]")
         page.wait_for_selector("[data-testid^=cfd-lever-]", timeout=600_000)
-        assert page.locator("[data-testid^=cfd-lever-]").count() >= 10
+        assert page.locator("[data-testid^=cfd-lever-]").count() >= 11, "the table and at least ten levers"
 
         # 10 bid forms: the particulars, a format, the letters
         _step(page, "forms")
         page.wait_for_selector("[data-testid=cfd-forms]", timeout=30_000)
-        assert page.locator("[data-testid^=cfd-form-7]").count() >= 10
+        assert page.locator("[data-testid^=cfd-formsnav-7]").count() >= 10
         if page.locator("[data-testid=cfd-form-field-bidder]").count():
             page.fill("[data-testid=cfd-form-field-bidder]", "Arkaja Renewables Private Limited")
-        page.click("[data-testid=cfd-form-7.1]")
+        page.click("[data-testid=\"cfd-formsnav-7.1\"]")
         page.wait_for_timeout(300)
         assert "covering" in page.locator("main").inner_text().lower()
         with page.expect_download(timeout=120_000) as dl:

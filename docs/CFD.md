@@ -5,15 +5,21 @@ A dashboard tab for bidding SECI's CfD-I tender: assured peak supply of 1000 MWh
 against the bidder's strike price. It is a separate tab (`cfd`, "CfD Bid") and runs in the browser;
 an administrator grants it like the other tabs.
 
-| Step | What it shows | Where |
-| --- | --- | --- |
-| 1 How it works | The tender as a picture: a flow diagram of energy and money (RE plant, group RE, green market → battery → exchange → CfD Pool → the bidder), the timeline from the Effective Date to the end of the term, a day of supply on IEX evening prices, the bidder's obligations in order from the bid and the e-RA to the end of the term, and the money in one line | `VisualModel.jsx` |
-| 2 Worked example | One bid size (50–150 MW) worked through: whether a plant is needed already (no), what the bidder signs up for, what it builds and how the battery is charged in each phase, the money put up before revenue, three real IEX evenings settled against a strike price, a Contract Week with a missed evening, and a year of evenings | `example.js`, `ExampleStep.jsx` |
-| 3 Tender terms | 100 terms in 10 groups, each with its document, clause, page and quote; terms an amendment replaced are kept and marked; where the RfS and the CfDA still differ the term is marked "documents differ" | `terms.js`, `TermsStep.jsx` |
-| 4 Plant and sourcing | Contracted MW (50–150, whole MW), Effective Date (the LoA, PBG and tender dates follow), battery, own solar and wind, charging sources and markets; **Fill up for me please**; **Optimise own RE** | `InputsStep.jsx` |
-| 5 Costs and finance | Capex, O&M, augmentation, exchange fees, LC, bank-guarantee cost, GST on SECI's charges, financing; what the RfS asks of this bid (EMD, PBG, SECI's charges, net worth, liquidity) | `InputsStep.jsx` |
-| 6 Operations | Every day of the term: supply, where the energy came from against the limits, surplus sold, curtailment, weekly penalties; any day's hourly operation | `model.js simulate`, `OperationsStep.jsx` |
-| 7 Bid and financials | The strike price for the target equity IRR (rounded up to two decimals), IRRs, DSCR, levelised cost, the CfD Pool at that price, revenue and costs by year, the statements; **Download financial model (Excel)** | `model.js financials`, `FinanceStep.jsx`, `POST /api/cfd/model` |
+| Step | Team | What it shows | Where |
+| --- | --- | --- | --- |
+| 01 What is a CfD | Tender / Legal | A plain-words explainer with a three-evening ₹5.70 table (every claim cites a term), the tender as a picture (energy and money flows, the timeline, a day of supply, the obligations in order), and the worked example for 50–150 MW | `ExplainStep.jsx`, `VisualModel.jsx`, `example.js`, `ExampleStep.jsx` |
+| 02 Tender & amendments | Tender / Legal | The five documents (RfS of 15.07.2026, the standard CfDA, Amendments 01–03), how the bid goes, the 37 changes clause by clause (was / now, with the page link), the points to raise with SECI | `pack.js`, `DocumentsStep.jsx`; the PDFs under `web/public/tenders/seci-cfd-i/` |
+| 03 Bid conditions | Tender / Legal | 251 conditions in 11 groups, each quoted word for word with its document, clause and page; the amended ones with "As issued"; the three where the RfS and the CfDA differ; Assign to Legal | `terms.js`, `ConditionsStep.jsx` |
+| 04 Bid inputs | Projects | Contracted MW (50–150, whole MW), the Effective Date with every date that follows it, the market to sell in, the sourcing choices, merchant sale, after the term; money at stake (EMD, PBG, CAC, fees, net worth, liquidity) | `BidInputsStep.jsx`, `inputs.jsx` |
+| 05 Design | Design | Battery MWh and MW per contracted MW, own solar and wind, RE commissioning, availability, CUFs, RTE, degradation, augmentation; **Fill up for me please**; **Optimise own RE** | `DesignStep.jsx` |
+| 06 Finance inputs | Finance | Costs and financing; debt repayment (six methods), moratorium, instalments, refinancing; construction months, drawdown, funding order; working capital and the debt service reserve; **Size the plant** | `FinanceInputsStep.jsx` |
+| 07 Size | Projects | The optimiser's own-RE sizes for the least strike price with every day met; the plant; seven tender checks; year-1 energy mix; every Contract Year; any day's hourly operation | `model.js optimiseOwnRe`, `SizeStep.jsx` |
+| 08 Financial model | Finance | The bid strike price from the shared financial engine (the screening price beside it), IRRs, DSCR, project cost, LC, Pool pay-in, penalty, charging power; Your quote; money at stake; revenue stack; the Pool; F.1 Assumptions to F.4 the 15-year model with the traceable explorer; **Download financial model (Excel)**: Cover, Live model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, Depreciation and tax, Working capital, Sensitivity | `finance.js`, `FinanceModelStep.jsx`, `web/src/rtc/engine.js`, `web/lib/liveModel.js`, `POST /api/cfd/model` |
+| 09 What-if | Finance | Returns at a tried strike price; every input one step up and down with the price it gives and how far it must move; Apply | `levers.js`, `WhatIfStep.jsx` |
+| 10 Bid forms | Tender / Legal | The RfS's 17 formats with their 224 blanks beside the RfS page, the particulars asked once, the letters in the RfS wording, eleven checks, Word and PDF | `forms.js`, `formats.js`, `letters/`, `BidForms.jsx`, `POST /api/cfd/forms`, `/api/cfd/letters` |
+| 11 Reference bids | Projects | No CfD-I result yet: SECI's eight results that compare, the gap to the lowest peak-power award, why a strike price sits where it does | `ReferenceBids.jsx`, `web/src/market/seed.js` |
+
+Across the steps: Save / Open (library module `cfd`), the Team panel with assignments on boxes, formats and conditions, pings and evidence on every box, feedback, and the voice bid agent (GPT-Live) with sixteen tools (`agent.js`, `voice.js`; the session from `POST /api/seci/live` with `tab: "cfd"`).
 
 ## Worked example (`workedExample`)
 

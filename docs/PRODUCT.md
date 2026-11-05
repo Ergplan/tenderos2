@@ -123,6 +123,13 @@ traceable model · Excel twin with nine sheets · sensitivity tables · money at
 **What-if** · instant rule-based what-if on any plant · tariff levers for bid day · seeded from the
 sized bid.
 
+**CfD bid (SECI CfD-I)** · what a Contract for Difference is, in plain words · the RfS and its
+three amendments with every change quoted · 251 conditions with their pages · bid inputs, design
+and finance inputs by team · own RE sized for the least strike price with every day's supply met
+· the full financial model through the shared engine (nine-sheet Excel, traceable model) · strike
+price levers · the RfS's 17 formats as letters (Word, PDF) · reference bids from SECI's results ·
+the same voice agent, team, evidence and save as the RTC tender.
+
 **Team and evidence** · team setup and roles · pings and threads on every box · assignments and
 hand-offs with email · evidence and sign-off on every input · evidence register · activity log ·
 feedback and change requests exported as a prompt.

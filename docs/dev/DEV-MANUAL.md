@@ -24,7 +24,7 @@ One web app with seven sidebar tabs (`web/lib/tabs.js` `TAB_CATALOG`, `web/src/m
 | Round the Clock (`rtc`) | RTC / FDRE sizing and finance from your own inputs; in-browser optimiser (Web Worker) plus the engine's HiGHS LP; same workbook | `rtc` | `web/src/rtc/` |
 | SECI RTC tender (`seciRtc`) | SECI FDRE-RTC-V (issued as RTC-TM-V): a curated tender pack with the RfS, 3 amendments, clarifications and PSA; ten steps by team from documents to bid forms, letters, the bid pack, the winning-bid bridge and a GPT-Live voice bid agent | `rtc`, `bid` | `web/src/seci/`, `docs/SECI_RTC.md` |
 | BESS Tender (`bessTender`) | Standalone battery tenders: read the tender, size the battery, capacity charge for the target IRR | `bess` | `web/src/bess/`, `engine/bess/` |
-| CfD Bid (`cfd`) | SECI CfD-I strike price, computed in the browser | none | `web/src/cfd/`, `docs/CFD.md` |
+| CfD Bid (`cfd`) | SECI CfD-I: eleven steps by team (explainer, documents and amendments, 251 conditions, bid inputs, design, finance inputs, own-RE sizing, the financial model through the shared engine with the nine-sheet workbook, What-if levers, the RfS's 17 formats as letters, reference bids), the voice agent | `POST /api/cfd/model`, `/api/cfd/forms`, `/api/cfd/letters`, `/api/seci/live` (tab `cfd`) | `web/src/cfd/`, `docs/CFD.md` |
 | What-if analysis (`whatIf`) | Your sizes, costs, financing and tariff in; IRRs, DSCR, LCOE, the tariff the target IRR needs, tender checks, tariff levers; rule-based hourly dispatch, no optimisation | none | `web/src/whatif/` |
 | Recent tenders (`recentTenders`) | SECI auction results as reported; CERC tariff-adoption orders uploaded and read by the engine | none (`/api/bid/cerc-order` goes through the `bid` family from this tab's upload) | `web/src/market/`, `engine/market/` |
 
@@ -42,7 +42,7 @@ Across the tabs:
   and the `tenderos-patch` tool.
 * **Users and tab access**: an administrator creates users and grants tabs; demo mode
   (`DEMO_MODE=1`) signs every visitor in as one shared user with every tab.
-* **Saved scenarios**: every tab except Tender to Bid, CfD, What-if and Recent tenders saves to a
+* **Saved scenarios**: every tab except Tender to Bid, What-if and Recent tenders saves to a
   library with versions (`/scenarios`); Tender to Bid saves its readings (`tender_reads`).
 
 ## 2. Stack and versions
@@ -150,7 +150,8 @@ Local development needs Python 3.12, Node 22 and a Postgres (`Makefile` header, 
 | `bid/model`, `rtc/model`, `cfd/model` | POST | The Excel workbooks (Tender to Bid / SECI, Round the clock, CfD), built with exceljs |
 | `bid/queries` | POST | Pre-bid queries as a Word file |
 | `seci/forms`, `seci/letters` | POST | The SECI bid pack and the letters as Word files |
-| `seci/live` | GET, POST | Whether the voice agent is set up; create the GPT-Live session from the browser's WebRTC offer (the OpenAI key, from API keys or `OPENAI_API_KEY`, stays on the server) |
+| `cfd/forms`, `cfd/letters` | POST | The CfD bid pack and the letters as Word files (`web/src/cfd/letters`) |
+| `seci/live` | GET, POST | Whether the voice agent is set up; create the GPT-Live session from the browser's WebRTC offer (the OpenAI key, from API keys or `OPENAI_API_KEY`, stays on the server); `tab: "cfd"` in the body picks the CfD agent's tools and greeting |
 | `plant/justification` | POST | The 25-year CUF justification as a Word file |
 | `team`, `team/members`, `team/members/[id]`, `team/act-as`, `team/assignments`, `team/assignments/[id]`, `team/files/[id]`, `team/outbox`, `team/messages`, `team/messages/read` | see `docs/TEAM.md` | Team state, members, demo "View as", assignments and actions, file download, outbox, pings and the inbox |
 | `evidence`, `evidence/[id]`, `evidence/signoff`, `evidence/register` | GET, POST; DELETE; POST; GET | Evidence on boxes, sign-off, the CSV register |
@@ -338,7 +339,7 @@ state (`docs/ARCHITECTURE.md`, "The bid agent"). `GET /api/seci/live` says wheth
 
 | State | Where it lives | Notes |
 | --- | --- | --- |
-| A tab's inputs, step and results | React state in the tab component, saved to `localStorage` on change | Keys: `fdre.bid.v4` (Tender to Bid), `tenderos.seci.v1` (SECI), `fdre.rtc.v1` (Round the clock), `fdre.bess.v1` (BESS), `fdre.cfd.v1` (CfD), `tenderos-whatif` (What-if). The What-if step inside the SECI flow (`embedded`) does not write the key. `BidTab` and `SeciTab` also keep a module-level `sessionState`/`sessionView` so switching sidebar tabs does not reset the step |
+| A tab's inputs, step and results | React state in the tab component, saved to `localStorage` on change | Keys: `fdre.bid.v4` (Tender to Bid), `tenderos.seci.v1` (SECI), `fdre.rtc.v1` (Round the clock), `fdre.bess.v1` (BESS), `fdre.cfd.v1` (CfD; module `cfd` in the library), `tenderos-whatif` (What-if). The What-if step inside the SECI flow (`embedded`) does not write the key. `BidTab` and `SeciTab` also keep a module-level `sessionState`/`sessionView` so switching sidebar tabs does not reset the step |
 | Hour-by-hour dispatch of a sizing | Memory only (`keepDispatch`, `web/src/bid/model.js`) | A bid opened from a save shows yearly values until sized again; `sizingSeed` (the last design) is kept in state to start the next solve |
 | Per-browser conveniences | `localStorage` | `tenderos-theme` (day/night, `web/src/themeScript.js`), `tenderos.pingIcons` (send icons always or on hover, `web/src/team/FieldPings.jsx`) |
 | Saved scenarios and versions | `scenarios` (module `rtc`, `fdre`, `bess`, `seci`; `created_by`, `archived`) and `scenario_versions` (inputs and results as jsonb, one row per version) | Save: `POST /api/scenarios` (version 1) or `PUT /api/scenarios/[id]` (new version); open: `/?open=<id>&v=<n>` (`app/page.js` → `MODULE_TAB` in `main.jsx` picks the tab); restore and compare in `/scenarios`. The SECI tab keeps `linked = {id, name, version}` and accepting a team answer writes a new version with a note |

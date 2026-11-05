@@ -5,8 +5,8 @@
 // Encryption: AES-256-GCM under sha256("tenderos-secrets:" + SESSION_SECRET), a fresh 12-byte
 // nonce per write; the stored text is base64(nonce | tag | ciphertext). Changing SESSION_SECRET
 // makes the stored keys unreadable (the screen then says so and asks for them again).
-import { query } from "./db";
-import { API_KEYS, cleanKey, decrypt, encrypt, hintOf, keyDef } from "./secretCodec";
+import { query } from "./db.js";
+import { API_KEYS, cleanKey, decrypt, encrypt, hintOf, keyDef } from "./secretCodec.js";
 
 export { API_KEYS, cleanKey, decrypt, encrypt, hintOf, keyDef };
 

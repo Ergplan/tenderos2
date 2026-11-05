@@ -153,16 +153,24 @@ Conventions:
 | BE-03 | Optimize | BE-01 | Optimize the bid (seconds) | The strategy map (oversize × augmentation interval), the answer in ₹ lakh/MW/month, the capacity trajectory, compliance, the finance table | manual only in the browser (`tools/check_bess_engine.mjs` checks the engine) |
 | BE-04 | Save / Reset | — | Save; Reset | The dialog; the defaults | manual only |
 
-## 7. CfD Bid
+## 7. CfD Bid (SECI CfD-I)
 
 | ID | Screen | Preconditions | Steps | Expected | Automated |
 | --- | --- | --- | --- | --- | --- |
-| CF-01 | Steps | — | How it works, Worked example, Tender terms, Plant and sourcing, Costs and finance, Operations, Bid and financials | Each opens; Next walks them | `test_click_tour.py::test_bess_cfd_recent_team` |
-| CF-02 | Worked example | — | 50 / 100 / 150 MW; change the strike price | The example's answer, commitments, phases, money, week and year follow the choice | `test_click_tour.py` (100 MW) |
-| CF-03 | Tender terms | — | Read the terms | Every term with its document and page quote; the RfS amounts | `test_click_tour.py` (count); `tests/engine/test_cfd_terms.py` (quotes word for word, needs the CfD documents) |
-| CF-04 | Fill up | — | Plant and sourcing › Fill up for me please | "0 inputs needed"; Optimise own RE enabled | `test_click_tour.py` |
-| CF-05 | Optimise own RE (long) | CF-04 | Optimise own RE (1–3 min, Stop available) | Solar/wind sizes that give the lowest strike price with every day's supply met | manual only (`tools/check_cfd_model.mjs` checks the model) |
-| CF-06 | Bid and financials | CF-04 | Step 7 | The strike price in ₹/kWh, the statements, the pool; Download the Excel | `test_click_tour.py` (₹ shown); Excel: `tools/demo_run.py` |
+| CF-01 | Steps | — | Click the eleven chips: What is a CfD, Tender & amendments, Bid conditions, Bid inputs, Design, Finance inputs, Size, Financial model, What-if, Bid forms, Reference bids | Each opens; the chip carries its team (Tender / Legal, Projects, Design, Finance); Next and Back walk them | `test_click_tour.py::test_bess_cfd_recent_team`; `test_cfd_bid.py` |
+| CF-02 | What is a CfD | — | Read the plain-words explainer, the ₹5.70 three-evening table, the flow diagram; 50 / 100 / 150 MW in the worked example; change the strike price | Every claim carries a cite to a term; the example's answer, commitments, phases, money, week and year follow the choice | `test_cfd_bid.py`; `test_click_tour.py` (100 MW) |
+| CF-03 | Tender & amendments | — | The five document cards (CfDA "not provided"); How the bid goes; filter the changes by All / Amendment-01 / 02 / 03; Points to raise | 37 changes (4 + 11 + 22), each clause as it was and as amended with its page link; 10 points to raise | `test_cfd_bid.py`; `test_click_tour.py` (Amendment-03 filter) |
+| CF-04 | Bid conditions | — | Read the 251 conditions; filter All / Amended / Differ / RfS / CfDA; Assign one to Legal | Every condition quoted word for word with its page link; the replaced ones show "As issued"; the three where the documents differ are flagged | `test_cfd_bid.py` (count); `tests/engine/test_cfd_terms.py` (quotes word for word against the public PDFs) |
+| CF-05 | Bid inputs | — | Contracted MW (50–150), the Effective Date, the market to sell in, the sourcing choices, merchant sale, after the term | The key dates strip follows the date (LoA, documents due, FC, SCD, last day with penalty, PBG valid to, RE by, term end); Money at stake follows the MW | `test_cfd_bid.py` (100 MW) |
+| CF-06 | Design › Fill up | — | Fill up for me please; Optimise own RE offered | "0 inputs needed"; the benchmarks marked; Optimise enabled | `test_click_tour.py`; `test_cfd_bid.py` |
+| CF-07 | Finance inputs | CF-06 | Repayment (six methods), moratorium, instalments, refinancing, construction months, drawdown, funding order, working capital, DSRA; Size the plant | Sculpted shows Target DSCR; the Size button runs the optimiser and opens Size | `test_cfd_bid.py` (sculpted / equal, Size the plant) |
+| CF-08 | Size (long) | CF-07 | Wait for "Own RE optimised" (seconds to a minute; Stop available) | The sized plant (solar, wind, battery, strike price for the target IRR), seven tender checks met, year-1 energy mix, the Contract Year table, a day's hourly chart | `test_cfd_bid.py` |
+| CF-09 | Financial model | CF-08 | The tiles; Σ on Equity IRR opens the traceable model; Download financial model (Excel); type a quote under Your quote | Bid strike price with the screening price beside it, IRRs, DSCR, project cost, LC, Pool pay-in, penalty, charging power; the workbook has Cover, Live model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, Depreciation and tax, Working capital, Sensitivity; a quote below the target warns | `test_cfd_bid.py` (trace, the nine sheets) |
+| CF-10 | What-if | CF-08 | Compute the levers; try a strike price; Apply a lever | One row per input with the price if up / if down, ₹ per step and how far it must move; returns at the tried price | `test_cfd_bid.py` (levers) |
+| CF-11 | Bid forms | CF-08 | Your particulars; open Format 7.1; Reviewed; Use ₹x/kWh; All letters (Word / PDF); Download bid pack | 17 formats grouped by envelope with their blanks beside the RfS page; the filled letters; the eleven checks | `test_cfd_bid.py` (particulars, 7.1, letters Word) |
+| CF-12 | Reference bids | — | Read the table | SECI's eight results that compare, the gap to the lowest peak-power award, why a strike price sits where it does | `test_cfd_bid.py`; `test_click_tour.py` |
+| CF-13 | Save and reopen | CF-08 | Save › name › Save; Open › the library (module CfD) › Open | Saved as version 1; the library lists it; reopening restores the sized bid | `test_cfd_bid.py` |
+| CF-14 | Voice agent | — | Talk to the bid agent (needs the OpenAI key) | The agent reads the tender, sets inputs, runs the optimiser and explains the result through its sixteen tools | manual; `tools/check_cfd_agent.mjs` checks the tools |
 
 ## 8. Recent tenders
 

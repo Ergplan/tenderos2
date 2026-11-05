@@ -5,7 +5,7 @@ financial-model line lists are read from `web/src` on every run; the computing f
 storage come from the curated map in the script, checked against the code it cites. Anything the
 script could not match is marked **to confirm**.
 
-159 headline numbers in 20 files, 56 entries in the 25-year table, 11 other calculated tables.
+192 headline numbers in 22 files, 56 entries in the 25-year table, 11 other calculated tables.
 
 Storage vocabulary: **computed** = worked out from the tab's state on every render and never stored; **localStorage `key`** = part of the tab's state the browser keeps under that key; **`scenarios.inputs.state.<path>`**, **`results.<path>`**, **`summary.<field>`** = the jsonb of the saved version (`scenario_versions`) when the tab is saved to the library (Round the clock, BESS, SECI only); a table name = a database row written by an API route.
 
@@ -162,42 +162,95 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | The Pool pays you, net / You pay the Pool, net *(label is an expression)* | `cfd/ExampleStep.jsx:186` | `cr(y.poolCr)` | `x.year.poolCr` = youCr − exchangeCr; `daysPoolPays`, `daysYouPay` | the strike price, the IEX prices | see the file's note above |
 | You receive | `cfd/ExampleStep.jsx:187` | `cr(y.youCr)` | `x.year.youCr` = SP × energy | the strike price | see the file's note above |
 
-### `web/src/cfd/FinanceStep.jsx`
+### `web/src/cfd/FinanceModelStep.jsx`
 
-**Screen:** CfD bid › Strike price to bid (step 6)  
-**Computed by:** `model.fin` = `financials(inputs, sim, sp)` and `model.bid` (`solveStrikePrice`), `poolFlows(sim, bid)` in `web/src/cfd/model.js`  
-**Rests on:** state.inputs and the simulation  
-**Stored:** computed; the Excel twin is written on request by `POST /api/cfd/model` (logged in `activity_log` as `export`)
+**Screen:** CfD bid › Financial model (step 08)  
+**Computed by:** `finance` = `runCfdFinance(state, model)` (`web/src/cfd/finance.js`: `cfdEngineInputs` → `E.runFinancialModel` of `web/src/rtc/engine.js`, solveBy npv); `quotedStrikeReturns` for the quote; `poolFlows(sim, sp)` (`model.js`)  
+**Rests on:** state.inputs, state.fin, state.costs, state.tariffLocked, the simulation's operating years  
+**Stored:** computed; the workbook is written on request by `POST /api/cfd/model` (logged in `activity_log` as `export`); `state.quoteTariff` and `forms.tariff` on Save
 
 | Label as shown | Where | Value expression | Computed by | Inputs | Stored |
 | --- | --- | --- | --- | --- | --- |
-| Strike price to bid | `cfd/FinanceStep.jsx:147` | `` `₹${bid.toFixed(2)}/kWh` `` | `model.bid` (`solveStrikePrice`: the exact `sp` for the target equity IRR, rounded up to 2 decimals) | inputs.targetEquityIrr and the whole model | see the file's note above |
-| Equity IRR | `cfd/FinanceStep.jsx:148` | `pf(fin.equityIrr, 2)` | `fin.equityIrr` (`xirr`), `fin.projectIrr` | the dated cash flows | see the file's note above |
-| DSCR | `cfd/FinanceStep.jsx:149` | `` `${nf(fin.minDscr, 2)} minimum` `` | `fin.minDscr`, `fin.avgDscr` | the rows | see the file's note above |
-| Levelised cost of supply | `cfd/FinanceStep.jsx:150` | `` `₹${nf(fin.levelisedCost, 2)}/kWh` `` | `fin.levelisedCost` at inputs.discountRate, net of surplus sales and RECs | the cost flows | see the file's note above |
-| Capex | `cfd/FinanceStep.jsx:151` | `` `₹${nf(fin.capex.total, 0)} cr` `` | `fin.capex.total`, `atScd`, `atRe` (`capex(inputs)`) | inputs costs, own RE MW | see the file's note above |
-| Letter of Credit to SECI | `cfd/FinanceStep.jsx:152` | `` `₹${nf(fin.lcCr, 2)} cr` `` | `fin.lcCr` (`lcCr(mw, sp)`) | contracted MW, the strike price | see the file's note above |
-| EMD and PBG | `cfd/FinanceStep.jsx:153` | `` `₹${nf(fin.rfs.emdCr, 1)} cr + ₹${nf(fin.rfs.pbgCr, 1)} cr` `` | `fin.rfs.emdCr`, `pbgCr`, `rows[0].bgCost` | RFS rates, contracted MW | see the file's note above |
-| Energy supplied | `cfd/FinanceStep.jsx:154` | `` `${nf(sim.years.reduce((a, y) => a + y.deliveredMwh, 0) / 1000, 0)} GWh` `` | Σ `sim.years[].deliveredMwh` | the simulation | see the file's note above |
-| Average evening market price | `cfd/FinanceStep.jsx:155` | `` `₹${nf(poolYear.mcpAvg, 2)}/kWh` `` | `poolFlows(sim, bid)` year 2 `mcpAvg` | the IEX prices of inputs.sellMarket | see the file's note above |
+| Equity IRR at this price | `cfd/FinanceModelStep.jsx:74` | `q ? irrText(q.equityIrr) : "–"` | `quotedStrikeReturns(state, model, finance, quote).equityIrr` (`runCfdFinance` with the tariff locked at the quote) | the quoted strike price, state.inputs, state.fin | see the file's note above |
+| Project IRR at this price | `cfd/FinanceModelStep.jsx:75` | `q ? irrText(q.projectIrr) : "–"` | `quotedStrikeReturns(...).projectIrr` | as above | see the file's note above |
+| Difference | `cfd/FinanceModelStep.jsx:76` | `` q ? `${q.gap >= 0 ? "+" : "−"}₹${nf(Math.abs(q.gap), 3)}` : "–" `` | quote − `finance.tariff` (the strike price for the target IRR) | the quote and the model | see the file's note above |
+| Strike price (fixed) / Strike price to bid *(label is an expression)* | `cfd/FinanceModelStep.jsx:177` | `` `₹${quote.toFixed(2)}/kWh` `` | `finance.tariff` (`E.runFinancialModel`, solveBy npv: the strike price at which the equity NPV at the target IRR is zero; `fin.tariff` when locked); `model.sp` beside it as the screening price; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `tariff` | state.inputs, state.fin, state.tariffLocked | see the file's note above |
+| Equity IRR | `cfd/FinanceModelStep.jsx:178` | `pf(finance.equityIrr, 2)` | `finance.equityIrr` (`irr` of `equityFlows`); opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `equityIrr` | the engine's cash flows | see the file's note above |
+| Project IRR | `cfd/FinanceModelStep.jsx:179` | `pf(finance.projectIrr, 2)` | `finance.projectIrr`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `projectIrr` | the engine's cash flows | see the file's note above |
+| Minimum DSCR | `cfd/FinanceModelStep.jsx:180` | `nf(finance.minDscr, 2)` | `finance.minDscr`, `avgDscr`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `minDscr` | the engine's rows | see the file's note above |
+| Project cost | `cfd/FinanceModelStep.jsx:181` | `` `₹${nf(finance.capex.total, 0)} cr` `` | `finance.capex.total` (`capexCr`: battery, own RE, line, SECI's charges and the guarantees' cost as `otherCapexCr`, pre-operative, IDC), `finance.lcoe`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `capexTotal` | state.inputs costs, state.costs | see the file's note above |
+| Year-1 supply | `cfd/FinanceModelStep.jsx:182` | `` `${nf(y1.deliveredMu, 1)} MU` `` | `finance.rows[0].deliveredMu`, `dfr`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at line `delivered`, year 1 | the simulation's first operating year | see the file's note above |
+| Year-1 operating cost | `cfd/FinanceModelStep.jsx:183` | `` `₹${nf(y1.opex, 1)} cr` `` | `finance.rows[0].opex` (O&M, insurance, other fixed, charging power, exchange fees, LC, penalty); opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at line `opex`, year 1 | the engine's rows | see the file's note above |
+| Letter of Credit to SECI | `cfd/FinanceModelStep.jsx:184` | `` `₹${nf(lc, 2)} cr` `` | `lcCr(contractedMw, finance.tariff)` = 2000 × MW × (₹10 − SP) × 30 ÷ 1e7; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at line `lcCostCr`, year 1 | contracted MW, the strike price | see the file's note above |
+| CfD Pool, a year | `cfd/FinanceModelStep.jsx:185` | `` `${poolYear.netCr < 0 ? "−" : "+"}₹${nf(Math.abs(poolYear.netCr), 1)} cr` `` | `poolFlows(sim, finance.tariff)` of the first full year: `netCr` = market value − SP × energy | the IEX prices of inputs.sellMarket, the strike price | see the file's note above |
+| Weekly shortfall penalty | `cfd/FinanceModelStep.jsx:186` | `` `₹${nf(finance.totals.cfdPenalty, 2)} cr` `` | `finance.totals.cfdPenalty` (engine: Σ 1.5 × max(0, ref − SP) × MWh beyond the 10% tolerance); opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at line `cfdPenCr`, year 1 | the simulation's weeks, the strike price | see the file's note above |
+| Charging power over the term | `cfd/FinanceModelStep.jsx:187` | `` `₹${nf(finance.totals.charging, 0)} cr` `` | `finance.totals.charging` (engine line `charging` from `op.chargingCostCr`); opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at line `chargingCr`, year 1 | the simulation's market and group charging costs | see the file's note above |
+| Equity payback | `cfd/FinanceModelStep.jsx:188` | `` finance.payback ? `year ${finance.payback}` : "beyond the term" `` | `finance.payback`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `payback` | the equity cash flows | see the file's note above |
+| Battery capex | `cfd/FinanceModelStep.jsx:199` | `` `₹${nf(eng.sizes.bessMwh * eng.costs.bessCrPerMwh, 0)} cr` `` | `eng.sizes.bessMwh × eng.costs.bessCrPerMwh` | state.inputs | see the file's note above |
+| Own RE capex | `cfd/FinanceModelStep.jsx:200` | `` `₹${nf(eng.sizes.solarMw * eng.costs.solarCrPerMw + eng.sizes.windMw * eng.costs.windCrPerMw, 0)} cr` `` | `solarMw × solarCrPerMw + windMw × windCrPerMw` | state.inputs | see the file's note above |
+| Line and SECI's charges | `cfd/FinanceModelStep.jsx:201` | `` `₹${nf(eng.costs.evacuationCr + eng.costs.otherCapexCr, 1)} cr` `` | `eng.costs.evacuationCr` + `otherCapexCr` (RfS cost, bid fee, CAC with GST, the EMD/PBG cost) | state.inputs, RFS rates | see the file's note above |
+| Bid security (EMD) | `cfd/FinanceModelStep.jsx:202` | `` `₹${nf(rfs.emdCr, 2)} cr` `` | `rfsAmounts(inputs).emdCr` | RFS rates, the sized plant | see the file's note above |
+| Performance guarantee (PBG) | `cfd/FinanceModelStep.jsx:203` | `` `₹${nf(rfs.pbgCr, 2)} cr` `` | `rfsAmounts(inputs).pbgCr` | as above | see the file's note above |
+| Net worth required | `cfd/FinanceModelStep.jsx:204` | `` `₹${nf(rfs.netWorthCr, 1)} cr` `` | `rfsAmounts(inputs).netWorthCr` | as above | see the file's note above |
+| Equity | `cfd/FinanceModelStep.jsx:205` | `` `₹${nf(finance.equity, 0)} cr` `` | `finance.equity`, `finance.debt`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `equity` | the capex and the debt share | see the file's note above |
+| Contract Administration Charges | `cfd/FinanceModelStep.jsx:206` | `` `₹${nf(rfs.cacCr, 2)} cr` `` | `rfsAmounts(inputs).cacCr` | contracted MW | see the file's note above |
+| CfD revenue, year 1 | `cfd/FinanceModelStep.jsx:212` | `` `₹${nf(y1.energyRevenue, 1)} cr` `` | `rows[0].energyRevenue` = SP × delivered; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at line `ppaRev`, year 1 | the engine's rows | see the file's note above |
+| Surplus RE and RECs, year 1 | `cfd/FinanceModelStep.jsx:213` | `` `₹${nf(y1.surplusRevenue, 1)} cr` `` | `rows[0].surplusRevenue` (merchant sales + the bidder's 50% of RECs, `op.surplusRevenueCr`); opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at line `mktRev`, year 1 | the simulation | see the file's note above |
+| Surplus RE and RECs, <finance.rows.length> years *(label is an expression)* | `cfd/FinanceModelStep.jsx:214` | `` `₹${nf(finance.rows.reduce((a, r) => a + r.surplusRevenue, 0), 0)} cr` `` | Σ `surplusRevenue` | the engine's rows | see the file's note above |
+| Total revenue, <finance.rows.length> years *(label is an expression)* | `cfd/FinanceModelStep.jsx:215` | `` `₹${nf(finance.totals.revenue, 0)} cr` `` | `finance.totals.revenue`, `totals.penalty`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `revenueTotal` | the engine's rows | see the file's note above |
 
-### `web/src/cfd/OperationsStep.jsx`
+### `web/src/cfd/ReferenceBids.jsx`
 
-**Screen:** CfD bid › Operations over the term (step 5)  
-**Computed by:** `model` = `runModel(state, prices)` (`web/src/cfd/model.js`: modelInputs → priceBook → profiles → simulate → solveStrikePrice), memoised in `CfdTab.jsx`; the figures reduce `model.sim.years`  
+**Screen:** CfD bid › Reference bids (step 11)  
+**Computed by:** `SECI_RESULTS`, `tariffRange`, `weightedTariff` (`web/src/market/seed.js`) against `model.bid`  
+**Rests on:** the SECI result notices in the seed; the model's strike price  
+**Stored:** code (the seed), not rows; nothing stored
+
+| Label as shown | Where | Value expression | Computed by | Inputs | Stored |
+| --- | --- | --- | --- | --- | --- |
+| Your strike price | `cfd/ReferenceBids.jsx:41` | `` sp !== null ? `₹${nf(sp, 2)}/kWh` : "Not sized" `` | `model.bid` | the model | see the file's note above |
+| <latestPeak.tender.replace(/\(.*\)/, "").trim()> / FDRE peak power *(label is an expression)* | `cfd/ReferenceBids.jsx:42` | `` peakRange[0] !== null ? `₹${nf(peakRange[0], 2)}–${nf(peakRange[1], 2)}` : "–" `` | `tariffRange(latestPeak)` of the latest FDRE peak-power result | `SECI_RESULTS` | see the file's note above |
+| Against the peak tariff | `cfd/ReferenceBids.jsx:43` | `` gap === null ? "–" : `${gap >= 0 ? "+" : "−"}₹${nf(Math.abs(gap), 2)}/kWh` `` | `model.bid` − the lowest tariff of that result | the model, `SECI_RESULTS` | see the file's note above |
+| Round-the-clock ceiling | `cfd/ReferenceBids.jsx:44` | `` (() => { const r = results.find((x) => x.product === "FDRE-RTC"); const t = r ? tariffRange(r) : [null]; return t[0] !== null ? `₹${nf(t[0], 2)}/kWh`… `` | `tariffRange` of the FDRE-RTC result | `SECI_RESULTS` | see the file's note above |
+
+### `web/src/cfd/SizeStep.jsx`
+
+**Screen:** CfD bid › Size (step 07): the own RE sized for the least strike price, the checks and the operations  
+**Computed by:** `model` = `runModel(state, prices)` (`web/src/cfd/model.js`: modelInputs → priceBook → profiles → simulate → solveStrikePrice), memoised in `CfdTab.jsx`; `optimiseOwnRe` sets solarMw/windMw; `sizingChecks(model)` in `SizeStep.jsx`; the figures reduce `model.sim.years`  
 **Rests on:** state.inputs (contracted MW, own RE, charging power, markets, availability, costs, financing)  
-**Stored:** computed; inputs in localStorage `fdre.cfd.v1`
+**Stored:** state.inputs in localStorage `fdre.cfd.v1` → `scenarios.inputs.state` on Save (module `cfd`); the results `results.sp`, `results.bid`, `results.solarMw`, `results.windMw` and the summary fields
 
 | Label as shown | Where | Value expression | Computed by | Inputs | Stored |
 | --- | --- | --- | --- | --- | --- |
-| Supplied | `cfd/OperationsStep.jsx:79` | `pf(supply, 1)` | Σ `deliveredMwh` ÷ Σ `requiredMwh` over `sim.years` | the simulation | see the file's note above |
-| Own RE share (after month 36) | `cfd/OperationsStep.jsx:80` | `minOwnAfter !== null ? pf(minOwnAfter, 1) : "–"` | min `shareOwn` of the Contract Years after month 36 | the simulation | see the file's note above |
-| Green market share (after month 36) | `cfd/OperationsStep.jsx:81` | `maxMarketAfter !== null ? pf(maxMarketAfter, 1) : "–"` | max `shareMarket` after month 36 against `TENDER.marketShare` | the simulation | see the file's note above |
-| Group RE share | `cfd/OperationsStep.jsx:82` | `maxGroup !== null ? pf(maxGroup, 1) : "–"` | max `shareGroup` | the simulation | see the file's note above |
-| Days short of charging power | `cfd/OperationsStep.jsx:83` | `nf(shortDays)` | Σ `shortDays` | the simulation | see the file's note above |
-| Weeks with a penalty | `cfd/OperationsStep.jsx:84` | `nf(penaltyWeeks)` | weeks with `beyondMwh` > 0; `penalty` = Σ `penaltyCr(year, sp)` | the simulation, the strike price | see the file's note above |
-| Surplus RE sold | `cfd/OperationsStep.jsx:85` | `` `${nf(years.reduce((a, y) => a + y.merchantMwh, 0) / 1000, 0)} GWh` `` | Σ `merchantMwh`, `merchantRevCr` | the simulation | see the file's note above |
-| Curtailed | `cfd/OperationsStep.jsx:86` | `` `${nf(years.reduce((a, y) => a + y.curtailedMwh, 0) / 1000, 1)} GWh` `` | Σ `curtailedMwh` | the simulation | see the file's note above |
+| Supplied, CY <y1.index> *(label is an expression)* | `cfd/SizeStep.jsx:102` | `gwh(y1.deliveredMwh)` | `y1.deliveredMwh` of the first Contract Year with the RE online, `supplyShare` = delivered ÷ required | the simulation | see the file's note above |
+| From own RE | `cfd/SizeStep.jsx:103` | `gwh(own)` | `y1.ownSuppliedMwh`, `shareOwn`, `windDirectMwh` | the simulation | see the file's note above |
+| From the green market | `cfd/SizeStep.jsx:104` | `gwh(market)` | `y1.chargeMarketMwh × rte`, `shareMarket`, `marketCostCr` | the simulation | see the file's note above |
+| From group RE | `cfd/SizeStep.jsx:105` | `gwh(group)` | `y1.chargeGroupMwh × rte`, `shareGroup`, `groupCostCr` | the simulation | see the file's note above |
+| Own generation | `cfd/SizeStep.jsx:106` | `gwh(gen)` | `y1.solarMwh + windMwh` | the simulation | see the file's note above |
+| Charged from own RE | `cfd/SizeStep.jsx:107` | `gwh(y1.chargeOwnMwh)` | `y1.chargeOwnMwh` | the simulation | see the file's note above |
+| Surplus sold | `cfd/SizeStep.jsx:108` | `gwh(y1.merchantMwh)` | `y1.merchantMwh`, `merchantRevCr` | the simulation | see the file's note above |
+| Curtailed | `cfd/SizeStep.jsx:109` | `gwh(y1.curtailedMwh)` | `y1.curtailedMwh` | the simulation | see the file's note above |
+| Contracted | `cfd/SizeStep.jsx:149` | `` `${nf(X)} MW` `` | `inputs.contractedMw`; the daily mandate = MW × 2 h | state.inputs.contractedMw | see the file's note above |
+| Battery | `cfd/SizeStep.jsx:150` | `` `${nf(X * i.essMwPerMw)} MW / ${nf(X * i.essMwhPerMw)} MWh` `` | `contractedMw × essMwPerMw` / `× essMwhPerMw`, `rte` | state.inputs | see the file's note above |
+| Own solar | `cfd/SizeStep.jsx:151` | `` `${nf(i.solarMw \|\| 0)} MWac` `` | `inputs.solarMw` (set by `optimiseOwnRe` or typed), `solarCuf` | state.inputs | see the file's note above |
+| Own wind | `cfd/SizeStep.jsx:152` | `` `${nf(i.windMw \|\| 0)} MW` `` | `inputs.windMw`, `windCuf` | state.inputs | see the file's note above |
+| Strike price for the target IRR | `cfd/SizeStep.jsx:153` | `` sp ? `₹${nf(sp, 3)}/kWh` : "–" `` | `model.sp` (`solveStrikePrice`), `model.bid` rounded up to the paisa, `model.fin.equityIrr` | inputs.targetEquityIrr and the whole model | see the file's note above |
+| Days short of charging power | `cfd/SizeStep.jsx:154` | `nf(years.reduce((s, y) => s + y.shortDays, 0))` | Σ `shortDays` over `sim.years` | the simulation | see the file's note above |
+| Weekly penalties | `cfd/SizeStep.jsx:155` | `` `₹${nf(penalty, 2)} cr` `` | Σ `penaltyCr(year, model.sp)`; weeks with `beyondMwh` > 0 | the simulation, the strike price | see the file's note above |
+| EMD and PBG | `cfd/SizeStep.jsx:156` | `` `₹${nf(a.emdCr, 2)} cr / ₹${nf(a.pbgCr, 2)} cr` `` | `rfsAmounts(inputs).emdCr`, `pbgCr` | RFS rates, the sized plant | see the file's note above |
+
+### `web/src/cfd/WhatIfStep.jsx`
+
+**Screen:** CfD bid › What-if (step 09): returns at a tried strike price and the levers  
+**Computed by:** `priceOf` / `cfdLeverEffects` (`web/src/cfd/levers.js`): each input one step up and down, operation levers re-simulated, the rest re-priced with `runCfdFinance`  
+**Rests on:** state.inputs, state.fin, state.costs and the tried strike price  
+**Stored:** computed; Apply writes the input back into state.inputs / state.fin
+
+| Label as shown | Where | Value expression | Computed by | Inputs | Stored |
+| --- | --- | --- | --- | --- | --- |
+| Equity IRR | `cfd/WhatIfStep.jsx:64` | `quoted ? irrText(quoted.equityIrr) : pf(finance.equityIrr, 2)` | `priceOf(state, model, price).equityIrr` (`runCfdFinance` with the tariff locked) | the tried strike price | see the file's note above |
+| Project IRR | `cfd/WhatIfStep.jsx:65` | `quoted ? irrText(quoted.projectIrr) : pf(finance.projectIrr, 2)` | `priceOf(...).projectIrr` | the tried strike price | see the file's note above |
+| Minimum DSCR | `cfd/WhatIfStep.jsx:66` | `quoted ? nf(quoted.minDscr, 2) : nf(finance.minDscr, 2)` | `priceOf(...).minDscr` | the tried strike price | see the file's note above |
 
 ### `web/src/dsm/DsmPanel.jsx`
 
