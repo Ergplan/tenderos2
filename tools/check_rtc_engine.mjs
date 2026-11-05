@@ -6,6 +6,7 @@ import {
   synthSolarCf, synthWindCf, buildDemand, buildContext, buildModel, simulate, optimize,
   runFinancialModel, parseProfileCsv, parseDatedProfile, mean, irr, withDuration, tariffAgeingBreakdown,
   optimizeSteps, highsPayload, LOSS_STAGES, toBusFactor, rteAtBus, lossFactors, splitSitesReady,
+  FINANCE_V3_KEYS, sensitivities,
 } from "../web/src/rtc/engine.js";
 
 const inputs = DEFAULT_RTC_INPUTS;
@@ -228,6 +229,24 @@ assert.throws(() => parseProfileCsv("1\n2\n3"));
   const fm = runFinancialModel(sitesCtx, os.best.sizes, { costs: DEFAULT_COSTS, fin: DEFAULT_FINANCE, bess: DEFAULT_BESS, dfrTarget: inputs.dfrTarget });
   assert.equal(fm.rows[0].wheeling, undefined, "nothing is sent between the sites, so no transmission charge");
   console.log(`separate sites: ${JSON.stringify(os.best.sizes)} ₹${os.best.tariff.toFixed(4)} · ${((performance.now() - t1) / 1000).toFixed(1)} s`);
+}
+
+// finance v3 (docs/dev/FINANCE-V3-SPEC.md; the feature checks are tools/check_finance_v3.mjs):
+// every new input is off by default and a model from before v3 gives the same numbers; with a
+// COD the rows carry dates; the reverse-auction sensitivities have every axis
+{
+  const finV3 = { ...DEFAULT_FINANCE, codDate: "2028-04-01" };
+  const dated = runFinancialModel(ctxL, plant, { costs: DEFAULT_COSTS, fin: finV3, bess: DEFAULT_BESS, dfrTarget: inputs.dfrTarget, tariffLocked: true });
+  const plain = runFinancialModel(ctxL, plant, { costs: DEFAULT_COSTS, fin: DEFAULT_FINANCE, bess: DEFAULT_BESS, dfrTarget: inputs.dfrTarget, tariffLocked: true });
+  assert.equal(dated.rows[0].start, "2028-04-01");
+  assert.equal(dated.rows[24].end, "2053-03-31");
+  assert.ok(Math.abs(dated.equityIrr - plain.equityIrr) < 1e-12 && plain.timeline === null, "dates change no number");
+  assert.ok(plain.rows.every((r) => r.carbonRevenue === 0 && r.sweepCr === 0 && r.mezzInterest === 0 && r.quasiOpening === 0 && r.opFactor === 1 && r.phase === "ppa"), "every v3 input off");
+  assert.ok(Number.isFinite(plain.lenderXirr) && Number.isFinite(plain.preTaxEquityIrr) && plain.minLlcr > 0, "the v3 results are there");
+  assert.ok(FINANCE_V3_KEYS.fin.every((k) => k in DEFAULT_FINANCE), "every v3 key has a default");
+  const sens = sensitivities(ctxL, plant, { costs: DEFAULT_COSTS, fin: DEFAULT_FINANCE, bess: DEFAULT_BESS, dfrTarget: inputs.dfrTarget, tariff: plain.tariff });
+  assert.equal(sens.rows.length, 8);
+  console.log(`finance v3: year 1 ${dated.rows[0].start} – ${dated.rows[0].end}; lender XIRR ${(plain.lenderXirr * 100).toFixed(2)}%, LLCR ${plain.minLlcr.toFixed(2)}; ${sens.rows.length} sensitivity axes`);
 }
 
 console.log("RTC engine checks passed");

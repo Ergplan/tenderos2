@@ -66,6 +66,7 @@ export const DEFAULT_BESS = {
   annualDegradation: 0.02,
   augmentation: "annual", // 'annual' | 'none' | 'oneTime'
   augmentationYear: 12,
+  augmentationYears: [6, 12, 18], // 'schedule': the years the capacity lost since the last augmentation is replaced
   costDeclinePct: 0.03,
   durationH: 4, // discharge duration chosen by the user: 2 or 4 hours (MWh = MW x hours); null = free
   minDurationH: 1,
@@ -79,6 +80,11 @@ export const DEFAULT_COSTS = {
   bessPcsCrPerMw: 0,
   evacuationCr: 0,
   preopPct: 0.05,
+  // finance v3 (docs/dev/FINANCE-V3-SPEC.md): when each part of the hard cost is spent inside the
+  // construction window, { solar: { start, months }, wind, bess, evac, other }; null: every part
+  // over the whole window
+  phasing: null,
+  moduleSharePct: 0.45, // the modules' share of the solar capex (the reverse-auction sensitivity)
 };
 
 export const DEFAULT_FINANCE = {
@@ -122,6 +128,50 @@ export const DEFAULT_FINANCE = {
   solarDegradation: 0.005,
   windDegradation: 0,
   discountRate: 0.1,
+  // ---- finance v3 (docs/dev/FINANCE-V3-SPEC.md); every input off by default
+  codDate: null, // ISO date of the COD; year y runs from cod + (y − 1) years
+  parts: [], // part commissioning: [{ share, offsetMonths }] (negative: early); [] = one part on the COD
+  bridge: { months: 0, rate: null, feePct: 0 }, // bridge loan over the first months of construction
+  generationCase: "p50", // 'p50' | 'p75' | 'p90'
+  caseFactors: { p75: 0.97, p90: 0.94 },
+  carbon: { enabled: false, tPerMwh: 0.71, pricePerT: 500, years: 10, escalation: 0.03 }, // ₹ per tonne
+  extension: { years: 0, capexCr: 0, tariffRsPerKwh: null, omFactor: 1, degradation: null }, // life beyond the PPA
+  repower: { year: 0, capexCr: 0, upliftPct: 0 }, // solar repowering
+  solarOmEscalation: null, // null: omEscalation
+  windOmEscalation: null,
+  bessOmEscalation: null,
+  windOmComponents: [], // [{ label, lakhPerMw, escalation }]; [] = windOmLakhPerMw
+  otherFixedLines: [], // [{ label, crPerYear, escalation }]; [] = otherFixedCr
+  refiRepayment: null, // the method after the refinancing; null: the same
+  rateStepDown: { afterYears: 0, rate: null }, // the senior rate from year afterYears + 1
+  topUp: { year: 0, debtFraction: null }, // new senior debt at the end of the year up to the fraction, paid to equity
+  prepaymentPct: 0, // fee on principal prepaid outside the schedule (refinancing takeout, cash sweep)
+  sweep: { pct: 0, fromYear: 1, toYear: null }, // share of the free cash prepaying the debt; unpaid sweep accrues
+  dsraBasis: "next", // 'next' (months of the next year's debt service) | 'peak' (of the highest year left)
+  dsraInterestRate: 0, // interest earned on the reserve, other income
+  quasi: { amountCr: 0, rate: 0.12, lenderMinDscr: 1.2, repayFromYear: 1 }, // quasi-equity from the holdco
+  mezz: { amountCr: 0, rate: 0.14, tenorYears: 10, graceYears: 0, repayment: "equal", feePct: 0 }, // mezzanine
+  guarantees: [], // [{ label, amountCr, feePct, marginPct, marginRate, fromYear, years }]
+  bookDepreciation: "slm", // 'slm' | 'wdv' (the books; taxDepreciation is the tax)
+  bookWdvRate: null, // null: wdvRate
+  lives: null, // book lives by component { solar, wind, bess, evac, other }; null: bookLifeYears
+  thinCapPct: 0, // 0: off; 0.3 caps the deductible quasi-equity and mezzanine interest at 30% of EBITDA
+  lossCarryYears: null, // business losses carried this many years; null: no limit (unabsorbed depreciation never lapses)
+  holdco: { expensesCrPerYear: 0, promoterShare: 1 },
+  lenderReinvestRate: null, // the lender's MIRR; null: the senior rate
+  capexUsdShare: 0, // share of the capex paid in dollars (the exchange-rate sensitivity)
+  fxBase: 83, // ₹ per dollar in the bid
+};
+
+/** The finance v3 inputs (docs/dev/FINANCE-V3-SPEC.md), for whitelists and the inputs sheet. */
+export const FINANCE_V3_KEYS = {
+  fin: ["codDate", "parts", "bridge", "generationCase", "caseFactors", "carbon", "extension", "repower",
+    "solarOmEscalation", "windOmEscalation", "bessOmEscalation", "windOmComponents", "otherFixedLines",
+    "refiRepayment", "rateStepDown", "topUp", "prepaymentPct", "sweep", "dsraBasis", "dsraInterestRate",
+    "quasi", "mezz", "guarantees", "bookDepreciation", "bookWdvRate", "lives", "thinCapPct", "lossCarryYears",
+    "holdco", "lenderReinvestRate", "capexUsdShare", "fxBase"],
+  costs: ["phasing", "moduleSharePct"],
+  bess: ["augmentationYears"],
 };
 
 // ---------------------------------------------------------------- helpers
@@ -851,6 +901,10 @@ export function yearFactors(year, fin, bess) {
   else if (bess.augmentation === "oneTime") {
     const since = year >= bess.augmentationYear ? year - bess.augmentationYear : year - 1;
     bessFactor = Math.max(0.4, 1 - deg * since);
+  } else if (bess.augmentation === "schedule") {
+    // finance v3: the capacity fades from the last augmentation year on or before this year
+    const last = (bess.augmentationYears || []).map((v) => Math.round(v)).filter((v) => v > 1 && v <= year).reduce((a, b) => Math.max(a, b), 1);
+    bessFactor = Math.max(0.4, 1 - deg * (year - last));
   }
   return { solarFactor, windFactor, bessFactor, demandFactor };
 }
@@ -907,7 +961,7 @@ export const DRAWDOWN_PROFILES = {
  * Null when there is no construction schedule (constructionMonths 0): IDC is then inside the
  * pre-operative percentage, as before.
  */
-export function constructionSchedule(baseCostCr, costs, fin) {
+export function constructionSchedule(baseCostCr, costs, fin, components = null) {
   const M = Math.max(0, Math.round(costs?.constructionMonths || 0));
   if (!(M > 0) || !fin) return null;
   const d = Math.min(1, Math.max(0, fin.debtFraction || 0));
@@ -915,23 +969,53 @@ export function constructionSchedule(baseCostCr, costs, fin) {
   const prof = DRAWDOWN_PROFILES[costs.drawdown] || DRAWDOWN_PROFILES.linear;
   const equityFirst = costs.drawOrder === "equityFirst";
   const equityTotal = baseCostCr * (1 - d);
+  // finance v3: the parts of the hard cost, each spent under the profile inside its own window
+  // (costs.phasing); a part without a window is spent over the whole construction like the
+  // pre-operative cost. Without phasing the month's cost is the profile's share of the whole.
+  const parts = (components || []).map((c) => {
+    const ph = c.start !== undefined && c.months !== undefined && c.months > 0 ? { start: Math.max(0, Math.min(M - 1, Math.round(c.start))), months: Math.max(1, Math.round(c.months)) } : null;
+    if (ph) ph.months = Math.min(ph.months, M - ph.start);
+    return { ...c, ph };
+  });
+  const phased = parts.some((c) => c.ph);
+  const bridgeMonths = Math.max(0, Math.min(M, Math.round(fin.bridge?.months || 0)));
+  const bridgeRate = (fin.bridge?.rate ?? fin.interestRate ?? 0) / 12;
+  const bridgeFeePct = bridgeMonths > 0 ? Math.max(0, fin.bridge?.feePct || 0) : 0;
   const rows = [];
   let cumEq = 0;
   let bal = 0;
   let idcTotal = 0;
+  let bridgeFee = 0;
   for (let m = 1; m <= M; m += 1) {
     const share = prof.cum(m / M) - prof.cum((m - 1) / M);
-    const cost = baseCostCr * share;
+    let cost = baseCostCr * share;
+    const byComponent = {};
+    if (phased) {
+      cost = 0;
+      for (const c of parts) {
+        let v;
+        if (c.ph) {
+          const t1 = (m - c.ph.start) / c.ph.months;
+          const t0 = (m - 1 - c.ph.start) / c.ph.months;
+          v = t1 <= 0 || t0 >= 1 ? 0 : (c.costCr || 0) * (prof.cum(Math.min(1, t1)) - prof.cum(Math.max(0, t0)));
+        } else v = (c.costCr || 0) * share;
+        byComponent[c.key] = v;
+        cost += v;
+      }
+    } else for (const c of parts) byComponent[c.key] = baseCostCr > 0 ? (cost * (c.costCr || 0)) / baseCostCr : 0;
     const equity = equityFirst ? Math.min(cost, Math.max(0, equityTotal - cumEq)) : cost * (1 - d);
     const debt = cost - equity;
     cumEq += equity;
     const opening = bal;
-    const idc = (opening + debt) * r;
+    const bridge = m <= bridgeMonths;
+    const idc = (opening + debt) * (bridge ? bridgeRate : r);
     bal = opening + debt + idc;
+    let fee = 0;
+    if (bridge && m === bridgeMonths) { fee = bal * bridgeFeePct; bal += fee; bridgeFee += fee; }
     idcTotal += idc;
-    rows.push({ month: m, share, cost, equity, debt, openingDebt: opening, idc, closingDebt: bal });
+    rows.push({ month: m, share, cost, equity, debt, openingDebt: opening, idc, closingDebt: bal, bridge, bridgeFee: fee, byComponent });
   }
-  return { months: M, profile: costs.drawdown || "linear", order: equityFirst ? "equityFirst" : "proRata", rows, idc: idcTotal, debtDrawn: baseCostCr * d, equity: equityTotal };
+  return { months: M, profile: costs.drawdown || "linear", order: equityFirst ? "equityFirst" : "proRata", rows, idc: idcTotal, bridgeFee, bridgeMonths, debtDrawn: baseCostCr * d, equity: equityTotal, phased, components: parts.map((c) => ({ key: c.key, costCr: c.costCr, start: c.ph?.start ?? 0, months: c.ph?.months ?? M })) };
 }
 
 /**
@@ -941,24 +1025,41 @@ export function constructionSchedule(baseCostCr, costs, fin) {
  * before IDC plus the IDC (debt0 / equity0 are then set; without one the caller applies the share).
  */
 export function capexCr(sizes, costs, fin = null) {
-  const hard = sizes.solarMw * costs.solarCrPerMw
-    + sizes.windMw * costs.windCrPerMw
-    + sizes.bessMwh * costs.bessCrPerMwh
-    + sizes.bessMw * (costs.bessPcsCrPerMw || 0)
-    + (sizes.biomassMw || 0) * (costs.biomassCrPerMw || 0) // Tender to Bid only; 0 for Round the clock
-    // Tender to Bid dispatchable plants (hydro, thermal): capex per MW; none for Round the clock
-    + (costs.plants || []).reduce((sum, pl) => sum + (sizes[`${pl.id}Mw`] || 0) * (pl.capexCrPerMw || 0), 0)
-    + (costs.evacuationCr || 0)
-    // other project cost given outright (SECI CfD-I: SECI's charges with GST and the bank guarantees' cost); 0 elsewhere
-    + (costs.otherCapexCr || 0);
+  // the hard cost by component (finance v3: the breakup, its phasing and the asset register)
+  const by = {
+    solar: sizes.solarMw * costs.solarCrPerMw,
+    wind: sizes.windMw * costs.windCrPerMw,
+    bess: sizes.bessMwh * costs.bessCrPerMwh,
+    pcs: sizes.bessMw * (costs.bessPcsCrPerMw || 0),
+    evac: costs.evacuationCr || 0,
+    other: (sizes.biomassMw || 0) * (costs.biomassCrPerMw || 0) // Tender to Bid only; 0 for Round the clock
+      // Tender to Bid dispatchable plants (hydro, thermal): capex per MW; none for Round the clock
+      + (costs.plants || []).reduce((sum, pl) => sum + (sizes[`${pl.id}Mw`] || 0) * (pl.capexCrPerMw || 0), 0)
+      // other project cost given outright (SECI CfD-I: SECI's charges with GST and the bank guarantees' cost); 0 elsewhere
+      + (costs.otherCapexCr || 0),
+  };
+  const hard = by.solar + by.wind + by.bess + by.pcs + by.evac + by.other;
   const preop = hard * (costs.preopPct || 0);
-  const construction = constructionSchedule(hard + preop, costs, fin);
+  const ph = costs.phasing || null;
+  const components = [
+    ...["solar", "wind", "bess", "evac", "other"].map((k) => ({ key: k, costCr: k === "bess" ? by.bess + by.pcs : by[k], ...(ph?.[k] ? { start: ph[k].start || 0, months: ph[k].months } : {}) })),
+    { key: "preop", costCr: preop },
+  ];
+  const construction = constructionSchedule(hard + preop, costs, fin, components);
   const idc = construction ? construction.idc : 0;
-  const total = hard + preop + idc;
+  const bridgeFee = construction ? construction.bridgeFee : 0;
+  // finance v3 fees funded by equity: the guarantees' fees over the construction period and the
+  // mezzanine arrangement fee
+  const M = construction ? construction.months : 0;
+  const guaranteeFees = (fin?.guarantees || []).reduce((a, g) => a + ((g.fromYear || 0) === 0 ? (g.amountCr || 0) * (g.feePct || 0) * (M / 12) : 0), 0);
+  const mezzFee = (fin?.mezz?.amountCr || 0) * (fin?.mezz?.feePct || 0);
+  const fees = guaranteeFees + mezzFee;
+  const total = hard + preop + idc + bridgeFee + fees;
   return {
-    hard, preop, idc, total, construction,
-    debt0: construction ? construction.debtDrawn + idc : null,
-    equity0: construction ? construction.equity : null,
+    hard, preop, idc, bridgeFee, fees, guaranteeFees, mezzFee, total, construction,
+    byComponent: { ...by, preop, idc, bridgeFee, fees },
+    debt0: construction ? construction.debtDrawn + idc + bridgeFee : null,
+    equity0: construction ? construction.equity + fees : null,
   };
 }
 
@@ -979,6 +1080,14 @@ function augmentationScheduleCr(sizes, costs, bess, years) {
     const y = bess.augmentationYear;
     const lost = Math.min(0.6, deg * (y - 1));
     out[y] = sizes.bessMwh * lost * priceAt(y);
+  } else if (bess.augmentation === "schedule") {
+    // finance v3: in each listed year the capacity lost since the previous augmentation is replaced
+    const ys = [...new Set((bess.augmentationYears || []).map((v) => Math.round(v)).filter((v) => v > 1 && v <= years))].sort((a, b) => a - b);
+    let last = 1;
+    for (const y of ys) {
+      out[y] = sizes.bessMwh * Math.min(0.6, deg * (y - last)) * priceAt(y);
+      last = y;
+    }
   }
   return out;
 }
@@ -1605,235 +1714,678 @@ export function principalOf(method, opening, n, rate, interestOpen, { balloon = 
   }
 }
 
+// ---------------------------------------------------------------- finance v3 helpers
+
+/** An ISO date moved by months (and days); null in, null out. */
+export function shiftDate(iso, months, days = 0) {
+  if (!iso) return null;
+  const d = new Date(`${iso}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCMonth(d.getUTCMonth() + months);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Internal rate of return of dated flows [{ date, amount }] (annual compounding on day fractions). */
+export function xirr(flows) {
+  const fl = flows.filter((f) => f && Number.isFinite(f.amount) && f.date);
+  if (fl.length < 2) return NaN;
+  const t0 = new Date(`${fl[0].date}T00:00:00Z`).getTime();
+  const ts = fl.map((f) => (new Date(`${f.date}T00:00:00Z`).getTime() - t0) / (365 * 86400e3));
+  const npv = (r) => fl.reduce((s, f, i) => s + f.amount / (1 + r) ** ts[i], 0);
+  let lo = -0.99;
+  let hi = 1.5;
+  let fLo = npv(lo);
+  const fHi = npv(hi);
+  if (!Number.isFinite(fLo) || fLo * fHi > 0) return NaN;
+  for (let i = 0; i < 200; i += 1) {
+    const mid = (lo + hi) / 2;
+    const fm = npv(mid);
+    if (fm * fLo > 0) { lo = mid; fLo = fm; } else hi = mid;
+    if (hi - lo < 1e-9) break;
+  }
+  return (lo + hi) / 2;
+}
+
+/** Modified IRR of yearly flows: the outflows financed at one rate, the inflows reinvested at another. */
+export function mirr(flows, financeRate, reinvestRate) {
+  const n = flows.length - 1;
+  if (n < 1) return NaN;
+  let pvNeg = 0;
+  let fvPos = 0;
+  flows.forEach((cf, i) => {
+    if (cf < 0) pvNeg += cf / (1 + financeRate) ** i;
+    else fvPos += cf * (1 + reinvestRate) ** (n - i);
+  });
+  if (!(pvNeg < 0) || !(fvPos > 0)) return NaN;
+  return (fvPos / -pvNeg) ** (1 / n) - 1;
+}
+
+/** The share of year y the parts of the plant run (capacity weighted); 1 without part commissioning. */
+export function operatingFactor(y, parts) {
+  if (!Array.isArray(parts) || !parts.length) return 1;
+  let f = 0;
+  for (const p of parts) {
+    const o = Number(p.offsetMonths) || 0;
+    const lo = y === 1 ? o : Math.max(12 * (y - 1), o);
+    const months = Math.max(0, 12 * y - lo);
+    f += (Number(p.share) || 0) * (months / 12);
+  }
+  return f;
+}
+
+/** Thin capitalisation and loss carry-forward: the year's tax from the pools carried in; pure. */
+function taxYear(fin, pools, y, { income, seniorInterest, otherInterest, fees, shInterest, taxDep }) {
+  const thin = Math.max(0, fin.thinCapPct || 0);
+  const intPool = pools.intPool.filter((e) => y - e.year <= 8); // disallowed interest lapses after eight years
+  const carriedIn = intPool.reduce((a, e) => a + e.amt, 0);
+  // the allowance goes to the interest carried in first (it lapses sooner), then to this year's;
+  // interestDisallowed is this year's interest not allowed, the pool what is carried out
+  let allowedSh = shInterest + carriedIn;
+  if (thin > 0) allowedSh = Math.min(shInterest + carriedIn, thin * Math.max(0, income));
+  let left = allowedSh;
+  const newIntPool = [];
+  for (const e of intPool) {
+    const use = Math.min(e.amt, left);
+    left -= use;
+    if (e.amt - use > 1e-12) newIntPool.push({ year: e.year, amt: e.amt - use });
+  }
+  const interestDisallowed = Math.max(0, shInterest - left);
+  if (interestDisallowed > 1e-12) newIntPool.push({ year: y, amt: interestDisallowed });
+  let taxable = income - seniorInterest - otherInterest - fees - allowedSh - taxDep;
+  // losses: unabsorbed depreciation never lapses; business losses lapse after lossCarryYears
+  const limit = fin.lossCarryYears > 0 ? Math.round(fin.lossCarryYears) : null;
+  let lossPool = (limit ? pools.lossPool.filter((e) => y - e.year <= limit) : pools.lossPool).map((e) => ({ ...e })); // copied: the function is called more than once a year
+  let depPool = pools.depPool;
+  let lossSetOff = 0;
+  let depSetOff = 0;
+  if (taxable > 0) {
+    for (const e of lossPool) {
+      if (taxable <= 0) break;
+      const use = Math.min(e.amt, taxable);
+      e.amt -= use;
+      taxable -= use;
+      lossSetOff += use;
+    }
+    lossPool = lossPool.filter((e) => e.amt > 1e-12);
+    if (taxable > 0 && depPool > 0) {
+      depSetOff = Math.min(depPool, taxable);
+      depPool -= depSetOff;
+      taxable -= depSetOff;
+    }
+  } else if (taxable < 0) {
+    const loss = -taxable;
+    const dep = Math.min(taxDep, loss); // the loss is depreciation first (unabsorbed depreciation)
+    depPool += dep;
+    if (loss - dep > 0) lossPool.push({ year: y, amt: loss - dep });
+    taxable = 0;
+  }
+  return {
+    tax: taxable * fin.taxRate, taxable, lossSetOff, depSetOff, interestDisallowed,
+    pools: { lossPool, depPool, intPool: newIntPool },
+    lossCarried: lossPool.reduce((a, e) => a + e.amt, 0), depCarried: depPool, interestCarried: newIntPool.reduce((a, e) => a + e.amt, 0),
+  };
+}
+
 function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
-  const years = fin.years || 25;
+  const years = fin.years || 25; // the PPA years
+  const extYears = Math.max(0, Math.round(fin.extension?.years || 0));
+  const T = years + extYears; // the model's years
   const capex = capexCr(sizes, costs, fin);
-  const debt0 = capex.debt0 ?? capex.total * fin.debtFraction;
-  const equity0 = capex.total - debt0;
+  const mezz0 = Math.max(0, fin.mezz?.amountCr || 0);
+  const quasi0 = Math.max(0, fin.quasi?.amountCr || 0);
+  const debt0 = capex.debt0 ?? (capex.total - capex.fees) * fin.debtFraction;
+  const equity0 = capex.total - debt0 - mezz0 - quasi0;
   const aug = augmentationScheduleCr(sizes, costs, bess, years);
   const dt = debtTerms(fin, years);
   const bookBase = capex.total * (1 - fin.salvagePct);
+  const bookLife = fin.bookLifeYears;
+  const cod = fin.codDate || null;
+  const nominalCod = cod || "2028-01-01"; // the lender's dated flows when no COD is given
+  // finance v3 settings
+  const parts = Array.isArray(fin.parts) && fin.parts.length ? fin.parts : null;
+  const genFactor = fin.generationCase && fin.generationCase !== "p50" ? (fin.caseFactors?.[fin.generationCase] ?? 1) : 1;
+  const carbon = fin.carbon?.enabled ? fin.carbon : null;
+  const ext = extYears > 0 ? fin.extension : null;
+  const extTariff = ext ? (ext.tariffRsPerKwh ?? fin.surplusPrice ?? 0) : 0;
+  const extDeg = ext ? (ext.degradation ?? fin.solarDegradation ?? 0) : 0;
+  const extCapex = ext ? Math.max(0, ext.capexCr || 0) : 0;
+  const rp = fin.repower && fin.repower.year > 0 && fin.repower.year <= T ? fin.repower : null;
+  const stepDown = fin.rateStepDown && fin.rateStepDown.afterYears > 0 ? fin.rateStepDown : null;
+  const topUp = fin.topUp && fin.topUp.year > 0 && fin.topUp.year < dt.tenor ? fin.topUp : null;
+  const prepayPct = Math.max(0, fin.prepaymentPct || 0);
+  const sweep = fin.sweep && fin.sweep.pct > 0 ? fin.sweep : null;
+  const mz = mezz0 > 0 ? { ...fin.mezz, tenor: Math.min(T, Math.max(1, Math.round(fin.mezz.tenorYears || 1))), grace: Math.max(0, Math.round(fin.mezz.graceYears || 0)) } : null;
+  const qs = quasi0 > 0 ? fin.quasi : null;
+  const guarantees = (fin.guarantees || []).filter((g) => (g.amountCr || 0) > 0);
+  const lives = fin.lives || null;
+  const bookWdv = fin.bookDepreciation === "wdv";
+  const bookWdvRate = fin.bookWdvRate ?? fin.wdvRate;
+  const holdcoExp = Math.max(0, fin.holdco?.expensesCrPerYear || 0);
+  // O&M by source (the sum is the old omBase × escalation when nothing is split)
+  const omSplit = fin.solarOmEscalation != null || fin.windOmEscalation != null || fin.bessOmEscalation != null || (fin.windOmComponents || []).length > 0;
+  const windComps = (fin.windOmComponents || []).filter((c) => (c.lakhPerMw || 0) > 0);
+  const om0 = {
+    solar: (sizes.solarMw * fin.solarOmLakhPerMw) / 100,
+    wind: windComps.length ? windComps.reduce((a, c) => a + (sizes.windMw * c.lakhPerMw) / 100, 0) : (sizes.windMw * fin.windOmLakhPerMw) / 100,
+    bess: (sizes.bessMwh * fin.bessOmLakhPerMwh) / 100,
+    biomass: ((sizes.biomassMw || 0) * (fin.biomassOmLakhPerMw || 0)) / 100,
+  };
+  const omBase = omCr(sizes, fin);
+  const escOf = (rate, y) => (1 + (rate ?? fin.omEscalation)) ** (y - 1);
+  const otherLines = (fin.otherFixedLines || []).filter((l) => (l.crPerYear || 0) > 0);
+  // the asset register: the gross block by component, the book lives
+  const hardShare = (k) => (capex.hard > 0 ? capex.byComponent[k] / capex.hard : 0);
+  const regKeys = ["solar", "wind", "bess", "pcs", "evac", "other"];
+  const lifeOf = (k) => (lives ? Math.max(1, Math.round(lives[k === "pcs" ? "bess" : k] || bookLife)) : bookLife);
+  const gross = Object.fromEntries(regKeys.map((k) => [k, capex.byComponent[k]]));
+  gross.preop = capex.preop; gross.idc = capex.idc; gross.fees = capex.fees + capex.bridgeFee;
+  const accDepBy = Object.fromEntries(Object.keys(gross).map((k) => [k, 0]));
+  // the extension capex depreciated straight line over the extension; the repowering over the book life left
+  const rpBookYears = rp ? Math.max(1, bookLife - rp.year + 1) : 0;
+  let augBookDep = 0;
+  let extAugDep = 0; // depreciation of the extension capex
+  let bookWdvBlock = capex.total;
+  let taxWdvBlock = capex.total;
+  let pools = { lossPool: [], depPool: 0, intPool: [] };
   let debt = debt0;
   let balloonBase = debt0; // the balance the balloon share applies to: the debt, or the balance refinanced
-  let wdvBlock = capex.total;
-  let lossCf = 0;
+  let mezzBal = mezz0;
+  let quasiBal = quasi0;
+  let quasiAccrued = 0;
+  let sweepAccrued = 0;
   let prevWc = 0;
-  let augBookDep = 0;
+  let prevMargin = 0;
+  let retained = 0;
+  let cumEquity = -equity0;
+  let payback = null;
   const rows = [];
   const equityFlows = [-equity0];
   const projectFlows = [-capex.total];
-  let cumEquity = -equity0;
-  let payback = null;
-  const omBase = omCr(sizes, fin);
-  for (let y = 1; y <= years; y += 1) {
-    const op = ops[y - 1];
-    const trf = tariff * (1 + fin.tariffEscalation) ** (y - 1);
-    const energyRev = op.deliveredMWh * trf * RS_CR_PER_MWH_AT_1RS;
-    // op.surplusRevenueCr: surplus sold at hourly market prices (Tender to Bid, IEX); else a flat price
-    const surplusRev = fin.sellSurplus ? (op.surplusRevenueCr ?? op.excessMWh * fin.surplusPrice * RS_CR_PER_MWH_AT_1RS) : 0;
-    // SECI FDRE-RTC-V (Amendment-03): the Solar Hours excess the buyer takes at a share of the year's tariff
-    const buyerRev = fin.sellSurplus ? (op.buyerExcessMWh || 0) * (op.buyerExcessShare || 0) * trf * RS_CR_PER_MWH_AT_1RS : 0;
-    const shortfallMWh = Math.max(0, dfrTarget * op.demandMWh - op.deliveredMWh);
-    const annualPenalty = shortfallMWh * (fin.shortfallPenalty || 0) * RS_CR_PER_MWH_AT_1RS;
-    // time-block floors (SECI RTC-TM): energy short of each block's floor, at a multiple of the
-    // year's tariff (1.5x); 0 when the sizing has no block floors
-    const blockShortfallMWh = op.blockShortfallMWh || 0;
-    const blockPenalty = blockShortfallMWh * (fin.blockPenaltyMultiple || 0) * trf * RS_CR_PER_MWH_AT_1RS;
-    // SECI CfD-I (web/src/cfd/finance.js): the weekly shortfall penalty, 1.5 × (the week's reference
-    // price − the strike price) on the energy short beyond the tolerance, week by week; 0 elsewhere
-    const cfdPenalty = (op.penaltyWeeks || []).reduce((a, w) => a + (fin.cfdPenaltyMultiple || 0) * Math.max(0, w.ref - trf) * w.beyondMwh, 0) * RS_CR_PER_MWH_AT_1RS;
-    const penalty = annualPenalty + blockPenalty + cfdPenalty;
-    const revenue = energyRev + surplusRev + buyerRev - penalty;
-    const esc = (1 + fin.omEscalation) ** (y - 1);
-    const om = omBase * esc;
-    const insurance = capex.hard * fin.insurancePct;
-    const other = (fin.otherFixedCr || 0) * esc;
-    // biomass fuel (Tender to Bid): Rs/kWh of biomass generation, escalating; 0 for Round the clock
-    const fuel = (op.biomassMWh || 0) * (fin.biomassFuelRsPerKwh || 0) * (1 + (fin.biomassFuelEscalation || 0)) ** (y - 1) * RS_CR_PER_MWH_AT_1RS;
-    // dispatchable plants (Tender to Bid): fixed charge per MW and energy cost per kWh (RECs for
-    // non-RE), each escalating at the plant's rate; none for Round the clock
-    const plantCost = {};
-    let plantsTotal = 0;
-    for (const pl of costs.plants || []) {
-      const esc = (1 + (pl.escalation || 0)) ** (y - 1);
-      const fixed = ((sizes[`${pl.id}Mw`] || 0) * (pl.fixedLakhPerMw || 0)) / 100 * esc;
-      const energy = (op[`${pl.id}MWh`] || 0) * ((pl.energyRsPerKwh || 0) + (pl.recRsPerKwh || 0)) * esc * RS_CR_PER_MWH_AT_1RS;
-      plantCost[`${pl.id}Cost`] = fixed + energy;
-      plantCost[`${pl.id}Mu`] = (op[`${pl.id}MWh`] || 0) / 1000;
-      plantsTotal += fixed + energy;
-    }
-    // DSM (CERC deviation settlement, web/src/dsm/dsm.js): the year's charges on the forecast
-    // error, a line in the year's tariff on the energy scheduled (what reaches the meter); a cost
-    // of operation. op.dsmChargeCr: given outright
-    const scheduledMWh = op.deliveredMWh + (op.excessMWh || 0) + (op.buyerExcessMWh || 0);
-    const dsm = op.dsmChargeCr ?? (scheduledMWh * ((op.dsmA || 0) * trf + (op.dsmB || 0))) / 1e7;
-    // SECI CfD-I: the power bought to charge the battery (green market, group RE), the exchange
-    // fees on the energy sold, and the cost of the Letter of Credit to SECI, which moves with the
-    // strike price: LC = 2000 kWh × MW × (C − SP) × 30 days, C at least ₹10/kWh; 0 elsewhere
-    const charging = op.chargingCostCr || 0;
-    const pxFees = op.pxFeesCr || 0;
-    const lcCost = (op.lcMw || 0) > 0 && (fin.lcCostPct || 0) > 0
-      ? (fin.lcCostPct * 2000 * op.lcMw * Math.max(0, (fin.lcMinPrice ?? 10) - trf) * (fin.lcDays ?? 30)) / 1e7 : 0;
-    const opex = om + insurance + other + fuel + plantsTotal + dsm + charging + pxFees + lcCost;
-    const ebitda = revenue - opex;
-    // book depreciation (SLM), augmentation depreciated over remaining life
-    if (aug[y] > 0) augBookDep += aug[y] / Math.max(1, years - y + 1);
-    const bookDep = (y <= fin.bookLifeYears ? bookBase / fin.bookLifeYears : 0) + augBookDep;
-    // working capital: receivables, O&M in hand and spares, held at the year end; interest on it
-    const recv = (revenue * fin.receivableDays) / 365;
-    const omStock = (om * (fin.omStockMonths || 0)) / 12;
-    const spares = om * (fin.sparesPctOm || 0);
-    const wcBalance = recv + omStock + spares;
-    const dWc = wcBalance - prevWc;
-    prevWc = wcBalance;
-    const wcInterest = wcBalance * (fin.wcInterestRate || 0);
-    // debt: the balance at the start of the year, this year's terms (refinanced from the year
-    // after the refinancing), the principal under the method, and the interest
-    const opening = debt;
-    const phase2 = dt.refi && y > dt.refiYear;
-    const rate = phase2 ? dt.refiRate : fin.interestRate;
-    const end = phase2 ? dt.refiEnd : dt.tenor;
-    const n = end - y + 1;
-    const repaying = y > dt.grace && y <= end && opening > 1e-9;
-    const interestOpen = opening * rate;
-    const sculpt = dt.method === "sculpted";
-    let principal = 0;
-    if (repaying && !sculpt) principal = principalOf(dt.method, opening, n, rate, interestOpen, { balloon: dt.balloonPct * balloonBase, stepUp: dt.stepUp });
-    let interest = interestOpen - dt.adj * principal;
-    // the refinancing fee: on the balance refinanced, expensed in that year
-    // tax depreciation
-    wdvBlock += aug[y];
-    let taxDep;
-    if (fin.taxDepreciation === "wdv") {
-      taxDep = wdvBlock * fin.wdvRate;
-      wdvBlock -= taxDep;
-    } else {
-      taxDep = bookDep;
-    }
-    // the sculpted principal needs the tax, which needs the interest: worked out first, on the
-    // opening balance (no instalment adjustment for sculpting)
-    const refiFeeOn = dt.refi && y === dt.refiYear;
-    const taxOf = (intr, fee) => {
-      let taxable = ebitda - intr - wcInterest - fee - taxDep;
-      let carried = lossCf;
-      if (taxable > 0 && carried > 0) {
-        const use = Math.min(carried, taxable);
-        taxable -= use;
-        carried -= use;
-      } else if (taxable < 0) {
-        carried += -taxable;
-        taxable = 0;
+  const preTaxEquityFlows = [-equity0];
+  const preTaxProjectFlows = [-capex.total];
+  const holdcoFlows = [-(equity0 + quasi0)];
+  const lenderYearly = [-debt0];
+  const lenderFlows = [];
+  if (capex.construction) {
+    const M = capex.construction.months;
+    for (const r of capex.construction.rows) if (r.debt > 0) lenderFlows.push({ date: shiftDate(nominalCod, r.month - M - 1), amount: -r.debt, kind: "draw" });
+  } else lenderFlows.push({ date: nominalCod, amount: -debt0, kind: "draw" });
+  // the yearly loop; dsraInterestIn: the reserve's interest by year from the previous pass (0 first)
+  const yearLoop = (dsraInterestIn) => {
+    rows.length = 0;
+    equityFlows.length = 1; projectFlows.length = 1; preTaxEquityFlows.length = 1; preTaxProjectFlows.length = 1; holdcoFlows.length = 1; lenderYearly.length = 1;
+    lenderFlows.length = capex.construction ? capex.construction.rows.filter((r) => r.debt > 0).length : 1;
+    augBookDep = 0; extAugDep = 0; bookWdvBlock = capex.total; taxWdvBlock = capex.total;
+    pools = { lossPool: [], depPool: 0, intPool: [] };
+    debt = debt0; balloonBase = debt0; mezzBal = mezz0; quasiBal = quasi0; quasiAccrued = 0; sweepAccrued = 0;
+    prevWc = 0; prevMargin = 0; retained = 0; cumEquity = -equity0; payback = null;
+    for (const k of Object.keys(accDepBy)) accDepBy[k] = 0;
+    let cumAug = 0;
+    for (let y = 1; y <= T; y += 1) {
+      const inPpa = y <= years;
+      const op0 = ops[Math.min(y, years) - 1];
+      // finance v3: the operating factor (part commissioning), the generation case, the extension
+      const opFactor = operatingFactor(y, parts);
+      const fade = inPpa ? 1 : (1 - extDeg) ** (y - years);
+      const k = genFactor * opFactor * fade;
+      const solarShare = (op0.solarGenMWh || 0) + (op0.windGenMWh || 0) > 0 ? (op0.solarGenMWh || 0) / ((op0.solarGenMWh || 0) + (op0.windGenMWh || 0)) : 1;
+      const uplift = rp && y > rp.year ? solarShare * (rp.upliftPct || 0) : 0;
+      const op = k === 1 && uplift === 0 && inPpa ? op0 : {
+        ...op0,
+        deliveredMWh: op0.deliveredMWh * k * (1 + uplift),
+        excessMWh: (op0.excessMWh || 0) * k * (1 + uplift),
+        buyerExcessMWh: (op0.buyerExcessMWh || 0) * k * (1 + uplift),
+        demandMWh: op0.demandMWh * opFactor,
+        dfr: genFactor !== 1 || fade !== 1 || uplift ? Math.min(op0.dfr * genFactor * fade * (1 + uplift), 1) : op0.dfr,
+        solarGenMWh: (op0.solarGenMWh || 0) * k * (1 + uplift),
+        windGenMWh: (op0.windGenMWh || 0) * k,
+        curtailMWh: (op0.curtailMWh || 0) * k,
+        biomassMWh: (op0.biomassMWh || 0) * opFactor,
+        ...(Number.isFinite(op0.surplusRevenueCr) ? { surplusRevenueCr: op0.surplusRevenueCr * k * (1 + uplift) } : {}),
+        ...(op0.evac ? { evac: Object.fromEntries(Object.entries(op0.evac).map(([n, v]) => [n, typeof v === "number" && n.endsWith("MWh") ? v * k * (1 + uplift) : v])) } : {}),
+        ...Object.fromEntries((costs.plants || []).map((pl) => [`${pl.id}MWh`, (op0[`${pl.id}MWh`] || 0) * opFactor])),
+        ...(inPpa ? {} : { blockShortfallMWh: 0, penaltyWeeks: [], dsmChargeCr: 0, dsmA: 0, dsmB: 0, chargingCostCr: 0, pxFeesCr: 0, lcMw: 0, buyerExcessMWh: 0, buyerExcessShare: 0 }),
+      };
+      const repowerUplift = uplift ? op0.deliveredMWh * k * uplift : 0;
+      const trf = inPpa ? tariff * (1 + fin.tariffEscalation) ** (y - 1) : extTariff;
+      // in the extension every unit (the PPA's and the surplus) sells at the extension price
+      const energyRev = (inPpa ? op.deliveredMWh : op.deliveredMWh + (op.excessMWh || 0)) * trf * RS_CR_PER_MWH_AT_1RS;
+      // op.surplusRevenueCr: surplus sold at hourly market prices (Tender to Bid, IEX); else a flat price
+      const surplusRev = inPpa && fin.sellSurplus ? (op.surplusRevenueCr ?? op.excessMWh * fin.surplusPrice * RS_CR_PER_MWH_AT_1RS) : 0;
+      // SECI FDRE-RTC-V (Amendment-03): the Solar Hours excess the buyer takes at a share of the year's tariff
+      const buyerRev = inPpa && fin.sellSurplus ? (op.buyerExcessMWh || 0) * (op.buyerExcessShare || 0) * trf * RS_CR_PER_MWH_AT_1RS : 0;
+      const shortfallMWh = inPpa ? Math.max(0, dfrTarget * op.demandMWh - op.deliveredMWh) : 0;
+      const annualPenalty = shortfallMWh * (fin.shortfallPenalty || 0) * RS_CR_PER_MWH_AT_1RS;
+      // time-block floors (SECI RTC-TM): energy short of each block's floor, at a multiple of the
+      // year's tariff (1.5x); 0 when the sizing has no block floors
+      const blockShortfallMWh = op.blockShortfallMWh || 0;
+      const blockPenalty = blockShortfallMWh * (fin.blockPenaltyMultiple || 0) * trf * RS_CR_PER_MWH_AT_1RS;
+      // SECI CfD-I (web/src/cfd/finance.js): the weekly shortfall penalty, 1.5 × (the week's reference
+      // price − the strike price) on the energy short beyond the tolerance, week by week; 0 elsewhere
+      const cfdPenalty = (op.penaltyWeeks || []).reduce((a, w) => a + (fin.cfdPenaltyMultiple || 0) * Math.max(0, w.ref - trf) * w.beyondMwh, 0) * RS_CR_PER_MWH_AT_1RS;
+      const penalty = annualPenalty + blockPenalty + cfdPenalty;
+      // finance v3: carbon credits on the energy generated, for the first years
+      const carbonRevenue = carbon && y <= (carbon.years || 0)
+        ? ((op.deliveredMWh + (op.excessMWh || 0)) * (carbon.tPerMwh || 0) * (carbon.pricePerT || 0) * (1 + (carbon.escalation || 0)) ** (y - 1)) / 1e7 : 0;
+      const revenue = energyRev + surplusRev + buyerRev - penalty + carbonRevenue;
+      const esc = (1 + fin.omEscalation) ** (y - 1);
+      const omFactor = (inPpa ? 1 : (ext.omFactor ?? 1)) * opFactor;
+      // O&M by source, each escalating at its own rate (finance v3); the wind by component
+      const windOmComponents = windComps.map((c) => (sizes.windMw * c.lakhPerMw) / 100 * escOf(c.escalation ?? fin.windOmEscalation, y) * omFactor);
+      let omBy;
+      if (omSplit) {
+        omBy = {
+          solar: om0.solar * escOf(fin.solarOmEscalation, y) * omFactor,
+          wind: windComps.length ? windOmComponents.reduce((a, b) => a + b, 0) : om0.wind * escOf(fin.windOmEscalation, y) * omFactor,
+          bess: om0.bess * escOf(fin.bessOmEscalation, y) * omFactor,
+          biomass: om0.biomass * esc * omFactor,
+        };
+      } else {
+        const omAll = omBase * esc * omFactor;
+        const sum = om0.solar + om0.wind + om0.bess + om0.biomass;
+        omBy = Object.fromEntries(Object.entries(om0).map(([n, v]) => [n, sum > 0 ? (omAll * v) / sum : 0]));
       }
-      return { tax: taxable * fin.taxRate, carried, taxable };
-    };
-    let refiFee = 0;
-    if (sculpt && repaying) {
-      const t0 = taxOf(interestOpen, 0);
-      const cfads0 = ebitda - t0.tax - dWc - aug[y] - wcInterest;
-      principal = principalOf("sculpted", opening, n, rate, interestOpen, { cfads: cfads0, targetDscr: dt.targetDscr });
-      interest = interestOpen;
+      const om = omSplit ? omBy.solar + omBy.wind + omBy.bess + omBy.biomass : omBase * esc * omFactor;
+      const insurance = capex.hard * fin.insurancePct;
+      // other fixed costs: one line, or the split lines each with its own escalation (finance v3)
+      const otherLinesCr = otherLines.map((l) => (l.crPerYear || 0) * escOf(l.escalation, y) * (inPpa ? 1 : (ext.omFactor ?? 1)));
+      const other = otherLines.length ? otherLinesCr.reduce((a, b) => a + b, 0) : (fin.otherFixedCr || 0) * esc * (inPpa ? 1 : (ext.omFactor ?? 1));
+      // biomass fuel (Tender to Bid): Rs/kWh of biomass generation, escalating; 0 for Round the clock
+      const fuel = (op.biomassMWh || 0) * (fin.biomassFuelRsPerKwh || 0) * (1 + (fin.biomassFuelEscalation || 0)) ** (y - 1) * RS_CR_PER_MWH_AT_1RS;
+      // dispatchable plants (Tender to Bid): fixed charge per MW and energy cost per kWh (RECs for
+      // non-RE), each escalating at the plant's rate; none for Round the clock
+      const plantCost = {};
+      let plantsTotal = 0;
+      for (const pl of costs.plants || []) {
+        const escP = (1 + (pl.escalation || 0)) ** (y - 1);
+        const fixed = ((sizes[`${pl.id}Mw`] || 0) * (pl.fixedLakhPerMw || 0)) / 100 * escP;
+        const energy = (op[`${pl.id}MWh`] || 0) * ((pl.energyRsPerKwh || 0) + (pl.recRsPerKwh || 0)) * escP * RS_CR_PER_MWH_AT_1RS;
+        plantCost[`${pl.id}Cost`] = fixed + energy;
+        plantCost[`${pl.id}Mu`] = (op[`${pl.id}MWh`] || 0) / 1000;
+        plantsTotal += fixed + energy;
+      }
+      // DSM (CERC deviation settlement, web/src/dsm/dsm.js): the year's charges on the forecast
+      // error, a line in the year's tariff on the energy scheduled (what reaches the meter); a cost
+      // of operation. op.dsmChargeCr: given outright
+      const scheduledMWh = op.deliveredMWh + (op.excessMWh || 0) + (op.buyerExcessMWh || 0);
+      const dsm = op.dsmChargeCr ?? (scheduledMWh * ((op.dsmA || 0) * trf + (op.dsmB || 0))) / 1e7;
+      // SECI CfD-I: the power bought to charge the battery (green market, group RE), the exchange
+      // fees on the energy sold, and the cost of the Letter of Credit to SECI, which moves with the
+      // strike price: LC = 2000 kWh × MW × (C − SP) × 30 days, C at least ₹10/kWh; 0 elsewhere
+      const charging = op.chargingCostCr || 0;
+      const pxFees = op.pxFeesCr || 0;
+      const lcCost = (op.lcMw || 0) > 0 && (fin.lcCostPct || 0) > 0
+        ? (fin.lcCostPct * 2000 * op.lcMw * Math.max(0, (fin.lcMinPrice ?? 10) - trf) * (fin.lcDays ?? 30)) / 1e7 : 0;
+      const opex = om + insurance + other + fuel + plantsTotal + dsm + charging + pxFees + lcCost;
+      const ebitda = revenue - opex;
+      // finance v3: the guarantees' fees and margin money, the reserve's and the margin's interest
+      let guaranteeFees = 0;
+      let marginBalance = 0;
+      let marginInterest = 0;
+      for (const g of guarantees) {
+        const from = Math.max(1, Math.round(g.fromYear || 0));
+        const to = Math.round(g.fromYear || 0) + Math.max(1, Math.round(g.years || 1)) - 1;
+        if (y >= from && y <= to) {
+          guaranteeFees += g.amountCr * (g.feePct || 0);
+          const margin = g.amountCr * (g.marginPct || 0);
+          marginBalance += margin;
+          marginInterest += margin * (g.marginRate || 0);
+        }
+      }
+      const dMargin = marginBalance - prevMargin;
+      prevMargin = marginBalance;
+      const dsraInterest = dsraInterestIn[y] || 0;
+      const otherIncome = dsraInterest + marginInterest;
+      // the capex of the year beyond the plant: battery augmentation, the life extension (in the
+      // last PPA year), the solar repowering
+      const augCapex = aug[y] || 0;
+      const extensionCapex = ext && y === years ? extCapex : 0;
+      const repowerCapex = rp && y === rp.year ? rp.capexCr || 0 : 0;
+      cumAug += augCapex;
+      // book depreciation: straight line (by component life when given) and written down, both
+      // kept; the augmentation over the remaining life
+      if (augCapex > 0) augBookDep += augCapex / Math.max(1, years - y + 1);
+      if (extensionCapex > 0) extAugDep += extensionCapex / extYears;
+      const extDep = ext && y > years ? extAugDep : 0;
+      const rpDep = rp && y >= rp.year && y < rp.year + rpBookYears ? (rp.capexCr || 0) / rpBookYears : 0;
+      // with component lives the whole book base (the pre-operative cost, IDC and fees included)
+      // sits on the hard assets pro rata, each written off over its own life
+      let slmBy;
+      if (lives) {
+        slmBy = Object.fromEntries(Object.keys(gross).map((kk) => {
+          if (!regKeys.includes(kk)) return [kk, 0];
+          const life = lifeOf(kk);
+          return [kk, y <= life ? (bookBase * hardShare(kk)) / life : 0];
+        }));
+      }
+      const bookDepSlm = (lives ? Object.values(slmBy).reduce((a, b) => a + b, 0) : (y <= bookLife ? bookBase / bookLife : 0)) + augBookDep + extDep + rpDep;
+      bookWdvBlock += augCapex + extensionCapex + repowerCapex;
+      const bookDepWdv = bookWdvBlock * bookWdvRate;
+      bookWdvBlock -= bookDepWdv;
+      const bookDep = bookWdv ? bookDepWdv : bookDepSlm;
+      // the asset register
+      gross.bess += augCapex; gross.other += extensionCapex; gross.solar += repowerCapex;
+      const grossBlock = Object.values(gross).reduce((a, b) => a + b, 0);
+      if (lives && !bookWdv) {
+        for (const kk of Object.keys(gross)) accDepBy[kk] += slmBy[kk];
+        accDepBy.bess += augBookDep; accDepBy.other += extDep; accDepBy.solar += rpDep;
+      } else for (const kk of Object.keys(gross)) accDepBy[kk] += grossBlock > 0 ? (bookDep * gross[kk]) / grossBlock : 0;
+      const accDep = Object.values(accDepBy).reduce((a, b) => a + b, 0);
+      const netBlock = grossBlock - accDep;
+      // working capital: receivables, O&M in hand and spares, held at the year end; interest on it
+      const recv = (revenue * fin.receivableDays) / 365;
+      const omStock = (om * (fin.omStockMonths || 0)) / 12;
+      const spares = om * (fin.sparesPctOm || 0);
+      const wcBalance = recv + omStock + spares;
+      const dWc = wcBalance - prevWc;
+      prevWc = wcBalance;
+      const wcInterest = wcBalance * (fin.wcInterestRate || 0);
+      // debt: the balance at the start of the year, this year's terms (refinanced from the year
+      // after the refinancing, stepped down after the step-down year), the principal under the
+      // method, and the interest
+      const opening = debt;
+      const phase2 = dt.refi && y > dt.refiYear;
+      const rate = phase2 ? dt.refiRate : (stepDown && y > stepDown.afterYears ? (stepDown.rate ?? fin.interestRate) : fin.interestRate);
+      const end = phase2 ? dt.refiEnd : dt.tenor;
+      const method = phase2 && REPAYMENT_METHODS[fin.refiRepayment] ? fin.refiRepayment : dt.method;
+      const adj = method === "sculpted" ? 0 : (dt.q - 1) / (2 * dt.q);
+      const n = end - y + 1;
+      const repaying = y > dt.grace && y <= end && opening > 1e-9;
+      const interestOpen = opening * rate;
+      const sculpt = method === "sculpted";
+      let principal = 0;
+      if (repaying && !sculpt) principal = principalOf(method, opening, n, rate, interestOpen, { balloon: dt.balloonPct * balloonBase, stepUp: dt.stepUp });
+      let interest = interestOpen - adj * principal;
+      // the mezzanine: interest on the opening balance, principal per its schedule
+      const mezzOpening = mezzBal;
+      const mezzInterest = mezzOpening * (mz?.rate || 0);
+      let mezzPrincipal = 0;
+      if (mz && mezzOpening > 1e-9 && y > mz.grace && y <= mz.tenor) mezzPrincipal = mz.repayment === "bullet" ? (y === mz.tenor ? mezzOpening : 0) : mezzOpening / (mz.tenor - y + 1);
+      if (mz && y === T) mezzPrincipal = mezzOpening; // whatever is left clears with the project
+      mezzBal = mezzOpening - mezzPrincipal;
+      const mezzService = mezzInterest + mezzPrincipal;
+      // tax depreciation: both bases kept, the chosen one used
+      taxWdvBlock += augCapex + extensionCapex + repowerCapex;
+      const taxDepWdv = taxWdvBlock * fin.wdvRate;
+      taxWdvBlock -= taxDepWdv;
+      const taxDepSlm = bookDepSlm;
+      const taxDep = fin.taxDepreciation === "wdv" ? taxDepWdv : taxDepSlm;
+      // the sculpted principal needs the tax, which needs the interest: worked out first, on the
+      // opening balance (no instalment adjustment for sculpting)
+      const refiFeeOn = dt.refi && y === dt.refiYear;
+      const income = ebitda + otherIncome;
+      const taxOf = (intr, fee, shInt) => taxYear(fin, pools, y, { income, seniorInterest: intr, otherInterest: wcInterest, fees: fee + guaranteeFees, shInterest: shInt, taxDep });
+      let refiFee = 0;
+      if (sculpt && repaying) {
+        const t0 = taxOf(interestOpen, 0, mezzInterest);
+        const cfads0 = ebitda - t0.tax - dWc - augCapex - wcInterest + otherIncome - guaranteeFees - extensionCapex - repowerCapex;
+        principal = principalOf("sculpted", opening, n, rate, interestOpen, { cfads: cfads0, targetDscr: dt.targetDscr });
+        interest = interestOpen;
+      }
+      debt = opening - principal;
+      let prepaymentFee = 0;
+      if (refiFeeOn) { refiFee = debt * dt.refiFeePct; prepaymentFee += debt * prepayPct; balloonBase = debt; }
+      // the cash flow before the sweep, the mezzanine and the quasi-equity
+      const t1 = taxOf(interest, refiFee + prepaymentFee, mezzInterest);
+      const cfadsOf = (tax) => ebitda - tax - dWc - augCapex - wcInterest + otherIncome - guaranteeFees - extensionCapex - repowerCapex;
+      const debtService = interest + principal;
+      let fcfeBefore = cfadsOf(t1.tax) - debtService - refiFee - prepaymentFee - mezzService;
+      // the cash sweep: a share of the free cash prepays the debt after the scheduled principal;
+      // what cannot be paid accrues to the next year
+      let sweepCr = 0;
+      if (sweep && y >= (sweep.fromYear || 1) && y <= (sweep.toYear || dt.tenor) && debt > 1e-9) {
+        const due = sweep.pct * Math.max(0, fcfeBefore) + sweepAccrued;
+        sweepCr = Math.min(due, Math.max(0, fcfeBefore), debt);
+        sweepAccrued = due - sweepCr;
+        debt -= sweepCr;
+        prepaymentFee += sweepCr * prepayPct;
+      } else if (sweep && debt <= 1e-9) sweepAccrued = 0;
+      // the top-up: new senior debt at the end of the year up to the fraction, paid out to equity
+      let topUpCr = 0;
+      if (topUp && y === topUp.year) {
+        topUpCr = Math.max(0, (topUp.debtFraction ?? fin.debtFraction) * capex.total - debt);
+        debt += topUpCr;
+        balloonBase = debt;
+      }
+      // the quasi-equity: interest due (and accrued) paid when the senior DSCR clears the lender's
+      // floor and the cash allows; the principal from what is left
+      const quasiOpening = quasiBal;
+      const dscr = debtService > 1e-9 ? cfadsOf(t1.tax) / debtService : null;
+      let quasiInterestPaid = 0;
+      let quasiRepaid = 0;
+      let terminal = 0;
+      if (y === T) terminal = capex.total * fin.salvagePct + wcBalance;
+      if (qs) {
+        const due = quasiOpening * (qs.rate || 0) + quasiAccrued;
+        const cash = fcfeBefore - sweepCr - prepaymentFee + (refiFeeOn ? debt * 0 : 0) + (y === T ? terminal - debt : 0);
+        const ok = dscr === null || dscr >= (qs.lenderMinDscr || 0);
+        if (ok) {
+          quasiInterestPaid = Math.min(due, Math.max(0, cash));
+          if (y >= (qs.repayFromYear || 1)) quasiRepaid = Math.min(quasiOpening, Math.max(0, cash - quasiInterestPaid));
+        }
+        quasiAccrued = due - quasiInterestPaid;
+        quasiBal = quasiOpening - quasiRepaid;
+      }
+      // the tax with every deduction of the year (the quasi interest when paid)
+      const t = qs || prepaymentFee ? taxOf(interest, refiFee + prepaymentFee, mezzInterest + quasiInterestPaid) : t1;
+      pools = t.pools;
+      const tax = t.tax;
+      const pbt = ebitda + otherIncome - bookDep - interest - wcInterest - refiFee - prepaymentFee - guaranteeFees - mezzInterest - quasiInterestPaid;
+      const pat = pbt - tax;
+      const cfads = cfadsOf(tax);
+      const fscr = debtService > 1e-9 ? (cfads + other + guaranteeFees) / (debtService + other + guaranteeFees) : null;
+      const totalDscr = debtService + mezzService > 1e-9 ? cfads / (debtService + mezzService) : null;
+      let fcfe = cfads - debtService - refiFee - prepaymentFee - sweepCr - mezzService - quasiInterestPaid - quasiRepaid + topUpCr - dMargin;
+      let projectCf = ebitda - Math.max(0, (ebitda - taxDep) * fin.taxRate) - dWc - augCapex - extensionCapex - repowerCapex + otherIncome - guaranteeFees;
+      if (y === T) {
+        fcfe += terminal - debt;
+        projectCf += terminal;
+      }
+      const dividends = fcfe; // the free cash is paid out each year (negative: equity put in)
+      retained += pat - dividends;
+      rows.push({
+        year: y,
+        start: shiftDate(cod, 12 * (y - 1)),
+        end: shiftDate(cod, 12 * y, -1),
+        phase: inPpa ? "ppa" : "extension",
+        opFactor,
+        generationFactor: genFactor,
+        tariff: trf,
+        demandMu: op.demandMWh / 1000,
+        // the units billed: generation at the 33 kV bus, the power transformer and line losses on
+        // the way to the 220 kV GSS, and what the billing meter records there
+        genBusMu: ((op.solarGenMWh || 0) + (op.windGenMWh || 0)) / 1000,
+        injectedMu: (op.evac?.injectedMWh ?? 0) / 1000,
+        trafoLossMu: (op.evac?.trafoLossMWh ?? 0) / 1000,
+        lineLossMu: (op.evac?.lineLossMWh ?? 0) / 1000,
+        meterMu: (op.evac?.meterMWh ?? op.deliveredMWh + (op.excessMWh || 0) + (op.buyerExcessMWh || 0)) / 1000,
+        deliveredMu: op.deliveredMWh / 1000,
+        dfr: op.dfr,
+        minMonthlyDfr: op.minMonthlyDfr,
+        excessMu: (op.excessMWh + (op.buyerExcessMWh || 0)) / 1000, // sold: in the market and, under SECI Amendment-03, to the buyer
+        curtailMu: op.curtailMWh / 1000,
+        shortfallMu: shortfallMWh / 1000,
+        solarFactor: op.solarFactor,
+        bessFactor: op.bessFactor,
+        repowerUplift,
+        energyRevenue: energyRev,
+        surplusRevenue: surplusRev,
+        buyerExcessMu: (op.buyerExcessMWh || 0) / 1000,
+        buyerRevenue: buyerRev,
+        carbonRevenue,
+        penalty,
+        annualPenalty,
+        blockPenalty,
+        cfdPenalty,
+        blockShortfallMu: blockShortfallMWh / 1000,
+        revenue,
+        om,
+        solarOm: omBy.solar,
+        windOm: omBy.wind,
+        bessOm: omBy.bess,
+        biomassOm: omBy.biomass,
+        windOmComponents,
+        insurance,
+        other,
+        otherLines: otherLinesCr,
+        fuel,
+        biomassMu: (op.biomassMWh || 0) / 1000,
+        ...plantCost,
+        dsm,
+        charging,
+        pxFees,
+        lcCost,
+        opex,
+        ebitda,
+        guaranteeFees,
+        marginBalance,
+        dMargin,
+        marginInterest,
+        dsraInterest,
+        otherIncome,
+        bookDep,
+        bookDepSlm,
+        bookDepWdv,
+        grossBlock,
+        grossBlockByComponent: { ...gross },
+        accDep,
+        netBlock,
+        netBlockByComponent: Object.fromEntries(Object.keys(gross).map((kk) => [kk, gross[kk] - accDepBy[kk]])),
+        interest,
+        wcInterest,
+        refiFee,
+        prepaymentFee,
+        mezzOpening,
+        mezzInterest,
+        mezzPrincipal,
+        mezzClosing: mezzBal,
+        mezzService,
+        quasiOpening,
+        quasiInterestPaid,
+        quasiAccrued,
+        quasiRepaid,
+        quasiClosing: quasiBal,
+        pbt,
+        taxDep,
+        taxDepSlm,
+        taxDepWdv,
+        taxableIncome: t.taxable,
+        lossSetOff: t.lossSetOff,
+        depSetOff: t.depSetOff,
+        lossCarried: t.lossCarried,
+        depCarried: t.depCarried,
+        interestDisallowed: t.interestDisallowed,
+        interestCarried: t.interestCarried,
+        tax,
+        pat,
+        receivables: recv,
+        omStock,
+        spares,
+        wcBalance,
+        dWc,
+        augCapex,
+        extensionCapex,
+        repowerCapex,
+        cfads,
+        debtRate: rate,
+        openingDebt: opening,
+        principal,
+        sweepCr,
+        sweepAccrued,
+        topUpCr,
+        closingDebt: debt,
+        debtService,
+        dscr,
+        totalDscr,
+        fscr,
+        fcfe,
+        dividends,
+        cumEquity,
+        projectCf,
+        preTaxEquityCf: fcfe + tax,
+        preTaxProjectCf: projectCf + Math.max(0, (ebitda - taxDep) * fin.taxRate),
+        shareCapital: equity0,
+        retained,
+        cwip: 0,
+        lenderCf: debtService + sweepCr + refiFee + prepaymentFee - topUpCr,
+      });
     }
-    debt = opening - principal;
-    if (refiFeeOn) { refiFee = debt * dt.refiFeePct; balloonBase = debt; }
-    const t = taxOf(interest, refiFee);
-    lossCf = t.carried;
-    const tax = t.tax;
-    const pbt = ebitda - bookDep - interest - wcInterest - refiFee;
-    const pat = pbt - tax;
-    const cfads = ebitda - tax - dWc - aug[y] - wcInterest;
-    const debtService = interest + principal;
-    const dscr = debtService > 1e-9 ? cfads / debtService : null;
-    let fcfe = cfads - debtService - refiFee;
-    let projectCf = ebitda - Math.max(0, (ebitda - taxDep) * fin.taxRate) - dWc - aug[y];
-    if (y === years) {
-      const terminal = capex.total * fin.salvagePct + wcBalance;
-      fcfe += terminal - debt;
-      projectCf += terminal;
+  };
+  // the debt service reserve: months of the next year's debt service (or of the highest year
+  // left: 'peak'), built and released from the equity cash (it does not touch the DSCR); its
+  // interest is other income, so the years run again until it settles when the rate is set
+  const dsraOf = () => {
+    const out = new Array(T + 1).fill(0);
+    for (let y = 1; y <= T; y += 1) {
+      if (y >= T) break;
+      if (fin.dsraBasis === "peak") {
+        let peak = 0;
+        for (let k = y + 1; k <= T; k += 1) peak = Math.max(peak, rows[k - 1].debtService);
+        out[y] = (peak * dt.dsraMonths) / 12;
+      } else out[y] = (rows[y].debtService * dt.dsraMonths) / 12;
     }
-    rows.push({
-      year: y,
-      tariff: trf,
-      demandMu: op.demandMWh / 1000,
-      // the units billed: generation at the 33 kV bus, the power transformer and line losses on
-      // the way to the 220 kV GSS, and what the billing meter records there
-      genBusMu: ((op.solarGenMWh || 0) + (op.windGenMWh || 0)) / 1000,
-      injectedMu: (op.evac?.injectedMWh ?? 0) / 1000,
-      trafoLossMu: (op.evac?.trafoLossMWh ?? 0) / 1000,
-      lineLossMu: (op.evac?.lineLossMWh ?? 0) / 1000,
-      meterMu: (op.evac?.meterMWh ?? op.deliveredMWh + (op.excessMWh || 0) + (op.buyerExcessMWh || 0)) / 1000,
-      deliveredMu: op.deliveredMWh / 1000,
-      dfr: op.dfr,
-      minMonthlyDfr: op.minMonthlyDfr,
-      excessMu: (op.excessMWh + (op.buyerExcessMWh || 0)) / 1000, // sold: in the market and, under SECI Amendment-03, to the buyer
-      curtailMu: op.curtailMWh / 1000,
-      shortfallMu: shortfallMWh / 1000,
-      solarFactor: op.solarFactor,
-      bessFactor: op.bessFactor,
-      energyRevenue: energyRev,
-      surplusRevenue: surplusRev,
-      buyerExcessMu: (op.buyerExcessMWh || 0) / 1000,
-      buyerRevenue: buyerRev,
-      penalty,
-      annualPenalty,
-      blockPenalty,
-      cfdPenalty,
-      blockShortfallMu: blockShortfallMWh / 1000,
-      revenue,
-      om,
-      insurance,
-      other,
-      fuel,
-      biomassMu: (op.biomassMWh || 0) / 1000,
-      ...plantCost,
-      dsm,
-      charging,
-      pxFees,
-      lcCost,
-      opex,
-      ebitda,
-      bookDep,
-      interest,
-      wcInterest,
-      refiFee,
-      pbt,
-      taxDep,
-      tax,
-      pat,
-      receivables: recv,
-      omStock,
-      spares,
-      wcBalance,
-      dWc,
-      augCapex: aug[y],
-      cfads,
-      debtRate: rate,
-      openingDebt: opening,
-      principal,
-      closingDebt: debt,
-      debtService,
-      dscr,
-      fcfe,
-      cumEquity,
-      projectCf,
-    });
+    return out;
+  };
+  let dsraInterestIn = new Array(T + 1).fill(0);
+  yearLoop(dsraInterestIn);
+  let dsra = dsraOf();
+  const dsraRate = Math.max(0, fin.dsraInterestRate || 0);
+  if (dsraRate > 0 && dt.dsraMonths > 0) {
+    for (let pass = 0; pass < 4; pass += 1) {
+      dsraInterestIn = dsra.map((v, y) => (y > 0 ? (dsra[y - 1] || 0) * dsraRate : 0));
+      yearLoop(dsraInterestIn);
+      dsra = dsraOf();
+    }
   }
-  // the debt service reserve: months of the next year's debt service, built and released from
-  // the equity cash (it does not touch the DSCR)
   let prevDsra = 0;
-  for (let y = 1; y <= years; y += 1) {
+  for (let y = 1; y <= T; y += 1) {
     const row = rows[y - 1];
-    const dsra = y < years ? (rows[y].debtService * dt.dsraMonths) / 12 : 0;
-    row.dsraBalance = dsra;
-    row.dDsra = dsra - prevDsra;
-    prevDsra = dsra;
+    row.dsraBalance = dsra[y];
+    row.dDsra = dsra[y] - prevDsra;
+    prevDsra = dsra[y];
     row.fcfe -= row.dDsra;
+    row.dividends = row.fcfe;
+    row.preTaxEquityCf -= row.dDsra;
+    // the balance sheet: the free cash is paid out, so the cash is the balancing figure between the
+    // book and the cash timing (small; 0 when the two agree)
+    row.retained = (y > 1 ? rows[y - 2].retained : 0) + row.pat - row.fcfe;
+    row.cash = (row.shareCapital + row.retained + row.closingDebt + row.mezzClosing + row.quasiClosing + row.quasiAccrued + row.sweepAccrued)
+      - (row.netBlock + row.wcBalance + row.dsraBalance + row.marginBalance);
     equityFlows.push(row.fcfe);
     projectFlows.push(row.projectCf);
+    preTaxEquityFlows.push(row.preTaxEquityCf);
+    preTaxProjectFlows.push(row.preTaxProjectCf);
+    holdcoFlows.push(row.fcfe + row.quasiInterestPaid + row.quasiRepaid - holdcoExp);
+    lenderYearly.push(row.lenderCf);
+    lenderFlows.push({ date: shiftDate(nominalCod, 12 * y, -1), amount: row.lenderCf, kind: "service" });
     cumEquity += row.fcfe;
     row.cumEquity = cumEquity;
     if (payback === null && cumEquity >= 0) payback = y;
   }
-  return { rows, equityFlows, projectFlows, capex, debt0, equity0, payback, debtTerms: dt };
+  // the loan life and project life cover ratios: the present value of the CFADS over the years left
+  // (to the tenor; to the end) at the year's rate, over the opening debt
+  for (let y = 1; y <= T; y += 1) {
+    const row = rows[y - 1];
+    if (!(row.openingDebt > 1e-9)) { row.llcr = null; row.plcr = null; continue; }
+    const end = dt.refi && y > dt.refiYear ? dt.refiEnd : dt.tenor;
+    let pvLoan = 0;
+    let pvProject = 0;
+    for (let k = y; k <= T; k += 1) {
+      const pv = rows[k - 1].cfads / (1 + row.debtRate) ** (k - y + 1);
+      if (k <= end) pvLoan += pv;
+      pvProject += pv;
+    }
+    row.llcr = pvLoan / row.openingDebt;
+    row.plcr = pvProject / row.openingDebt;
+  }
+  const promoterShare = Math.min(1, Math.max(0, fin.holdco?.promoterShare ?? 1));
+  const promoterFlows = holdcoFlows.map((v) => v * promoterShare);
+  return {
+    rows, equityFlows, projectFlows, preTaxEquityFlows, preTaxProjectFlows, holdcoFlows, promoterFlows, lenderFlows, lenderYearly,
+    capex, debt0, equity0, mezz0, quasi0, payback, debtTerms: dt, years: T, ppaYears: years,
+    timeline: cod ? { codDate: cod, constructionStart: shiftDate(cod, -(capex.construction?.months || 0)) } : null,
+  };
 }
 
 export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tariffLocked, ops: givenOps = null, solveBy = "irr" }) {
@@ -1863,6 +2415,8 @@ export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tar
   const equityIrr = irr(cf.equityFlows);
   const projectIrr = irr(cf.projectFlows);
   const dscrs = cf.rows.map((r) => r.dscr).filter((v) => v !== null && Number.isFinite(v));
+  const minOf = (k) => { const v = cf.rows.map((row) => row[k]).filter((x) => x !== null && Number.isFinite(x)); return v.length ? Math.min(...v) : null; };
+  const seniorRate = fin.interestRate || 0;
   const r = fin.discountRate;
   // levelised cost of delivered energy (pre-financing, pre-tax)
   let pvCost = cf.capex.total;
@@ -1897,6 +2451,25 @@ export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tar
     rows: cf.rows,
     equityFlows: cf.equityFlows,
     projectFlows: cf.projectFlows,
+    // finance v3 (docs/dev/FINANCE-V3-SPEC.md)
+    years: cf.years,
+    ppaYears: cf.ppaYears,
+    timeline: cf.timeline,
+    mezz: cf.mezz0,
+    quasi: cf.quasi0,
+    minFscr: minOf("fscr"),
+    minLlcr: minOf("llcr"),
+    minPlcr: minOf("plcr"),
+    minTotalDscr: minOf("totalDscr"),
+    preTaxEquityIrr: irr(cf.preTaxEquityFlows),
+    preTaxProjectIrr: irr(cf.preTaxProjectFlows),
+    holdcoIrr: irr(cf.holdcoFlows),
+    promoterIrr: irr(cf.promoterFlows),
+    holdcoFlows: cf.holdcoFlows,
+    promoterFlows: cf.promoterFlows,
+    lenderFlows: cf.lenderFlows,
+    lenderXirr: xirr(cf.lenderFlows),
+    lenderMirr: mirr(cf.lenderYearly, seniorRate, fin.lenderReinvestRate ?? seniorRate),
     totals: {
       deliveredMu: sum("deliveredMu"),
       revenue: sum("revenue"),
@@ -1910,8 +2483,58 @@ export function runFinancialModel(ctx, sizes, { costs, fin, bess, dfrTarget, tar
       charging: sum("charging"),
       lcCost: sum("lcCost"),
       cfdPenalty: sum("cfdPenalty"),
+      carbonRevenue: sum("carbonRevenue"),
+      guaranteeFees: sum("guaranteeFees"),
+      sweepCr: sum("sweepCr"),
+      prepaymentFee: sum("prepaymentFee"),
+      mezzInterest: sum("mezzInterest"),
+      quasiInterestPaid: sum("quasiInterestPaid"),
+      otherIncome: sum("otherIncome"),
     },
     minLifetimeDfr: Math.min(...cf.rows.map((row) => row.dfr)),
+  };
+}
+
+/**
+ * The reverse-auction sensitivities (finance v3): the tariff the target equity IRR needs, and the
+ * equity IRR and the lowest DSCR at the bid's tariff, with one input moved at a time: the capital
+ * cost, the module cost (its share of the solar capex), the exchange rate (on the dollar share of
+ * the capex), the interest rate, the generation case, a part-commissioning delay, a life extension
+ * and the refinancing rate. Every point is a full run of runFinancialModel on the same yearly
+ * energy. args: the runFinancialModel options (costs, fin, bess, dfrTarget, ops, solveBy) with the
+ * bid's tariff in fin.tariff (or `tariff`).
+ */
+export function sensitivities(ctx, sizes, args) {
+  const base = { ...args, fin: { ...args.fin, tariff: args.tariff ?? args.fin.tariff } };
+  const run = ({ costs = base.costs, fin = base.fin } = {}) => {
+    const solved = runFinancialModel(ctx, sizes, { ...base, costs, fin, tariffLocked: false });
+    const at = runFinancialModel(ctx, sizes, { ...base, costs, fin, tariffLocked: true });
+    return { tariff: solved.tariff, equityIrr: at.equityIrr, minDscr: at.minDscr };
+  };
+  const scaleCapex = (k) => ({
+    ...base.costs,
+    solarCrPerMw: base.costs.solarCrPerMw * k, windCrPerMw: base.costs.windCrPerMw * k, bessCrPerMwh: base.costs.bessCrPerMwh * k,
+    bessPcsCrPerMw: (base.costs.bessPcsCrPerMw || 0) * k, biomassCrPerMw: (base.costs.biomassCrPerMw || 0) * k,
+    evacuationCr: (base.costs.evacuationCr || 0) * k, otherCapexCr: (base.costs.otherCapexCr || 0) * k,
+    plants: (base.costs.plants || []).map((pl) => ({ ...pl, capexCrPerMw: (pl.capexCrPerMw || 0) * k })),
+  });
+  const pct = (d) => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
+  const moduleShare = base.costs.moduleSharePct ?? 0.45;
+  const usdShare = base.fin.capexUsdShare || 0;
+  const axes = [
+    { key: "capex", label: "Capital cost", steps: [-0.1, 0.1].map((d) => ({ label: pct(d), costs: scaleCapex(1 + d) })) },
+    { key: "module", label: `Module cost (${Math.round(moduleShare * 100)}% of the solar capex)`, steps: [-0.1, 0.1].map((d) => ({ label: pct(d), costs: { ...base.costs, solarCrPerMw: base.costs.solarCrPerMw * (1 + d * moduleShare) } })) },
+    { key: "fx", label: `Exchange rate (${Math.round(usdShare * 100)}% of the capex in dollars, ₹${base.fin.fxBase || 83}/$)`, steps: [-0.05, 0.05].map((d) => ({ label: pct(d), costs: scaleCapex(1 + d * usdShare) })) },
+    { key: "rate", label: "Interest rate", steps: [-0.005, 0.005].map((d) => ({ label: `${d > 0 ? "+" : "−"}50 bp`, fin: { ...base.fin, interestRate: Math.max(0, base.fin.interestRate + d) } })) },
+    { key: "generation", label: "Generation case", steps: ["p50", "p75", "p90"].filter((c) => c !== (base.fin.generationCase || "p50")).map((c) => ({ label: c.toUpperCase(), fin: { ...base.fin, generationCase: c } })) },
+    { key: "parts", label: "Commissioning delay", steps: [3, 6].map((m) => ({ label: `+${m} months`, fin: { ...base.fin, parts: [{ share: 1, offsetMonths: m }] } })) },
+    { key: "extension", label: "Project life", steps: [5, 10].map((n) => ({ label: `+${n} years`, fin: { ...base.fin, extension: { ...(base.fin.extension || DEFAULT_FINANCE.extension), years: (base.fin.extension?.years || 0) + n } } })) },
+    { key: "refi", label: base.fin.refiYear > 0 ? `Refinancing rate (year ${base.fin.refiYear})` : "Refinancing rate (no refinancing in the bid)", steps: [-0.01, 0.01].map((d) => ({ label: `${d > 0 ? "+" : "−"}100 bp`, fin: { ...base.fin, refiRate: Math.max(0, (base.fin.refiRate || 0) + d) } })) },
+  ];
+  const baseline = run();
+  return {
+    base: { label: "Bid", ...baseline },
+    rows: axes.map((a) => ({ key: a.key, label: a.label, cases: a.steps.map((st) => ({ label: st.label, ...run({ costs: st.costs, fin: st.fin }) })) })),
   };
 }
 
