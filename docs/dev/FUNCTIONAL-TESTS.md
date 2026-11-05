@@ -165,17 +165,16 @@ deselects it; `make e2e` and `make test-slow` select it.
 
 ## Latest results
 
-As reported by the latest full run on the demo VM:
+As reported by the latest full run (5 November 2026, the finance v3 build, demo stack on the development machine):
 
 | Level | Result |
 | --- | --- |
 | `next build` | OK |
-| `make test` (unit suite) | 691 passed, 3 skipped (optional inputs absent: the CfD documents for `test_cfd_terms.py`, the WBSEDCL RfP `RFQ_RFP_Final_22_09.pdf` for two `test_extraction.py` tests; set `CFD_DOCS_DIR` / `EXTRACTION_WBSEDCL_RFP` to run them) |
-| `make check-web` | every `tools/check_*.mjs` passed, LibreOffice recalculation included |
-| `make e2e` (browser suite) | 23 passed in 6 min 42 s |
-| `tests/e2e/test_click_tour.py` | 6 passed in about 50 s (run twice) |
-| `tests/deploy` | 9 passed in 2 s |
-| Core-zone instance check | voice agent 403, tender-reading routes 403, sizing allowed |
+| `make test` (unit suite) | passed, no failures (the three optional-input skips as before) |
+| `make check-web` | `check_finance_v3` (26 blocks), `check_rtc_engine`, `check_live_model` (15 cases, LibreOffice recalculation, 35 ok lines), `check_cfd_finance`, `check_cfd_model`, `check_trace` (10,684 cells), `check_dispatch_sheets`, `check_mcp`: all passed |
+| `tests/e2e/test_finance_v3.py` | 1 passed in 19 s |
+| Browser suites (round the clock, SECI tab, click tour, demo 2, feedback, evidence, theme, team, team mode, API keys, MCP) | 25 passed, 1 skipped in 4 min 38 s |
+| `tests/e2e/test_cfd_bid.py` and `test_tender_to_bid.py` | 8 passed in 2 min 19 s |
 
 ## How to read a failure
 
