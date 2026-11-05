@@ -71,6 +71,8 @@ check-web` runs every one except `check_nhpc_terms.mjs`, which takes a reading f
 | `check_cfd_agent.mjs` | The CfD bid agent: 67 inputs round-trip, the 37-item voice script, the 16 tools | CF-14 |
 | `check_bess_engine.mjs` | The BESS engine: every strategy keeps the contracted energy every year; oversize 0 is just enough for year 1; the optimizer's answer is no worse than any strategy on its grid | BESS tab |
 | `check_nhpc_terms.mjs` | The Tender to Bid terms derived from an NHPC reading are each proved by a located quote (run by `test_nhpc_tender.py`) | BW-05 |
+| `check_finance_v3.mjs` | The finance team's inputs of 4 November, one block per feature with every other input off: carbon adds the expected ₹ cr to revenue; a 6-month part delay halves year-1's operating share; the cash sweep lowers the closing debt and lifts later DSCRs; quasi-equity interest accrues below the lender's DSCR floor; mezzanine in the funding lowers the equity cheque; the peak DSRA is at least the next-year DSRA; SLM and WDV book rows both present and SLM equals the old book depreciation; thin capitalisation disallows and carries; the lender's XIRR sits at the senior rate without fees; the sensitivity table has every axis; and the fingerprint of every pre-existing case unchanged | FMV-03 to FMV-34 |
+| `check_live_model.mjs` (v3 cases) | One workbook case per finance v3 feature, recalculated by LibreOffice and compared with the app: the Inputs sheet, the dated year row, every new row and sheet | FMV-02, workbook column of the FMV rows |
 
 ## Browser end to end (`tests/e2e`)
 
@@ -103,6 +105,7 @@ with a login (`TENDEROS_EMAIL`, `TENDEROS_PASSWORD`). Every test fails on any un
 | `::test_switch_redraws_open_charts` | Switching with a chart on screen redraws it at once | P-07 |
 | `test_mcp.py::test_mcp_server` | Initialize, tools/list, `tender_lookup` with an Amendment-03 page link, `check_bid`, a wrong token 404, a GET 405 (needs `MCP_TOKEN`) | TI-15 |
 | `test_cfd_bid.py` (2 tests, about 3 min) | A whole SECI CfD-I bid: the eleven steps with their teams, the explainer, the five documents and 37 changes with the filter, 251 conditions, 100 MW with the key dates, Fill up, the repayment select, Size the plant with the optimiser, the sized plant and its seven checks, the financial model's tiles and the traceable model, the workbook with its nine sheets, the levers, the particulars, Format 7.1 and the letters as Word, the reference bids, Save and reopen from the library; Tender to Bid reads the CfD-I set, types it as a Contract for Difference tender and hands off to the CfD Bid tab | CF-01 to CF-13, TB-CfD |
+| `test_finance_v3.py::test_finance_team_inputs_and_statements` | The finance team's inputs: on the SECI tab's Finance inputs step the ten groups (timeline, construction, generation, operating cost, debt, quasi-equity and mezzanine, guarantees, tax, returns, sensitivity) open and close, a COD date is typed, an EMD guarantee preset adds a row, carbon credits are switched on; on Round the Clock (the model is instant there) the F.1 toggle shows the same groups, carbon on adds the "Carbon credits" line to F.4 and lifts total revenue, a COD date puts month names on the year headers, F.5 Returns, F.7 Balance sheet and cash-flow statement are present, F.8 runs the sensitivities and lists the axes; the CfD tab's Finance inputs step carries the ten groups too | FMV-03, FMV-09, FMV-26, FMV-29 to FMV-34 |
 | `test_click_tour.py` (6 tests, about 1 min) | The fast tour: every sidebar tab, the zone badge, day/night; Tender to Bid's six steps on the prefilled tender with Fill up, One site / Separate sites, the before-sizing states; the SECI tab's ten steps with their teams, the amendment filter, the RfS wording, the bid choices, Fill up, the loss-kind tabs, the schematic on one and two sites, the solar studio, the repayment methods, construction months, the drawdown profile, the DSM switch, the What-if levers, the formats and the letter view, the winning bid, the Save dialog, the agent panel, the paperclip and the send icon on a box, Reset; the standalone What-if (Bid at this tariff, levers, trace, Reset); Round the Clock's chapters, separate sites, the repayment select, the construction view; BESS chapters; the CfD tab's eleven steps with their teams, the worked example, the amendment filter, 200+ conditions, Fill up, the finance terms, the financial model tiles, the formats, the reference bids; Recent tenders; Team setup; Messages. No long job; no 5xx from the API; no page error | the quick path of every feature above |
 
 ## Deploy tests (`tests/deploy`)
@@ -217,6 +220,11 @@ Read from the tests; each is a manual case in `CLICK-TESTS.md` where it is click
 * **Finance inputs the model checks cover but no browser test clicks:** refinancing, instalments a
   year, the moratorium, the DSM steps table, the drawdown profiles' effect on IDC (the click tour
   changes the selects and months but does not read the model's answer).
+* **Finance team's inputs (v3) the engine and workbook checks cover but the browser test does not
+  fill:** phasing, parts, bridge, life extension, repowering, augmentation schedule, O&M splits,
+  other fixed lines, step-down, top-up, prepayment, sweep, DSRA basis, quasi-equity, mezzanine,
+  tax basis and lives, HoldCo and lender inputs (the browser test opens every group and fills the
+  COD, carbon and one guarantee; `tools/check_finance_v3.mjs` proves each input's effect).
 * **What-if:** Apply on a lever row; the solar and wind studios opened from the What-if tab; the
   week slider.
 * **Library:** the scenario versions page and Compare; saving on Round the Clock and BESS;

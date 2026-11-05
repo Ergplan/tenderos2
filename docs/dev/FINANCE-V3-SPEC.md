@@ -133,3 +133,15 @@ The balance sheet gains the asset split: `grossBlockByComponent`, `cwip` (year 0
 
 * "Keep metrics proprietary (risk)": whether the workbook should carry a confidentiality mark and omit the benchmark notes, or whether some outputs should not leave the application at all.
 * Returns at the promoter level assume the promoter holds `promoterShare` of the holdco and the holdco holds all of the SPV; dividend distribution rules are not modelled.
+
+## 12. Status (5 November 2026)
+
+| Stream | State | Where |
+| --- | --- | --- |
+| UI inputs and outputs | Built | `web/src/rtc/financeV3.js`, `FinanceInputsV3.jsx` (ten groups, mounted on the Finance inputs step of Tender to Bid / SECI 4.3a and CfD 5.4a and under F.1 "More inputs (finance team)"), `FinanceStatements.jsx` (F.5 Returns, F.6 Tax schedule, F.7 Balance sheet and cash-flow statement, F.8 Reverse-auction sensitivity), `FinanceView.jsx` (dated year headers, the v3 lines of F.4 as optional lines, CSV); COD seeded from the SCSD (SECI, Tender to Bid), the SCD (CfD), typed in Round the Clock |
+| Engine | See the engine stream's report | `web/src/rtc/engine.js`, `tools/check_finance_v3.mjs`, `tools/check_rtc_engine.mjs` |
+| Workbook | See the workbook stream's report | `web/lib/liveModel.js`, `tools/check_live_model.mjs` |
+| Docs and tests | Built | `docs/enterprise/FEATURES.md` / `.xlsx` (FMV-01 to FMV-34, through `tools/build_enterprise_features.py`), `docs/dev/DEV-MANUAL.md` §6.2, 6.2a, 8.5, 10, `SCREEN-TO-DATA.md`, `FUNCTIONAL-TESTS.md`, `CLICK-TESTS.md` §2a (FV3-01 to FV3-24), the two user manuals ("More inputs (finance team)"), `docs/PRODUCT.md`, `CFD.md`, `SECI_RTC.md`, `TENDER_TO_BID.md`; `tests/e2e/test_finance_v3.py` |
+
+Open points of §11 stand: "Keep metrics proprietary" (FMV-01, not built) and the promoter-level
+assumption (FMV-30 note).

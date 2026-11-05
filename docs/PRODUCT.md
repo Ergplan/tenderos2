@@ -120,6 +120,18 @@ faster re-runs from the last solution.
 moratorium, instalments · refinancing · working capital and DSRA · tax with losses carried ·
 traceable model · Excel twin with nine sheets · sensitivity tables · money at stake (EMD, PBG).
 
+**Finance team's model (November 2026)** · a dated timeline from the commercial operation date ·
+capex phasing by component, part and early commissioning, a bridge loan · P50 / P75 / P90 cases,
+carbon credits, life extension, solar repowering, battery augmentation on a schedule · O&M
+escalation by source and wind component, other fixed costs as separate lines · refinancing with
+re-sculpting, rate step-down, top-up, prepayment penalty, cash sweep with accruals, FSCR / LLCR /
+PLCR, DSRA on the peak with interest · quasi-equity and mezzanine · EMD, PBG, connectivity and
+statutory guarantees and surety bonds with fees and margin money · book depreciation on SLM and
+WDV, thin capitalisation, losses carried · returns at the SPV, HoldCo and promoter, the lender's
+XIRR and MIRR · a full balance sheet and cash-flow statement · reverse-auction sensitivities
+(capex, modules, exchange rate, interest, generation case, commissioning delay, life, refinancing)
+· inputs on their own sheet of the workbook. Every input off by default.
+
 **What-if** · instant rule-based what-if on any plant · tariff levers for bid day · seeded from the
 sized bid.
 
@@ -182,9 +194,10 @@ Docker, a domain or a provided certificate. Installation: `docs/dev/INSTALL-ANY-
 
 ## Roadmap (not in the current release)
 
-Enterprise single sign-on · sign-off per step and a submission lock · commissioning in parts and
-capex phasing by package · letter-of-credit cost · scenario compare of saved what-if cases ·
-review-before-transfer screen and the signed transfer package tooling in the intake zone.
+Enterprise single sign-on · sign-off per step and a submission lock · letter-of-credit cost ·
+scenario compare of saved what-if cases · review-before-transfer screen and the signed transfer
+package tooling in the intake zone · which model outputs stay inside the application ("keep
+metrics proprietary", a decision pending from the finance team).
 
 ---
 

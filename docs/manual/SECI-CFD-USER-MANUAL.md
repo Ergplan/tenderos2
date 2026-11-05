@@ -157,6 +157,13 @@ inputs (six repayment methods with their extra box, moratorium, instalments a ye
 year, rate, tenor and fee; construction months, drawdown profile, funding order; receivable days,
 O&M in hand, spares, interest on working capital, debt service reserve).
 
+**5.4a · Finance team's inputs.** The ten closed groups of the finance team's list (timeline,
+construction and commissioning, generation and revenue, operating cost, debt, quasi-equity and
+mezzanine, guarantees, tax and depreciation, returns, sensitivity for the reverse auction); each
+off until filled. The commercial operation date defaults to the battery's SCD, 15 months from the
+Effective Date. The groups are explained in the RTC tender manual's chapter **More inputs (finance
+team)**; they work the same here, on the CfD model.
+
 **5.5 · Size the plant.** The bar lists what is still missing; **Size the plant** runs the
 optimiser and opens Size.
 
@@ -222,9 +229,16 @@ year by year.
 **5.3 · The CfD Pool.** This project's net pay-in or pay-out each Contract Year at the strike
 price, against the IEX evenings.
 
-**F.1 to F.4.** The assumptions (with the tariff lock: lock the strike price to see the returns
-at a fixed price), earnings and coverage, debt and equity cash, the construction month by month
-when months are set, and the full 15-year table; click any number for its formula; **Export CSV**.
+**F.1 to F.8.** The assumptions (with the tariff lock: lock the strike price to see the returns
+at a fixed price; **More inputs (finance team)** opens the ten groups of 5.4a), earnings and
+coverage, debt and equity cash, the construction month by month when months are set, the full
+15-year table (dated from the SCD once the commercial operation date is set, with the finance
+team's lines when their inputs are on; click any number for its formula; **Export CSV**), then
+**F.5 Returns** (levered and unlevered, pre- and post-tax, HoldCo and promoter, the lender's XIRR
+and MIRR, DSCR / FSCR / LLCR / PLCR), **F.6 Tax schedule**, **F.7 Balance sheet and cash-flow
+statement** and **F.8 Reverse-auction sensitivity** (the strike price your target IRR needs when
+the capex, module price, exchange rate, interest, generation case, a commissioning delay, a longer
+life or the refinancing rate move; **Run sensitivities**).
 
 *One price.* Every step, the chip, the bid agent, the bid forms, the saved bid and the workbook
 carry the same strike price: the full financial model's. The fast screening model that was used

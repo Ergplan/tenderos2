@@ -228,6 +228,22 @@ The quote is shown and checked in three places:
 The bid agent's `check_tariff` gives the same figures. Tender to Bid's Financials has the same
 "Your quote" panel.
 
+## The finance team's inputs (November 2026)
+
+Finance inputs 4.3a and F.1 of the Financial model carry the ten groups of the finance team's list
+(`docs/dev/FINANCE-V3-SPEC.md`; `web/src/rtc/FinanceInputsV3.jsx`, shared with Tender to Bid,
+Round the Clock and the CfD tab): a timeline dated from the SCSD (`terms.supplyStart` seeds
+`fin.codDate`), capex phasing by component and part commissioning, a bridge loan, P50 / P75 / P90,
+carbon credits, life extension, repowering, augmentation on a schedule, O&M escalation by source
+and wind component, other fixed costs as lines, re-sculpting on refinancing, rate step-down,
+top-up, prepayment penalty, cash sweep, DSRA on the peak with interest, quasi-equity and mezzanine,
+the guarantees with fees and margin money, book depreciation on SLM and WDV with thin
+capitalisation and losses carried, returns at the SPV, HoldCo and promoter with the lender's XIRR
+and MIRR, and the reverse-auction sensitivities (F.8). The Financial model step adds F.5 Returns,
+F.6 Tax schedule and F.7 Balance sheet and cash-flow statement; the workbook gains an Inputs sheet.
+Every input is off by default and the bid tariff is unchanged until one is filled; the user manual's
+chapter **More inputs (finance team)** explains each group.
+
 ## The bid forms
 
 **Particulars.** The bid forms start with the particulars, asked once. They are:

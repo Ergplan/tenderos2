@@ -231,6 +231,11 @@ capitalised as debt.
 capital** (0: funded from equity cash), **Debt service reserve** (months of the next year's debt
 service, held from equity cash).
 
+**4.3a · Finance team's inputs.** Ten closed groups for the finance team's own modelling choices;
+every one is off until you fill it, so the model's numbers do not move until you decide. Each group
+is explained in **More inputs (finance team)** below; the same boxes appear under F.1 on the
+Financial model step.
+
 **4.4 · Deviation settlement (CERC DSM).** What the plant pays when it injects more or less than
 its day-ahead schedule. **Apply DSM charges** (on/off); **Seller category** (by the sources, or
 solar / wind / hybrid); **Forecast error (σ)** of the schedule in a 15-minute block before the
@@ -311,6 +316,9 @@ the bid forms.
 **Tax depreciation** (WDV / straight line), **WDV rate**, **Book life**, **Salvage value**,
 **Other fixed cost**). Changing any of them recomputes the model at once.
 
+**More inputs (finance team).** A button under the assumptions opens the finance team's groups
+(the same as 4.3a on Finance inputs); see the chapter of that name below.
+
 **F.2 · Earnings & coverage** — revenue, EBITDA, PAT, debt service and DSCR by year.
 **F.3 · Debt, equity cash & DFR** — closing debt, cumulative equity cash and the delivery ratio.
 **F.3a · Deviation settlement** — the DSM panel with the year-1 charge on this plant.
@@ -318,8 +326,36 @@ the bid forms.
 equity, debt, IDC, closing debt; the IDC total and the gearing at COD.
 
 **F.4 · 25-year financial model.** The full table: operations (MU, DFR, tariff), profit and loss,
-working capital, cash flow, debt and DSCR, year by year. **Click any number** to open its formula
-and every input behind it; **Export CSV** downloads the table.
+working capital, cash flow, debt and DSCR, year by year. Once a commercial operation date is set
+the columns read *Y1 · May 2028 – Apr 2029* instead of Y1, Y2. Lines that belong to a finance
+team's input (carbon credits, O&M by source, guarantee fees, the sweep, quasi-equity and mezzanine,
+repowering …) appear only when that input is on. **Click any number** to open its formula and every
+input behind it; **Export CSV** downloads the table with a "Year starts" row.
+
+**F.5 · Returns.** Equity IRR (levered) and project IRR (unlevered), each post-tax and pre-tax;
+the **HoldCo IRR** and **Promoter IRR** when the Returns group is filled; the lender's **XIRR**
+(dated draws and repayments) and **MIRR** (at the reinvestment rate); minimum **DSCR**, **FSCR**
+(fixed costs and guarantee fees added to both sides), **LLCR** (cash to the end of the loan over
+the debt) and **PLCR** (cash to the end of the project over the debt). With mezzanine or
+quasi-equity, a Funding tile shows the split.
+
+**F.6 · Tax schedule.** Profit before tax, the tax depreciation taken instead of book, interest
+disallowed under thin capitalisation, business losses and unabsorbed depreciation set off, taxable
+income and tax; what is carried forward; book depreciation on both straight line and written-down
+value with the one used marked; gross block, accumulated depreciation and net block by component.
+
+**F.7 · Balance sheet and cash-flow statement.** Assets line by line (gross block by component,
+capital work in progress, accumulated depreciation, net block, the debt service reserve, margin
+money, receivables, cash) and the liabilities (share capital, retained earnings, senior debt,
+mezzanine, quasi-equity, accrued interest); the cash-flow statement with every line of the model.
+
+**F.8 · Reverse-auction sensitivity.** Click **Run sensitivities**: for each axis the tariff your
+target IRR needs when that one thing moves. Capex ±10 %, module cost ±10 % (on the module share of
+the solar capex), exchange rate ±5 % (on the foreign-currency share), interest ±50 bp, the P50 /
+P75 / P90 case, a commissioning delay of 3 or 6 months, a life extension of 5 or 10 years, the
+refinancing rate ±100 bp. Use it on bid day to know how far below your tariff you can go and what
+it would cost you. It runs the whole model many times, so it is on a button and says "Run again"
+after an input changes.
 
 ![The traceable model](img/seci-07-trace-explorer.jpg)
 
@@ -328,6 +364,83 @@ inputs (with where they came from), green cells the optimiser's energy, the rest
 cell: its formula with each reference as a chip, its precedents and dependents, and **the inputs it
 rests on**. The search box finds a line; a year's energy opens the hour-by-hour dispatch behind it,
 down to months and 15-minute blocks. Escape closes it.
+
+---
+
+## More inputs (finance team)
+
+![Finance team's inputs](img/seci-05-finance-inputs-full.jpg)
+
+The finance team's groups (4.3a on Finance inputs, and under F.1 of the Financial model). Every
+group starts closed and off: with nothing filled, the model gives exactly the numbers it gave
+before. Open a group, read its one-line note, fill what your case needs. Everything is saved with
+the bid and goes into the Excel workbook as inputs on their own sheet.
+
+**Timeline.** *Commercial operation date*: the model's year 1 starts here (the tender's SCSD is
+offered; **Use <date>** puts it back). Columns, the CSV and the workbook then carry real months
+instead of Y1, Y2.
+
+**Construction and commissioning.** *Phasing*: give each component (solar, wind, battery,
+evacuation, other) the month it starts and how many months it spends; a component without a row
+spends over the whole window. *Parts*: commission the plant in parts, each with its share and its
+months after (or before, negative) the COD; the shares must add to 100 %. Year 1's energy, revenue
+and O&M scale with the share of the year the parts run. *Bridge loan*: the first months drawn on a
+bridge at its own rate, taken out by the term loan with a fee that goes into the project cost with
+the IDC. Example: parts 50 % at 0 months and 50 % at 6 months give year 1 an operating share of
+75 %.
+
+**Generation and revenue.** *Generation case*: P50 (as modelled), P75 or P90, with the factors
+(0.97 and 0.94 by default) the energy is scaled by; the DFR and the penalties follow. *Carbon credit
+revenue*: tonnes per MWh × price, escalating, for the years credited; a revenue line, taxable.
+Example: 0.71 t/MWh × ₹500/t on 2,000 MU a year is ₹71 cr. *Life extension*: extra years after
+the PPA at a sale price (the surplus price until set), with the extension capex spent in the last
+PPA year, an O&M factor and the degradation after the PPA; the table grows to PPA + extension
+years. *Repowering*: solar repowering capex in a year and the energy uplift from the year after.
+*Augmentation* (battery): every year to nameplate, a one-time restore, or **on a schedule** in the
+years you list (6, 12, 18), each replacing what was lost since the last.
+
+**Operating cost.** *O&M escalation* for solar, wind and battery separately (the common rate until
+set). *Wind O&M by component*: rows with a label, ₹ lakh/MW and their own escalation (gearbox,
+blades, balance of plant …). *Other fixed costs*: solar park fees, audit fees, asset management
+fee, each as its own P&L line with its own escalation; their sum is the Other fixed line.
+
+**Debt.** *Repayment after refinancing*: keep the method or re-sculpt to the target DSCR from the
+refinancing year. *Rate step-down*: a lower rate from a year after COD. *Top-up*: new debt at the
+end of a year (usually year 2) to a higher debt share; the new money is paid out to equity and
+repaid over the years left. *Prepayment penalty*: on principal prepaid by a refinancing take-out or
+the sweep. *Cash sweep*: a share of the free cash prepays principal between two years; what cannot
+be paid accrues and is paid later. *Debt service reserve basis*: next year's service or the peak of
+the years ahead, with the swing put aside or released each year; *interest on the reserve* is
+other income.
+
+**Quasi-equity and mezzanine.** *Quasi-equity* (promoter loans): part of the funding below the
+senior debt, so the equity cheque falls by the amount; its interest is paid only in years whose
+senior DSCR is above the lender's minimum, else it accrues; principal is repaid from the cash left
+from the year you set. *Mezzanine*: a tranche with its rate, tenor, moratorium, equal or bullet
+repayment and arrangement fee, paid every year; the Total DSCR counts its service.
+
+**Guarantees.** Add the EMD, PBG, connectivity BG, statutory BG or a surety bond from the presets,
+then type the amount (the tender's per-MW figures are in Money at stake). Each carries its fee,
+the margin money blocked while it runs and the interest that money earns, from a year (0 = during
+construction, where the fee is capitalised) for a number of years. Fees sit below EBITDA with the
+working-capital interest; margin interest is other income.
+
+**Tax and depreciation.** *Book depreciation*: straight line (as before) or written-down value;
+both are worked out and shown in F.6. *Component lives* for solar, wind, battery, evacuation and
+other. *Thin capitalisation*: interest on quasi-equity and mezzanine above this share of EBITDA is
+disallowed and carried eight years (0 = off). *Loss carry-forward*: business losses lapse after
+these years; unabsorbed depreciation never does. Quasi-equity interest is deductible when paid, not
+when accrued.
+
+**Returns.** *HoldCo expenses* a year and the *promoter's share* of the HoldCo give the HoldCo and
+Promoter IRR in F.5 (the HoldCo funds the equity and the quasi-equity and receives dividends,
+quasi interest and repayments). *Lender's reinvestment rate* for the MIRR.
+
+**Sensitivity for the reverse auction.** The share of the hard cost in foreign currency, the
+exchange rate it was priced at, and the module share of the solar capex: F.8 moves them.
+
+*Not decided yet.* "Keep metrics proprietary": which outputs may leave the application (workbook,
+CSV) and which stay on screen is an open point for the finance team; today nothing is withheld.
 
 ---
 

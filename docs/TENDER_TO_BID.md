@@ -290,6 +290,20 @@ the tab computed:
 * **Financial model (values)**: the app's numbers; energy and tariff, revenue, operating costs, profit and loss, cash flow
   and debt for every year with totals, then the equity and project cash flows from year 0.
 
+## The finance team's inputs (November 2026)
+
+The Finance inputs step (section 4.3a, "Finance team's inputs") and F.1 of Financials carry the
+ten groups of the finance team's list of 4 November (`docs/dev/FINANCE-V3-SPEC.md`), shared with
+the SECI, Round the Clock and CfD tabs through `web/src/rtc/FinanceInputsV3.jsx`: the commercial
+operation date (seeded from the tender's supply start, so the model's columns read real months),
+capex phasing and part commissioning, a bridge loan, generation cases, carbon credits, life
+extension, repowering, augmentation on a schedule, O&M splits and other fixed lines, the debt
+features, quasi-equity and mezzanine, guarantees, tax bases, HoldCo and lender returns and the
+reverse-auction sensitivities. `modelInputs` (`web/src/bid/model.js`) passes `costs.phasing`,
+`costs.moduleSharePct` and the battery schedule to the engine; Financials shows F.5 Returns, F.6
+Tax schedule, F.7 Balance sheet and cash-flow statement and F.8 Reverse-auction sensitivity, and
+the workbook an Inputs sheet with the dated year row and the new rows. Everything is off by default.
+
 ## Recently extracted tenders
 
 Each tender read is saved (`tender_reads`, migration 006) and listed on the Tender step for every

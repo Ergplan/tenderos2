@@ -166,7 +166,7 @@ Local development needs Python 3.12, Node 22 and a Postgres (`Makefile` header, 
 | --- | --- |
 | `main.jsx` | The workspace shell: sidebar, tab routing, tab access, zone badge, team layers (`FieldPings`, `EvidenceLayer`), inbox, Team setup |
 | `bid/` | Tender to Bid: `BidTab.jsx` (steps `tender, dates, capacity, sources, size, finance`), `model.js` (state, inputs, `lpPayload`, `runSizing`, benchmarks), `tenderMap.js` (reading → terms), `readTender.js` (jobs and polling), `useSizing.js` (shared sizing hook), `quote.js` (returns at a quoted tariff), `exportModel.js` + `liveModelRequest.js` (workbook request), `SiteSchematic.jsx`, `Dispatch15.jsx`, `FinanceInputsStep.jsx`, `TenderSet.jsx`, `ScanStage.jsx`, `scanAgents.js`, `preBidQueries.js`, `hourSankey.js` |
-| `rtc/` | Round the clock: `engine.js` (the pure financial and dispatch engine, section 6.2), `RtcTab.jsx`, `optimizer.worker.js`, `exportModel.js`, `FinanceView.jsx`, `ConstructionView.jsx`, `LossChain.jsx`, `MeterView.jsx`, `ProfileLibrary.jsx`, `charts.jsx`, `Theatre.jsx` (the solver theatre) |
+| `rtc/` | Round the clock: `engine.js` (the pure financial and dispatch engine, section 6.2), `RtcTab.jsx`, `optimizer.worker.js`, `exportModel.js`, `FinanceView.jsx`, `financeV3.js` and `FinanceInputsV3.jsx` (the finance team's inputs of 4 November: defaults, helpers and the ten input groups shared by every tab, section 6.2a), `FinanceStatements.jsx` (F.5 Returns, F.6 Tax schedule, F.7 Balance sheet and cash-flow statement, F.8 Reverse-auction sensitivity), `ConstructionView.jsx`, `LossChain.jsx`, `MeterView.jsx`, `ProfileLibrary.jsx`, `charts.jsx`, `Theatre.jsx` (the solver theatre) |
 | `seci/` | SECI RTC tender: `SeciTab.jsx` (`SECI_STEPS`), `terms.js` (`seciTerms`), `seci-rtc-tm-v.json` (the pack), `state.js`, `formats.js`, `forms.js`, `letters/` (one template per format, `export.js`), `agent.js` + `voice.js` + `LiveAgent.jsx` (the voice agent), `peakPrices.js`, `winningBid.js` + `WinningBid.jsx`, `charts.js`, the step components |
 | `bess/`, `cfd/` | The BESS tender and CfD bid models and tabs |
 | `whatif/` | `model.js` (`runWhatIf`, `whatIfFromBid`), `levers.js`, `WhatIfTab.jsx`, `LeverPanel.jsx` |
@@ -391,6 +391,62 @@ drawdown and IDC (`DRAWDOWN_PROFILES`); `capexCr` the project cost. `simulate`, 
 `highsPayload` are the Round the clock tab's own dispatch and optimiser. `yearFactors` gives the
 degradation per year. Checks: `tools/check_rtc_engine.mjs`, `check_live_model.mjs`.
 
+**Finance v3 (the finance team's inputs of 4 November 2026).** `docs/dev/FINANCE-V3-SPEC.md` is the
+contract: every new input key, its default and the row key it produces. The keys live under
+`state.fin`, `state.costs` and `state.bess` beside the existing ones and are all off by default, so
+a model with none of them set gives exactly the numbers it gave before (the fingerprint cases of
+`tools/check_rtc_engine.mjs` and `check_live_model.mjs` prove it). `FINANCE_V3_KEYS` in the
+engine names them; `DEFAULT_FINANCE` / `DEFAULT_COSTS` / `DEFAULT_BESS` carry their defaults for
+the engine, and `web/src/rtc/financeV3.js` (`V3_FIN_DEFAULTS`, `V3_COST_DEFAULTS`, `v3Fin(fin)`)
+the same defaults for the screens, which must never read a key without them.
+
+| Group (screen) | Keys | Engine rows and results |
+| --- | --- | --- |
+| Timeline | `fin.codDate` | `rows[y].start`, `rows[y].end`, `finance.timeline` |
+| Construction and commissioning | `costs.phasing`, `fin.parts`, `fin.bridge` | `construction.rows[m].byComponent`, `.bridge`, `finance.capex.byComponent`, `.bridgeFee`, `rows[y].opFactor` |
+| Generation and revenue | `fin.generationCase`, `fin.caseFactors`, `fin.carbon`, `fin.extension`, `fin.repower`, `bess.augmentation = "schedule"`, `bess.augmentationYears` | `generationFactor`, `carbonRevenue`, `phase`, `finance.ppaYears`, `extensionCapex`, `repowerCapex`, `repowerUplift`, `augCapex` |
+| Operating cost | `fin.solarOmEscalation`, `windOmEscalation`, `bessOmEscalation`, `fin.windOmComponents`, `fin.otherFixedLines` | `solarOm`, `windOm`, `bessOm`, `biomassOm`, `windOmComponents[]`, `otherLines[]` (sums stay `om` and `other`) |
+| Debt | `fin.refiRepayment`, `fin.rateStepDown`, `fin.topUp`, `fin.prepaymentPct`, `fin.sweep`, `fin.dsraBasis`, `fin.dsraInterestRate` | `debtRate`, `topUpCr`, `prepaymentFee`, `sweepCr`, `sweepAccrued`, `fscr`, `llcr`, `plcr`, `dsraBalance`, `dDsra`, `dsraInterest`, `finance.minFscr/minLlcr/minPlcr` |
+| Quasi-equity and mezzanine | `fin.quasi`, `fin.mezz` | `quasiOpening/InterestPaid/Accrued/Repaid/Closing`, `mezzOpening/Interest/Principal/Closing`, `totalDscr`, `finance.quasi`, `finance.mezz` (equity = cost − debt − mezz − quasi) |
+| Guarantees | `fin.guarantees[]` | `guaranteeFees`, `marginBalance`, `marginInterest` |
+| Tax and depreciation | `fin.bookDepreciation`, `fin.lives`, `fin.thinCapPct`, `fin.lossCarryYears` | `bookDepSlm/Wdv`, `taxDepSlm/Wdv`, `grossBlock(ByComponent)`, `accDep`, `netBlock(ByComponent)`, `taxableIncome`, `lossSetOff`, `depSetOff`, `lossCarried`, `depCarried`, `interestDisallowed`, `interestCarried` |
+| Returns | `fin.holdco`, `fin.lenderReinvestRate` | `finance.preTaxEquityIrr`, `preTaxProjectIrr`, `holdcoIrr`, `promoterIrr`, `holdcoFlows`, `promoterFlows`, `lenderFlows`, `lenderXirr`, `lenderMirr`; helpers `xirr`, `mirr` |
+| Statements | — | `cash`, `retained`, `shareCapital`, `cwip` |
+| Sensitivity for the reverse auction | `fin.capexUsdShare`, `fin.fxBase`, `costs.moduleSharePct` | `sensitivities(ctx, sizes, args)` → `[{ key, label, cases: [{ label, tariff, equityIrr, minDscr }] }]` |
+
+Checks: `tools/check_finance_v3.mjs` (one block per feature: the number each input moves and by how
+much), beside `check_rtc_engine.mjs`.
+
+### 6.2a The finance team's inputs on screen: `FinanceInputsV3.jsx`, `FinanceStatements.jsx`
+
+`FinanceInputsV3` (`web/src/rtc/FinanceInputsV3.jsx`) is one component for every tab: props
+`fin`, `costs`, `bessAug` (`{ augmentation, augmentationYears }`), `patchFin(values)`,
+`patchCosts(values)`, `patchBess(values)`, `codDefault` (the tender's date that seeds the
+timeline) and `lockProps`. It renders ten closed `<details>` groups (`data-testid="fin-v3-<id>"`:
+timeline, construction, generation, opex, debt, quasi, guarantees, tax, returns, sensitivity) with
+the same `Field` / `SelectBox` / `SwitchBox` boxes as the rest of the finance inputs, so team
+mode, evidence and the e2e `_field(page, label)` helper work on them. It is mounted on the Finance
+inputs step of Tender to Bid and SECI (`bid/FinanceInputsStep.jsx`, section 4.3a, `codDefault =
+terms.supplyStart`), of the CfD tab (`cfd/FinanceInputsStep.jsx`, 5.4a, the SCD 15 months after
+the Effective Date) and under the **More inputs (finance team)** toggle of F.1 in `FinanceView`
+(`fin-v3-toggle`; Round the Clock has no tender date, so the COD is typed there). The lists
+(parts, wind O&M components, other fixed lines, guarantees) are small tables with an add button
+(`fin-v3-parts`, `fin-v3-add-part`, `fin-v3-parts-sum`, `fin-v3-wind-om(-add)`,
+`fin-v3-other-fixed(-add)`, `fin-v3-guarantee-list` with the presets `fin-v3-guarantee-emd|pbg|
+connectivity|statutory|surety`).
+
+`FinanceStatements.jsx` holds the output sections FinanceView mounts after F.4: `ReturnsSection`
+(F.5, `fin-returns`: levered / unlevered, pre- and post-tax, HoldCo, promoter, lender XIRR and
+MIRR, minimum DSCR / FSCR / LLCR / PLCR, every tile a trace key), `TaxSection` (F.6, `fin-tax`;
+hidden until the model carries `taxableIncome` or `bookDepSlm`), `StatementsSection` (F.7,
+`fin-balance` and `fin-cashflow`) and `SensitivitySection` (F.8, `fin-sensitivity-run` then
+`fin-sensitivity` with one `fin-sensitivity-<axis>` row per axis; it calls the engine's
+`sensitivities` with the `modelArgs = { ctx, sizes, args }` the tab gives FinanceView, on a button
+because it runs the model many times). `FinanceView` labels the year columns with `yearLabel(row)`
+(`Y1 · May 2028 – Apr 2029` once `rows[y].start` exists), shows the v3 rows of F.4 as optional
+lines (present only when some year has a value; the per-source O&M lines only when more than one
+source has one) and exports them in the CSV with a "Year starts" row.
+
 ### 6.3 The Excel twin: `web/lib/liveModel.js`, `modelWorkbook.js`, `dispatchSheets.js`
 
 `addLiveModel(wb, m, …)` writes the Live model sheet line by line through a small builder
@@ -409,6 +465,13 @@ Beside the Live model, `addScheduleSheets` (called at the end of `addLiveModel`)
 (`'Live model'!E120`) or on the sheet's own rows, so the Live model stays the single place the
 model is computed. `SCHEDULE_SHEETS` lists them; `tools/check_live_model.mjs` recalculates them
 with LibreOffice like the Live model.
+
+Finance v3 adds an **Inputs** sheet (every input of the model, the Live model and the schedule
+sheets link to it: "inputs separate from outputs"), a "Year starts" row under the year numbers
+(`EDATE` on the COD cell), the v3 rows of `cashflows` as formulas, the sheets the spec names (Tax
+schedule, Returns, Guarantees and reserves, Quasi-equity and mezzanine) and the reverse-auction
+axes on the Sensitivity sheet. `tools/check_live_model.mjs` carries one case per v3 feature; its
+`SAME` map (sheet key → app key) must name every new row.
 
 ### 6.4 The traceable model: `web/src/model/trace.js`
 
@@ -624,34 +687,49 @@ proved on its page. The SECI tab is the template for the tab itself.
 
 ### 8.5 Add a finance input end to end
 
-Example: a new yearly cost input `fin.<key>`.
+Example: a new yearly cost input `fin.<key>`. Finance v3 (section 6.2) is the pattern to copy; its
+spec `docs/dev/FINANCE-V3-SPEC.md` shows how to write the contract first when more than one person
+builds.
 
-1. **State and engine.** Add the default with a comment to `DEFAULT_FINANCE` in
-   `web/src/rtc/engine.js`; use it in `cashflows()` (and `constructionSchedule`/`debtTerms` if it
-   is a financing term). The default must reproduce today's numbers (0 or "off").
-2. **Inputs on screen.** Tender to Bid and SECI: add a `FINANCE_FIELDS` entry in
-   `web/src/bid/model.js` (section, key, label, unit, `pct`, min, max, step) or a `<Field>` in
-   `web/src/bid/FinanceInputsStep.jsx` with `lockProps("fin.<key>")`; Round the clock:
-   `web/src/rtc/FinanceView.jsx`. A `data-testid` on the box gives team mode and evidence a stable
-   key. Add a benchmark to `BENCHMARKS` if one exists; old saves get the default through
-   `mergeBidState`.
-3. **What-if.** Add it to `defaultWhatIf()` and to the `pick(fin, [...])` list in
+1. **Spec.** Add the key, its default (0 or "off": the default must reproduce today's numbers), the
+   row key it produces and its formula to `docs/dev/FINANCE-V3-SPEC.md` (or a sibling document).
+2. **State and engine.** Add the default with a comment to `DEFAULT_FINANCE` in
+   `web/src/rtc/engine.js` and to `FINANCE_V3_KEYS`; use it in `cashflows()` (and
+   `constructionSchedule` / `debtTerms` if it is a financing term); write the new `rows[y].<row>`
+   every year (0 when off) so the screens and the workbook can rely on the key. Add the block to
+   `tools/check_finance_v3.mjs` that proves what the input moves and by how much, and run
+   `node tools/check_rtc_engine.mjs` to show the fingerprint cases unchanged.
+3. **Screen defaults.** Mirror the default in `V3_FIN_DEFAULTS` (`web/src/rtc/financeV3.js`), so
+   `v3Fin(fin)` fills it for a saved bid from before the input existed.
+4. **Inputs on screen.** Add the box to the right group of `web/src/rtc/FinanceInputsV3.jsx` (a
+   `<Field>` / `<SelectBox>` / `<SwitchBox>` with `{...lp("fin.<key>")}` for the lock and a hint in
+   plain English). That one component serves Tender to Bid, SECI, CfD and F.1 of every tab, so
+   nothing else to mount. If the input is a core financing term that belongs with the existing
+   boxes instead, add a `FINANCE_FIELDS` entry in `web/src/bid/model.js` or a `<Field>` in
+   `web/src/bid/FinanceInputsStep.jsx` / `web/src/cfd/FinanceInputsStep.jsx` and a benchmark in
+   `BENCHMARKS`.
+5. **Outputs on screen.** A line in `FIN_LINES` of `web/src/rtc/FinanceView.jsx` (add its key to
+   `OPTIONAL_LINES` to show it only when some year has a value) and its `TRACE_LINE` entry, named as
+   the workbook row; a tile in `FinanceStatements.jsx` when it is a result.
+6. **What-if.** Add it to `defaultWhatIf()` and to the `pick(fin, [...])` list in
    `whatIfFromBid` (`web/src/whatif/model.js`) so the What-if step carries it from the bid.
-4. **Workbook request.** Add the key to `LIVE_FIN_KEYS` and the inputs table in
+7. **Workbook request.** Add the key to `LIVE_FIN_KEYS` and the inputs table in
    `web/src/rtc/exportModel.js` (both tabs' requests pass through `liveResults`/`liveModelRequest`),
    and to the whitelist in `liveModelInput()` (`web/lib/liveModel.js`), otherwise the server drops it.
-5. **Live model.** In `addLiveModel`, add the input cell (`S.one("<name>", "<label>", "<unit>",
-   { v, kind: "input", fmt, source })`) in the inputs block and the formula lines that read it
+8. **Live model.** In `addLiveModel`, add the input cell on the Inputs sheet (`S.one("<name>",
+   "<label>", "<unit>", { v, kind: "input", fmt, source })`) and the formula lines that read it
    (`S.series(..., { f: (y) => ..., v: (y) => ... })`), mirroring `cashflows` line for line. The
    trace (`web/src/model/trace.js`) and the explorer pick it up from the sheet, nothing to add.
-6. **Checks.** Extend a case in `tools/check_live_model.mjs` (the app-to-sheet mapping near line
-   142 and the cases) so LibreOffice proves the formula; `check_trace.mjs` and `check_whatif.mjs`
-   if the number has its own line; `check_bid_model.mjs` for the request. Run `make check-web`.
-7. **Agent and MCP.** If the voice agent or Claude should set it, add it to `agentInputs` in
+9. **Checks.** Extend a case in `tools/check_live_model.mjs` (the `SAME` sheet-to-app mapping and
+   the cases) so LibreOffice proves the formula; `check_trace.mjs` and `check_whatif.mjs` if the
+   number has its own line; `check_bid_model.mjs` for the request. Run `make check-web`.
+10. **Agent and MCP.** If the voice agent or Claude should set it, add it to `agentInputs` in
    `web/src/seci/agent.js` (the MCP `list_inputs`/`set_input` tools read the same list) and to
    `tools/check_seci_agent.mjs` / `check_mcp.mjs`.
-8. **Docs.** The finance table in `docs/DEMO2.md` and the feature row in
-   `docs/enterprise/FEATURES.md` (through `tools/build_enterprise_features.py`).
+11. **Docs and tests.** The feature row in `tools/build_enterprise_features.py` (regenerates
+   `docs/enterprise/FEATURES.md` and `.xlsx`), the finance table in `docs/DEMO2.md`, the group's
+   case in `docs/dev/CLICK-TESTS.md` (FV3-…) and `FUNCTIONAL-TESTS.md`, the manuals' "More inputs
+   (finance team)" chapter, `SCREEN-TO-DATA.md`, and a step in `tests/e2e/test_finance_v3.py`.
 
 ### 8.6 Add an MCP tool
 
@@ -747,13 +825,14 @@ From `docs/enterprise/FEATURES.md` (status Build or Extend) and the "not yet" no
 | TI-16 Review before transfer | A reviewer confirming the whole reading before it is packaged for the core; today the reviewer ticks unlocated values in the workflow | Build, P1 |
 | TI-17 Transfer package to the core | The signed, checksummed tender package exported from the intake zone and imported in the core | Build, P1 |
 | BW-07 Sign-off per step and submission lock | Sign-off is per box (evidence); no per-step gate, no frozen submission version | Build, P2 |
-| W-03 Sensitivity table | One-way and two-way sensitivities | Build, P2 |
+| FMV-01 Keep metrics proprietary | Which model outputs may leave the application (workbook, CSV): an open point from the finance team's list of 4 November; nothing is withheld today | Build, P2 |
 | P-02 Enterprise sign-in (SSO) | SAML/OIDC or LDAP; today local accounts only | Build, P2 |
 | TI-13 Tender questions by voice | The GPT-Live agent also drives the bid; a tender-only mode for the DMZ | Extend, P2 |
 | TI-15 Claude connector | Limit to the tender (no bid data) in the enterprise edition; off (404) in the core zone (`web/app/api/mcp/[token]/route.js` checks `ZONE`) | Extend, P3 |
 | W-04 Scenario compare | Compare exists for saved bids, not for What-if cases | Extend, P2 |
 | E-06 Audit log export | Activity log exists; export to build | Extend, P2 |
-| F-06, F-09, F-12, F-13 notes | Capex phasing by package and commissioning in parts; DSM/penalty reserve and letter-of-credit cost; prepayment cost (use the fee); covenant list | notes in the Live rows |
+| F-09, F-13 notes | DSM/penalty reserve and letter-of-credit cost; covenant list (phasing, parts, prepayment, FSCR and the lender's view came with finance v3) | notes in the Live rows |
+| FMV-30 promoter returns | The HoldCo is assumed to hold all of the SPV and the promoter a share of the HoldCo; dividend distribution rules are not modelled | `docs/dev/FINANCE-V3-SPEC.md` §11 |
 | Team (`docs/TEAM.md`) | Assignments only on the SECI tab; one team per server; assignments need a saved bid; no due-date reminders; no e-signature | "Not yet" |
 | Model reading | Not yet run against a real tender with a key in this repository; tests use a fake SDK (`README.md`, `docs/DEPLOY.md` §4) | |
 | Deployment | `gcp-create-vm.sh`, a real Let's Encrypt issuance and the Docker install on a fresh VM were not run here; `build-bundle.sh`, `install.sh`, `tenderos-patch apply`/`rollback` were not run against a Docker daemon (`docs/DEPLOY.md` "Tested", `deploy/enterprise/README.md` "Not run here") | |

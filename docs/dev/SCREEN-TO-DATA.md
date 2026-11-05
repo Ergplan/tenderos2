@@ -318,6 +318,44 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | DSCR min / avg | `rtc/FinanceView.jsx:167` | `` `${nf(finance.minDscr, 2)} / ${nf(finance.avgDscr, 2)}` `` | `finance.minDscr` / `avgDscr` over the years with debt service; detail from `fin.tenorYears`, `fin.repayment`, `fin.graceYears`, `finance.debtTerms`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `minDscr` | CFADS and debt service per year | see the file's note above |
 | Equity payback | `rtc/FinanceView.jsx:168` | `` finance.payback ? `Year ${finance.payback}` : "–" `` | `finance.payback`: the first year cumulative equity cash turns positive; detail `finance.equity`, `finance.debt`; opens the traceable model (`web/src/model/trace.js` traceModel over `web/lib/liveModel.js`) at the named cell `payback` | cumulative FCFE, capex, fin.debtFraction | see the file's note above |
 
+### `web/src/rtc/FinanceInputsV3.jsx` (the finance team's inputs of 4 November)
+
+**Screen:** Tender to Bid and SECI › Finance inputs › 4.3a "Finance team's inputs"; CfD Bid › Finance inputs › 5.4a; every tab's Financial model › F.1 › **More inputs (finance team)** (`fin-v3-toggle`)  
+**Writes:** `state.fin`, `state.costs`, `state.bess` (SECI / Tender to Bid: `state.src.bess`) through the tab's own patch; nothing computed here  
+**Stored:** with the tab's state (localStorage and the saved scenario's `inputs.state`); old saves get the defaults from `v3Fin()` (`web/src/rtc/financeV3.js`)
+
+| Group (`data-testid`) | Boxes | State keys |
+| --- | --- | --- |
+| Timeline (`fin-v3-timeline`) | Commercial operation date (`fin-v3-cod`), "Use <tender's date>" | `fin.codDate` (seed: `terms.supplyStart` in SECI and Tender to Bid, `keyDates(effectiveDate).scd` in CfD, none in Round the Clock) |
+| Construction and commissioning (`fin-v3-construction`) | Phasing table per component (`fin-v3-phasing`: start month, months), parts table (`fin-v3-parts`, `fin-v3-add-part`, the 100 % check `fin-v3-parts-sum`), Bridge loan months, rate, take-out fee | `costs.phasing.{solar,wind,bess,evac,other}.{start,months}`, `fin.parts[].{share,offsetMonths}`, `fin.bridge.{months,rate,feePct}` |
+| Generation and revenue (`fin-v3-generation`) | Generation case, P75 and P90 factors; Carbon credit revenue switch, emission factor, credit price, years, escalation; Extra years, extension capex, sale price after the PPA, O&M factor, degradation; Repower in year, capex, uplift; Augmentation select and years (`fin-v3-aug-years`) | `fin.generationCase`, `fin.caseFactors.{p75,p90}`, `fin.carbon.*`, `fin.extension.*`, `fin.repower.*`, `bess.augmentation`, `bess.augmentationYears` |
+| Operating cost (`fin-v3-opex`) | Solar / wind / battery O&M escalation; wind O&M components table (`fin-v3-wind-om`); other fixed lines table (`fin-v3-other-fixed`) | `fin.solarOmEscalation`, `fin.windOmEscalation`, `fin.bessOmEscalation`, `fin.windOmComponents[].{label,lakhPerMw,escalation}`, `fin.otherFixedLines[].{label,crPerYear,escalation}` |
+| Debt (`fin-v3-debt`) | Repayment after refinancing; rate step-down after / rate; top-up year / debt share; prepayment penalty; cash sweep %, from, to; debt service reserve basis; interest on the reserve | `fin.refiRepayment`, `fin.rateStepDown.{afterYears,rate}`, `fin.topUp.{year,debtFraction}`, `fin.prepaymentPct`, `fin.sweep.{pct,fromYear,toYear}`, `fin.dsraBasis`, `fin.dsraInterestRate` |
+| Quasi-equity and mezzanine (`fin-v3-quasi`) | Quasi-equity amount, interest, lender's minimum DSCR, repay from year; Mezzanine amount, interest, tenor, moratorium, repayment, arrangement fee | `fin.quasi.{amountCr,rate,lenderMinDscr,repayFromYear}`, `fin.mezz.{amountCr,rate,tenorYears,graceYears,repayment,feePct}` |
+| Guarantees (`fin-v3-guarantees`) | The list (`fin-v3-guarantee-list`: label, amount, fee, margin, margin rate, from year, years) and the presets EMD, PBG, connectivity, statutory, surety (`fin-v3-guarantee-<id>`) | `fin.guarantees[].{label,amountCr,feePct,marginPct,marginRate,fromYear,years}` |
+| Tax and depreciation (`fin-v3-tax`) | Book depreciation basis, thin capitalisation cap, loss carry-forward, component lives (`fin-v3-lives`) | `fin.bookDepreciation`, `fin.thinCapPct`, `fin.lossCarryYears`, `fin.lives.{solar,wind,bess,evac,other}` |
+| Returns (`fin-v3-returns`) | HoldCo expenses, promoter's share, lender's reinvestment rate | `fin.holdco.{expensesCrPerYear,promoterShare}`, `fin.lenderReinvestRate` |
+| Sensitivity for the reverse auction (`fin-v3-sensitivity`) | Capex in foreign currency, exchange rate, modules in the solar capex | `fin.capexUsdShare`, `fin.fxBase`, `costs.moduleSharePct` |
+
+### `web/src/rtc/FinanceStatements.jsx` (F.5 to F.8 of FinanceView)
+
+**Screen:** after F.4 on every Financial model screen (Round the Clock, Tender to Bid, SECI, CfD)  
+**Computed by:** the same `finance` result as F.4 (`runFinancialModel` → `cashflows`); F.8 by `sensitivities(ctx, sizes, args)` (`web/src/rtc/engine.js`) on the button  
+**Stored:** not stored (Round the Clock saves `finance.rows`, which carries the rows below)
+
+| Section (`data-testid`) | Label as shown | Value |
+| --- | --- | --- |
+| F.5 Returns (`fin-returns`) | Equity IRR (levered, post-tax) / Project IRR (unlevered, post-tax) | `finance.equityIrr`, `finance.projectIrr` |
+| | Equity IRR pre-tax / Project IRR pre-tax | `finance.preTaxEquityIrr`, `finance.preTaxProjectIrr` |
+| | HoldCo IRR / Promoter IRR | `finance.holdcoIrr` (dividends + quasi interest + quasi repayments − `fin.holdco.expensesCrPerYear`), `finance.promoterIrr` (× `fin.holdco.promoterShare`) |
+| | Lender XIRR / Lender MIRR | `finance.lenderXirr` (dated `finance.lenderFlows`), `finance.lenderMirr` (reinvested at `fin.lenderReinvestRate` ?? `fin.interestRate`) |
+| | Minimum DSCR / FSCR / LLCR / PLCR | `finance.minDscr` (avg beside), `minFscr`, `minLlcr`, `minPlcr` |
+| | Funding (when mezzanine or quasi-equity) | `finance.capex.total`, `debt`, `mezz`, `quasi`, `equity` |
+| F.6 Tax schedule (`fin-tax`) | Profit before tax, Less tax depreciation, Interest disallowed, Business loss set off, Unabsorbed depreciation set off, Taxable income, Tax; Business losses carried, Unabsorbed depreciation carried, Disallowed interest carried; Book straight line / written-down value / used, Tax straight line / written-down value / used; Gross block, Accumulated depreciation, Net block, Net block · <component> | `rows[].pbt`, `taxDep`, `interestDisallowed`, `lossSetOff`, `depSetOff`, `taxableIncome`, `tax`, `lossCarried`, `depCarried`, `interestCarried`, `bookDepSlm`, `bookDepWdv`, `bookDep`, `taxDepSlm`, `taxDepWdv`, `grossBlock`, `accDep`, `netBlock`, `netBlockByComponent.<k>` |
+| F.7 Balance sheet (`fin-balance`) | Gross block by component, Capital work in progress, Accumulated depreciation, Net block, Debt service reserve, Margin money, Receivables, Cash; Share capital, Retained earnings, Senior debt, Mezzanine, Quasi-equity, Accrued quasi interest, Sweep accrued | `rows[].grossBlockByComponent`, `cwip`, `accDep`, `netBlock`, `dsraBalance`, `marginBalance`, `receivables`, `cash`, `shareCapital`, `retained`, `closingDebt`, `mezzClosing`, `quasiClosing`, `quasiAccrued`, `sweepAccrued` |
+| F.7 Cash-flow statement (`fin-cashflow`) | Every cash line of the model incl. carbon, extension and repowering capex, top-up, sweep, prepayment fee, quasi-equity and mezzanine flows, guarantee fees and margin money, DSRA interest | the F.4 cash-flow rows below |
+| F.8 Reverse-auction sensitivity (`fin-sensitivity`, button `fin-sensitivity-run`, rows `fin-sensitivity-<axis>`) | Capex ±10 %, module cost ±10 %, exchange rate ±5 %, interest ±50 bp, generation case P50 / P75 / P90, commissioning delay +3 / +6 months, life extension +5 / +10 years, refinancing rate ±100 bp; each case's tariff for the target IRR, equity IRR and minimum DSCR | `sensitivities(...)[].cases[].{label, tariff, equityIrr, minDscr}`; inputs `fin.capexUsdShare`, `fin.fxBase`, `costs.moduleSharePct` |
+
 ### `web/src/rtc/MeterView.jsx`
 
 **Screen:** Round the clock › Plant to meter chapter (`PlantToMeter` in `RtcTab.jsx`)  
@@ -431,6 +469,7 @@ Shown in Round the clock › Finance, Tender to Bid › Financials and SECI › 
 Every cell is `finance.rows[year][key]`, computed by `web/src/rtc/engine.js` cashflows (called by runFinancialModel) from the year's
 operations (`ops`: the simulation in Round the clock, `opsFromLp(lp, …)` in the bid tabs) and the cost, financing and tax inputs.
 A click on a cell opens the traceable model at the Live model line named in the Trace column (`TRACE_LINE` in FinanceView.jsx → `web/lib/liveModel.js`).
+The year columns read `Y1`, `Y2` … or, once `fin.codDate` is set, `Y1 · May 2028 – Apr 2029` from `rows[y].start` / `rows[y].end` (`yearLabel` in `web/src/rtc/financeV3.js`); the CSV export carries a "Year starts" row.
 Stored: Round the clock saves the whole `finance.rows` as `results.finance.rows` (the Excel export `GET /api/scenarios/export` prints it);
 the bid tabs store nothing of it (recomputed from `inputs.state.lp` on load). Rows marked *optional* show only when some year has a value.
 
@@ -502,6 +541,27 @@ Round the clock adds the bus-to-meter energy lines before *Delivered* (`web/src/
 | Power transformer loss (MU) | `trafoLossMu` |
 | Transmission line loss (MU) | `lineLossMu` |
 | At the 220 kV billing meter (MU) | `meterMu` |
+
+Finance v3 lines (all *optional*: shown when some year has a value; the per-source O&M lines only when more than one source has one):
+
+| Line as shown | `finance.rows[].key` | Trace line | Note |
+| --- | --- | --- | --- |
+| Operating share of the year (part commissioning) | `opFactor` | `opFactor` | percent; `fin.parts` |
+| Generation case factor | `generationFactor` | `genFactor` | percent; `fin.generationCase` |
+| Carbon credits | `carbonRevenue` | `carbonRev` | inside Total revenue |
+| O&M · solar / wind / battery / biomass | `solarOm`, `windOm`, `bessOm`, `biomassOm` | `solarOmCr`, `windOmCr`, `bessOmCr` | their sum is `om` |
+| Other fixed · \<label\> | `otherLines[i]` | – | one line per `fin.otherFixedLines` entry; their sum is `other` |
+| Guarantee fees | `guaranteeFees` | `bgFees` | P&L and cash flow |
+| Mezzanine interest / principal | `mezzInterest`, `mezzPrincipal` | `mezzInt`, `mezzPrin` | |
+| Quasi-equity interest paid / repaid | `quasiInterestPaid`, `quasiRepaid` | `quasiInt`, `quasiRepay` | |
+| Interest on the debt service reserve | `dsraInterest` | `dsraInt` | other income |
+| Interest on margin money | `marginInterest` | `marginInt` | other income |
+| Prepayment penalty | `prepaymentFee` | `prepayFee` | |
+| Solar repowering | `repowerCapex` | `repower` | cash flow |
+| Life-extension capex | `extensionCapex` | `extCapex` | cash flow, the last PPA year |
+| Cash sweep prepayment | `sweepCr` | `sweep` | accrued: `sweepAccrued` (`sweepAccr`) |
+| Top-up debt paid to equity | `topUpCr` | `topUp` | |
+| FSCR / LLCR / PLCR / Total DSCR | `fscr`, `llcr`, `plcr`, `totalDscr` | same | ratios |
 
 Tender to Bid / SECI add cost lines after *Other fixed* when the source is on (`web/src/bid/FinanceStep.jsx` costLines, from `opsFromLp` → `lp.lifetime[]` energies and the fuel/plant costs):
 

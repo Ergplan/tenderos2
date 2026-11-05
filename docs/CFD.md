@@ -136,6 +136,22 @@ limits.
 scaled to 500 MW this shows how long the ₹76 crore Pool would last, which is the bidder's payment
 security (CfDA 10.4(b)).
 
+## The finance team's inputs (November 2026)
+
+The CfD Finance inputs step (5.4a) and F.1 of the Financial model carry the shared
+`FinanceInputsV3` groups (`web/src/rtc/FinanceInputsV3.jsx`, spec `docs/dev/FINANCE-V3-SPEC.md`):
+a dated timeline from the battery's SCD (`keyDates(effectiveDate).scd` seeds `fin.codDate`),
+capex phasing and part commissioning, a bridge loan, P50 / P75 / P90 cases, carbon credits, life
+beyond the term, repowering, augmentation on a schedule (`state.bess.augmentation = "schedule"`,
+merged on open by `mergeCfdState`), O&M splits, debt features (re-sculpting, step-down, top-up,
+prepayment, sweep, DSRA on the peak with interest), quasi-equity and mezzanine, the guarantees
+(EMD and PBG are also costed by the fast screening model from the RfS's amounts; the guarantee
+rows here are the finance team's own schedule with fees and margin money), tax bases, HoldCo and
+lender returns and the reverse-auction sensitivities. `cfdEngineInputs` (`finance.js`) passes
+`costs.phasing`, `costs.moduleSharePct` and the battery schedule to the engine; the Financial model
+step shows F.5 to F.8 like the RTC tender. Every input is off by default, so the strike price is
+unchanged until one is filled.
+
 ## Checks
 
 * `tools/check_cfd_model.mjs`: the terms, dates and Contract Years, the worked example (exchange + Pool =
