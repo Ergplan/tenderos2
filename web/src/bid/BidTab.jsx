@@ -270,7 +270,7 @@ export default function BidTab({ user = null, openTab = null }) {
       <div className="bid-page" style={{ "--chapter": step.color }} key={step.id}>
         {step.id === "tender" && <TenderStep {...props} onRead={onRead} onModelRead={onModelRead} onNewTender={() => setView("start")} />}
         {step.id === "dates" && <DatesStep {...props} />}
-        {!scope.applies && sizingStep(step.id) && <ScopeNotice scope={scope} goto={goto} openBess={openBessTab} fileInMemory={fileInMemory} />}
+        {!scope.applies && sizingStep(step.id) && <ScopeNotice scope={scope} goto={goto} openBess={openBessTab} openCfd={openTab ? () => openTab("cfd") : null} fileInMemory={fileInMemory} />}
         {scope.applies && step.id === "capacity" && <CapacityStep {...props} />}
         {scope.applies && step.id === "sources" && <SourcesStep {...props} startSizing={startSizing} />}
         {scope.applies && step.id === "size" && <SizeStep {...props} run={run} startSizing={startSizing} stopSizing={stopSizing} hourly={hourly} startDispatch15={startDispatch15} />}

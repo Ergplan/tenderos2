@@ -24,24 +24,26 @@ import copy
 import re
 from bisect import bisect_right
 from dataclasses import dataclass
-from typing import Any
+from functools import lru_cache
+from typing import Any, cast
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 from rapidfuzz import fuzz
 
 from engine.extraction import rules_reader
-from engine.extraction.extract import Draft, Quote, _field_json, finalise
+from engine.extraction.extract import _PY_TYPES, Draft, Quote, _field_json, finalise
 from engine.extraction.pages import CharBoxes
 from engine.extraction.resolver import PageText, locate, normalise
-from engine.extraction.schema import TenderSchema
+from engine.extraction.schema import FieldSpec, TenderSchema
 from engine.extraction.tenderset.changes import same_clause
+from engine.extraction.values import JSON_KINDS
 
 QUOTE_IN_EXISTING = 88.0
 MIN_QUOTE_WORDS = 8  # a shorter quote (a name, a heading) is in too many clauses to say which one changed  # partial ratio of a field quote inside an amendment's existing text
 # what the document is, not a term: an amendment quoting the RfS's name does not change it
 NOT_AMENDED = ("core.summary.", "core.identity.")
 AMENDED_PROMPT = "amended_fields"
-AMENDED_VERSION = "v1"
+AMENDED_VERSION = "v2"
 
 _NUMBERED = re.compile(r"^\s*(\d{1,2}(?:\.\d{1,2}){1,3})\.?(?:\s*$|\s+(?=\S))")
 _SECTION = re.compile(r"^\s*(\d{1,2})\.?\s*$")  # a top-level clause number alone on its line
@@ -176,17 +178,31 @@ class AmendedEvidence(BaseModel):
     quote: str = Field(description="Verbatim words of the amended text that state the value (5 to 40 words)")
 
 
-class AmendedField(BaseModel):
-    path: str
-    value: Any = None
-    withdrawn: bool = False
-    confidence: float = 0.0
-    rationale: str = ""
-    evidence: list[AmendedEvidence] = Field(default_factory=list)
+@lru_cache(maxsize=64)
+def _amended_kind_model(kind: str) -> type[BaseModel]:
+    """One field's answer, typed by the field's JSON kind like extract's `_kind_model`. A typed
+    `value` matters: the SDK builds the structured-output schema from this model and rejects an
+    untyped (`Any`) property, which made every re-read fail before it was sent."""
+    make = cast(Any, create_model)
+    return cast(
+        type[BaseModel],
+        make(
+            f"Amended_{kind}",
+            value=(_PY_TYPES.get(kind, str) | None, None),
+            withdrawn=(bool, False),
+            confidence=(float, 0.0),
+            rationale=(str, ""),
+            evidence=(list[AmendedEvidence], Field(default_factory=list)),
+        ),
+    )
 
 
-class AmendedFieldsOutput(BaseModel):
-    fields: list[AmendedField] = Field(default_factory=list)
+def amended_output_model(specs: list[FieldSpec]) -> type[BaseModel]:
+    """The structured-output model for one re-read: one required entry per field, keyed by the
+    field's key (the last part of its path), each typed by the field's kind."""
+    make = cast(Any, create_model)
+    properties = {spec.key: (_amended_kind_model(JSON_KINDS.get(spec.type, "string")), ...) for spec in specs}
+    return cast(type[BaseModel], make("AmendedFields", **properties))
 
 
 def reread_model(
@@ -198,32 +214,32 @@ def reread_model(
     usage: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
     """The fields touched by one change, read again from its amended text by the model."""
+    specs = [schema.field(field["path"]) for field in fields]
     lines = []
-    for field in fields:
-        spec = schema.field(field["path"])
+    for spec, field in zip(specs, fields, strict=True):
         lines.append(
-            f"- path: {spec.path}\n  label: {spec.label}\n  type: {spec.type}{f' ({spec.unit})' if spec.unit else ''}\n"
+            f"- key: {spec.key}\n  path: {spec.path}\n  label: {spec.label}\n  type: {spec.type}{f' ({spec.unit})' if spec.unit else ''}\n"
             f"  help: {spec.help or ''}\n  value before the amendment: {field.get('display') or field.get('value')}"
         )
     text = (
         f"Document amended: {change['document']}, clause {change['clause']}\n\n"
         f"Existing text (as the amendment quotes it):\n{change['before']['text'] or '(not quoted)'}\n\n"
-        f"Amended text:\n{change['after']['text']}\n\nFields:\n" + "\n".join(lines)
+        f"Amended text:\n{change['after']['text']}\n\nFields (answer under each field's key):\n" + "\n".join(lines)
     )
     usage["calls"] += 1
-    parsed, used = client.call(AMENDED_PROMPT, AMENDED_VERSION, [{"type": "text", "text": text}], AmendedFieldsOutput, 4096)
+    parsed, used = client.call(AMENDED_PROMPT, AMENDED_VERSION, [{"type": "text", "text": text}], amended_output_model(specs), 4096)
     usage["input_tokens"] += int(used.get("input_tokens", 0))
     usage["output_tokens"] += int(used.get("output_tokens", 0))
     window = change["pages"] or [1]
     out: dict[str, dict[str, Any]] = {}
-    wanted = {field["path"] for field in fields}
-    for answer in parsed.fields:  # type: ignore[attr-defined]
-        if answer.path not in wanted or (answer.value is None and not answer.withdrawn):
+    for spec in specs:
+        answer = getattr(parsed, spec.key, None)
+        if answer is None or (answer.value is None and not answer.withdrawn):
             continue
         quotes = [Quote(window[0], e.quote, True) for e in answer.evidence if e.quote.strip()]
         confidence = min(max(float(answer.confidence or 0.0), 0.0), 1.0)
         draft = Draft(None if answer.withdrawn else answer.value, confidence, answer.rationale, quotes, window, answer.withdrawn)
-        out[answer.path] = _finalised(schema, answer.path, draft, amendment_pages)
+        out[spec.path] = _finalised(schema, spec.path, draft, amendment_pages)
     return out
 
 

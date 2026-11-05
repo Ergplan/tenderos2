@@ -167,10 +167,11 @@ optimiser and opens Size.
 ![Size](img/cfd-07-size-full.jpg)
 
 **6 · Plant.** While it runs the chip says *Optimising n/N* and **Stop** halts it (seconds to a
-minute: the model simulates every day of the 15 years for each candidate size). The banner then
-says what it found. Tiles: **Contracted**, **Battery**, **Own solar**, **Own wind**, **Strike
-price for the target IRR** (the screening model's exact price and the quote rounded up to the
-paisa), **Days short of charging power**, **Weekly penalties**, **EMD and PBG**. **Optimise own
+minute: the model simulates every day of the 15 years for each candidate size and prices each
+with the full financial model). The banner then says what it found. Tiles: **Contracted**,
+**Battery**, **Own solar**, **Own wind**, **Strike price to bid** (the full financial model's
+price, the same figure as on the Financial model step and in the workbook, with the quote rounded
+up to the paisa), **Days short of charging power**, **Weekly penalties**, **EMD and PBG**. **Optimise own
 RE** reruns it; **Financial model** jumps on.
 
 **6.1 · Tender conditions.** Seven checks, met or not, each with its page: capacity 50–150 MW,
@@ -197,7 +198,7 @@ prices of the day.
 
 **5 · Bid strike price.** The tiles come from the same financial engine as the RTC tender, fed
 with the CfD operations: **Strike price to bid** (the price that gives the target equity IRR;
-the screening model's price beside it), **Equity IRR**, **Project IRR**, **Minimum DSCR** (red
+the same figure as on Size, with the fast screening model's figure beside it for reference), **Equity IRR**, **Project IRR**, **Minimum DSCR** (red
 below 1.1: year 1 may run on bought charging power until the RE is online), **Project cost** (per
 contracted MW, with the LCOE), **Year-1 supply**, **Year-1 operating cost** (charging power and
 O&M), **Letter of Credit to SECI** (nil when the strike price is above ₹10), **CfD Pool, a year**
@@ -225,10 +226,10 @@ price, against the IEX evenings.
 at a fixed price), earnings and coverage, debt and equity cash, the construction month by month
 when months are set, and the full 15-year table; click any number for its formula; **Export CSV**.
 
-*A note on the two prices.* The Size step's price comes from the fast screening model the
-optimiser uses; the Financial model's price adds the full tax, working-capital and reserve
-treatment and spends the whole capex at the start. The workbook's cover states these
-simplifications.
+*One price.* Every step, the chip, the bid agent, the bid forms, the saved bid and the workbook
+carry the same strike price: the full financial model's. The fast screening model that was used
+to explore sizes is shown only as a small figure beside it; the workbook's cover states the
+model's simplifications (the whole capex spent before the SCD, operating years from the SCD).
 
 ---
 

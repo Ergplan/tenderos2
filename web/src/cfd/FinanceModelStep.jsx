@@ -174,7 +174,7 @@ export default function FinanceModelStep({ state, setState, patch, set, lockProp
         )}>
         {saveError && <div className="alert"><TriangleAlert size={14} /> {saveError}</div>}
         <div className="rtc-grid rtc-grid-4" data-testid="cfd-finance">
-          <Stat label={finance.tariffLocked ? "Strike price (fixed)" : "Strike price to bid"} value={`₹${quote.toFixed(2)}/kWh`} detail={`₹${nf(finance.tariff, 4)} exact, rounded up · screening model ₹${nf(model.sp, 3)}`} trace={{ key: "tariff" }} />
+          <Stat label={finance.tariffLocked ? "Strike price (fixed)" : "Strike price to bid"} value={`₹${quote.toFixed(2)}/kWh`} detail={`₹${nf(finance.tariff, 4)} exact, rounded up · fast screening ₹${nf(model.screening?.sp ?? model.sp, 3)}`} trace={{ key: "tariff" }} />
           <Stat label="Equity IRR" value={pf(finance.equityIrr, 2)} detail={finance.tariffLocked ? `target ${pf(eng.fin.targetEquityIrr, 2)}` : "the target, by construction"} trace={{ key: "equityIrr" }} />
           <Stat label="Project IRR" value={pf(finance.projectIrr, 2)} detail="post-tax, unlevered" trace={{ key: "projectIrr" }} />
           <Stat label="Minimum DSCR" value={nf(finance.minDscr, 2)} detail={`average ${nf(finance.avgDscr, 2)}${y1.dfr < 0.5 && (i.reCodMonths || 0) > 0 ? " · year 1 runs on bought power until the RE is in" : ""}`} tone={finance.minDscr !== null && finance.minDscr < 1.1 ? "bad" : undefined} trace={{ key: "minDscr" }} />

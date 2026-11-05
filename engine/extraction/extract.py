@@ -82,6 +82,13 @@ TYPE_KEYWORDS: dict[str, list[tuple[str, float]]] = {
         (r"\brtc\b", 2.0),
         (r"peak\s+hours", 1.0),
     ],
+    "cfd": [
+        (r"contract\s+for\s+difference", 3.0),
+        (r"\bcfda?\b", 2.0),
+        (r"strike\s+price", 3.0),
+        (r"cfd\s+pool|stabili[sz]ation\s+fund", 2.0),
+        (r"market\s+clearing\s+price", 1.0),
+    ],
     "bess": [
         (r"battery\s+energy\s+storage", 2.0),
         (r"\bbess\b", 1.0),

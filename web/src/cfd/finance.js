@@ -201,7 +201,7 @@ export function cfdModelExport({ state, model, finance }) {
   const poolYear = pool.find((p) => p.cy === 2) || pool[0];
   const outputs = [
     ["Strike price to bid (₹/kWh, two decimals)", quote, "tariff", `the solved price rounded up; digits after two decimals are ignored (RfS 40.3)`],
-    [finance.tariffLocked ? "Strike price (fixed by you, ₹/kWh)" : "Strike price for the target IRR (₹/kWh)", finance.tariff, "tariff", `${finance.tariffLocked ? "the returns below are at this price" : `for a ${(eng.fin.targetEquityIrr * 100).toFixed(2)}% equity IRR`}; screening model ₹${model.sp?.toFixed(4) ?? "–"}`, "tariff"],
+    [finance.tariffLocked ? "Strike price (fixed by you, ₹/kWh)" : "Strike price for the target IRR (₹/kWh)", finance.tariff, "tariff", `${finance.tariffLocked ? "the returns below are at this price" : `for a ${(eng.fin.targetEquityIrr * 100).toFixed(2)}% equity IRR`}; fast screening ₹${(model.screening?.sp ?? model.sp)?.toFixed(4) ?? "–"}`, "tariff"],
     ["Equity IRR", finance.equityIrr, "pct", "", "equityIrr"],
     ["Project IRR", finance.projectIrr, "pct", "", "projectIrr"],
     ["Equity NPV at the target IRR (₹ cr)", finance.equityNpv, "cr", "", "equityNpv"],

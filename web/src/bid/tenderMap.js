@@ -307,11 +307,12 @@ const SIZING_TYPES = new Set(["fdre", "re_rtc", "hybrid", "solar", "wind", "gene
 
 /**
  * Whether Tender to Bid's sizing applies to a reading: { applies, kind, type }. kind is "bess"
- * for a standalone battery tender (the BESS tender tab prices it) and "network" for transmission
- * or EPC tenders (no supply to size).
+ * for a standalone battery tender (the BESS tender tab prices it), "cfd" for a Contract for
+ * Difference tender (the CfD Bid tab models it) and "network" for transmission or EPC tenders
+ * (no supply to size).
  */
 export function sizingScope(result) {
   const type = result?.tender_type || null;
   if (!type || SIZING_TYPES.has(type)) return { applies: true, kind: null, type };
-  return { applies: false, kind: type === "bess" ? "bess" : "network", type };
+  return { applies: false, kind: type === "bess" ? "bess" : type === "cfd" ? "cfd" : "network", type };
 }

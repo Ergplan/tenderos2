@@ -39,7 +39,13 @@ ROOT = Path(__file__).resolve().parents[2]
 SET = ROOT / "web/public/tenders/seci-rtc-tm-v"
 FIXTURES = Path(__file__).resolve().parent / "fixtures/docling"
 PACK = json.loads((ROOT / "web/src/seci/seci-rtc-tm-v.json").read_text())
-FILES = {"rfs": "RfS.pdf", "amd1": "Amendment-01.pdf", "amd2": "Amendment-02.pdf", "clar1": "Clarifications-01.pdf", "psa": "Standard-PSA.pdf"}
+FILES = {
+    "rfs": "RfS.pdf",
+    "amd1": "Amendment-01.pdf",
+    "amd2": "Amendment-02.pdf",
+    "clar1": "Clarifications-01.pdf",
+    "psa": "Standard-PSA.pdf",
+}
 
 
 def _bytes(doc: str) -> bytes:
@@ -98,7 +104,7 @@ def test_documents_roles_numbers_and_order():
 def test_clause_labels_and_keys():
     assert clause_label("Annexu re-A Sl. 1, 2, and 3") == "Annexure-A Sl. 1, 2, and 3"
     assert clause_label("13.1.1.( i)") == "13.1.1.(i)"
-    assert clause_label('1.1 “SCSD ”') == '1.1 "SCSD"'
+    assert clause_label("1.1 “SCSD ”") == '1.1 "SCSD"'
     assert clause_key("Clause 8.1(c)") == clause_key("8.1.c") == clause_key("8.1 c") == ("8", "1", "c")
     assert same_clause(("8", "1"), ("8", "1", "c")) and not same_clause(("8", "1", "a"), ("8", "1", "c"))
     assert not same_clause(("10",), ("10", "2"))  # a single number is not the parent of a clause
@@ -110,7 +116,9 @@ def test_docling_changes_cover_the_pack_and_every_quote_is_located(changes):
     assert len([c for c in changes if c["doc"] == "amd2"]) == 21  # 14 RfS + 6 PPA + 1 PSA
     for gold in [g for g in PACK["changes"] if g["doc"] in PARSED]:
         key = clause_key(gold["clause"])
-        hits = [c for c in changes if c["doc"] == gold["doc"] and c["document"] == gold["document"] and same_clause(key, tuple(c["clause_key"]))]
+        hits = [
+            c for c in changes if c["doc"] == gold["doc"] and c["document"] == gold["document"] and same_clause(key, tuple(c["clause_key"]))
+        ]
         assert hits, f"{gold['id']} ({gold['doc']} {gold['document']} {gold['clause']}) not found"
     for change in changes:
         for evidence in change["before"]["evidence"] + change["after"]["evidence"]:
@@ -136,7 +144,14 @@ def test_pymupdf_fallback_reads_the_same_schedules():
     for doc in ("amd1", "amd2"):
         found += read_changes(doc, tables_from_pymupdf(_bytes(doc)), _pages(doc))
     gold = [g for g in PACK["changes"] if g["doc"] in PARSED]
-    hits = [g for g in gold if any(c["doc"] == g["doc"] and c["document"] == g["document"] and same_clause(clause_key(g["clause"]), tuple(c["clause_key"])) for c in found)]
+    hits = [
+        g
+        for g in gold
+        if any(
+            c["doc"] == g["doc"] and c["document"] == g["document"] and same_clause(clause_key(g["clause"]), tuple(c["clause_key"]))
+            for c in found
+        )
+    ]
     assert len(hits) == len(gold)
     assert sum(1 for c in found if c["doc"] == "amd2") == 21
 
@@ -216,10 +231,16 @@ def test_a_deleted_clause_withdraws_its_field(changes, rfs_pages):
     rfs = read_tender("RfS.pdf", _bytes("rfs"), mode="rules")
     target = _field(rfs, "sector.power.common.min_bid_mw")
     deletion = {
-        "id": "amd9-rfs-1", "doc": "amd9", "document": "RfS", "clause": "5.1", "clause_key": ["5", "1"], "kind": "deleted",
+        "id": "amd9-rfs-1",
+        "doc": "amd9",
+        "document": "RfS",
+        "clause": "5.1",
+        "clause_key": ["5", "1"],
+        "kind": "deleted",
         "before": {"text": "", "evidence": []},
         "after": {"text": "Not used.", "evidence": [{"page": 1, "quote": "Not used.", "located": True, "doc": "amd9"}]},
-        "pages": [1], "merged": True,
+        "pages": [1],
+        "merged": True,
     }
     result, amended = consolidate(compile_type(rfs["tender_type"]), rfs, rfs_pages, [deletion], {"amd9": []})
     field = _field(result, target["path"])
@@ -228,7 +249,7 @@ def test_a_deleted_clause_withdraws_its_field(changes, rfs_pages):
 
 
 class _AmendSDK:
-    """Answers amended_fields/v1 with a canned re-read of the field asked about."""
+    """Answers amended_fields/v2 with a canned re-read of the field asked about."""
 
     def __init__(self) -> None:
         self.messages = self
@@ -238,13 +259,19 @@ class _AmendSDK:
         text = messages[0]["content"][0]["text"]
         self.prompts.append(text)
         usage = SimpleNamespace(input_tokens=500, output_tokens=50)
-        fields = []
-        if "sector.power.common.location_constraint" in text:
-            fields.append({
-                "path": "sector.power.common.location_constraint", "value": "ists_anywhere", "confidence": 0.8, "rationale": "still anywhere in India",
+        # one entry per field key the model was asked for (the output model is built per re-read)
+        answers = {
+            key: {"value": None, "withdrawn": False, "confidence": 0.0, "rationale": "not stated", "evidence": []}
+            for key in output_format.model_fields
+        }
+        if "location_constraint" in answers:
+            answers["location_constraint"] = {
+                "value": "ists_anywhere",
+                "confidence": 0.8,
+                "rationale": "still anywhere in India",
                 "evidence": [{"quote": "the Projects can be located anywhere on the moon at the bidder's choice"}],
-            })
-        return SimpleNamespace(parsed_output=output_format.model_validate({"fields": fields}), usage=usage, stop_reason="end_turn")
+            }
+        return SimpleNamespace(parsed_output=output_format.model_validate(answers), usage=usage, stop_reason="end_turn")
 
 
 def test_model_reread_of_amended_fields(changes, rfs_pages):
@@ -254,7 +281,9 @@ def test_model_reread_of_amended_fields(changes, rfs_pages):
     sdk = _AmendSDK()
     usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
     six_one = [c for c in changes if c["id"] == "amd2-rfs-1"]
-    result, _ = consolidate(compile_type(rfs["tender_type"]), rfs, rfs_pages, six_one, {"amd2": _pages("amd2")}, client=LLMClient(sdk), usage=usage)
+    result, _ = consolidate(
+        compile_type(rfs["tender_type"]), rfs, rfs_pages, six_one, {"amd2": _pages("amd2")}, client=LLMClient(sdk), usage=usage
+    )
     field = _field(result, "sector.power.common.location_constraint")
     assert usage["calls"] == 1 and "Amended text:" in sdk.prompts[0] and "value before the amendment: " in sdk.prompts[0]
     assert field["changed_by"] == "amd2-rfs-1" and field["evidence"][0]["doc"] == "amd2"
@@ -398,7 +427,9 @@ def test_llamaparse_fills_only_scanned_pages(monkeypatch):
             return httpx.Response(200, json={"id": "job1"})
         if request.url.path == "/api/v1/parsing/job/job1":
             return httpx.Response(200, json={"status": "SUCCESS"})
-        return httpx.Response(200, json={"pages": [{"page": 1, "text": "REPLACED"}, {"page": 2, "text": "The EMD shall be Rs. 10 lakh per MW."}]})
+        return httpx.Response(
+            200, json={"pages": [{"page": 1, "text": "REPLACED"}, {"page": 2, "text": "The EMD shall be Rs. 10 lakh per MW."}]}
+        )
 
     with httpx.Client(transport=httpx.MockTransport(handler)) as http:
         filled_pages, filled = fill_scanned("scan.pdf", payload, pages, client=http)
@@ -416,8 +447,18 @@ class _ProseSDK:
     def parse(self, *, model, max_tokens, system, messages, output_format):
         assert any(b["type"] == "document" for b in messages[0]["content"])
         usage = SimpleNamespace(input_tokens=900, output_tokens=80)
-        answer = {"changes": [{"document": "RfS", "clause": "Bid submission deadline", "kind": "modified", "existing_quote": "",
-                               "amended_quote": "The last date of bid submission is extended to 15.05.2026", "page_no": 1}]}
+        answer = {
+            "changes": [
+                {
+                    "document": "RfS",
+                    "clause": "Bid submission deadline",
+                    "kind": "modified",
+                    "existing_quote": "",
+                    "amended_quote": "The last date of bid submission is extended to 15.05.2026",
+                    "page_no": 1,
+                }
+            ]
+        }
         return SimpleNamespace(parsed_output=output_format.model_validate(answer), usage=usage, stop_reason="end_turn")
 
 

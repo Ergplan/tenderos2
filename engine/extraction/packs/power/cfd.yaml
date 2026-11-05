@@ -1,0 +1,28 @@
+type: cfd
+pack: power
+includes: [summary, identity_and_scope, key_dates, eligibility, guarantees, commercial, penalties, connectivity_and_compliance, supply_sources, documents, derived]
+sections:
+  cfd_terms:
+    label: CfD terms
+    prompt: extract/cfd_terms
+    prompt_version: v1
+    roles: [rfs, contractual, nit]
+    section_kinds: [introduction_and_scope, technical_requirements, commercial_terms, penalties_and_remedies]
+    keywords: [contract for difference, cfd, strike price, market clearing price, mcp, cfd pool, stabilization fund, peak hours, time-block, power exchange, gdam, dam, rtm, energy storage, ess, green market, renewable energy certificate]
+fields:
+  sector.power.cfd.strike_price_ceiling_inr_per_kwh: {section: cfd_terms, label: Strike price ceiling, type: decimal, unit: INR per kWh, min: 0, max: 50, help: "The highest tariff a bidder may quote, if the tender states one; null when the ceiling was removed."}
+  sector.power.cfd.settlement_rule: {section: cfd_terms, label: CfD settlement, type: long_text, required: true, help: "How the difference between the market clearing price and the strike price is settled between the developer and the CfD Pool, as written (full pass-through, or sharing ratios by slab)."}
+  sector.power.cfd.pool_size_inr: {section: cfd_terms, label: CfD Pool, type: money_inr, unit: INR, help: "The stabilisation fund behind the settlement, in rupees."}
+  sector.power.cfd.daily_energy_kwh_per_mw: {section: cfd_terms, label: Daily energy per MW, type: decimal, unit: kWh per MW per day, min: 0, max: 24000, required: true, help: "The energy the developer must sell every day per MW of contracted capacity (2000 kWh/MW for 2 hours at full capacity)."}
+  sector.power.cfd.peak_window: {section: cfd_terms, label: Peak window, type: text, help: "The hours within which the daily supply must fall (for example 18:00 to 24:00) and how many hours the developer picks."}
+  sector.power.cfd.peak_hours_per_day: {section: cfd_terms, label: Peak hours a day, type: decimal, unit: hours, min: 0, max: 24, help: "How many hours a day the developer must supply within the window."}
+  sector.power.cfd.storage_per_mw: {section: cfd_terms, label: Storage per contracted MW, type: text, help: "The energy storage the developer must install per MW contracted (for example X MW / 2X MWh) and whether it must own it."}
+  sector.power.cfd.storage_mwh_per_mw: {section: cfd_terms, label: Storage energy per MW, type: decimal, unit: MWh per MW, min: 0, max: 24, help: "The MWh of storage per MW contracted, as a number."}
+  sector.power.cfd.markets_allowed: {section: cfd_terms, label: Markets allowed, type: list_text, help: "The power exchange market segments the supply may be sold in (DAM, GDAM, HP-DAM, RTM, TAM, G-TAM)."}
+  sector.power.cfd.green_market_share_pct: {section: cfd_terms, label: Green market sourcing, type: percent, unit: percent, help: "The share of the annual energy that may be sourced from the green market or bilateral agreements."}
+  sector.power.cfd.re_commissioning_months: {section: cfd_terms, label: RE commissioning deadline, type: duration_months, unit: months, min: 0, max: 120, help: "Months from the effective date by which the renewable generating components must be commissioned, where it differs from the storage's SCD."}
+  sector.power.cfd.term_years: {section: cfd_terms, label: CfD term, type: int, unit: years, min: 1, max: 40, required: true, help: "The term of the CfD agreement from the scheduled commissioning date."}
+  sector.power.cfd.weekly_tolerance_pct: {section: cfd_terms, label: Weekly shortfall tolerance, type: percent, unit: percent, help: "The share of a contract week's energy the supply may fall short of before a penalty."}
+  sector.power.cfd.shortfall_penalty_rule: {section: cfd_terms, label: Shortfall penalty, type: long_text, help: "The penalty on energy not supplied, as written (for example 1.5 times the highest market price less the strike price)."}
+  sector.power.cfd.rec_sharing_pct: {section: cfd_terms, label: REC proceeds to the Pool, type: percent, unit: percent, help: "The share of renewable energy certificate proceeds paid into the CfD Pool."}
+  sector.power.cfd.letter_of_credit_rule: {section: cfd_terms, label: Letter of Credit, type: text, help: "The letter of credit the developer must give, as a formula if the tender states one."}

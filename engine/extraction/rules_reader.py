@@ -482,6 +482,8 @@ def _per_mw_amount(pages: list[PageText], words: str) -> list[Hit]:
     pattern = (
         rf"(?:{words})[^.;]{{0,160}}?{INR}\s*\[?\s*{NUM}\s*\]?\s*(lakhs?|lacs?|crores?|cr)?\s*(?:/-)?\s*"
         r"(?:\([^()]{0,60}?\bper\s+MW(?![hp])[^()]{0,10}\)|(?:\([^()]{0,60}\)\s*)?(?:/|per)\s*MW(?![hp]))"
+        # not a daily charge ("Rs. 1000/MW/day" for late documents or financial closure)
+        r"(?!\s*(?:/|per)\s*day)"
     )
     for page, m in _iter(pages, pattern):
         amount = number(m.group(1))

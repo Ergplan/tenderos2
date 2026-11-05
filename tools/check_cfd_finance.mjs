@@ -144,6 +144,14 @@ assert.ok(fin.totals.charging > 0 && fin.totals.cfdPenalty === 0, "the benchmark
   assert.ok(exp.inputs.some((x) => x.group === "Financing terms" && x.input === "Repayment") && exp.cover.notes.length >= MODEL_NOTES.length);
   assert.ok(!/undefined|NaN/.test(JSON.stringify(exp.cover)), "nothing undefined on the cover");
 }
+// one price: with the engine as the pricer, the model carries the engine's strike price (what the
+// Size step, the chip, the agent and the forms show) and keeps the screening figure beside it
+{
+  const priced = runModel(state, prices, { price: (inputs, sim) => runCfdFinance({ ...state, tariffLocked: false }, { inputs, sim, opYears: sim.opYears, sp: null }) });
+  assert.ok(Math.abs(priced.sp - fin.tariff) < 1e-9, `the priced model's strike price is the engine's (${priced.sp} vs ${fin.tariff})`);
+  assert.ok(priced.screening.sp > 0 && Math.abs(priced.screening.sp - model.sp) < 1e-9, "the screening price is kept beside it");
+  assert.ok(Math.abs(priced.fin.equityIrr - fin.equityIrr) < 1e-9 && priced.bid === Math.ceil(fin.tariff * 100 - 1e-9) / 100, "the returns and the quote follow the engine");
+}
 console.log(`CfD finance checks passed: strike price ₹${fin.tariff.toFixed(4)}/kWh for a ${(i.targetEquityIrr * 100).toFixed(0)}% equity IRR (screening ₹${model.sp.toFixed(4)}), capex ₹${fin.capex.total.toFixed(1)} cr, min DSCR ${fin.minDscr.toFixed(2)}`);
 
 // ---- the strike-price levers (the What-if step)

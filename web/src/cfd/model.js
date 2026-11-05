@@ -716,7 +716,25 @@ export function runModel(state, prices, opts = {}) {
   const prof = profiles(inputs);
   const sim = simulate(inputs, book, prof, opts);
   const solved = solveStrikePrice(inputs, sim);
-  return { inputs, sim, opYears: sim.opYears, ...solved, book, prof };
+  const out = { inputs, sim, opYears: sim.opYears, ...solved, screening: { sp: solved.sp ?? null, bid: solved.bid ?? null }, book, prof };
+  // opts.price(inputs, sim): the full financial model (web/src/cfd/finance.js runCfdFinance), so
+  // that the strike price on every step, in the chip, the agent, the forms and the workbook is the
+  // same one; the fast screening model above then only reports beside it
+  if (typeof opts.price === "function") {
+    const finance = opts.price(inputs, sim);
+    if (finance && isNum(finance.tariff)) {
+      out.finance = finance;
+      out.sp = finance.tariff;
+      out.bid = Math.ceil(finance.tariff * 100 - 1e-9) / 100;
+      out.reason = undefined;
+      out.fin = {
+        ...(solved.fin || {}),
+        sp: finance.tariff, equityIrr: finance.equityIrr, projectIrr: finance.projectIrr, minDscr: finance.minDscr, avgDscr: finance.avgDscr,
+        capex: { ...(solved.fin?.capex || {}), total: finance.capex.total }, lcCr: lcCr(inputs.contractedMw, finance.tariff),
+      };
+    }
+  }
+  return out;
 }
 
 /** Feasible when no day after the RE is online falls short for lack of charging energy. */
@@ -727,17 +745,25 @@ export const capShortfall = (sim) => sim.years.reduce((a, cy) => a + cy.shortMwh
  * a coarse grid then a finer one around the best, on solar; then the same on wind when wind is in
  * the bid. Calls onProgress(done, total) between evaluations; resolves to { solarMw, windMw, sp }.
  */
-export async function optimiseOwnRe(state, prices, { onProgress, signal } = {}) {
+export async function optimiseOwnRe(state, prices, { onProgress, signal, price = null } = {}) {
   const base = modelInputs(state);
   if (!base) throw new Error("Fill in the inputs first.");
   const book = priceBook(prices, base.sellMarket);
   const X = base.contractedMw;
+  // price(inputs, sim): the full financial model's strike price (the one shown everywhere); without
+  // it the fast screening model prices each candidate
+  const priceOf = (inputs, sim) => {
+    if (typeof price === "function") {
+      const f = price(inputs, sim);
+      if (f && isNum(f.tariff)) return f.tariff;
+    }
+    return solveStrikePrice(inputs, sim).sp ?? Infinity;
+  };
   const evaluate = (solarMw, windMw) => {
     const inputs = { ...base, solarMw, windMw };
     const sim = simulate(inputs, book, profiles(inputs));
-    const s = solveStrikePrice(inputs, sim);
     const short = capShortfall(sim);
-    return { solarMw, windMw, sp: s.sp ?? Infinity, short, ok: short < 1e-3 * X };
+    return { solarMw, windMw, sp: priceOf(inputs, sim), short, ok: short < 1e-3 * X };
   };
   const better = (a, b) => (a.ok !== b.ok ? a.ok : a.sp < b.sp);
   const tick = () => new Promise((r) => { setTimeout(r, 0); });

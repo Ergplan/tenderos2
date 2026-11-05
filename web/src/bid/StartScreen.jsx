@@ -11,6 +11,7 @@ export const TYPE_LABEL = {
   fdre: "FDRE (firm and dispatchable)",
   re_rtc: "RE round the clock (RE-RTC)",
   bess: "Battery storage (BESS)",
+  cfd: "Contract for Difference (CfD)",
   hybrid: "Wind-solar hybrid",
   solar: "Solar",
   wind: "Wind",

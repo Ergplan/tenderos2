@@ -158,3 +158,24 @@ def test_cfd_bid_end_to_end(tmp_path):
         page.locator("tr", has_text="Acme CfD bid test").first.locator("a:has-text('Open')").click()
         page.wait_for_selector("[data-testid=cfd-tab]", timeout=30_000)
         assert "acme cfd bid test" in page.locator("[data-testid=cfd-linked]").inner_text().lower()
+
+
+def test_tender_to_bid_hands_a_cfd_set_to_the_cfd_tab():
+    """Tender to Bid reads the CfD-I set (the RfS and its three amendments), types it as a
+    Contract for Difference tender, shows the set's changes, and on the sizing steps points to the
+    CfD Bid tab instead of sizing a PPA plant."""
+    from pathlib import Path
+
+    base = Path(__file__).resolve().parents[2] / "web" / "public" / "tenders" / "seci-cfd-i"
+    files = [str(base / n) for n in ("RfS.pdf", "Amendment-01.pdf", "Amendment-02.pdf", "Amendment-03.pdf")]
+    with _session() as page:
+        page.set_input_files("[data-testid=bid-file]", files)
+        page.click("[data-testid=bid-read]")
+        page.wait_for_selector("[data-testid=tender-set]", timeout=900_000)
+        page.click("[data-testid=set-tab-changes]")
+        assert page.locator("[data-testid=set-change-row]").count() >= 30, "every amendment's changes"
+        page.click("[data-testid=bid-step-capacity]")
+        page.wait_for_selector("[data-testid=bid-scope]", timeout=30_000)
+        assert "contract for difference" in page.locator("[data-testid=bid-scope]").inner_text().lower()
+        page.click("[data-testid=bid-open-cfd]")
+        page.wait_for_selector("[data-testid=cfd-tab]", timeout=30_000)

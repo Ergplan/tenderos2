@@ -12,6 +12,7 @@ import * as E from "../rtc/engine";
 import { loadMarketPrices } from "../bid/model.js";
 import * as M from "./model.js";
 import { STORAGE_KEY, defaultCfdState, mergeCfdState, missingInputs, optimiseOwnRe, runModel } from "./model.js";
+import { runCfdFinance } from "./finance.js";
 import { RFS, TENDER } from "./terms.js";
 import { exampleMw } from "./example.js";
 import { createToolRunner } from "./agent.js";
@@ -200,8 +201,17 @@ export default function CfdTab({ initialScenario = null }) {
   const setExample = useCallback((p) => setState((s) => ({ ...s, example: { ...(s.example || {}), ...p } })), []);
 
   const missing = missingInputs(state);
+  // the strike price everywhere on this tab is the full financial model's (the shared engine, the
+  // same model the Financial model step and the workbook show); the optimiser sizes on it too
+  const pricer = useCallback((inputs, sim) => {
+    try {
+      return runCfdFinance({ ...stateRef.current, tariffLocked: false }, { inputs, sim, opYears: sim.opYears, sp: null });
+    } catch {
+      return null;
+    }
+  }, [state.fin, state.costs]); // eslint-disable-line react-hooks/exhaustive-deps
   // the model: the day-by-day operation and the strike price for the target IRR (about a second)
-  const model = useMemo(() => (missing.length || !prices ? null : runModel(state, prices)), [state.inputs, prices]); // eslint-disable-line react-hooks/exhaustive-deps
+  const model = useMemo(() => (missing.length || !prices ? null : runModel(state, prices, { price: pricer })), [state.inputs, state.fin, state.costs, prices]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const optimise = useCallback(async () => {
     const s = stateRef.current;
@@ -211,7 +221,7 @@ export default function CfdTab({ initialScenario = null }) {
     setOptimising({ done: 0, total: 1 });
     setMessage(null);
     try {
-      const best = await optimiseOwnRe(s, prices, { signal: abort.signal, onProgress: (done, total) => setOptimising({ done, total }) });
+      const best = await optimiseOwnRe(s, prices, { signal: abort.signal, price: pricer, onProgress: (done, total) => setOptimising({ done, total }) });
       trackEvent("optimize", { module: CFD_MODULE, contractedMw: s.inputs.contractedMw });
       setState((st) => {
         const filled = { ...st.filled };
@@ -316,7 +326,7 @@ export default function CfdTab({ initialScenario = null }) {
   const [traceAsk, setTraceAsk] = useState(null);
   const onTrace = useCallback((t) => setTraceAsk({ ...t, at: Date.now() }), []);
   useEffect(() => { if (step.id !== "finance") setTraceAsk(null); }, [step.id]);
-  const agentRunner = useCallback((ctx) => createToolRunner({ ...ctx, getPrices: () => prices, getModel: () => (missingInputs(ctx.getState()).length || !prices ? null : runModel(ctx.getState(), prices)) }), [prices]);
+  const agentRunner = useCallback((ctx) => createToolRunner({ ...ctx, getPrices: () => prices, getModel: () => (missingInputs(ctx.getState()).length || !prices ? null : runModel(ctx.getState(), prices, { price: pricer })) }), [prices, pricer]);
 
   return (
     <TeamContext.Provider value={teamCtx}>

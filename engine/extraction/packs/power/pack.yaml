@@ -10,7 +10,7 @@ reads_versions: [v1, v2, v3]
 read_again:
   v1: [sector.power.transmission.elements]
 sector: power
-subdomains: [common, solar, wind, hybrid, fdre, bess, transmission, generation, epc, ipp, re_rtc]
+subdomains: [common, solar, wind, hybrid, fdre, bess, transmission, generation, epc, ipp, re_rtc, cfd]
 
 # Section groups this pack adds to the core ones.
 sections:
