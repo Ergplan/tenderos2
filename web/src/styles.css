@@ -1750,3 +1750,26 @@ tr.selected td { background: var(--surface-3); color: var(--ink); font-weight: 6
 .zone-badge small { color: var(--muted); font-family: var(--font-mono); font-size: 10px; }
 .zone-badge.zone-core { border-color: color-mix(in srgb, var(--signal) 50%, transparent); }
 .zone-badge.zone-intake { border-color: color-mix(in srgb, #ff8a5f 50%, transparent); }
+
+/* ---- the finance team's inputs and statements (rtc/FinanceInputsV3.jsx, rtc/FinanceStatements.jsx) */
+.fin-v3-toggle { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+.fin-v3 { display: grid; gap: 10px; margin-top: 14px; }
+.fin-v3-group { border: 1px solid var(--line); background: var(--surface); }
+.fin-v3-group > summary { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 12px 14px; cursor: pointer; list-style: none; }
+.fin-v3-group > summary::-webkit-details-marker { display: none; }
+.fin-v3-group > summary::before { content: "+"; font-family: var(--font-mono); color: var(--ink-2); width: 12px; }
+.fin-v3-group[open] > summary::before { content: "−"; }
+.fin-v3-group > summary strong { font-size: 13px; }
+.fin-v3-group > summary span { color: var(--muted); font-size: 12px; }
+.fin-v3-body { padding: 4px 14px 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.fin-v3-body .rtc-subhead { margin-top: 12px; }
+.fin-v3-list { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.fin-v3-list th { text-align: left; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.fin-v3-list td { padding: 4px 8px; border-bottom: 1px solid var(--line); }
+.fin-v3-list input { width: 100%; min-width: 70px; }
+.fin-v3-list button.icon { background: none; border: 0; color: var(--muted); cursor: pointer; padding: 4px; }
+.fin-v3-list button.icon:hover { color: var(--ink); }
+.fin-v3-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.fin-v3-row small { color: var(--muted); }
+.fin-v3-bad { color: var(--warn, #f5b83d) !important; }
+.fin-v3 input[type="date"] { min-height: 34px; }

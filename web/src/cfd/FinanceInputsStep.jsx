@@ -3,7 +3,8 @@ import { ArrowRight, CheckCircle2, Sparkles, TriangleAlert, Zap } from "lucide-r
 import { Field, Section, SelectBox } from "../rtc/ui";
 import * as E from "../rtc/engine";
 import Cite from "./Cite.jsx";
-import { fillBenchmarks, missingInputs } from "./model.js";
+import { cfdBessAug, fillBenchmarks, keyDates, missingInputs, patchCfdBess } from "./model.js";
+import FinanceInputsV3 from "../rtc/FinanceInputsV3";
 import { Fields, FillBar } from "./inputs.jsx";
 
 /**
@@ -67,6 +68,12 @@ export default function FinanceInputsStep({ state, setState, setInput, lockProps
           <Field label="Interest on working capital" pct value={fin.wcInterestRate || 0} onChange={(v) => setFin({ wcInterestRate: v })} {...lockProps("fin.wcInterestRate")} step={0.05} min={0} max={25} hint="0: funded from equity cash" />
           <Field label="Debt service reserve" unit="months" value={fin.dsraMonths || 0} onChange={(v) => setFin({ dsraMonths: v })} {...lockProps("fin.dsraMonths")} step={1} min={0} max={12} hint="of the next year's debt service, from equity cash" />
         </div>
+      </Section>
+
+      <Section index={`${index}.4a`} title="Finance team's inputs" note="Timeline, phasing and part commissioning, generation cases and carbon, O&M splits, debt features, quasi-equity and mezzanine, guarantees, tax, returns and the auction sensitivities; every group off until filled">
+        <FinanceInputsV3 fin={fin} costs={costs} bessAug={cfdBessAug(state)} patchFin={setFin} patchCosts={setCosts} patchBess={(values) => setState((s) => patchCfdBess(s, values))}
+          codDefault={state.inputs?.effectiveDate ? keyDates(state.inputs.effectiveDate).scd : null} lockProps={lockProps} />
+        <p className="rtc-note">The commercial operation date defaults to the battery's SCD, 15 months from the Effective Date <Cite id="essScd" />.</p>
       </Section>
 
       <section className="optimize-bar">

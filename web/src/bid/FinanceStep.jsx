@@ -152,7 +152,9 @@ export default function FinanceStep({ state, patch, set, lockProps, goto, terms,
       </Section>
 
       <div className="story-divider"><span>Financial model · {fin.years} years</span></div>
-      <FinanceView state={{ ...state, fin }} patch={patch} set={set} lockProps={lockProps} finance={finance} sizes={sizes} extraLines={costLines(state)} />
+      <FinanceView state={{ ...state, fin }} patch={patch} set={set} lockProps={lockProps} finance={finance} sizes={sizes} extraLines={costLines(state)}
+        codDefault={terms?.supplyStart || null} bessAug={state.src?.bess || null} patchBess={(values) => patch("src", { bess: { ...state.src.bess, ...values } })}
+        modelArgs={{ ctx: null, sizes, args: { costs, fin, bess, dfrTarget: annualTarget, tariffLocked: false, ops, solveBy: "npv" } }} />
     </TraceProvider>
   );
 }

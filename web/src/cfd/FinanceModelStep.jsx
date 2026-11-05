@@ -6,7 +6,7 @@ import { Section, Stat, nf, pf } from "../rtc/ui";
 import { TraceButton, TraceProvider } from "../model/ModelExplorer";
 import Cite from "./Cite.jsx";
 import { TENDER } from "./terms.js";
-import { fmtDate, lcCr, poolFlows, rfsAmounts } from "./model.js";
+import { cfdBessAug, fmtDate, keyDates, lcCr, patchCfdBess, poolFlows, rfsAmounts } from "./model.js";
 import { MODEL_NOTES, cfdLiveRequest, cfdModelExport, downloadCfdModel, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
 import "./finance.css";
 
@@ -232,7 +232,9 @@ export default function FinanceModelStep({ state, setState, patch, set, lockProp
       </Section>
 
       <div className="story-divider"><span>Financial model · {finance.rows.length} years</span></div>
-      <FinanceView state={viewState} patch={viewPatch} set={setFn} lockProps={locks} finance={finance} sizes={eng.sizes} extraLines={EXTRA_LINES} />
+      <FinanceView state={viewState} patch={viewPatch} set={setFn} lockProps={locks} finance={finance} sizes={eng.sizes} extraLines={EXTRA_LINES}
+        codDefault={i.effectiveDate ? keyDates(i.effectiveDate).scd : null} bessAug={cfdBessAug(state)} patchBess={(values) => setAll((s) => patchCfdBess(s, values))}
+        modelArgs={{ ctx: null, sizes: eng.sizes, args: { costs: eng.costs, fin: eng.fin, bess: eng.bess, dfrTarget: 0, tariffLocked: false, ops: eng.ops, solveBy: "npv" } }} />
     </TraceProvider>
   );
 }

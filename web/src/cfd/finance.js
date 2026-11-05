@@ -44,13 +44,19 @@ export function cfdEngineInputs(state, model) {
     constructionMonths: Math.max(0, Math.round(state.costs?.constructionMonths || 0)),
     drawdown: state.costs?.drawdown || "linear",
     drawOrder: state.costs?.drawOrder || "proRata",
+    // the finance team's inputs (docs/dev/FINANCE-V3-SPEC.md)
+    phasing: state.costs?.phasing || null,
+    moduleSharePct: state.costs?.moduleSharePct ?? 0.45,
   };
+  const scd = i.effectiveDate ? keyDates(i.effectiveDate).scd : null;
   const tail = i.afterTerm === "merchant" ? Math.max(0, Math.round(i.merchantYears || 0)) : 0;
   const years = model.opYears.length + tail;
   const sf = state.fin || {};
   const fin = {
     ...E.DEFAULT_FINANCE,
     ...sf,
+    // the timeline: the bidder's COD, else the SCD from the Effective Date
+    codDate: sf.codDate || (Number.isFinite(scd) ? new Date(scd).toISOString().slice(0, 10) : null),
     years,
     tariff: isNum(sf.tariff) ? sf.tariff : model.sp,
     tariffEscalation: 0,
@@ -69,7 +75,7 @@ export function cfdEngineInputs(state, model) {
   const bess = {
     ...E.DEFAULT_BESS,
     rte: i.rte, annualDegradation: i.essDegradation || 0,
-    augmentation: i.augmentation === "annual" ? "annual" : "none", costDeclinePct: i.augDecline || 0,
+    augmentation: state.bess?.augmentation || (i.augmentation === "annual" ? "annual" : "none"), augmentationYears: state.bess?.augmentationYears || undefined, augmentationYear: state.bess?.augmentationYear, costDeclinePct: i.augDecline || 0,
     durationH: i.essMwPerMw > 0 ? i.essMwhPerMw / i.essMwPerMw : 2,
   };
   const recShare = 1 - TENDER.recPoolShare; // the bidder keeps 50% of the REC proceeds (CfDA 9.2.vi)

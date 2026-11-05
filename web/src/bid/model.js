@@ -449,6 +449,13 @@ export function marketLabel(state, prices) {
 const SIZE_KEY = { solar: "solarMw", wind: "windMw", hydro: "hydroMw", biomass: "biomassMw", thermal: "thermalMw", bess: "bessMw" };
 
 /** The bidder's inputs in the engine's terms: costs, finance, battery, biomass, plants and size ranges. */
+/** An ISO date from a tender date (string or timestamp); null when it is not one. */
+function isoDate(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const d = new Date(v);
+  return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : null;
+}
+
 export function modelInputs(state, terms) {
   const { src, sources } = state;
   const on = (id) => Boolean(sources[id]);
@@ -465,6 +472,9 @@ export function modelInputs(state, terms) {
     constructionMonths: state.costs.constructionMonths || 0,
     drawdown: state.costs.drawdown || "linear",
     drawOrder: state.costs.drawOrder || "proRata",
+    // the finance team's inputs (docs/dev/FINANCE-V3-SPEC.md): hard-cost phasing, the module share for the sensitivities
+    phasing: state.costs.phasing || null,
+    moduleSharePct: state.costs.moduleSharePct ?? 0.45,
     plants: ["hydro", "thermal"].filter(on).map((id) => ({
       id,
       capexCrPerMw: s[id].capex,
@@ -477,6 +487,8 @@ export function modelInputs(state, terms) {
   const selling = Boolean(state.market?.sell) && Boolean(terms?.sale) && terms.sale !== "not_allowed";
   const fin = {
     ...state.fin,
+    // the timeline: the bidder's COD, else the tender's supply start date
+    codDate: state.fin.codDate || isoDate(terms?.supplyStart),
     years: terms?.years || state.fin.years,
     sellSurplus: selling,
     surplusPrice: selling && state.market.source === "flat" ? state.market.flatPrice || 0 : 0,
@@ -501,6 +513,7 @@ export function modelInputs(state, terms) {
     initSoc: Math.min(s.bess.maxSoc ?? 1, Math.max(s.bess.minSoc ?? 0, 0.5)),
     annualDegradation: on("bess") ? s.bess.degradation || 0 : 0,
     augmentation: s.bess.augmentation || "none",
+    augmentationYears: Array.isArray(s.bess.augmentationYears) ? s.bess.augmentationYears : undefined,
     costDeclinePct: 0,
     durationH: duration,
   };

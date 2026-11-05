@@ -135,13 +135,31 @@ export function defaultCfdState() {
   };
 }
 
+/**
+ * The battery augmentation choice for the finance team's inputs: "annual" and "none" are the
+ * tender input (inputs.augmentation); "oneTime" and "schedule" (with augmentationYears) live in
+ * state.bess, which the shared model reads first.
+ */
+export function patchCfdBess(s, values) {
+  const bess = { ...(s.bess || {}), ...values };
+  const inputs = { ...s.inputs };
+  if (values.augmentation === "annual" || values.augmentation === "none") {
+    inputs.augmentation = values.augmentation;
+    bess.augmentation = null;
+  }
+  return { ...s, inputs, bess };
+}
+
+/** The augmentation choice shown on the finance team's inputs. */
+export const cfdBessAug = (s) => ({ augmentation: s.bess?.augmentation || s.inputs?.augmentation || "none", augmentationYears: s.bess?.augmentationYears || [] });
+
 export function mergeCfdState(saved) {
   const base = defaultCfdState();
   if (!saved || saved.version !== 1) return base;
   return {
     ...base, ...saved,
     inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) },
-    fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, locks: { ...(saved.locks || {}) },
+    fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, bess: { ...(saved.bess || {}) }, locks: { ...(saved.locks || {}) },
     tariffLocked: Boolean(saved.tariffLocked),
   };
 }

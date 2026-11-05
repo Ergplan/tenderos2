@@ -5,6 +5,7 @@ import * as E from "../rtc/engine";
 import { BENCHMARK_NOTE, FINANCE_FIELDS, fillBenchmarks, missingInputs } from "./model";
 import AssignButton from "../team/AssignButton";
 import DsmPanel from "../dsm/DsmPanel";
+import FinanceInputsV3 from "../rtc/FinanceInputsV3";
 import { DSM_DEFAULTS } from "../dsm/dsm";
 
 const unmark = (filled, keys) => {
@@ -80,6 +81,12 @@ export default function FinanceInputsStep({ state, setState, terms, lockProps, g
           <Field label="Interest on working capital" pct value={fin.wcInterestRate || 0} onChange={(v) => setFin({ wcInterestRate: v })} {...lockProps("fin.wcInterestRate")} step={0.05} min={0} max={25} hint="0: funded from equity cash" />
           <Field label="Debt service reserve" unit="months" value={fin.dsraMonths || 0} onChange={(v) => setFin({ dsraMonths: v })} {...lockProps("fin.dsraMonths")} step={1} min={0} max={12} hint="of the next year's debt service, from equity cash" />
         </div>
+      </Section>
+
+      <Section index={`${index}.3a`} title="Finance team's inputs" note="Timeline, phasing and part commissioning, generation cases and carbon, O&M splits, debt features, quasi-equity and mezzanine, guarantees, tax, returns and the auction sensitivities; every group off until filled">
+        <FinanceInputsV3 fin={fin} costs={costs} bessAug={state.src?.bess || null} patchFin={setFin} patchCosts={setCosts}
+          patchBess={(values) => setState((s) => ({ ...s, src: { ...s.src, bess: { ...s.src.bess, ...values } }, lp: null }))}
+          codDefault={terms?.supplyStart || null} lockProps={lockProps} />
       </Section>
 
       <DsmPanel index={`${index}.4`} dsm={state.dsm || DSM_DEFAULTS} onChange={setDsm} sources={state.sources} tariff={state.lp?.tariff || 5} lockProps={lockProps} />

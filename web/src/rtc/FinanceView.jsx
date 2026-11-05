@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { LiveChart } from "./charts";
 import { DATA_COLORS } from "../chartTheme";
@@ -8,6 +8,9 @@ import { DRAWDOWN_PROFILES, REPAYMENT_METHODS } from "./engine";
 import ConstructionView from "./ConstructionView";
 import DsmPanel from "../dsm/DsmPanel";
 import { DSM_DEFAULTS } from "../dsm/dsm";
+import FinanceInputsV3 from "./FinanceInputsV3";
+import { ReturnsSection, SensitivitySection, StatementsSection, TaxSection } from "./FinanceStatements";
+import { rowsHave, v3Fin, yearLabel } from "./financeV3";
 
 // the financial model's rows → the lines of the traceable model (web/lib/liveModel.js keys)
 const TRACE_LINE = {
@@ -17,9 +20,20 @@ const TRACE_LINE = {
   dWc: "dWc", augCapex: "aug", cfads: "cfads", debtService: "debtService", fcfe: "fcfe", cumEquity: "cumEq", projectCf: "projCf",
   openingDebt: "openDebt", closingDebt: "closeDebt", dscr: "dscr", receivables: "recv",
   wcInterest: "wcInt", refiFee: "refiFeeCr", dDsra: "dDsra", dsraBalance: "dsra", omStock: "omStock", spares: "spares", wcBalance: "wcBal", dsm: "dsmCr", debtRate: "rateY",
+  // the finance team's lines (docs/dev/FINANCE-V3-SPEC.md)
+  opFactor: "opFactor", generationFactor: "genFactor", carbonRevenue: "carbonRev", solarOm: "solarOmCr", windOm: "windOmCr", bessOm: "bessOmCr", biomassOm: "biomassOmCr",
+  guaranteeFees: "bgFees", dsraInterest: "dsraInt", marginInterest: "marginInt", marginBalance: "marginBal", prepaymentFee: "prepayFee", sweepCr: "sweep", sweepAccrued: "sweepAccr", topUpCr: "topUp",
+  quasiOpening: "quasiOpen", quasiInterestPaid: "quasiInt", quasiAccrued: "quasiAccr", quasiRepaid: "quasiRepay", quasiClosing: "quasiClose",
+  mezzOpening: "mezzOpen", mezzInterest: "mezzInt", mezzPrincipal: "mezzPrin", mezzClosing: "mezzClose", repowerCapex: "repower", extensionCapex: "extCapex",
+  fscr: "fscr", llcr: "llcr", plcr: "plcr", totalDscr: "totalDscr",
 };
 // rows shown only when some year has them
-const OPTIONAL_LINES = ["buyerRevenue", "dsm", "wcInterest", "refiFee", "dDsra", "dsraBalance", "omStock", "spares"];
+const OPTIONAL_LINES = ["buyerRevenue", "dsm", "wcInterest", "refiFee", "dDsra", "dsraBalance", "omStock", "spares",
+  "opFactor", "generationFactor", "carbonRevenue", "solarOm", "windOm", "bessOm", "biomassOm", "guaranteeFees", "dsraInterest", "marginInterest", "marginBalance", "prepaymentFee",
+  "sweepCr", "sweepAccrued", "topUpCr", "quasiOpening", "quasiInterestPaid", "quasiAccrued", "quasiRepaid", "quasiClosing", "mezzOpening", "mezzInterest", "mezzPrincipal", "mezzClosing",
+  "repowerCapex", "extensionCapex", "fscr", "llcr", "plcr", "totalDscr"];
+// the sources' O&M lines are shown only when more than one source has one (else "O&M" is the line)
+const OM_SPLIT = ["solarOm", "windOm", "bessOm", "biomassOm"];
 
 // ---------------------------------------------------------------- 06 financial model
 
@@ -34,13 +48,20 @@ const FIN_LINES = [
   ["Solar output factor", "solarFactor", "pct"],
   ["BESS capacity factor", "bessFactor", "pct"],
   ["Tariff (₹/kWh)", "tariff", 3],
+  ["Operating share of the year (part commissioning)", "opFactor", "pct"],
+  ["Generation case factor", "generationFactor", "pct"],
   ["Profit & loss (₹ cr)", null],
   ["Energy revenue", "energyRevenue", 1],
   ["Surplus revenue", "surplusRevenue", 1],
   ["Excess sold to the buyer", "buyerRevenue", 1],
   ["Shortfall penalty", "penalty", 1, -1],
+  ["Carbon credits", "carbonRevenue", 1],
   ["Total revenue", "revenue", 1, 1, true],
   ["O&M", "om", 1, -1],
+  ["O&M · solar", "solarOm", 1, -1],
+  ["O&M · wind", "windOm", 1, -1],
+  ["O&M · battery", "bessOm", 1, -1],
+  ["O&M · biomass", "biomassOm", 1, -1],
   ["Insurance", "insurance", 1, -1],
   ["Other fixed", "other", 1, -1],
   ["Deviation settlement charges (CERC DSM)", "dsm", 1, -1],
@@ -48,7 +69,13 @@ const FIN_LINES = [
   ["Book depreciation", "bookDep", 1, -1],
   ["Interest", "interest", 1, -1],
   ["Interest on working capital", "wcInterest", 1, -1],
+  ["Guarantee fees", "guaranteeFees", 1, -1],
+  ["Mezzanine interest", "mezzInterest", 1, -1],
+  ["Quasi-equity interest paid", "quasiInterestPaid", 1, -1],
+  ["Interest on the debt service reserve", "dsraInterest", 1],
+  ["Interest on margin money", "marginInterest", 1],
   ["Refinancing fee", "refiFee", 1, -1],
+  ["Prepayment penalty", "prepaymentFee", 1, -1],
   ["Profit before tax", "pbt", 1, 1, true],
   ["Tax depreciation", "taxDep", 1],
   ["Tax", "tax", 1, -1],
@@ -64,9 +91,19 @@ const FIN_LINES = [
   ["Working capital change", "dWc", 1, -1],
   ["Interest on working capital", "wcInterest", 1, -1],
   ["BESS augmentation", "augCapex", 1, -1],
+  ["Solar repowering", "repowerCapex", 1, -1],
+  ["Life-extension capex", "extensionCapex", 1, -1],
+  ["Guarantee fees", "guaranteeFees", 1, -1],
   ["CFADS", "cfads", 1, 1, true],
   ["Debt service", "debtService", 1, -1],
+  ["Cash sweep prepayment", "sweepCr", 1, -1],
+  ["Prepayment penalty", "prepaymentFee", 1, -1],
   ["Refinancing fee", "refiFee", 1, -1],
+  ["Top-up debt paid to equity", "topUpCr", 1],
+  ["Mezzanine interest", "mezzInterest", 1, -1],
+  ["Mezzanine principal", "mezzPrincipal", 1, -1],
+  ["Quasi-equity interest paid", "quasiInterestPaid", 1, -1],
+  ["Quasi-equity repaid", "quasiRepaid", 1, -1],
   ["Debt service reserve put aside (released)", "dDsra", 1, -1],
   ["Free cash to equity", "fcfe", 1, 1, true],
   ["Cumulative equity cash", "cumEquity", 1],
@@ -79,19 +116,50 @@ const FIN_LINES = [
   ["Closing balance", "closingDebt", 1],
   ["Debt service", "debtService", 1],
   ["DSCR", "dscr", 2],
+  ["DSCR on senior and mezzanine", "totalDscr", 2],
+  ["FSCR", "fscr", 2],
+  ["LLCR", "llcr", 2],
+  ["PLCR", "plcr", 2],
   ["Debt service reserve held", "dsraBalance", 1],
+  ["Cash sweep accrued", "sweepAccrued", 1],
+  ["Quasi-equity and mezzanine (₹ cr)", null],
+  ["Quasi-equity opening", "quasiOpening", 1],
+  ["Quasi-equity interest accrued", "quasiAccrued", 1],
+  ["Quasi-equity closing", "quasiClosing", 1],
+  ["Mezzanine opening", "mezzOpening", 1],
+  ["Mezzanine closing", "mezzClosing", 1],
+  ["Margin money on guarantees", "marginBalance", 1],
 ];
 
-export default function FinanceView({ state, patch, set, lockProps, finance, sizes, extraLines = null, energyLines = null, actions = null }) {
+/**
+ * codDefault: the tender's commercial operation date (seeds the timeline when fin.codDate is empty);
+ * modelArgs: { ctx, sizes, args } as given to runFinancialModel, for the F.8 sensitivities;
+ * bessAug / patchBess: the tab's battery augmentation choice for the schedule option.
+ */
+export default function FinanceView({ state, patch, set, lockProps, finance, sizes, extraLines = null, energyLines = null, actions = null, codDefault = null, modelArgs = null, bessAug = null, patchBess = null }) {
   const { fin } = state;
+  const finV3 = useMemo(() => v3Fin(fin), [fin]);
+  const [moreInputs, setMoreInputs] = useState(false);
   // extraLines: [label, key, fmt, sign] rows a caller adds after "Other fixed" (Tender to Bid: biomass fuel);
   // energyLines: rows added before "Delivered" (Round the clock: the 33 kV bus to the 220 kV meter);
   // actions: buttons beside Export CSV (Round the clock: the Excel workbook)
   const lines = useMemo(() => {
     // the rows a bid may not have (the Solar Hours excess to the buyer, DSM, working-capital
     // interest, refinancing, the reserve) only when some year has them
-    const has = (key) => finance.rows.some((r) => Math.abs(r[key] || 0) > 1e-9);
-    let out = FIN_LINES.filter((l) => !OPTIONAL_LINES.includes(l[1]) || has(l[1]));
+    const has = (key) => rowsHave(finance.rows, key);
+    const omSplit = OM_SPLIT.filter(has).length > 1;
+    let out = FIN_LINES.filter((l) => !OPTIONAL_LINES.includes(l[1]) || (has(l[1]) && (!OM_SPLIT.includes(l[1]) || omSplit)));
+    // the other fixed costs as the finance team's lines, when they split them
+    const otherLines = finance.rows.find((r) => Array.isArray(r.otherLines) && r.otherLines.length)?.otherLines;
+    if (otherLines?.length && Array.isArray(fin.otherFixedLines) && fin.otherFixedLines.length === otherLines.length) {
+      const at = out.findIndex((l) => l[1] === "other") + 1;
+      out = [...out.slice(0, at), ...fin.otherFixedLines.map((l, k) => [`Other fixed · ${l.label || `line ${k + 1}`}`, (r) => r.otherLines?.[k], 1, -1]), ...out.slice(at)];
+    }
+    const windParts = finance.rows.find((r) => Array.isArray(r.windOmComponents) && r.windOmComponents.length)?.windOmComponents;
+    if (windParts?.length && Array.isArray(fin.windOmComponents) && fin.windOmComponents.length === windParts.length) {
+      const at = out.findIndex((l) => l[1] === "windOm");
+      if (at >= 0) out = [...out.slice(0, at + 1), ...fin.windOmComponents.map((c, k) => [`O&M · wind · ${c.label || `component ${k + 1}`}`, (r) => r.windOmComponents?.[k], 1, -1]), ...out.slice(at + 1)];
+    }
     if (energyLines?.length) {
       const at = out.findIndex((l) => l[1] === "deliveredMu");
       out = [...out.slice(0, at), ...energyLines, ["Delivered to the customer at the meter (MU)", "deliveredMu", 1], ...out.slice(at + 1)];
@@ -101,9 +169,11 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
       out = [...out.slice(0, at), ...extraLines, ...out.slice(at)];
     }
     return out;
-  }, [extraLines, energyLines, finance.rows]);
+  }, [extraLines, energyLines, finance.rows, fin.otherFixedLines, fin.windOmComponents]);
   const rows = finance.rows;
   const years = rows.map((r) => `Y${r.year}`);
+  const yearHeads = rows.map((r) => yearLabel(r));
+  const cell = (r, key) => (typeof key === "function" ? key(r) : r[key]);
   const trace = useTrace();
   const traceable = Boolean(trace?.available);
   const plOption = useMemo(() => ({
@@ -137,13 +207,16 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
   }), [rows, finance.debt, finance.equity]);
 
   function exportCsv() {
-    const head = ["Line item", "Y0", ...years];
+    const head = ["Line item", "Y0", ...yearHeads.map((y) => `"${y}"`)];
     const csv = [head.join(",")];
+    if (rows[0]?.start) csv.push(["Year starts", "", ...rows.map((r) => r.start || "")].join(","));
     const y0 = { "Free cash to equity": -finance.equity, "Project cash flow (unlevered)": -finance.capex.total, "Closing balance": finance.debt };
     for (const [label, key] of lines) {
       if (!key) { csv.push(`"${label}"`); continue; }
-      csv.push([`"${label}"`, y0[label] ?? "", ...rows.map((r) => (r[key] === null ? "" : Number(r[key]).toFixed(4)))].join(","));
+      csv.push([`"${label}"`, y0[label] ?? "", ...rows.map((r) => { const v = cell(r, key); return v === null || v === undefined ? "" : Number(v).toFixed(4); })].join(","));
     }
+    const extra = [["Equity IRR pre-tax", "preTaxEquityIrr"], ["Project IRR pre-tax", "preTaxProjectIrr"], ["HoldCo IRR", "holdcoIrr"], ["Promoter IRR", "promoterIrr"], ["Lender XIRR", "lenderXirr"], ["Lender MIRR", "lenderMirr"], ["Min DSCR", "minDscr"], ["Min FSCR", "minFscr"], ["Min LLCR", "minLlcr"], ["Min PLCR", "minPlcr"], ["Mezzanine cr", "mezz"], ["Quasi-equity cr", "quasi"]];
+    for (const [label, key] of extra) if (Number.isFinite(finance[key])) csv.push(`"${label}",${Number(finance[key]).toFixed(5)}`);
     csv.push("");
     csv.push(`"Solar MW",${sizes.solarMw}`, `"Wind MW",${sizes.windMw}`, `"BESS MW",${sizes.bessMw}`, `"BESS MWh",${sizes.bessMwh}`);
     csv.push(`"Project cost cr",${finance.capex.total.toFixed(2)}`, `"Tariff Rs/kWh",${finance.tariff.toFixed(4)}`, `"Equity IRR",${finance.equityIrr.toFixed(5)}`, `"Project IRR",${finance.projectIrr.toFixed(5)}`);
@@ -226,6 +299,16 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
           <Field label="Insurance" pct value={fin.insurancePct} onChange={(v) => patch("fin", { insurancePct: v })} {...lockProps("fin.insurancePct")} step={0.05} min={0} max={3} hint="of hard cost / yr" />
           <Field label="Other fixed cost" unit="₹ cr/yr" value={fin.otherFixedCr} onChange={(v) => patch("fin", { otherFixedCr: v })} {...lockProps("fin.otherFixedCr")} step={0.5} min={0} hint="Land lease, SLDC, overheads" />
         </div>
+        <div className="fin-v3-toggle">
+          <button type="button" className={moreInputs ? "primary" : "secondary"} onClick={() => setMoreInputs((v) => !v)} data-testid="fin-v3-toggle" aria-expanded={moreInputs}>
+            {moreInputs ? "Hide the finance team's inputs" : "More inputs (finance team)"}
+          </button>
+          {!moreInputs && <small className="rtc-note">Timeline, phasing and part commissioning, generation cases and carbon, O&M splits, debt features, quasi-equity and mezzanine, guarantees, tax, returns and the auction sensitivities</small>}
+        </div>
+        {moreInputs && (
+          <FinanceInputsV3 fin={fin} costs={state.costs} bessAug={bessAug} patchFin={(values) => patch("fin", values)} patchCosts={(values) => patch("costs", values)} patchBess={patchBess}
+            codDefault={codDefault} lockProps={lockProps} />
+        )}
       </Section>
 
       <div className="rtc-grid rtc-grid-2 rtc-flush">
@@ -240,12 +323,12 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
       {(state.dsm || state.sources) && <DsmPanel index="F.3a" dsm={state.dsm || DSM_DEFAULTS} onChange={(v) => patch("dsm", v)} sources={state.sources} tariff={finance.tariff} scheduledMu={finance.rows[0] ? finance.rows[0].deliveredMu + finance.rows[0].excessMu : null} lockProps={lockProps} />}
       {finance.construction && <ConstructionView index="F.3b" finance={finance} />}
 
-      <Section index="F.4" title={`${fin.years}-year financial model`} note={`Project cost ₹${nf(finance.capex.total, 1)} cr (hard ₹${nf(finance.capex.hard, 1)} + pre-op ₹${nf(finance.capex.preop, 1)}${finance.capex.idc > 0 ? ` + IDC ₹${nf(finance.capex.idc, 1)}` : ""})`} actions={<><TraceButton />{actions}<button type="button" className="secondary" onClick={exportCsv}><Download size={14} /> Export CSV</button></>}>
+      <Section index="F.4" title={`${rows.length}-year financial model${finance.ppaYears && rows.length > finance.ppaYears ? ` (${finance.ppaYears} PPA years + ${rows.length - finance.ppaYears} of extension)` : ""}`} note={`Project cost ₹${nf(finance.capex.total, 1)} cr (hard ₹${nf(finance.capex.hard, 1)} + pre-op ₹${nf(finance.capex.preop, 1)}${finance.capex.idc > 0 ? ` + IDC ₹${nf(finance.capex.idc, 1)}` : ""})`} actions={<><TraceButton />{actions}<button type="button" className="secondary" onClick={exportCsv}><Download size={14} /> Export CSV</button></>}>
         {traceable && <p className="rtc-note">Click any number to see its formula and every input behind it.</p>}
         <div className="table-wrap rtc-model fin-table">
           <table>
             <thead>
-              <tr><th>Line item</th><th>Y0</th>{years.map((y) => <th key={y}>{y}</th>)}</tr>
+              <tr><th>Line item</th><th>Y0</th>{yearHeads.map((y) => <th key={y}>{y}</th>)}</tr>
             </thead>
             <tbody>
               {lines.map(([label, key, fmt, sign, strong], i) => {
@@ -255,9 +338,9 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
                   <tr key={i} className={strong ? "rtc-model-total" : ""}>
                     <td>{label}</td>
                     <td>{y0 === null ? "" : fmtCell(y0, fmt)}</td>
-                    {rows.map((r) => (traceable && TRACE_LINE[key]
-                      ? <td key={r.year} className="is-traceable" onClick={() => trace.openTrace({ line: TRACE_LINE[key], year: r.year })} title="Show how this number is worked out">{fmtCell(r[key], fmt, sign)}</td>
-                      : <td key={r.year}>{fmtCell(r[key], fmt, sign)}</td>))}
+                    {rows.map((r) => (traceable && typeof key === "string" && TRACE_LINE[key]
+                      ? <td key={r.year} className="is-traceable" onClick={() => trace.openTrace({ line: TRACE_LINE[key], year: r.year })} title="Show how this number is worked out">{fmtCell(cell(r, key), fmt, sign)}</td>
+                      : <td key={r.year}>{fmtCell(cell(r, key), fmt, sign)}</td>))}
                   </tr>
                 );
               })}
@@ -265,6 +348,11 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
           </table>
         </div>
       </Section>
+
+      <ReturnsSection finance={finance} fin={finV3} />
+      <TaxSection finance={finance} fin={finV3} />
+      <StatementsSection finance={finance} />
+      <SensitivitySection finance={finance} modelArgs={modelArgs} />
     </>
   );
 }

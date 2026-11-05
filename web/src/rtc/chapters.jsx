@@ -435,7 +435,7 @@ export function BessChapter({ state, patch, setVar, lockProps, sizes, sim }) {
       <Group title="Ageing & augmentation">
         <div className="rtc-grid rtc-grid-4">
           <Field label="Capacity fade" pct value={bess.annualDegradation} onChange={(v) => patch("bess", { annualDegradation: v })} {...lockProps("bess.annualDegradation")} step={0.1} min={0} max={10} hint="per year" />
-          <SelectBox label="Augmentation" value={bess.augmentation} onChange={(v) => patch("bess", { augmentation: v })} {...lockProps("bess.augmentation")} options={[["annual", "Annual top-up to nameplate"], ["oneTime", "One-time restore"], ["none", "None"]]} />
+          <SelectBox label="Augmentation" value={bess.augmentation} onChange={(v) => patch("bess", { augmentation: v })} {...lockProps("bess.augmentation")} options={[["annual", "Annual top-up to nameplate"], ["oneTime", "One-time restore"], ["schedule", "On a schedule (years on the Finance inputs)"], ["none", "None"]]} />
           <Field label="Augmentation year" value={bess.augmentationYear} onChange={(v) => patch("bess", { augmentationYear: Math.round(v) })} {...lockProps("bess.augmentationYear")} disabled={bess.augmentation !== "oneTime"} step={1} min={2} max={25} />
           <Field label="Price decline" pct value={bess.costDeclinePct} onChange={(v) => patch("bess", { costDeclinePct: v })} {...lockProps("bess.costDeclinePct")} step={0.5} min={0} max={20} hint="per year, prices augmentation" />
         </div>
