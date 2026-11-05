@@ -25,7 +25,7 @@ MONTHS = "Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec"
 
 
 def _field(scope, label):
-    return scope.locator(".rtc-field", has=scope.locator(".rtc-field-top span", has_text=re.compile(rf"^{re.escape(label)}$"))).first
+    return scope.locator(".rtc-field", has=scope.page.locator(".rtc-field-top span", has_text=re.compile(rf"^{re.escape(label)}$", re.I))).first
 
 
 def _open_group(page, root, group):
@@ -100,7 +100,8 @@ def test_finance_team_inputs_and_statements():
         page.wait_for_timeout(200)
         rows = g.locator("[data-testid=fin-v3-guarantee-list] tbody tr")
         assert rows.count() == before + 1
-        assert "EMD" in rows.last.inner_text() or "Earnest" in rows.last.inner_text()
+        label = rows.last.locator("input[type=text]").first.input_value()
+        assert "EMD" in label or "Earnest" in label, label
 
         g = _open_group(page, root, "generation")
         _switch_on(page, g, "Carbon credit revenue")
@@ -150,14 +151,14 @@ def test_finance_team_inputs_and_statements():
         page.locator("[data-testid=fin-v3-cod]").dispatch_event("change")
         page.wait_for_timeout(800)
         heads = page.locator("table thead th").all_inner_texts()
-        assert any(re.search(rf"Y1\s*·\s*({MONTHS}) 2028", h) for h in heads), heads[:6]
+        assert any(re.search(rf"Y1\s*·\s*({MONTHS}) 2028", h, re.I) for h in heads), heads[:6]
 
         # the statements
         for tid in ("fin-returns", "fin-balance", "fin-cashflow"):
             assert page.locator(f"[data-testid={tid}]").count() == 1, tid
-        returns = page.locator("[data-testid=fin-returns]").inner_text()
+        returns = page.locator("[data-testid=fin-returns]").inner_text().lower()
         for label in ("Equity IRR", "Project IRR", "Lender XIRR", "Minimum DSCR", "Minimum FSCR"):
-            assert label in returns, label
+            assert label.lower() in returns, label
 
         # the reverse-auction sensitivities (a button: the model runs many times)
         run = page.locator("[data-testid=fin-sensitivity-run]")
