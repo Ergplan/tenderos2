@@ -1921,6 +1921,8 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
     debt = debt0; balloonBase = debt0; mezzBal = mezz0; quasiBal = quasi0; quasiAccrued = 0; sweepAccrued = 0;
     prevWc = 0; prevMargin = 0; retained = 0; cumEquity = -equity0; payback = null;
     for (const k of Object.keys(accDepBy)) accDepBy[k] = 0;
+    // the asset register starts again each pass (the reserve's interest runs the years more than once)
+    for (const k of regKeys) gross[k] = capex.byComponent[k];
     let cumAug = 0;
     for (let y = 1; y <= T; y += 1) {
       const inPpa = y <= years;

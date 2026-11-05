@@ -40,7 +40,7 @@ export function explainGeneration(live, { source = "all", year = 1, month = null
   const y = Math.min(model.N, Math.max(1, Math.round(Number(year) || 1)));
   const m = month ? Math.min(12, Math.max(1, Math.round(Number(month)))) : null;
   const d = m && day ? Math.min(MONTH_DAYS[m - 1], Math.max(1, Math.round(Number(day)))) : null;
-  const sheet = (addr) => `'Live model'!${addr}`;
+  const sheet = (addr) => (addr && addr.includes("!") ? `'${addr.split("!")[0]}'!${addr.split("!")[1]}` : `'Live model'!${addr}`);
   const out = { ok: true, year: y, formula: "MW × CUF × 365 days × 24 hours ÷ 1,000 = MU (million kWh), × the year's degradation factor, × (1 − losses to the 33 kV bus)", sources: [] };
   const spoken = [];
   const candidates = { model: 0, noDegradation: 0, noLosses: 0, neither: 0 };

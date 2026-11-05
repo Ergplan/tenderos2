@@ -2,7 +2,7 @@
 // (web/lib/liveModel.js), written into an in-memory worksheet instead of an Excel file, so the app
 // can show every number with the formula that makes it, the numbers it reads (precedents) and the
 // numbers that read it (dependents). Plain JavaScript, used in Node by tools/check_trace.mjs.
-import { addLiveModel, liveModelInput, CONSTRUCTION_SHEET, LIVE_SHEET } from "../../lib/liveModel.js";
+import { addLiveModel, liveModelInput, CONSTRUCTION_SHEET, INPUTS_SHEET, LIVE_SHEET } from "../../lib/liveModel.js";
 import { HEAD_ROW, dispatchLetters } from "../../lib/dispatchSheets.js";
 
 const colNum = (letters) => [...letters].reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0);
@@ -217,6 +217,7 @@ export function traceModel(live) {
   const consSheet = sheets.get(CONSTRUCTION_SHEET);
   const consHead = consSheet ? [...consSheet.cells.values()].find((x) => x.col === 1 && x.v === "Month")?.row : 0;
   const consRefs = (formula) => formulaRefs(formula).map((a) => (a.startsWith(`${LIVE_SHEET}!`) ? a.slice(LIVE_SHEET.length + 1) : a.includes("!") ? a : `${CONSTRUCTION_SHEET}!${a}`));
+  let addOther = () => {};
   const addCons = (a) => {
     if (cells[a]) return;
     const rc = consSheet?.cells.get(a.split("!")[1]);
@@ -229,13 +230,36 @@ export function traceModel(live) {
       value: rc.v, formula: rc.formula, fmt: rc.numFmt, kind: rc.formula ? "calc" : KIND_OF_FONT[rc.font?.color?.argb] || "value", source: null,
       refs: consRefs(rc.formula), usedBy: [],
     };
-    for (const r of cells[a].refs) if (r.startsWith(`${CONSTRUCTION_SHEET}!`)) addCons(r);
+    for (const r of cells[a].refs) if (r.startsWith(`${CONSTRUCTION_SHEET}!`)) addCons(r); else if (r.includes("!") && !/^Dispatch Y\d+!/.test(r)) addOther(r);
+  };
+  // the Inputs sheet and the schedule sheets (finance v3): their cells are traced like the grid's,
+  // named by the sheet, their row label and the year column; their own references stay on their
+  // sheet, the ones to the Live model are the grid's own addresses
+  addOther = (a) => {
+    if (cells[a]) return;
+    const [sheet, at] = a.split("!");
+    const sh = sheets.get(sheet);
+    const rc = sh?.cells.get(at);
+    if (!rc) return;
+    const rowLabel = sh.cells.get(addrOf(rc.row, 1))?.v;
+    let yearHead = 0;
+    for (let r = 1; r <= Math.min(sh.maxRow, 6) && !yearHead; r += 1) if (sh.cells.get(addrOf(r, 4))?.v === "Year 0") yearHead = r;
+    const column = yearHead && rc.col >= 5 ? `Year ${rc.col - 4}` : rc.col === 3 ? "Value" : rc.col === 4 && yearHead ? "Year 0" : colName(rc.col);
+    const d = sheet === INPUTS_SHEET ? sh.cells.get(addrOf(rc.row, 4)) : null;
+    const refs = formulaRefs(rc.formula).map((x) => (x.startsWith(`${LIVE_SHEET}!`) ? x.slice(LIVE_SHEET.length + 1) : x.includes("!") ? x : `${sheet}!${x}`));
+    cells[a] = {
+      addr: a, row: rc.row, col: rc.col, sheet, label: typeof rowLabel === "string" && rowLabel ? (sheet === INPUTS_SHEET ? rowLabel : `${sheet} · ${rowLabel}`) : sheet, unit: typeof sh.cells.get(addrOf(rc.row, 2))?.v === "string" ? sh.cells.get(addrOf(rc.row, 2)).v : "",
+      column, value: rc.v, formula: rc.formula, fmt: rc.numFmt, kind: rc.formula ? "calc" : KIND_OF_FONT[rc.font?.color?.argb] || "value",
+      source: d && !d.formula && typeof d.v === "string" ? d.v : null, refs, usedBy: [],
+    };
+    for (const r of refs) if (r.includes("!")) { if (r.startsWith(`${CONSTRUCTION_SHEET}!`)) addCons(r); else if (!/^Dispatch Y\d+!/.test(r)) addOther(r); }
   };
   for (const c of Object.values(cells)) {
     for (const a of c.refs) {
       if (!a.includes("!") || cells[a]) continue;
       const [sheet, at] = a.split("!");
       if (sheet === CONSTRUCTION_SHEET) { addCons(a); continue; }
+      if (!/^Dispatch Y\d+$/.test(sheet)) { addOther(a); continue; }
       const rc = sheets.get(sheet)?.cells.get(at);
       if (!rc) continue;
       const year = Number(/Y(\d+)$/.exec(sheet)?.[1]);
@@ -250,11 +274,11 @@ export function traceModel(live) {
   for (const c of Object.values(cells)) for (const a of c.refs) cells[a]?.usedBy.push(c.addr);
   const keys = Object.fromEntries(Object.entries(res.cells).map(([k, ref]) => [k, ref.split("!").pop().replace(/\$/g, "")]));
   // each model line's key → { addr } for one value, { row } for a year series
-  const lines = Object.fromEntries(Object.entries(res.addr || {}).map(([k, a]) => [k, typeof a === "number" ? { row: a } : { addr: String(a).replace(/\$/g, "") }]));
+  const lines = Object.fromEntries(Object.entries(res.addr || {}).map(([k, a]) => [k, typeof a === "number" ? { row: a } : { addr: String(a).replace(/\$/g, "").replace(/^'([^']+)'!/, "$1!") }]));
   // each row's line key, and the hourly profiles behind the generation build-up (for the drill-down
   // from a year to its months and 15-minute blocks; the profiles are not part of the Excel request)
   const rowKey = {};
-  for (const [k, l] of Object.entries(lines)) rowKey[l.row ?? cells[l.addr]?.row] = k;
+  for (const [k, l] of Object.entries(lines)) if (l.row || (l.addr && !l.addr.includes("!"))) rowKey[l.row ?? cells[l.addr]?.row] = k;
   const gen = Object.fromEntries(Object.entries(m.gen || {}).filter(([k]) => live.gen?.[k]?.hourly?.length >= 8760)
     .map(([k, g]) => [k, { ...g, hourly: live.gen[k].hourly }]));
   const dispatch = m.dispatch ? { data: m.dispatch, years: res.dispatch } : null;

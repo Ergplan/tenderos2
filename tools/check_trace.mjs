@@ -52,14 +52,15 @@ const ins = inputsOf(model, model.keys.equityIrr);
 const kinds = new Set(ins.map((a) => model.cells[a].kind));
 assert.ok(kinds.has("input") && kinds.has("opt"), [...kinds].join(","));
 const names = ins.map((a) => cellName(model, a));
-for (const want of ["Solar", "Debt share", "Interest rate", "Corporate tax", "Delivered to the procurer · Year 1"]) {
+for (const want of ["Solar", "Debt share", "Interest rate", "Corporate tax", "Delivered to the procurer (the dispatch) · Year 1"]) {
   assert.ok(names.some((n) => n.startsWith(want)), `equity IRR rests on ${want}`);
 }
 // inputs carry where they came from; year cells carry their year
 const capex = Object.values(model.cells).find((c) => c.kind === "input" && c.label === "Solar" && c.unit === "₹ cr/MW");
 assert.ok(capex && capex.source, "an input's source");
 const ppa = Object.values(model.cells).find((c) => c.label === "PPA supply revenue" && c.column === "Year 3");
-assert.ok(ppa && /\/10$/.test(ppa.formula) && ppa.refs.length === 2, ppa?.formula);
+assert.ok(ppa && /\/10$/.test(ppa.formula) && ppa.refs.length >= 2, ppa?.formula);
+assert.ok(ppa.refs.some((a) => a.startsWith("Inputs!")), "the PPA years come from the Inputs sheet");
 // sections for the grid
 assert.ok(model.rows.filter((r) => r.section).map((r) => r.label).includes("Revenue"));
 console.log(`Trace checks passed (${Object.keys(model.cells).length} cells, ${ins.length} inputs under the equity IRR, built in ${ms} ms)`);

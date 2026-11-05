@@ -10,7 +10,7 @@
 // Plain JavaScript (no browser APIs), checked in Node by tools/check_cfd_finance.mjs.
 import * as E from "../rtc/engine.js";
 import { genSource } from "../model/generation.js";
-import { liveResults } from "../rtc/exportModel.js";
+import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
 import { BENCHMARK_NOTE, BG_YEARS, CHOICES, FIELDS, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
 import { TENDER } from "./terms.js";
 
@@ -178,16 +178,11 @@ export function cfdLiveRequest({ state, model, finance }) {
     market: i.sellMarket || null,
     on: { solar: eng.sizes.solarMw > 0, wind: eng.sizes.windMw > 0, hydro: false, biomass: false, thermal: false, bess: true },
     sizes: pick(eng.sizes, ["solarMw", "windMw", "bessMw", "bessMwh"]),
-    costs: { ...pick(eng.costs, ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "evacuationCr", "otherCapexCr", "preopPct", "constructionMonths", "drawdown", "drawOrder"]), plants: [] },
+    costs: { ...pick(eng.costs, [...LIVE_COST_KEYS, "otherCapexCr"]), plants: [] },
     otherCapexLabel: "SECI's charges and the bank guarantees' cost",
-    fin: pick(eng.fin, [
-      "tariffEscalation", "solarOmLakhPerMw", "windOmLakhPerMw", "bessOmLakhPerMwh", "omEscalation", "insurancePct", "otherFixedCr", "sellSurplus", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple",
-      "debtFraction", "interestRate", "tenorYears", "repayment", "targetEquityIrr", "discountRate", "taxRate", "taxDepreciation", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays",
-      "graceYears", "paymentsPerYear", "targetDscr", "balloonPct", "stepUpPct", "refiYear", "refiRate", "refiTenorYears", "refiFeePct", "omStockMonths", "sparesPctOm", "wcInterestRate", "dsraMonths",
-      "lcCostPct", "lcMinPrice", "lcDays", "cfdPenaltyMultiple",
-    ]),
-    bess: pick(eng.bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
-    ops: eng.ops.map((o) => ({ ...pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "chargingCostCr", "pxFeesCr", "lcMw"]), penaltyWeeks: o.penaltyWeeks })),
+    fin: pick(eng.fin, [...LIVE_FIN_KEYS, "lcCostPct", "lcMinPrice", "lcDays", "cfdPenaltyMultiple"]),
+    bess: pick(eng.bess, LIVE_BESS_KEYS),
+    ops: eng.ops.map((o) => ({ ...pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "chargingCostCr", "pxFeesCr", "lcMw", "solarGenMWh", "windGenMWh"]), penaltyWeeks: o.penaltyWeeks })),
     gen,
     dispatch: null,
     sources: liveSources(state),

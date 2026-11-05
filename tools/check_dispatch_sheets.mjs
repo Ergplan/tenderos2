@@ -98,7 +98,7 @@ assert.equal(liveModelInput({ ...live, dispatch: { ...live.dispatch, solarCf: so
 // ---- the sheet: energy by year is a formula on the dispatch sheets and carries the app's value
 const res = addLiveModel(new ExcelJS.Workbook(), input);
 const ws0 = res.sheet;
-const row = res.addr.delivered;
+const row = res.addr.deliveredRaw; // the dispatch's row; the model's delivered row applies the operating factors to it
 const y10 = ws0.getRow(row).getCell(4 + 10);
 assert.match(y10.formula, /'Dispatch Y1'!\$\w+\$5.*'Dispatch Y25'!\$\w+\$5/, y10.formula);
 for (const r of finance.rows) {
@@ -111,7 +111,7 @@ assert.ok(close(res.values.equityIrr, finance.equityIrr, 1e-9), "the same equity
 {
   const { traceModel } = await import("../web/src/model/trace.js");
   const model = traceModel(JSON.parse(JSON.stringify(live)));
-  const cell = model.cells[`N${model.lines.delivered.row}`]; // year 10
+  const cell = model.cells[`N${model.lines.deliveredRaw.row}`]; // year 10, the dispatch's row
   const ext = cell.refs.filter((a) => a.startsWith("Dispatch Y"));
   assert.deepEqual(ext.map((a) => a.split("!")[0]), ["Dispatch Y1", "Dispatch Y25"], cell.formula);
   const total = model.cells[ext[0]];

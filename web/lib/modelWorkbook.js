@@ -103,8 +103,8 @@ export async function buildModelWorkbook(body, { preparedBy, product }) {
     cond.views = [{ state: "frozen", ySplit: 1 }];
   }
 
-  // ---- every input, with where it came from
-  const inp = wb.addWorksheet("Inputs");
+  // ---- every input, with where it came from (the live model's own Inputs sheet holds the ones it reads)
+  const inp = wb.addWorksheet("Inputs (list)");
   header(inp.addRow(["Group", "Input", "Value", "Unit", "Source"]));
   for (const i of body.inputs || []) {
     const row = inp.addRow([str(i.group, 60), str(i.input, 120), typeof i.value === "number" ? i.value : str(i.value), str(i.unit, 40), str(i.source, 120)]);

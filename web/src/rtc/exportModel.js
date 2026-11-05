@@ -12,9 +12,13 @@ export const LIVE_FIN_KEYS = [
   "biomassFuelRsPerKwh", "biomassFuelEscalation", "sellSurplus", "surplusPrice", "shortfallPenalty", "blockPenaltyMultiple", "debtFraction", "interestRate",
   "tenorYears", "repayment", "targetEquityIrr", "discountRate", "taxRate", "taxDepreciation", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays",
   "graceYears", "paymentsPerYear", "targetDscr", "balloonPct", "stepUpPct", "refiYear", "refiRate", "refiTenorYears", "refiFeePct", "omStockMonths", "sparesPctOm", "wcInterestRate", "dsraMonths",
+  // the finance team's inputs (docs/dev/FINANCE-V3-SPEC.md) and the solar degradation the extension's fade falls back to
+  ...E.FINANCE_V3_KEYS.fin, "solarDegradation",
 ];
 /** The cost keys the Live model reads (the construction schedule with them). */
-export const LIVE_COST_KEYS = ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "biomassCrPerMw", "evacuationCr", "preopPct", "constructionMonths", "drawdown", "drawOrder"];
+export const LIVE_COST_KEYS = ["solarCrPerMw", "windCrPerMw", "bessCrPerMwh", "bessPcsCrPerMw", "biomassCrPerMw", "evacuationCr", "preopPct", "constructionMonths", "drawdown", "drawOrder", ...E.FINANCE_V3_KEYS.costs];
+/** The battery keys the Live model reads. */
+export const LIVE_BESS_KEYS = ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct", ...E.FINANCE_V3_KEYS.bess];
 
 const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o?.[k]]));
 
@@ -36,6 +40,19 @@ export function liveResults(finance, fin) {
     debt: finance.debt,
     equity: finance.equity,
     revenueTotal: finance.totals.revenue,
+    // finance v3: the other parties' returns, the cover ratios, the subordinated funding
+    mezz: finance.mezz ?? 0,
+    quasi: finance.quasi ?? 0,
+    preTaxEquityIrr: finance.preTaxEquityIrr,
+    preTaxProjectIrr: finance.preTaxProjectIrr,
+    holdcoIrr: finance.holdcoIrr,
+    promoterIrr: finance.promoterIrr,
+    lenderXirr: finance.lenderXirr,
+    lenderMirr: finance.lenderMirr,
+    minFscr: finance.minFscr,
+    minLlcr: finance.minLlcr,
+    minPlcr: finance.minPlcr,
+    minTotalDscr: finance.minTotalDscr,
   };
 }
 
@@ -194,7 +211,7 @@ export function rtcModelExport({ inputs, sizes, costs, fin, bess, sites, finance
       sizes: pick(sizes, ["solarMw", "windMw", "bessMw", "bessMwh"]),
       costs: { ...pick(costs, LIVE_COST_KEYS), plants: [] },
       fin: pick(fin, LIVE_FIN_KEYS),
-      bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
+      bess: pick(bess, LIVE_BESS_KEYS),
       // the year-by-year energy of the tab's hourly simulation, from the model's own rows
       ops: finance.rows.map((r) => ({
         demandMWh: mwh(r.demandMu), deliveredMWh: mwh(r.deliveredMu), excessMWh: mwh(r.excessMu),

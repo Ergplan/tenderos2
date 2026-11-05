@@ -3,7 +3,7 @@
 // (tools/check_live_model.mjs) can build it in Node.
 import { FINANCE_FIELDS, SOURCES, SOURCE_FIELDS, dispatchFor, lossFactorsOf, resourceProfiles } from "./model.js";
 import { cufPoint, genSource } from "../model/generation.js";
-import { LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
+import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
 
 /**
  * What the Live model sheet (web/lib/liveModel.js) needs to rebuild the financial model as Excel
@@ -38,8 +38,8 @@ export function liveModelRequest({ state, lp, finance, costs, fin, bess, ops, df
       plants: (costs.plants || []).map((p) => pick(p, ["id", "capexCrPerMw", "fixedLakhPerMw", "energyRsPerKwh", "recRsPerKwh", "escalation"])),
     },
     fin: pick(fin, LIVE_FIN_KEYS),
-    bess: pick(bess, ["annualDegradation", "augmentation", "augmentationYear", "costDeclinePct"]),
-    ops: ops.slice(0, n).map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "dsmChargeCr", "dsmA", "dsmB"])),
+    bess: pick(bess, LIVE_BESS_KEYS),
+    ops: ops.slice(0, n).map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "dsmChargeCr", "dsmA", "dsmB", "solarGenMWh", "windGenMWh"])),
     gen,
     dispatch: dispatchFor(lp), // the modelled years hour by hour: the workbook's dispatch sheets
     sources,

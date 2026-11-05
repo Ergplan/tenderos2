@@ -279,7 +279,8 @@ the tab computed:
     recalculated returns against the app run on the same inputs.
 * **Tender conditions**: each condition, what the tender says, its page and quote, what the plant
   and bid deliver, and met / not met.
-* **Inputs**: every input with its unit and source (your input, industry benchmark, model default).
+* **Inputs**: every input the Live model reads, in groups (blue cells; the Live model and every schedule sheet link to them), with the tables of the finance team's inputs (part commissioning, wind O&M components, other fixed cost lines, guarantees, augmentation years).
+* **Inputs (list)**: every input of the bid with its unit and source (your input, industry benchmark, model default), as the app recorded them.
 * **Plant and capex**: sizes, capex by source, transmission, pre-operative costs, debt and equity.
 * **Round the clock** downloads the same workbook from its financial model (F.4, **Download
   financial model (Excel)**, `POST /api/rtc/model`): no tender conditions sheet, the energy from
