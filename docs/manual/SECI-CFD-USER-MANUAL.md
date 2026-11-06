@@ -77,6 +77,10 @@ tolerance and the 1.5× penalty; the Letter of Credit; what you bid and how the 
 15-year term. Every sentence carries a chip (*Amd-03 p. 5*, *CfDA p. 40*): click it to open the
 page.
 
+**1a · The tender in simple terms.** The same six paragraphs as the chapter above (what SECI
+buys, how you are paid, what you build, what a miss costs, the money up front, why bidders like
+it), each with the clause chips behind it.
+
 **2 · The tender as a picture.** The flow of energy and money (your RE, group RE and the green
 market charge the battery; the battery and wind supply the exchange; the Pool settles against the
 strike price), the timeline from the Effective Date to the end of the term, a day of supply on
@@ -180,6 +184,8 @@ with every day's supply met within the sourcing limits; it is offered here and o
 ---
 
 ## Step 06 · Finance inputs *(Finance)*
+
+**Lender's minimum DSCR.** The floor your lender sets (1.1 by default). It does not change the model; the Minimum DSCR tile on the Financial model, What-if and F.5 Returns turns red below it.
 
 ![Finance inputs](img/cfd-06-financeInputs-full.jpg)
 

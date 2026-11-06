@@ -212,7 +212,7 @@ construction months are set below, pre-operative only), **Transmission / evacuat
 
 **4.1 · Debt repayment and refinancing.**
 * **Repayment** — *Equal principal*, *Annuity* (level debt service), *Sculpted to a DSCR* (the
-  principal each year keeps the DSCR at the target; a **Target DSCR** box appears), *Balloon* (a
+  principal each year keeps the DSCR at the target; a **Target DSCR** box appears; **Lender's minimum DSCR** beside it is the floor your lender sets, 1.1 by default, below which the DSCR tile turns red), *Balloon* (a
   **Balloon share** box: that share in the last year), *Bullet* (all in the last year), *Step-up*
   (a **Principal step-up** box: the principal grows at that rate).
 * **Principal moratorium** (years within the tenor; interest is paid) and **Instalments a year**

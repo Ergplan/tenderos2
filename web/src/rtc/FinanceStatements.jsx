@@ -72,7 +72,7 @@ export function ReturnsSection({ finance, fin, index = "F.5" }) {
         <Stat label="Promoter IRR" value={has("promoterIrr") ? pf(finance.promoterIrr, 2) : "–"} detail={`${pf(fin.holdco?.promoterShare ?? 1, 0)} of the HoldCo`} trace={{ key: "promoterIrr" }} />
         <Stat label="Lender XIRR" value={has("lenderXirr") ? pf(finance.lenderXirr, 2) : "–"} detail="dated draws and debt service" trace={{ key: "lenderXirr" }} />
         <Stat label="Lender MIRR" value={has("lenderMirr") ? pf(finance.lenderMirr, 2) : "–"} detail={`reinvested at ${pf(fin.lenderReinvestRate ?? fin.interestRate, 2)}`} trace={{ key: "lenderMirr" }} />
-        <Stat label="Minimum DSCR" value={ratio("minDscr")} detail={`average ${has("avgDscr") ? nf(finance.avgDscr, 2) : "–"}`} tone={tone(finance.minDscr, 1.1)} trace={{ key: "minDscr" }} />
+        <Stat label="Minimum DSCR" value={ratio("minDscr")} detail={`average ${has("avgDscr") ? nf(finance.avgDscr, 2) : "–"}`} tone={tone(finance.minDscr, fin.lenderMinDscr ?? 1.1)} trace={{ key: "minDscr" }} />
         <Stat label="Minimum FSCR" value={ratio("minFscr")} detail="fixed charges added to both sides" trace={{ key: "minFscr" }} />
         <Stat label="Minimum LLCR" value={ratio("minLlcr")} detail="CFADS to the end of the tenor over the debt" trace={{ key: "minLlcr" }} />
         <Stat label="Minimum PLCR" value={ratio("minPlcr")} detail="CFADS to the end of the project over the debt" trace={{ key: "minPlcr" }} />

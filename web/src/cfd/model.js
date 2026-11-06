@@ -112,7 +112,7 @@ export const STORAGE_KEY = "fdre.cfd.v1";
 export const CFD_FIN_DEFAULTS = {
   tariff: null,
   repayment: E.DEFAULT_FINANCE.repayment, graceYears: E.DEFAULT_FINANCE.graceYears, paymentsPerYear: E.DEFAULT_FINANCE.paymentsPerYear,
-  targetDscr: E.DEFAULT_FINANCE.targetDscr, balloonPct: E.DEFAULT_FINANCE.balloonPct, stepUpPct: E.DEFAULT_FINANCE.stepUpPct,
+  targetDscr: E.DEFAULT_FINANCE.targetDscr, lenderMinDscr: E.DEFAULT_FINANCE.lenderMinDscr, balloonPct: E.DEFAULT_FINANCE.balloonPct, stepUpPct: E.DEFAULT_FINANCE.stepUpPct,
   refiYear: E.DEFAULT_FINANCE.refiYear, refiRate: E.DEFAULT_FINANCE.refiRate, refiTenorYears: E.DEFAULT_FINANCE.refiTenorYears, refiFeePct: E.DEFAULT_FINANCE.refiFeePct,
   omStockMonths: E.DEFAULT_FINANCE.omStockMonths, sparesPctOm: E.DEFAULT_FINANCE.sparesPctOm, wcInterestRate: E.DEFAULT_FINANCE.wcInterestRate, dsraMonths: E.DEFAULT_FINANCE.dsraMonths,
   receivableDays: E.DEFAULT_FINANCE.receivableDays, taxDepreciation: E.DEFAULT_FINANCE.taxDepreciation, wdvRate: E.DEFAULT_FINANCE.wdvRate,

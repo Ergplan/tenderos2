@@ -63,7 +63,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
           <Field label="Strike price to try" unit="₹/kWh" value={tried ?? quoteOf(base)} onChange={(v) => setTried(v)} step={0.01} min={0} digits={3} hint={`the model needs ₹${nf(base, 3)} for a ${pf(finance.engine.fin.targetEquityIrr, 1)} equity IRR`} />
           <Stat label="Equity IRR" value={quoted ? irrText(quoted.equityIrr) : pf(finance.equityIrr, 2)} detail={quoted ? `target ${pf(quoted.targetEquityIrr, 2)}` : "at the solved price"} tone={quoted && quoted.status !== "ok" ? "bad" : undefined} />
           <Stat label="Project IRR" value={quoted ? irrText(quoted.projectIrr) : pf(finance.projectIrr, 2)} detail="post-tax, unlevered" tone={quoted && quoted.status !== "ok" ? "bad" : undefined} />
-          <Stat label="Minimum DSCR" value={quoted ? nf(quoted.minDscr, 2) : nf(finance.minDscr, 2)} detail={quoted ? `${quoted.gap >= 0 ? "+" : "−"}₹${nf(Math.abs(quoted.gap), 3)} against the solved price` : `average ${nf(finance.avgDscr, 2)}`} tone={(quoted ? quoted.minDscr : finance.minDscr) < 1.1 ? "bad" : undefined} />
+          <Stat label="Minimum DSCR" value={quoted ? nf(quoted.minDscr, 2) : nf(finance.minDscr, 2)} detail={quoted ? `${quoted.gap >= 0 ? "+" : "−"}₹${nf(Math.abs(quoted.gap), 3)} against the solved price` : `average ${nf(finance.avgDscr, 2)}`} tone={(quoted ? quoted.minDscr : finance.minDscr) < (state.fin?.lenderMinDscr ?? 1.1) ? "bad" : undefined} />
         </div>
       </Section>
 

@@ -100,6 +100,41 @@ export default function ExplainStep({ state, prices, model, setExample, goto }) 
           </p>
         </div>
       </Section>
+      <Section index="1a" title="The tender in simple terms" note="What SECI buys, how you are paid, what you build, what a miss costs, the money up front, and why bidders like it">
+        <div className="cfd-explain" data-testid="cfd-explainer-plain">
+          <p>
+            <strong>What SECI is buying.</strong> Not round-the-clock power, just the evening peak. For every MW you contract, you put {nf(2)} MWh into the grid every
+            evening, in two hours of your choosing between 6 pm and midnight. SECI wants 500 MW of this, so 1,000 MWh an evening in all. A group bids 50 to 150 MW
+            <Cite id="twoHours" compact /> <Cite id="range" compact />.
+          </p>
+          <p>
+            <strong>How you get paid.</strong> You do not sell to SECI. You sell your evening energy on the power exchange at whatever the market price is that evening.
+            SECI's CfD Pool then tops you up or takes the excess, so that you always end up with your bid price, the strike price: when the market clears below it, the
+            Pool pays you the difference; when the market clears above it, you pay the difference into the Pool. The exchange and the Pool together give you a fixed
+            price per kWh for 15 years, and SECI never buys the power itself. The auction is on the strike price, lowest wins; the earlier price ceiling was removed and
+            the earlier slab sharing of gains was replaced by this full pass-through <Cite id="settlement" compact /> <Cite id="term" compact /> <Cite id="ceiling" compact />.
+          </p>
+          <p>
+            <strong>What you must build.</strong> A battery of at least 1 MW and 2 MWh per contracted MW, ready 15 months after the Effective Date, and your own solar or
+            wind by month 36. Until then you may charge the battery entirely from green power bought on the market; after month 36 at least a quarter of the energy must
+            come from your own renewable plant, more if you do not use group-company plants <Cite id="ess" compact /> <Cite id="essScd" compact /> <Cite id="reCod" compact /> <Cite id="market75" compact /> <Cite id="group50" compact />.
+          </p>
+          <p>
+            <strong>What happens if you miss.</strong> The obligation is also measured by the week: 14 MWh per MW. Up to 10% short is free. Beyond that, each missed kWh
+            costs 1.5 times the gap between the week's highest evening market price and your strike price, and you lose that evening's revenue. You also give SECI a
+            letter of credit sized on the strike price <Cite id="tolerance" compact /> <Cite id="shortfall" compact /> <Cite id="lc" compact />.
+          </p>
+          <p>
+            <strong>Money up front.</strong> An earnest money deposit, then a performance bank guarantee within 20 days of the award, SECI's administration charges, and a
+            net-worth and liquidity test. No plant is needed to bid; you qualify as a company <Cite id="emd" compact /> <Cite id="pbg" compact /> <Cite id="cac" compact />.
+          </p>
+          <p>
+            <strong>Why bidders like it.</strong> Fixed revenue like a PPA, but you keep selling on the market, so there is no discom payment risk, and the battery earns on
+            the peak where prices are highest. The risk is the strike price you quote: too low and the returns are thin, too high and you lose the auction. That is what
+            the steps that follow size, price and let you test with What-if <Cite id="noRisk" compact />.
+          </p>
+        </div>
+      </Section>
 
       <VisualModel state={state} prices={prices} />
       <ExampleStep state={state} prices={prices} model={model} setExample={setExample} goto={goto} />

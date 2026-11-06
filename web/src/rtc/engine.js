@@ -99,6 +99,7 @@ export const DEFAULT_FINANCE = {
   graceYears: 0, // principal moratorium after COD; interest is paid
   paymentsPerYear: 1, // 1 yearly, 2 half-yearly, 4 quarterly, 12 monthly instalments
   targetDscr: 1.3, // sculpted: the principal each year is what keeps the DSCR at this
+  lenderMinDscr: 1.1, // the lender's floor: the minimum DSCR tile turns red below it (a check, not a constraint of the model)
   balloonPct: 0.3, // balloon: this share of the debt is repaid in the last year, the rest in equal parts
   stepUpPct: 0.05, // stepUp: the principal grows at this rate a year
   refiYear: 0, // refinance the balance at the end of this year (0: never)

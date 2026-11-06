@@ -109,7 +109,7 @@ export default function FinanceStep({ state, patch, set, lockProps, goto, terms,
           </div>
           <Stat label="Equity IRR" value={pf(finance.equityIrr, 2)} detail={finance.tariffLocked ? `target ${pf(fin.targetEquityIrr, 2)}` : "the target, by construction"} trace={{ key: "equityIrr" }} />
           <Stat label="Project IRR" value={pf(finance.projectIrr, 2)} detail="post-tax, unlevered" trace={{ key: "projectIrr" }} />
-          <Stat label="Minimum DSCR" value={nf(finance.minDscr, 2)} detail={`average ${nf(finance.avgDscr, 2)}`} tone={finance.minDscr !== null && finance.minDscr < 1.1 ? "bad" : undefined} trace={{ key: "minDscr" }} />
+          <Stat label="Minimum DSCR" value={nf(finance.minDscr, 2)} detail={`average ${nf(finance.avgDscr, 2)}`} tone={finance.minDscr !== null && finance.minDscr < (state.fin?.lenderMinDscr ?? 1.1) ? "bad" : undefined} trace={{ key: "minDscr" }} />
           <Stat label="Project cost" trace={{ key: "capexTotal" }} value={`₹${nf(finance.capex.total, 0)} cr`} detail={`₹${nf(finance.capex.total / (total || 1), 2)} cr per contracted MW · LCOE ₹${nf(finance.lcoe, 3)}/kWh at ${pf(fin.discountRate, 1)}`} />
           <Stat label="Year-1 supply" trace={{ line: "delivered", year: 1 }} value={`${nf(y1.deliveredMu, 0)} MU`} detail={`${pf(y1.dfr, 1)} of contracted`} />
           <Stat label="Year-1 operating cost" trace={{ line: "opex", year: 1 }} value={`₹${nf(y1.opex, 0)} cr`} detail={[state.sources.biomass ? `biomass fuel ₹${nf(y1.fuel, 0)} cr` : null, state.sources.hydro ? `hydro ₹${nf(y1.hydroCost || 0, 0)} cr` : null, state.sources.thermal ? `thermal ₹${nf(y1.thermalCost || 0, 0)} cr` : null].filter(Boolean).join(" · ") || "O&M and insurance"} />
