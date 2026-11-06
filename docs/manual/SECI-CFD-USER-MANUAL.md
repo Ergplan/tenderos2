@@ -300,6 +300,31 @@ statement** and **F.8 Reverse-auction sensitivity** (the strike price your targe
 the capex, module price, exchange rate, interest, generation case, a commissioning delay, a longer
 life or the refinancing rate move; **Run sensitivities**).
 
+**F.9 · Market prices: the path and the bid.** The exchange price never touches the strike price
+itself (Amendment-03 pays it on every kWh); it reaches you only where you *buy* charging power
+from the GDAM, *sell* surplus own RE, or pay a penalty (the week's highest evening price). The
+chart shows two bands as a percentage of today's IEX year, one dot per year of the term: the
+**midday band** (the cheapest charging hours before 18:00, ₹1.88/kWh today in the GDAM) and the
+**evening band** (the two dearest hours of 18:00–24:00 in the market you sell in, ₹8.31/kWh in
+the DAM). Pull a dot up or down to change that year; **Smooth** evens the path; **Flat**,
+**Storage flood** (midday +3% a year, evening −3%) and **Tight grid** (evening +3%) set a named
+path; **Your own path** keeps what you dragged. Every change re-runs the full financial model:
+the tiles show the strike price on that path, the equity IRR, the charging bought in the first
+three years (when the battery may run entirely on market power; your Contract Years table shows
+the share, for example 100% in CY1, 85% in CY2, 20% in CY3) and **Merchant sales in the bid**,
+the share of the strike price that rests on selling surplus RE, red above 15%. **Compare the
+scenarios** runs all of them and tabulates the strike price, its gap to flat, the IRR at the
+quote, the minimum DSCR, the charging cost and the merchant share; the table beneath lists each
+year's bands, charging cost in ₹/kWh and ₹ cr, surplus sales and the penalty reference.
+
+*Reading it.* On the benchmark bid the midday price matters far more through the surplus solar
+you sell at midday than through charging: a storage flood (dearer midday) *lowers* the strike
+price by about ₹0.80 because the surplus earns more, while without merchant sales it raises it.
+If you do not want the bid to lean on merchant sales, switch them off on Bid inputs and read the
+strike price again. The **Share of the GDAM you can buy in an hour** box on Bid inputs caps market
+charging at that share of the hour's cleared GDAM volume (20% by default; midday GDAM clears
+about 1.2–1.8 GW on thin days, so 500 MW of winners charging together would take a third of it).
+
 *One price.* Every step, the chip, the bid agent, the bid forms, the saved bid and the workbook
 carry the same strike price: the full financial model's. The fast screening model that was used
 to explore sizes is shown only as a small figure beside it; the workbook's cover states the

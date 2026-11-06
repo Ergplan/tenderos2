@@ -162,6 +162,14 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | The Pool pays you, net / You pay the Pool, net *(label is an expression)* | `cfd/ExampleStep.jsx:186` | `cr(y.poolCr)` | `x.year.poolCr` = youCr − exchangeCr; `daysPoolPays`, `daysYouPay` | the strike price, the IEX prices | see the file's note above |
 | You receive | `cfd/ExampleStep.jsx:187` | `cr(y.youCr)` | `x.year.youCr` = SP × energy | the strike price | see the file's note above |
 
+### `web/src/cfd/MarketPrices.jsx` (F.9 of the Financial model step)
+
+**Screen:** CfD bid › Financial model › F.9 Market prices  
+**Computed by:** `pricePathOf(state.inputs)` (the bands per year), `priceBands(model.book)` (today's levels), `summary(model, finance)` from `model.sim.years` (marketCostCr, chargeMarketMwh, merchantRevCr, weeks[].ref) and `runCfdFinance`; "Compare the scenarios" runs `runModel(state with priceScenario, prices, { price })` per scenario  
+**Writes:** `inputs.pricePath` (`{ midday[], evening[] }`, multipliers per year) and `inputs.priceScenario` on a drag, Smooth or a scenario button (through `setInput`)  
+**Rests on:** state.inputs (incl. `priceEscalation`, `gdamShareCap`, `merchant`), state.fin, state.costs, the IEX price file  
+**Stored:** with the bid on Save (state.inputs)
+
 ### `web/src/cfd/FinanceModelStep.jsx`
 
 **Screen:** CfD bid › Financial model (step 08)  

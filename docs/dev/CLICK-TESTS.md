@@ -212,6 +212,7 @@ same as before.
 | CF-11 | Bid forms | CF-08 | Your particulars; open Format 7.1; Reviewed; Use ₹x/kWh; All letters (Word / PDF); Download bid pack | 17 formats grouped by envelope with their blanks beside the RfS page; the filled letters; the eleven checks | `test_cfd_bid.py` (particulars, 7.1, letters Word) |
 | CF-12 | Reference bids | — | Read the table | SECI's eight results that compare, the gap to the lowest peak-power award, why a strike price sits where it does | `test_cfd_bid.py`; `test_click_tour.py` |
 | CF-13 | Save and reopen | CF-08 | Save › name › Save; Open › the library (module CfD) › Open | Saved as version 1; the library lists it; reopening restores the sized bid | `test_cfd_bid.py` |
+| CF-13a | Market price path (F.9) | CF-08 | Financial model › F.9: click Storage flood; drag a midday dot; Smooth; Compare the scenarios | The tiles re-run on each change (strike price, IRR, charging bought in years 1–3, merchant share); dragging switches the scenario to Your own path; the table lists flat, storage flood, tight grid and the own path with the strike price and its gap to flat | `test_cfd_bid.py` |
 | CF-14 | Voice agent | — | Talk to the bid agent (needs the OpenAI key) | The agent reads the tender, sets inputs, runs the optimiser and explains the result through its sixteen tools | manual; `tools/check_cfd_agent.mjs` checks the tools |
 
 ## 8. Recent tenders

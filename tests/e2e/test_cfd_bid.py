@@ -122,6 +122,28 @@ def test_cfd_bid_end_to_end(tmp_path):
         for name in SHEETS:
             assert name in wb.sheetnames, (name, wb.sheetnames)
 
+        # 08a market prices (F.9): a scenario, a dragged dot, Smooth, the comparison table
+        panel = page.locator("[data-testid=cfd-price-path]")
+        panel.scroll_into_view_if_needed()
+        assert panel.count() == 1
+        page.click("[data-testid=cfd-price-scenario-storageFlood]")
+        page.wait_for_timeout(1500)
+        assert "₹" in page.locator("[data-testid=cfd-price-now]").inner_text()
+        dot = page.locator("[data-testid=cfd-price-dot-midday-2]")
+        box = dot.bounding_box()
+        page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(box["x"] + box["width"] / 2, box["y"] - 40, steps=5)
+        page.mouse.up()
+        page.wait_for_timeout(1500)
+        assert page.locator("[data-testid=cfd-price-scenario-custom]").get_attribute("class") == "primary", "dragging a dot makes it the bidder's own path"
+        page.click("[data-testid=cfd-price-smooth]")
+        page.wait_for_timeout(1500)
+        page.click("[data-testid=cfd-price-run]")
+        page.wait_for_selector("[data-testid=cfd-price-row-custom]", timeout=120_000)
+        assert page.locator("[data-testid=cfd-price-table] tbody tr").count() == 4
+        assert "₹" in page.locator("[data-testid=cfd-price-row-storageFlood]").inner_text()
+
         # 09 what-if: the levers
         _step(page, "whatif")
         page.wait_for_selector("[data-testid=cfd-whatif]", timeout=60_000)

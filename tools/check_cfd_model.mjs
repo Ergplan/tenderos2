@@ -142,3 +142,42 @@ assert.ok(opt.sp <= real.sp + 1e-9, "the optimised size is no dearer");
 assert.equal(capShortfall(opt.sim), 0);
 
 console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh with ${best.solarMw} MW of solar on the benchmark inputs)`);
+
+// ---- market price paths (F.9): two bands, the scenarios, the bidder's own path, the GDAM depth cap
+{
+  const { PRICE_SCENARIOS, priceBands, pricePathOf, smoothPath } = await import("../web/src/cfd/model.js");
+  const base = fillBenchmarks(defaultCfdState());
+  base.inputs.contractedMw = 100;
+  base.inputs.effectiveDate = base.inputs.effectiveDate || "2026-12-01";
+  const real = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
+  const run = (patch) => runModel({ ...base, inputs: { ...base.inputs, ...patch } }, real);
+  const flat = run({ priceScenario: "flat" });
+  const flood = run({ priceScenario: "storageFlood" });
+  const tight = run({ priceScenario: "tightGrid" });
+  assert.ok(Object.keys(PRICE_SCENARIOS).length === 4, "four scenarios");
+  const path = pricePathOf({ priceEscalation: 0.02, priceScenario: "storageFlood" }, 4);
+  assert.ok(Math.abs(path.midday[1] - 1.05) < 1e-9 && Math.abs(path.evening[1] - 0.99) < 1e-9, "the scenario adds its slope to the escalation per band");
+  assert.ok(flood.sim.years[0].marketCostCr >= flat.sim.years[0].marketCostCr - 1e-9 && flood.sim.years[2].marketCostCr > flat.sim.years[2].marketCostCr, "dearer midday power costs more to charge");
+  // the benchmark bid sells its surplus solar at midday: dearer midday prices lower the strike price
+  // through the merchant sales more than they raise it through the charging; with no merchant sales
+  // only the charging cost is left and the strike price rises
+  const sumOf = (m, k) => m.sim.years.slice(0, 15).reduce((a, y) => a + (y[k] || 0), 0);
+  assert.ok(sumOf(flood, "merchantRevCr") > sumOf(flat, "merchantRevCr") && sumOf(flood, "marketCostCr") > sumOf(flat, "marketCostCr"), "a storage flood lifts both the merchant revenue and the charging cost");
+  assert.ok(flood.sp < flat.sp, "with surplus solar sold, a storage flood lowers the strike price");
+  const floodNoSale = run({ priceScenario: "storageFlood", merchant: false });
+  const flatNoSale = run({ priceScenario: "flat", merchant: false });
+  assert.ok(floodNoSale.sp > flatNoSale.sp, "without merchant sales, a storage flood raises it (charging dearer)");
+  assert.ok(flatNoSale.sp > flat.sp + 2, "the benchmark bid leans on merchant sales for several rupees of its strike price");
+  assert.ok(Math.abs(tight.sp - flat.sp) < 0.05, "a tight grid (evening only) barely moves a solar-only bid");
+  const own = run({ priceScenario: "custom", pricePath: { midday: [1, 1.5, 2], evening: [1, 1, 1] } });
+  assert.ok(own.sim.years[1].marketCostCr > flat.sim.years[1].marketCostCr && Math.abs(own.sim.years[0].marketCostCr - flat.sim.years[0].marketCostCr) < 1e-6, "the bidder's own path applies per year, the last value carrying on");
+  const sm = smoothPath([1, 1, 4, 1, 1]);
+  assert.ok(sm[0] === 1 && sm[4] === 1 && sm[2] < 4 && sm[2] > sm[1] && sm[1] > 1 && Math.abs(sm[1] - sm[3]) < 1e-9, `smoothing evens a spike, the ends kept (${sm.join(", ")})`);
+  const bands = priceBands(flat.book);
+  assert.ok(bands.midday > 1 && bands.midday < 3 && bands.evening > 7 && bands.evening < 10, `the bands read in rupees (${bands.midday.toFixed(2)}, ${bands.evening.toFixed(2)})`);
+  const capped = run({ gdamShareCap: 0.001 });
+  assert.ok(capped.sim.years[0].chargeMarketMwh < flat.sim.years[0].chargeMarketMwh * 0.2 && capped.sim.years[0].shortMwh > flat.sim.years[0].shortMwh, "a tiny GDAM depth cap starves market charging");
+  const wide = run({ gdamShareCap: 0 });
+  assert.ok(Math.abs(wide.sp - flat.sp) < 1e-9, "0 = no cap; 20% does not bind for 100 MW");
+  console.log(`CfD market price paths: flat ₹${flat.sp.toFixed(3)}, storage flood ₹${flood.sp.toFixed(3)}, tight grid ₹${tight.sp.toFixed(3)}; bands ₹${bands.midday.toFixed(2)} midday, ₹${bands.evening.toFixed(2)} evening`);
+}

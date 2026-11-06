@@ -5,6 +5,7 @@ import { LiveChart } from "../rtc/charts";
 import { Section, Stat, nf, pf } from "../rtc/ui";
 import { TraceButton, TraceProvider } from "../model/ModelExplorer";
 import Cite from "./Cite.jsx";
+import MarketPrices from "./MarketPrices.jsx";
 import { TENDER } from "./terms.js";
 import { cfdBessAug, fmtDate, keyDates, lcCr, patchCfdBess, poolFlows, rfsAmounts } from "./model.js";
 import { MODEL_NOTES, cfdLiveRequest, cfdModelExport, downloadCfdModel, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
@@ -90,7 +91,7 @@ function QuoteBox({ state, model, finance, quote, onChange }) {
  * prices, model (runModel), quoteTariff / onQuoteTariff (the price the bidder will quote),
  * traceRequest (from the agent), sizeStep (the id of the step that sizes the plant).
  */
-export default function FinanceModelStep({ state, setState, patch, set, lockProps, isLocked, goto, prices, model, quoteTariff, onQuoteTariff, traceRequest = null, sizeStep = "size" }) {
+export default function FinanceModelStep({ state, setState, setInput, patch, set, lockProps, isLocked, goto, prices, model, quoteTariff, onQuoteTariff, traceRequest = null, sizeStep = "size" }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [ownQuote, setOwnQuote] = useState(null);
@@ -235,6 +236,7 @@ export default function FinanceModelStep({ state, setState, patch, set, lockProp
       <FinanceView state={viewState} patch={viewPatch} set={setFn} lockProps={locks} finance={finance} sizes={eng.sizes} extraLines={EXTRA_LINES}
         codDefault={i.effectiveDate ? keyDates(i.effectiveDate).scd : null} bessAug={cfdBessAug(state)} patchBess={(values) => setAll((s) => patchCfdBess(s, values))}
         modelArgs={{ ctx: null, sizes: eng.sizes, args: { costs: eng.costs, fin: eng.fin, bess: eng.bess, dfrTarget: 0, tariffLocked: false, ops: eng.ops, solveBy: "npv" } }} />
+      {setInput && <MarketPrices state={state} setInput={setInput} prices={prices} model={model} />}
     </TraceProvider>
   );
 }

@@ -96,7 +96,13 @@ Replaced and marked: the ₹5.80 ceiling and the slab sharing (Amd-03); RfS 4.4'
 ## Operations (`simulate`)
 
 Every day from the SCD to the end of the term, with the IEX DAM/GDAM/RTM prices of Sep 2025 –
-Sep 2026 (escalated by the bidder's rate):
+Sep 2026, each year scaled by the **price path** (`pricePathOf`): two multipliers per model year,
+the midday band (hours before 18:00: charging, midday merchant sales) and the evening band (the
+peak hours: the settlement price, evening merchant sales, the penalty reference). The path comes
+from the scenario (`PRICE_SCENARIOS`: flat, storage flood, tight grid, each a slope per band on
+top of the market price escalation) or from the bidder's own dots (`inputs.pricePath`, dragged
+on F.9 of the Financial model step and smoothed by `smoothPath`). Market charging in an hour is
+also capped at `gdamShareCap` × the hour's cleared GDAM volume (`hourlyMcvMw` of the price file):
 
 1. The 2 Peak Hours are the two highest-priced hours of 18:00–24:00 in the market the bidder sells
    in (the CfDA asks the RPD to bid to maximise revenue).
@@ -107,6 +113,15 @@ Sep 2026 (escalated by the bidder's rate):
 4. Own RE not needed is sold in the GDAM within the connection (the Contracted MW) on days the
    supply is met (CfDA 4.4.1.v), or curtailed.
 5. Each Contract Week's shortfall beyond 10% is penalised at the strike price being solved.
+
+F.9 of the Financial model step (`MarketPrices.jsx`) draws the two bands (`priceBands` gives
+today's levels: the cheapest three charging hours and the two dearest evening hours), lets the
+bidder drag a year's dot, smooth or pick a scenario, re-runs the full financial model on every
+change, and compares the scenarios through the full model (`runModel` with the `price` function).
+`tools/check_cfd_model.mjs` checks the bands, the scenarios' effect on charging cost, merchant
+revenue and the strike price (dearer midday power lowers the benchmark bid's strike price through
+its surplus solar sales and raises it when those sales are off), the bidder's own path, smoothing
+and the depth cap.
 
 Shown as assumptions, not tender terms: hourly (not 15-minute) prices; the battery empties each
 evening and recharges the next day; group-company power is available in any hour before 18:00; RECs

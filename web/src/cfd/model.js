@@ -48,7 +48,8 @@ export const FIELDS = [
   { section: "sourcing", key: "marketCharges", label: "Charges on green-market power", unit: "₹/kWh", min: 0, max: 3, step: 0.01, hint: "Exchange fee, transmission charges and losses on power bought in the GDAM" },
   { section: "sourcing", key: "groupPrice", label: "Group-company RE price", unit: "₹/kWh", min: 0, max: 10, step: 0.01, hint: "Used only if you source from group companies (after 36 months)" },
   { section: "sourcing", key: "groupCharges", label: "Charges on group-company power", unit: "₹/kWh", min: 0, max: 3, step: 0.01 },
-  { section: "sourcing", key: "priceEscalation", label: "Market price escalation", unit: "%/yr", pct, min: -5, max: 10, step: 0.1, hint: "Applied to the 2025–26 IEX prices" },
+  { section: "sourcing", key: "priceEscalation", label: "Market price escalation", unit: "%/yr", pct, min: -5, max: 10, step: 0.1, hint: "Applied to the 2025–26 IEX prices; the price scenario on the Financial model step can split it into a midday and an evening path" },
+  { section: "sourcing", key: "gdamShareCap", label: "Share of the GDAM you can buy in an hour", unit: "%", pct, min: 0, max: 100, step: 1, hint: "Cap on market charging each hour: that share of the hour's cleared GDAM volume (IEX MCV); 0 = no cap. Midday GDAM clears about 1.2–1.8 GW on thin days" },
   { section: "sourcing", key: "recPrice", label: "REC price", unit: "₹/REC (MWh)", min: 0, max: 2000, step: 10, hint: "You keep 50% (CfDA 9.2.vi)" },
   // ---- costs
   { section: "costs", key: "essCrPerMwh", label: "Battery capex (all-in)", unit: "₹ cr/MWh", min: 0, max: 5, step: 0.01 },
@@ -92,12 +93,13 @@ export const BENCHMARKS = {
   effectiveDate: "2027-02-01",
   essMwhPerMw: 2, essMwPerMw: 1, solarMw: null, windMw: 0, reCodMonths: 21, availability: 0.97,
   solarCuf: 0.25, solarDegradation: 0.005, windCuf: 0.33, rte: 0.87, essDegradation: 0.02,
-  marketCharges: 0.3, groupPrice: 3.0, groupCharges: 0.3, priceEscalation: 0, recPrice: 150,
+  marketCharges: 0.3, groupPrice: 3.0, groupCharges: 0.3, priceEscalation: 0, gdamShareCap: 0.2, recPrice: 150,
   essCrPerMwh: 1.0, solarCrPerMw: 4.0, windCrPerMw: 6.5, evacuationCrPerMw: 0.3, preopPct: 0.05, augDecline: 0.05,
   essOmLakhPerMwh: 1.2, solarOmLakhPerMw: 4, windOmLakhPerMw: 9, otherFixedLakhPerMw: 2, insurancePct: 0.003, omEscalation: 0.05,
   pxFee: 0.02, lcCostPct: 0.01, pbgCostPct: 0.01, gstRate: 0.18,
   targetEquityIrr: 0.14, debtFraction: 0.75, interestRate: 0.09, tenorYears: 12, taxRate: 0.2517, essLifeYears: 15, reLifeYears: 25, discountRate: 0.1,
   sellMarket: "DAM", useMarket: true, useGroup: false, merchant: true, augmentation: "annual", afterTerm: "none", merchantYears: 0,
+  priceScenario: "flat", pricePath: null,
 };
 
 export const DEFAULT_CONTRACTED_MW = 100;
@@ -195,7 +197,7 @@ export function missingInputs(state) {
   for (const key of ["sellMarket", "useMarket", "useGroup", "merchant", "augmentation", "afterTerm"]) {
     if (i[key] === null || i[key] === undefined) out.push(CHOICES[key].label);
   }
-  const optional = new Set(["windCuf", "windCrPerMw", "windOmLakhPerMw", "groupPrice", "groupCharges", "recPrice"]);
+  const optional = new Set(["windCuf", "windCrPerMw", "windOmLakhPerMw", "groupPrice", "groupCharges", "recPrice", "gdamShareCap"]);
   for (const f of FIELDS) {
     if (optional.has(f.key)) continue;
     if (!isNum(i[f.key])) out.push(f.label);
@@ -269,12 +271,64 @@ function priceDay(t) {
 
 // ---------------------------------------------------------------- inputs for the simulation
 
+/**
+ * Market price scenarios: how the midday (charging) and evening (selling, penalty reference) prices
+ * move over the term, as a multiplier on the IEX price year per model year. The single
+ * "Market price escalation" input is the common drift; a scenario adds its own slope to each band.
+ * The bidder's own path (dragged on the Financial model step) is kept in inputs.pricePath.
+ */
+export const PRICE_SCENARIOS = {
+  flat: { label: "Flat", note: "Today's shape, both bands escalated at the market price escalation", midday: 0, evening: 0 },
+  storageFlood: { label: "Storage flood", note: "Storage build-out lifts midday prices 3% a year and pulls the evening down 3% a year, on top of the escalation", midday: 0.03, evening: -0.03 },
+  tightGrid: { label: "Tight grid", note: "Demand outruns supply: the evening rises 3% a year, midday follows the escalation", midday: 0, evening: 0.03 },
+  custom: { label: "Your own path", note: "The dots you dragged on the Financial model step", midday: 0, evening: 0 },
+};
+
+/** The price path of the term: { midday[], evening[] } multipliers on the IEX year, one per model year. */
+export function pricePathOf(inputs, years = TENDER.termYears + 1) {
+  const esc = inputs.priceEscalation || 0;
+  const key = PRICE_SCENARIOS[inputs.priceScenario] ? inputs.priceScenario : "flat";
+  const sc = PRICE_SCENARIOS[key];
+  const gen = (slope) => Array.from({ length: years }, (_, k) => (1 + esc + slope) ** k);
+  const own = key === "custom" && inputs.pricePath && Array.isArray(inputs.pricePath.midday) && Array.isArray(inputs.pricePath.evening) ? inputs.pricePath : null;
+  const pad = (arr, fallback) => Array.from({ length: years }, (_, k) => {
+    const v = arr?.[Math.min(k, arr.length - 1)];
+    return Number.isFinite(v) && v > 0 ? v : fallback[k];
+  });
+  return own ? { midday: pad(own.midday, gen(0)), evening: pad(own.evening, gen(0)), scenario: key } : { midday: gen(sc.midday), evening: gen(sc.evening), scenario: key };
+}
+
+/** Smooth a path of dots: two passes of a 3-point average, the ends kept. */
+export function smoothPath(values) {
+  let v = values.slice();
+  for (let pass = 0; pass < 2; pass += 1) {
+    v = v.map((x, k) => (k === 0 || k === v.length - 1 ? x : (v[k - 1] + x + v[k + 1]) / 3));
+  }
+  return v.map((x) => Math.round(x * 1000) / 1000);
+}
+
+/** The IEX year's price levels the path multiplies: the cheapest three charging hours and the two dearest evening hours, ₹/kWh. */
+export function priceBands(book) {
+  let mid = 0;
+  let eve = 0;
+  for (let d = 0; d < 365; d += 1) {
+    const b = d * 24;
+    const cheap = book.buyOrder[d].slice(0, 3);
+    mid += cheap.reduce((a, h) => a + book.buy[b + h], 0) / cheap.length;
+    const top = book.peakOrder[d].slice(0, TENDER.peakHours);
+    eve += top.reduce((a, h) => a + book.sell[b + h], 0) / top.length;
+  }
+  return { midday: mid / 365, evening: eve / 365 };
+}
+
 /** Hourly prices in ₹/kWh from the IEX price year, and each day's hour orderings (fixed for the year). */
 export function priceBook(prices, sellMarket) {
   const series = (m) => Float64Array.from(prices.markets[m].hourlyRsPerMwh, (v) => v / 1000);
   const sell = series(sellMarket);
   const buy = series("GDAM");
   const merchant = series("GDAM");
+  const mcvRaw = prices.markets.GDAM?.hourlyMcvMw;
+  const mcv = Array.isArray(mcvRaw) && mcvRaw.length >= E.HOURS ? Float64Array.from(mcvRaw) : null; // cleared volume, MW, for the depth cap
   const all = ["DAM", "GDAM", "RTM"].filter((m) => prices.markets[m]).map(series);
   const maxAll = new Float64Array(E.HOURS);
   for (let t = 0; t < E.HOURS; t += 1) maxAll[t] = Math.max(...all.map((s) => s[t]));
@@ -294,7 +348,7 @@ export function priceBook(prices, sellMarket) {
     for (let h = TENDER.peakStart; h < TENDER.peakEnd; h += 1) ref = Math.max(ref, maxAll[b + h]);
     peakRef[d] = ref;
   }
-  return { sell, buy, merchant, maxAll, peakOrder, chargeOrder, buyOrder, peakRef, sellMarket };
+  return { sell, buy, merchant, mcv, maxAll, peakOrder, chargeOrder, buyOrder, peakRef, sellMarket };
 }
 
 /** Hourly own-RE output per MW (year 1) at the bidder's CUFs. */
@@ -362,12 +416,16 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
   let cyIdx = 0;
   let marketUsed = 0;
   let groupUsed = 0;
+  const path = pricePathOf(inputs, Math.ceil((dates.end - dates.scd) / DAY_MS / 365) + 1);
+  const shareCap = isNum(inputs.gdamShareCap) && inputs.gdamShareCap > 0 ? inputs.gdamShareCap : null;
   for (let t = dates.scd, k = 0; t < dates.end; t += DAY_MS, k += 1) {
     while (cyIdx < out.length - 1 && t >= out[cyIdx].end) { cyIdx += 1; marketUsed = 0; groupUsed = 0; }
     const cy = out[cyIdx];
     const oy = opYears[opIndex(k)];
     const year = Math.floor(k / 365) + 1;
-    const esc = (1 + inputs.priceEscalation) ** (year - 1);
+    const escM = path.midday[year - 1]; // the charging band (hours before 18:00)
+    const escE = path.evening[year - 1]; // the evening band (the peak hours)
+    const escOf = (h) => (h < TENDER.peakStart ? escM : escE);
     const solarF = (1 - inputs.solarDegradation) ** (year - 1);
     const cap = inputs.augmentation === "annual" ? capNominal : capNominal * Math.max(0.4, 1 - inputs.essDegradation * (year - 1));
     const reOn = t >= reCod;
@@ -412,13 +470,14 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     // then bought power, cheapest first, within the Contract Year's limits (MWh supplied)
     if (chargeLeft > 1e-9 && (inputs.useMarket || (inputs.useGroup && !extra))) {
       const offers = [];
-      if (inputs.useMarket) for (const h of book.buyOrder[d]) offers.push({ h, src: "m", price: book.buy[b + h] * esc + inputs.marketCharges });
+      if (inputs.useMarket) for (const h of book.buyOrder[d]) offers.push({ h, src: "m", price: book.buy[b + h] * escM + inputs.marketCharges });
       if (inputs.useGroup && !extra) for (let h = 0; h < TENDER.peakStart; h += 1) offers.push({ h, src: "g", price: inputs.groupPrice + inputs.groupCharges });
       offers.sort((x, y) => x.price - y.price || x.h - y.h);
       for (const o of offers) {
         if (chargeLeft <= 1e-9) break;
         const budget = o.src === "m" ? (cy.marketCapMwh - marketUsed) / rte : (cy.groupCapMwh - groupUsed) / rte;
-        const c = Math.min(room[o.h], chargeLeft, Math.max(0, budget));
+        const depth = o.src === "m" && shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + o.h] - mkt[o.h]) : Infinity; // the GDAM depth cap, MWh in the hour
+        const c = Math.min(room[o.h], chargeLeft, Math.max(0, budget), depth);
         if (c <= 1e-9) continue;
         room[o.h] -= c; chargeLeft -= c;
         if (o.src === "m") { mkt[o.h] += c; marketUsed += c * rte; cy.marketCostCr += c * o.price * 1e-4; } else { grp[o.h] += c; groupUsed += c * rte; cy.groupCostCr += c * o.price * 1e-4; }
@@ -442,7 +501,7 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
       const s = inputs.merchant && met ? Math.min(spare, Math.max(0, X - injected)) : 0;
       sale[h] = s;
       merchantMwh += s;
-      merchantRev += s * book.merchant[b + h] * esc * 1e-4;
+      merchantRev += s * book.merchant[b + h] * escOf(h) * 1e-4;
       curtailed += spare - s;
     }
     let ownCharged = 0;
@@ -452,7 +511,7 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     for (let h = 0; h < TENDER.peakStart; h += 1) ownCharged += own[h];
     const ownSupplied = windDirect + ownCharged * rte * (charged > 0 ? Math.min(1, essOut / (charged * rte)) : 0);
     let mcp = 0;
-    for (const h of chosen) mcp += book.sell[b + h] * esc * (direct[h] + essOut / chosen.length);
+    for (const h of chosen) mcp += book.sell[b + h] * escE * (direct[h] + essOut / chosen.length);
     const marketDay = mkt.reduce((a, v) => a + v, 0);
     const groupDay = grp.reduce((a, v) => a + v, 0);
     const marketCostDay = cy.marketCostCr - cyMarketCost;
@@ -475,12 +534,12 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     const w = weeks.get(wk) || { start: wk, required: 0, supplied: 0, ref: 0, cy: cyIdx, oy: opIndex(k) };
     w.required += X * TENDER.mwhPerMwDay;
     w.supplied += delivered;
-    w.ref = Math.max(w.ref, book.peakRef[d] * esc);
+    w.ref = Math.max(w.ref, book.peakRef[d] * escE);
     w.cy = cyIdx;
     weeks.set(wk, w);
     if (keep.has(k)) {
       days[k] = { date: t, chosen, solar: Array.from(sol), wind: Array.from(wnd), own: [...own, ...new Array(6).fill(0)], market: [...mkt, ...new Array(6).fill(0)], group: [...grp, ...new Array(6).fill(0)],
-        sale: Array.from(sale), essOut, windDirect: direct, delivered, required: X * TENDER.mwhPerMwDay, price: Array.from({ length: 24 }, (_, h) => book.sell[b + h] * esc), buyPrice: Array.from({ length: 24 }, (_, h) => book.buy[b + h] * esc) };
+        sale: Array.from(sale), essOut, windDirect: direct, delivered, required: X * TENDER.mwhPerMwDay, price: Array.from({ length: 24 }, (_, h) => book.sell[b + h] * escOf(h)), buyPrice: Array.from({ length: 24 }, (_, h) => book.buy[b + h] * escOf(h)) };
     }
   }
   for (const w of weeks.values()) {
