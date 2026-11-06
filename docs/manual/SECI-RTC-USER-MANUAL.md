@@ -316,6 +316,13 @@ the bid forms.
 **Tax depreciation** (WDV / straight line), **WDV rate**, **Book life**, **Salvage value**,
 **Other fixed cost**). Changing any of them recomputes the model at once.
 
+*About the discount rate.* It serves two numbers: the LCOE and the **Project NPV at the discount
+rate** (Key results of the workbook, the trace). The tariff is solved for the *equity* target
+IRR, so the project as a whole, before debt, earns less than that (about 10% on the defaults).
+A discount rate above the project IRR gives a negative project NPV; that reports the project's
+return against the rate you chose, not a loss. Set it to the blended cost of capital, or read
+Project IRR and the equity NPV at the target instead.
+
 **More inputs (finance team).** A button under the assumptions opens the finance team's groups
 (the same as 4.3a on Finance inputs); see the chapter of that name below.
 

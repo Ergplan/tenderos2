@@ -20,6 +20,46 @@ bid, so that you net the strike price on every kWh. You must build a battery of 
 X MW contracted, commission it within 15 months, bring RE online within 36 months, and sell 2 MWh
 per MW every day in two hours you choose between 18:00 and 24:00, for 15 years.
 
+## The CfD tender in simple terms
+
+**What SECI is buying.** Not round-the-clock power, just the evening peak. For every MW you
+contract, you put 2 MWh into the grid every evening, in two hours of your choosing between 6 pm
+and midnight. SECI wants 500 MW of this, so 1,000 MWh an evening in all. A group bids 50 to
+150 MW.
+
+**How you get paid: the "Contract for Difference".** You do not sell to SECI. You sell your
+evening energy on the power exchange at whatever the market price is that evening. SECI's CfD
+Pool then tops you up or takes the excess, so that you always end up with your bid price, the
+**strike price**:
+
+* the market clears below your strike price: the Pool pays you the difference;
+* the market clears above it: you pay the difference into the Pool.
+
+The exchange and the Pool together give you a fixed price per kWh for 15 years, and SECI never
+buys the power itself. The auction is on the strike price, lowest wins. The earlier price ceiling
+was removed by Amendment-03, and the earlier slab sharing of gains was replaced by this full
+pass-through.
+
+**What you must build.** A battery of at least 1 MW and 2 MWh per contracted MW, ready 15 months
+after the Effective Date, and your own solar or wind by month 36. Until then you may charge the
+battery entirely from green power bought on the market; after month 36 at least a quarter of the
+energy must come from your own renewable plant, more if you do not use group-company plants.
+
+**What happens if you miss.** The obligation is also measured by the week: 14 MWh per MW. Up to
+10% short is free. Beyond that, each missed kWh costs 1.5 times the gap between the week's
+highest evening market price and your strike price, and you lose that evening's revenue. You
+also give SECI a letter of credit sized on the strike price.
+
+**Money up front.** An earnest money deposit, then a performance bank guarantee within 20 days
+of the award, SECI's administration charges, and a net-worth and liquidity test. No plant is
+needed to bid; you qualify as a company.
+
+**Why bidders like it.** Fixed revenue like a PPA, but you keep selling on the market, so there is
+no discom payment risk, and the battery earns on the peak where prices are highest. The risk is
+the strike price you quote: too low and the returns are thin, too high and you lose the auction.
+That is what this tab sizes, prices and lets you test with What-if. Step 01 carries the same
+explanation with a three-evening worked example, every claim linked to its clause.
+
 ---
 
 ## Step 01 · What is a CfD *(Tender / Legal)*
@@ -216,6 +256,20 @@ model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, D
 tax, Working capital and Sensitivity, every number a formula on the blue inputs.
 
 ![The traceable model](img/cfd-08-trace.jpg)
+
+**Why "Project NPV at the discount rate" can be negative.** The strike price is solved so that
+the *equity* earns the target IRR (14% by default). The project NPV, on the Key results of the
+workbook and in the trace, discounts the *unlevered* project cash flows (before debt) at the
+**Discount rate (LCOE / NPV)** of F.1, 10% by default. With 75% debt at 9%, equity reaches 14%
+while the project as a whole earns about 10% or a little less, so a 10% discount rate sits just
+above the project IRR and the NPV comes out slightly negative (for example −₹13.96 cr on a
+₹660 cr project). That is not a loss: it says the project's return is below the discount rate
+you chose, not below your cost of capital. Read it against **Project IRR** on the same tiles:
+the NPV is zero when the discount rate equals the project IRR, positive below it, negative above
+it. To judge the project on its own, set the discount rate to the blended cost of capital (debt
+after tax and equity in their shares, about 8 to 9% on the defaults), or read **Equity IRR** and
+its NPV at the target, which is what the auction price is built on. The LCOE uses the same
+discount rate, so changing it moves the levelised cost as well.
 
 **5.0 · Your quote.** Type the **strike price you will quote**: the equity and project IRR it
 earns and the difference to the target; a warning below the target.
