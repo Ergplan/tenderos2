@@ -89,8 +89,19 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   }
   const applyTrack = (steps) => setState((s) => steps.reduce((acc, st) => withCfdLever(acc, { key: st.key, min: -Infinity, max: Infinity, int: st.int }, st.to), s));
   const frozen = state.frozen || {};
-  const onFreeze = (value, record) => { if (freezing) setState((s) => freezeLever(s, freezing.lever, value, record)); };
-  const onUnfreeze = (key) => setState((s) => unfreezeLever(s, key));
+  // the price before the first freeze is kept, so the panel can say how much of the gap the frozen values secured
+  const onFreeze = (value, record) => {
+    if (!freezing) return;
+    setState((s) => {
+      const first = !Object.keys(s.frozen || {}).length;
+      const next = freezeLever(s, freezing.lever, value, record);
+      return first || !Number.isFinite(s.frozenBaseline?.price) ? { ...next, frozenBaseline: { price: base, at: new Date().toISOString() } } : next;
+    });
+  };
+  const onUnfreeze = (key) => setState((s) => {
+    const next = unfreezeLever(s, key);
+    return Object.keys(next.frozen || {}).length ? next : { ...next, frozenBaseline: null };
+  });
 
   // the What-if case as a workbook: the bid with the track's moves applied, priced through the full
   // model, with a What-if track sheet (the moves, their chances, the frozen levers)
@@ -147,13 +158,15 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
           {(progress || tracking) && <button type="button" className="secondary" onClick={() => abortRef.current?.abort()}><Square size={12} /> Stop</button>}
           {track && trackStale && !progress && !tracking && <small className="lever-stale">The case changed: plot again</small>}
         </div>
-        <FrozenPanel frozen={frozen} onUnfreeze={onUnfreeze} />
+        <FrozenPanel frozen={frozen} onUnfreeze={onUnfreeze} baseline={state.frozenBaseline?.price ?? null} now={base} target={target} />
         {track && <TrackView track={track.result} targetIrr={finance.engine.fin.targetEquityIrr} onApply={applyTrack} frozen={frozen} onFreeze={(st) => setFreezing({ lever: st, value: st.to })} onDownload={downloadWhatIf} downloading={downloading} />}
         {downloadError && <div className="alert">{downloadError}</div>}
         {freezing && <FreezeDialog lever={freezing.lever} value={freezing.value} me={me} onFreeze={onFreeze} onClose={() => setFreezing(null)} />}
       </Section>
 
-      <Section index="6.1" title="Strike-price levers for bid day" note="What moves the strike price you need, and how far each lever alone would have to go to reach the price you want to quote" className="lever-panel">
+      <Section index="6.1" title="Behind the track: every lever, one step at a time" note="The measurements the track is built from. Open it to see the levers the track did not pick, how much each moves the price per step, and to apply or freeze one by hand" className="lever-panel">
+        <details className="lever-details" data-testid="cfd-levers-details">
+        <summary>Show every lever</summary>
         <div className="lever-head">
           <button type="button" className="primary" onClick={compute} disabled={Boolean(progress)} data-testid="cfd-levers-run">
             {progress ? <Loader2 className="spin" size={14} /> : <SlidersHorizontal size={14} />} {progress ? `Computing ${progress.done} of ${progress.total}` : res && !stale ? "Levers up to date" : res ? "Recompute the levers" : "Compute the levers"}
@@ -221,6 +234,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
             <p className="rtc-note">Each row is the model run with that input one step up and one step down, everything else as in the bid; the reach is the straight-line move of that lever alone, so use it as a direction, then recompute. Levers that cannot move in this bid (no wind, no group RE) are left out. A lever marked re-simulated changes the day-by-day operation; after applying one, size the plant again for the least-price own RE.</p>
           </div>
         )}
+        </details>
       </Section>
     </div>
   );

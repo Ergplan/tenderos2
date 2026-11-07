@@ -76,3 +76,20 @@
 .freeze-dialog input { display: block; width: 100%; margin-top: 4px; }
 .track-step-head .freeze-btn, .lever-table .freeze-btn { display: inline-flex; align-items: center; gap: 4px; }
 .track-step-head .frozen-mark { color: var(--good, #4cc38a); display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
+
+/* frozen table, progress, lit moves, folded levers */
+.frozen-progress { margin: 6px 0 10px; }
+.frozen-progress-bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.frozen-progress-bar i { display: block; height: 100%; background: var(--good, #4cc38a); transition: width 300ms ease; }
+.frozen-progress-text { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.frozen-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.frozen-table th { text-align: left; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.frozen-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.frozen-table td.bad { color: var(--bad, #e5484d); }
+.frozen-table td:last-child { text-align: right; white-space: nowrap; }
+.track-waterfall .wf-bar.pick { cursor: pointer; }
+.track-waterfall .wf-bar.pick:hover { opacity: 0.8; }
+.track-steps li.lit { border-color: var(--signal); box-shadow: 0 0 0 2px var(--signal); transition: box-shadow 300ms; }
+.lever-details > summary { cursor: pointer; color: var(--signal); font-size: 13px; margin-bottom: 10px; list-style: none; }
+.lever-details > summary::before { content: "▸ "; }
+.lever-details[open] > summary::before { content: "▾ "; }

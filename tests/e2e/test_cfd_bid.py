@@ -165,13 +165,19 @@ def test_cfd_bid_end_to_end(tmp_path):
         assert page.locator("[data-testid=cfd-track-chance]").count() >= 1
         assert page.locator("[data-testid=cfd-track-waterfall]").count() == 1
         assert "chance" in page.locator("[data-testid=cfd-track-verdict]").inner_text().lower()
-        # freeze the first move with a note as evidence; the next track leaves it alone; the What-if workbook
+        # a waterfall bar scrolls to its move and lights it
         first = page.locator("[data-testid^=cfd-track-step-]").first.get_attribute("data-testid").replace("cfd-track-step-", "")
+        page.click(f"[data-testid=\"cfd-track-bar-{first}\"]")
+        page.wait_for_timeout(300)
+        assert "lit" in (page.locator(f"[data-testid=\"cfd-track-step-{first}\"]").get_attribute("class") or "")
+        # freeze the first move with a note as evidence; the next track leaves it alone; the What-if workbook
         page.click(f"[data-testid=\"cfd-track-freeze-{first}\"]")
         page.wait_for_selector("[data-testid=cfd-freeze-dialog]", timeout=10_000)
         page.fill("[data-testid=cfd-freeze-note]", "Signed quote of 6 November")
         page.click("[data-testid=cfd-freeze-confirm]")
         page.wait_for_selector(f"[data-testid=\"cfd-frozen-{first}\"]", timeout=10_000)
+        assert page.locator("[data-testid=cfd-frozen-table] thead th").count() >= 5, "the frozen levers as a table"
+        assert "secured" in page.locator("[data-testid=cfd-frozen-progress]").inner_text().lower()
         page.click("[data-testid=cfd-track-run]")
         page.wait_for_selector("[data-testid=cfd-track-verdict]", timeout=900_000)
         page.wait_for_function("() => !document.querySelector('[data-testid=cfd-track-run]').disabled", timeout=900_000)
@@ -183,6 +189,7 @@ def test_cfd_bid_end_to_end(tmp_path):
         wb2 = openpyxl.load_workbook(str(wi), read_only=True)
         assert "What-if track" in wb2.sheetnames, wb2.sheetnames
         page.click(f"[data-testid=\"cfd-unfreeze-{first}\"]")
+        page.locator("[data-testid=cfd-levers-details] summary").click()
         page.wait_for_selector("[data-testid^=cfd-lever-]", timeout=600_000)
         assert page.locator("[data-testid^=cfd-lever-]").count() >= 11, "the table and at least ten levers"
         # the reading guide and a lever's explanation

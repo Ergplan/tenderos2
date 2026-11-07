@@ -16,7 +16,7 @@ export function Chance({ p }) {
   return <span className={`track-chip ${cls}`} data-testid="cfd-track-chance">{pf(p, p > 0 && p < 0.01 ? 1 : 0)} · {word}</span>;
 }
 
-function Waterfall({ track }) {
+function Waterfall({ track, onPick }) {
   const shown = track.steps.slice(0, 8);
   const rest = track.steps.slice(8);
   const steps = rest.length ? [...shown, { label: `${rest.length} more moves`, price: track.steps[track.steps.length - 1].price, drop: shown[shown.length - 1].price - track.steps[track.steps.length - 1].price }] : shown;
@@ -33,7 +33,7 @@ function Waterfall({ track }) {
   const bars = [];
   let prev = top;
   bars.push({ label: "Model needs", from: top, to: top, kind: "base" });
-  for (const s of steps) { bars.push({ label: s.label, from: prev, to: s.price, kind: s.drop >= 0 ? "drop" : "rise" }); prev = s.price; }
+  for (const s of steps) { bars.push({ label: s.label, from: prev, to: s.price, kind: s.drop >= 0 ? "drop" : "rise", key: s.key || null, title: `${s.label}: ₹${nf(prev, 3)} → ₹${nf(s.price, 3)}` }); prev = s.price; }
   bars.push({ label: track.reached ? "Your quote" : "Still short", from: prev, to: bottom, kind: track.reached ? "quote" : "short", full: true });
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="track-waterfall" data-testid="cfd-track-waterfall">
@@ -46,7 +46,9 @@ function Waterfall({ track }) {
         const h = Math.max(2, Math.abs(y(b.from) - y(b.to)));
         return (
           <g key={k}>
-            <rect x={x} y={b.kind === "base" || b.full ? y(b.from) : yTop} width={colW - 8} height={b.kind === "base" || b.full ? Math.max(2, H - padB - y(b.from)) : h} className={`wf-bar ${b.kind}`} />
+            <rect x={x} y={b.kind === "base" || b.full ? y(b.from) : yTop} width={colW - 8} height={b.kind === "base" || b.full ? Math.max(2, H - padB - y(b.from)) : h} className={`wf-bar ${b.kind} ${b.key ? "pick" : ""}`} onClick={b.key && onPick ? () => onPick(b.key) : undefined} data-testid={b.key ? `cfd-track-bar-${b.key}` : undefined}>
+              {b.title && <title>{b.title}</title>}
+            </rect>
             <text x={x + (colW - 8) / 2} y={H - 6} textAnchor="middle" className="axis">{b.label.length > 14 ? `${b.label.slice(0, 13)}…` : b.label}</text>
           </g>
         );
@@ -57,6 +59,13 @@ function Waterfall({ track }) {
 
 export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFreeze = null, onDownload = null, downloading = false }) {
   const [showFloor, setShowFloor] = useState(false);
+  const [lit, setLit] = useState(null);
+  const pick = (key) => {
+    const el = document.querySelector(`[data-testid="cfd-track-step-${key}"]`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setLit(key);
+    setTimeout(() => setLit((k) => (k === key ? null : k)), 1800);
+  };
   if (track.above) {
     return (
       <div className="track" data-testid="cfd-track">
@@ -81,11 +90,11 @@ export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFr
         <Stat label="Chance it all comes off" value={pf(track.chance, track.chance > 0 && track.chance < 0.01 ? 1 : 0)} detail="the moves' chances multiplied" tone={tone === "good" ? "good" : "bad"} />
       </div>
       <p className={`track-verdict ${tone}`} data-testid="cfd-track-verdict">{verdict}</p>
-      {track.steps.length > 0 && <Waterfall track={track} />}
+      {track.steps.length > 0 && <Waterfall track={track} onPick={pick} />}
       {track.steps.length > 0 && (
         <ol className="track-steps" data-testid="cfd-track-steps">
           {track.steps.map((st, k) => (
-            <li key={st.key} data-testid={`cfd-track-step-${st.key}`}>
+            <li key={st.key} className={lit === st.key ? "lit" : ""} data-testid={`cfd-track-step-${st.key}`}>
               <div className="track-step-head">
                 <b>{k + 1}. {st.label}</b>: {fmtV(st, st.from)}{unitOf(st)} → <b>{fmtV(st, st.to)}{unitOf(st)}</b> <Chance p={st.p} />
                 <span className="track-price">price {st.drop >= 0 ? "falls" : "rises"} ₹{nf(Math.abs(st.drop), 3)} to <b>₹{nf(st.price, 3)}</b></span>

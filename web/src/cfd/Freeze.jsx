@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Lock, Paperclip, Unlock, X } from "lucide-react";
 import { nf, pf } from "../rtc/ui";
 import { withCfdLever } from "./levers.js";
@@ -87,7 +88,8 @@ export function FreezeDialog({ lever, value: initial, me, onFreeze, onClose }) {
     setBusy(false);
     onClose();
   };
-  return (
+  // through a portal on the body: the step's own containers would pin the dialog far down the page
+  return createPortal(
     <div className="modal-backdrop" role="dialog" aria-modal="true" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <form className="modal freeze-dialog" onSubmit={submit} data-testid="cfd-freeze-dialog">
         <div className="modal-head">
@@ -107,28 +109,52 @@ export function FreezeDialog({ lever, value: initial, me, onFreeze, onClose }) {
           <button type="submit" className="primary" disabled={busy || !Number.isFinite(value)} data-testid="cfd-freeze-confirm"><Lock size={12} /> {busy ? "Freezing…" : `Freeze at ${fmtV(lever, value)}${unitOf(lever)}`}</button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
-/** The frozen levers of the bid, with their evidence, and Unfreeze. */
-export function FrozenPanel({ frozen, onUnfreeze }) {
+/**
+ * The frozen levers of the bid as a table, with the ground secured so far: the price before the
+ * first freeze (`baseline`), the price now (`now`, the bid with the frozen values in it) and the
+ * quote (`target`), so the bar reads "₹x of the ₹y gap found, ₹z still to find".
+ */
+export function FrozenPanel({ frozen, onUnfreeze, baseline = null, now = null, target = null }) {
   const list = Object.values(frozen || {});
   if (!list.length) return null;
+  const gap = Number.isFinite(baseline) && Number.isFinite(target) ? baseline - target : null;
+  const secured = Number.isFinite(baseline) && Number.isFinite(now) ? baseline - now : null;
+  const left = Number.isFinite(now) && Number.isFinite(target) ? now - target : null;
+  const share = gap > 0 && secured !== null ? Math.max(0, Math.min(1, secured / gap)) : null;
+  const dateOf = (iso) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "");
   return (
     <div className="frozen-panel" data-testid="cfd-frozen">
       <div className="frozen-head"><Lock size={13} /> <b>Frozen levers</b> <small>kept as they are in every track; unfreeze to let the plan move them again</small></div>
-      <ul>
-        {list.map((f) => (
-          <li key={f.key} data-testid={`cfd-frozen-${f.key}`}>
-            <b>{f.label}</b> at <b>{fmtV(f, f.value)}{unitOf(f)}</b>
-            <small> · {f.by || "you"}, {new Date(f.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small>
-            {f.evidence ? <small className={f.evidence.warning ? "bad" : ""}> · <Paperclip size={11} /> {f.evidence.name}{f.evidence.warning ? ` (${f.evidence.warning})` : ""}</small> : <small className="bad"> · no evidence attached</small>}
-            {f.note && <small> · {f.note}</small>}
-            <button type="button" className="secondary" onClick={() => onUnfreeze(f.key)} data-testid={`cfd-unfreeze-${f.key}`}><Unlock size={11} /> Unfreeze</button>
-          </li>
-        ))}
-      </ul>
+      {gap !== null && (
+        <div className="frozen-progress" data-testid="cfd-frozen-progress">
+          <div className="frozen-progress-bar"><i style={{ width: `${Math.round((share ?? 0) * 100)}%` }} /></div>
+          <div className="frozen-progress-text">
+            {secured >= 0
+              ? <>The frozen values have brought the price from <b>₹{nf(baseline, 3)}</b> to <b>₹{nf(now, 3)}</b>: <b>₹{nf(secured, 3)}</b> of the ₹{nf(gap, 3)} gap to ₹{nf(target, 3)} is secured ({pf(share ?? 0, 0)}){left > 0.0005 ? <>; <b>₹{nf(left, 3)}</b> still to find, which the track below plans</> : <>; the quote is reached</>}.</>
+              : <>The frozen values have raised the price from ₹{nf(baseline, 3)} to ₹{nf(now, 3)}; ₹{nf(left, 3)} to find for ₹{nf(target, 3)}.</>}
+          </div>
+        </div>
+      )}
+      <table className="frozen-table" data-testid="cfd-frozen-table">
+        <thead><tr><th>Lever</th><th>Frozen at</th><th>By · on</th><th>Evidence</th><th>Note</th><th /></tr></thead>
+        <tbody>
+          {list.map((f) => (
+            <tr key={f.key} data-testid={`cfd-frozen-${f.key}`}>
+              <td><b>{f.label}</b></td>
+              <td><b>{fmtV(f, f.value)}</b>{unitOf(f)}</td>
+              <td>{f.by || "you"} · {dateOf(f.at)}</td>
+              <td className={f.evidence?.warning || !f.evidence ? "bad" : ""}>{f.evidence ? <><Paperclip size={11} /> {f.evidence.name}{f.evidence.warning ? ` (${f.evidence.warning})` : ""}</> : "none attached"}</td>
+              <td>{f.note || ""}</td>
+              <td><button type="button" className="secondary" onClick={() => onUnfreeze(f.key)} data-testid={`cfd-unfreeze-${f.key}`}><Unlock size={11} /> Unfreeze</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
