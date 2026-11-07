@@ -477,6 +477,21 @@ leaves it alone and looks for the rest of the gap elsewhere. Click a bar of the 
 to its move. The evidence also lands in the tab's evidence register. **Unfreeze**
 lets the plan move it again (the value stays).
 
+*Freezing a better value than the track asked for.* The dialog opens at the move's value, but you
+type what your evidence supports. If the track asked for a battery at ₹0.59 cr/MWh and your quote
+is ₹0.50, freeze ₹0.50: the dialog says what the benchmark bands make of that value (sure, a
+stretch, or beyond what they allow for) and that your evidence overrides them, the price impact
+in the Frozen levers table is measured through the full model at ₹0.50 (not scaled from the
+suggestion), the secured-gap bar moves by that much, and the next track starts from the lower
+price and needs fewer other moves.
+
+*Not for us.* Every suggested move also has a **Not for us** button. Click it when the move is one
+you will not make (say, a longer loan tenor your lender has ruled out): the lever is recorded with
+the bid under **Not for us**, the track is plotted again without it and finds the gap through the
+other levers, and the verdict says how many levers you turned down. **Allow again** lets the plan
+use it. The bid size is never offered as a move: every cost scales with the MW, so it hardly moves
+the price, and it is a decision for the Bid inputs step.
+
 *Download What-if model (Excel).* The button is always there under the track section: with a
 track plotted it builds the full financial model of the What-if case: the bid with every move applied, priced through the full model, the
 same sheets as the Financial model step, plus a **What-if track** sheet with the summary, the

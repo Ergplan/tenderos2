@@ -179,7 +179,7 @@ export function mergeCfdState(saved) {
     ...base, ...saved,
     inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) },
     fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, bess: { ...(saved.bess || {}) }, locks: { ...(saved.locks || {}) },
-    frozen: { ...(saved.frozen || {}) }, frozenBaseline: saved.frozenBaseline || null,
+    frozen: { ...(saved.frozen || {}) }, frozenBaseline: saved.frozenBaseline || null, rejected: { ...(saved.rejected || {}) },
     studio: { ...(saved.studio || {}) }, solarUpload: saved.solarUpload || null, windUpload: saved.windUpload || null,
     solarMonthScale: Array.isArray(saved.solarMonthScale) && saved.solarMonthScale.length === 12 ? saved.solarMonthScale : new Array(12).fill(1),
     windMonthScale: Array.isArray(saved.windMonthScale) && saved.windMonthScale.length === 12 ? saved.windMonthScale : new Array(12).fill(1),

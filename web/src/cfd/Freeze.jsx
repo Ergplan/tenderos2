@@ -1,8 +1,9 @@
 import React, { useState } from "react";
 import { createPortal } from "react-dom";
-import { Lock, Paperclip, Unlock, X } from "lucide-react";
+import { Ban, Lock, Paperclip, Undo2, Unlock, X } from "lucide-react";
 import { nf, pf } from "../rtc/ui";
 import { withCfdLever } from "./levers.js";
+import { leverChance } from "./leverNotes.js";
 
 // Freezing a lever: the bidder is sure of a value (a signed quote, a term sheet, a board minute)
 // and pins it, with the evidence attached. A frozen lever is written into the bid at that value,
@@ -33,6 +34,36 @@ export function unfreezeLever(state, key) {
   return { ...state, frozen, locks };
 }
 
+/** Turn a lever down: the next track looks for the gap elsewhere. The record lives in state.rejected[key]. */
+export function rejectLever(state, lever, by) {
+  return { ...state, rejected: { ...(state.rejected || {}), [lever.key]: { key: lever.key, label: lever.label, at: new Date().toISOString(), by: by || "you", from: lever.from ?? null, to: lever.to ?? null, unit: lever.unit || "", pct: Boolean(lever.pct), step: lever.step ?? 1 } } };
+}
+
+/** Allow a turned-down lever again. */
+export function allowLever(state, key) {
+  const rejected = { ...(state.rejected || {}) };
+  delete rejected[key];
+  return { ...state, rejected };
+}
+
+/** The levers the bidder turned down, with Allow again. */
+export function RejectedPanel({ rejected, onAllow }) {
+  const list = Object.values(rejected || {}).sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+  if (!list.length) return null;
+  return (
+    <div className="rejected-panel" data-testid="cfd-rejected">
+      <Ban size={13} /> <b>Not for us:</b>
+      {list.map((r) => (
+        <span key={r.key} className="rejected-chip" data-testid={`cfd-rejected-${r.key}`}>
+          {r.label}{Number.isFinite(r.to) ? ` (the track wanted ${fmtV(r, r.to)}${unitOf(r)})` : ""}
+          <button type="button" className="rtc-icon-btn" onClick={() => onAllow(r.key)} title="Let the track move this lever again" data-testid={`cfd-allow-${r.key}`}><Undo2 size={11} /> allow again</button>
+        </span>
+      ))}
+      <small>The track leaves these levers alone and finds the gap elsewhere.</small>
+    </div>
+  );
+}
+
 /** Attach the evidence of a frozen value to the CfD tab's evidence register; null when nothing was given. */
 async function attachEvidence({ lever, value, file, note, url }) {
   const base = { fieldKey: `cfd:lever:${lever.key}`, fieldLabel: lever.label, place: "CfD Bid › What-if › frozen lever", valueAt: String(value), tab: "cfd" };
@@ -58,8 +89,12 @@ async function attachEvidence({ lever, value, file, note, url }) {
  * The freeze dialog: the value to freeze at (the move's, or the current), a note, a file or a link
  * as evidence, then Freeze. onFreeze(value, record) writes the bid.
  */
-export function FreezeDialog({ lever, value: initial, me, onFreeze, onClose }) {
+export function FreezeDialog({ lever, value: initial, me, inputs = null, suggested = null, onFreeze, onClose }) {
   const [value, setValue] = useState(initial);
+  // what the benchmark bands make of the typed value (the move's chance, or that of a value the
+  // bidder improves on); the evidence attached is what makes it sure
+  const chance = Number.isFinite(lever.value) && Number.isFinite(value) ? leverChance({ ...lever, value: lever.value }, value, inputs) : null;
+  const better = Number.isFinite(suggested) && Number.isFinite(value) && Number.isFinite(lever.value) && Math.abs(value - lever.value) > Math.abs(suggested - lever.value) + 1e-12 && Math.sign(value - lever.value) === Math.sign(suggested - lever.value);
   const [note, setNote] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState(null);
@@ -100,6 +135,12 @@ export function FreezeDialog({ lever, value: initial, me, onFreeze, onClose }) {
         <label>Value{lever.pct ? " (%)" : lever.unit ? ` (${lever.unit})` : ""}
           <input type="number" step="any" value={shown} onChange={(e) => setValue(lever.pct ? Number(e.target.value) / 100 : Number(e.target.value))} required data-testid="cfd-freeze-value" />
         </label>
+        {chance && !chance.fixed && (
+          <p className="freeze-chance" data-testid="cfd-freeze-chance">
+            {Number.isFinite(suggested) && Math.abs(value - suggested) > 1e-12 ? <>The track suggested {fmtV(lever, suggested)}{unitOf(lever)}; you are freezing <b>{fmtV(lever, value)}{unitOf(lever)}</b>{better ? ", a better value" : ""}. </> : null}
+            The benchmark bands put this value at <b>{pf(chance.p, chance.p > 0 && chance.p < 0.01 ? 1 : 0)}</b> chance{chance.p >= 0.999 ? "" : chance.p > 0 ? " (a stretch for a 2028 project)" : " (beyond what they allow for)"}; your evidence overrides them, so the frozen value counts as sure. The price impact is measured through the full model at the value you freeze, and the next track starts from it.
+          </p>
+        )}
         <label>Evidence file<input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} data-testid="cfd-freeze-file" /></label>
         <label>Or a link<input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" /></label>
         <label>Note<input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Who gave it, when, on what terms" maxLength={500} data-testid="cfd-freeze-note" /></label>

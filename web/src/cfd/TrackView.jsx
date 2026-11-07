@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, Crosshair, Download, Loader2, Lock } from "lucide-react";
+import { Ban, ChevronDown, ChevronRight, Crosshair, Download, Loader2, Lock } from "lucide-react";
 import { Stat, nf, pf } from "../rtc/ui";
 
 // The track to a quote, as a story: the verdict, a waterfall from the price the model needs down to
@@ -73,7 +73,7 @@ function Waterfall({ track, onPick }) {
   );
 }
 
-export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFreeze = null, onDownload = null, downloading = false }) {
+export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFreeze = null, onReject = null, onDownload = null, downloading = false }) {
   const [showFloor, setShowFloor] = useState(false);
   const [lit, setLit] = useState(null);
   const pick = (key) => {
@@ -115,7 +115,8 @@ export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFr
                 <b>{k + 1}. {st.label}</b>: {fmtV(st, st.from)}{unitOf(st)} → <b>{fmtV(st, st.to)}{unitOf(st)}</b> <Chance p={st.p} />
                 <span className="track-price">price {st.drop >= 0 ? "falls" : "rises"} ₹{nf(Math.abs(st.drop), 3)} to <b>₹{nf(st.price, 3)}</b></span>
                 <span className="track-cum">chance so far {pf(st.cum, st.cum > 0 && st.cum < 0.01 ? 1 : 0)}</span>
-                {frozen[st.key] ? <span className="frozen-mark"><Lock size={11} /> frozen</span> : onFreeze && <button type="button" className="secondary freeze-btn" onClick={() => onFreeze(st)} title="Sure of this value? Freeze it with the evidence; the next track leaves it alone" data-testid={`cfd-track-freeze-${st.key}`}><Lock size={11} /> Freeze at this value</button>}
+                {frozen[st.key] ? <span className="frozen-mark"><Lock size={11} /> frozen</span> : onFreeze && <button type="button" className="secondary freeze-btn" onClick={() => onFreeze(st)} title="Sure of this value? Freeze it with the evidence (a better one if you have it); the next track leaves it alone" data-testid={`cfd-track-freeze-${st.key}`}><Lock size={11} /> Freeze at this value</button>}
+                {!frozen[st.key] && onReject && <button type="button" className="secondary freeze-btn" onClick={() => onReject(st)} title="Not a move you will make? Turn it down; the track is plotted again without it" data-testid={`cfd-track-reject-${st.key}`}><Ban size={11} /> Not for us</button>}
               </div>
               <div className="track-step-body">
                 {st.who && <span><b>Who decides:</b> {st.who}.</span>}
@@ -127,7 +128,7 @@ export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFr
           ))}
         </ol>
       )}
-      {track.frozenKeys?.length > 0 && <p className="track-note">{track.frozenKeys.length} frozen {track.frozenKeys.length === 1 ? "lever was" : "levers were"} left as they are; the track found the gap elsewhere.</p>}
+      {(track.frozenKeys?.length > 0 || track.rejectedKeys?.length > 0) && <p className="track-note">{[track.frozenKeys?.length ? `${track.frozenKeys.length} frozen ${track.frozenKeys.length === 1 ? "lever was" : "levers were"} left as they are` : null, track.rejectedKeys?.length ? `${track.rejectedKeys.length} ${track.rejectedKeys.length === 1 ? "lever you turned down was" : "levers you turned down were"} not used` : null].filter(Boolean).join("; ")}; the track found the gap elsewhere.</p>}
       {track.steps.length > 0 && (onApply || onDownload) && (
         <div className="track-actions">
           {onApply && <button type="button" className="secondary" onClick={() => onApply(track.steps)} data-testid="cfd-track-apply"><Crosshair size={12} /> Apply every move to the bid</button>}

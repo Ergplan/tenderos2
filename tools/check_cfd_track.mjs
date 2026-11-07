@@ -88,4 +88,18 @@ assert.ok(above.above && above.reached && above.steps.length === 0, "a quote abo
   const s3 = withCfdLever(s0, { key: "essMwhPerMw", min: 2, max: 3, value: 2 }, 2.5);
   assert.equal(s3.inputs.solarMw, 240, "other levers leave the plant alone");
 }
-console.log("CfD track checks passed (frozen levers, the bid size carries the plant)");
+
+// ---- a lever turned down is left out of the plan; the bid size is never a lever
+{
+  assert.ok(!leversOf(state, model).some((l) => l.key === "contractedMw"), "the bid size is not offered as a lever");
+  const reachable = Number((effects.base - 0.4).toFixed(2));
+  const plan = await planTrack({ state, model, prices, effects, target: reachable, tick: async () => {} });
+  const firstKey = plan.steps[0].key;
+  const s2 = { ...state, rejected: { [firstKey]: { key: firstKey, label: plan.steps[0].label, at: new Date().toISOString(), by: "test" } } };
+  const plan2 = await planTrack({ state: s2, model, prices, effects, target: reachable, tick: async () => {} });
+  assert.ok(!plan2.steps.some((st) => st.key === firstKey), "a turned-down lever is not moved");
+  assert.deepEqual(plan2.rejectedKeys, [firstKey]);
+  assert.ok(plan2.reached, "the gap is found through the other levers");
+  console.log(`rejected ${plan.steps[0].label}: the track now uses ${plan2.steps.map((st) => st.label).join(", ")}`);
+}
+console.log("CfD track checks passed (frozen levers, the bid size carries the plant, turned-down levers)");

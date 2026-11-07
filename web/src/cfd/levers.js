@@ -11,7 +11,9 @@ import { runCfdFinance } from "./finance.js";
 /** The inputs whose change alters the operation (the rest only re-price it). */
 const OPERATION_KEYS = new Set(["contractedMw", "essMwhPerMw", "essMwPerMw", "solarMw", "windMw", "reCodMonths", "availability", "solarCuf", "solarDegradation", "windCuf", "rte", "essDegradation", "marketCharges", "groupPrice", "groupCharges", "priceEscalation", "gdamShareCap", "extraEssMwhPerMw", "solarDcAc", "windDegradation", "essSocMin", "essSocMax"]);
 /** Inputs that are not levers (fixed by the tender, or a choice rather than a number). */
-const NOT_LEVERS = new Set(["gstRate"]);
+// not levers: the GST rate (the law) and the bid size (it carries the whole plant with it and barely
+// moves the price; the bidder chooses it on the Bid inputs step, not as a way to a quote)
+const NOT_LEVERS = new Set(["gstRate", "contractedMw"]);
 
 /** The lever of a FIELDS entry: its key, label, unit, step, range and whether it re-simulates. */
 export function leversOf(state, model) {

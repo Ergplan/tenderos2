@@ -258,6 +258,17 @@ def test_cfd_bid_end_to_end(tmp_path):
         wb2 = openpyxl.load_workbook(str(wi), read_only=True)
         assert "What-if track" in wb2.sheetnames, wb2.sheetnames
         page.click(f"[data-testid=\"cfd-unfreeze-{first}\"]")
+        # turn a suggested move down: it is recorded, the track is plotted again without it, allow again
+        page.wait_for_selector("[data-testid^=cfd-track-reject-]", timeout=10_000)
+        turned = page.locator("[data-testid^=cfd-track-reject-]").first.get_attribute("data-testid").replace("cfd-track-reject-", "")
+        page.click(f"[data-testid=\"cfd-track-reject-{turned}\"]")
+        page.wait_for_selector(f"[data-testid=\"cfd-rejected-{turned}\"]", timeout=10_000)
+        page.wait_for_function("() => !document.querySelector('[data-testid=cfd-track-run]').disabled", timeout=900_000)
+        assert page.locator(f"[data-testid=\"cfd-track-step-{turned}\"]").count() == 0, "a turned-down lever is not moved"
+        assert "turned down" in page.locator("[data-testid=cfd-track]").inner_text().lower()
+        assert page.locator("[data-testid^=cfd-track-step-]").count() == 0 or "contracted" not in page.locator("[data-testid=cfd-track-steps]").inner_text().lower(), "the bid size is not a move"
+        page.click(f"[data-testid=\"cfd-allow-{turned}\"]")
+        page.wait_for_selector(f"[data-testid=\"cfd-rejected-{turned}\"]", state="detached", timeout=10_000)
         page.locator("[data-testid=cfd-levers-details] summary").click()
         page.wait_for_selector("[data-testid^=cfd-lever-]", timeout=600_000)
         assert page.locator("[data-testid^=cfd-lever-]").count() >= 11, "the table and at least ten levers"

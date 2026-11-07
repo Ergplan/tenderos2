@@ -4,8 +4,8 @@ import { Field, Section, Stat, nf, pf } from "../rtc/ui";
 import { cfdModelExport, downloadCfdModel, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
 import { runModel } from "./model.js";
 import { useTeamContext } from "../team/useTeam";
-import { FreezeDialog, FrozenPanel, freezeLever, unfreezeLever } from "./Freeze.jsx";
-import { cfdLeverEffects, withCfdLever } from "./levers.js";
+import { FreezeDialog, FrozenPanel, RejectedPanel, allowLever, freezeLever, rejectLever, unfreezeLever } from "./Freeze.jsx";
+import { cfdLeverEffects, priceOf, withCfdLever } from "./levers.js";
 import { LEVER_NOTES, explainLever } from "./leverNotes.js";
 import { planTrack } from "./track.js";
 import TrackView from "./TrackView.jsx";
@@ -95,9 +95,18 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   const onFreeze = (value, record) => {
     if (!freezing) return;
     const lv = freezing.lever;
-    let impact = null; // ₹/kWh the price falls by at this value (a rise is negative)
-    if (Number.isFinite(freezing.drop) && Number.isFinite(freezing.from) && Number.isFinite(freezing.to) && Math.abs(freezing.to - freezing.from) > 1e-12) impact = freezing.drop * ((value - freezing.from) / (freezing.to - freezing.from));
-    else if (Number.isFinite(lv.slope)) impact = -(lv.slope * (value - lv.value));
+    // ₹/kWh the price falls by at the frozen value (a rise is negative): the full model priced at that
+    // value, so a value better than the track's suggestion counts for what it is worth, not a
+    // straight-line guess; the one-step slope only if the pricing fails
+    let impact = null;
+    try {
+      const priced = priceOf(withCfdLever(state, { key: lv.key, min: -Infinity, max: Infinity, int: Boolean(lv.int) }, value), model, prices, { operation: Boolean(lv.operation) });
+      if (Number.isFinite(priced)) impact = base - priced;
+    } catch { /* fall back below */ }
+    if (impact === null) {
+      if (Number.isFinite(freezing.drop) && Number.isFinite(freezing.from) && Number.isFinite(freezing.to) && Math.abs(freezing.to - freezing.from) > 1e-12) impact = freezing.drop * ((value - freezing.from) / (freezing.to - freezing.from));
+      else if (Number.isFinite(lv.slope)) impact = -(lv.slope * (value - lv.value));
+    }
     setState((s) => {
       const first = !Object.keys(s.frozen || {}).length;
       const next = freezeLever(s, lv, value, { ...record, impact });
@@ -108,6 +117,11 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
     const next = unfreezeLever(s, key);
     return Object.keys(next.frozen || {}).length ? next : { ...next, frozenBaseline: null };
   });
+  // a move turned down: recorded with the bid, and the track plotted again without that lever
+  const [replan, setReplan] = useState(0);
+  const onReject = (st) => { setState((s) => rejectLever(s, st, me?.name)); setReplan((n) => n + 1); };
+  const onAllow = (key) => setState((s) => allowLever(s, key));
+  useEffect(() => { if (replan > 0 && track && !progress && !tracking) plot(); }, [replan]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the What-if case as a workbook: the bid with the track's moves applied, priced through the full
   // model, with a What-if track sheet (the moves, their chances, the frozen levers)
@@ -163,7 +177,8 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
           {track && trackStale && !progress && !tracking && <small className="lever-stale">The case changed: plot again</small>}
         </div>
         <FrozenPanel frozen={frozen} onUnfreeze={onUnfreeze} baseline={state.frozenBaseline?.price ?? null} now={base} target={target} />
-        {track && <TrackView track={track.result} targetIrr={finance.engine.fin.targetEquityIrr} onApply={applyTrack} frozen={frozen} onFreeze={(st) => setFreezing({ lever: st, value: st.to, drop: st.drop, from: st.from, to: st.to })} onDownload={downloadWhatIf} downloading={downloading} />}
+        <RejectedPanel rejected={state.rejected} onAllow={onAllow} />
+        {track && <TrackView track={track.result} targetIrr={finance.engine.fin.targetEquityIrr} onApply={applyTrack} frozen={frozen} onFreeze={(st) => setFreezing({ lever: { ...st, value: st.from }, value: st.to, drop: st.drop, from: st.from, to: st.to })} onReject={onReject} onDownload={downloadWhatIf} downloading={downloading} />}
         {(!track || track.result.above || !track.result.steps.length) && (
           <div className="track-actions" data-testid="cfd-whatif-download-row">
             <button type="button" className="primary" onClick={downloadWhatIf} disabled={downloading} data-testid="cfd-whatif-download"><Download size={12} /> {downloading ? "Building the workbook…" : "Download What-if model (Excel)"}</button>
@@ -171,7 +186,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
           </div>
         )}
         {downloadError && <div className="alert">{downloadError}</div>}
-        {freezing && <FreezeDialog lever={freezing.lever} value={freezing.value} me={me} onFreeze={onFreeze} onClose={() => setFreezing(null)} />}
+        {freezing && <FreezeDialog lever={freezing.lever} value={freezing.value} suggested={freezing.to ?? null} inputs={model.inputs} me={me} onFreeze={onFreeze} onClose={() => setFreezing(null)} />}
         <details className="lever-details" data-testid="cfd-levers-details">
           <summary>Every lever, one step at a time: the measurements behind the track, the levers it did not pick, and Apply or Freeze by hand</summary>
         <div className="lever-head">
