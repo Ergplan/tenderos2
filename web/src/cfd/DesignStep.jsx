@@ -12,7 +12,7 @@ import SiteSchematic from "../bid/SiteSchematic";
 import { defaultLosses } from "../bid/model";
 import { useTeamContext } from "../team/useTeam";
 import Cite from "./Cite.jsx";
-import { designProfiles, lossFactorsOfCfd, missingInputs, socWindow } from "./model.js";
+import { designProfiles, essRequiredPerMw, lossFactorsOfCfd, missingInputs, socWindow } from "./model.js";
 import { Choice, Fields, FillBar } from "./inputs.jsx";
 
 const COLORS = { solar: DATA_COLORS.solar, wind: DATA_COLORS.wind, bess: DATA_COLORS.bess };
@@ -176,6 +176,7 @@ export default function DesignStep({ state, setState, setInput, set, lockProps, 
   const win = socWindow(i);
   const nameplate = isNum(i.essMwhPerMw) ? i.essMwhPerMw : null;
   const usable = nameplate !== null ? nameplate * win : null;
+  const need = essRequiredPerMw(state);
   const duration = isNum(i.essMwhPerMw) && isNum(i.essMwPerMw) && i.essMwPerMw > 0 ? i.essMwhPerMw / i.essMwPerMw : null;
   const rteAt = state.losses ? POINTS.bess[state.losses.bessRteAt ?? POINTS.bess.length - 1] : "the billing meter (model the losses to say where it is quoted)";
   return (
@@ -192,7 +193,8 @@ export default function DesignStep({ state, setState, setInput, set, lockProps, 
                 <p className="rtc-note" data-testid="cfd-battery-size">
                   Battery {nf(X * (i.essMwPerMw || 1))} MW / {nf(X * nameplate)} MWh nameplate for {nf(X)} MW contracted{duration !== null ? `; discharge duration ${nf(duration, 2)} h` : ""}{win < 1 ? `; usable ${nf(X * usable)} MWh within the ${pf(i.essSocMin || 0, 0)}–${pf(i.essSocMax ?? 1, 0)} state-of-charge window` : ""} <Cite id="ess" /> <Cite id="essOwned" /> <Cite id="colocated" />
                   {i.extraEssMwhPerMw > 0 && <>, plus {nf(X * i.extraEssMwhPerMw)} MWh for evening sale outside the peak hours, once the day's supply is met <Cite id="essOtherUse" /></>}.
-                  {usable !== null && usable < 2 - 1e-9 && <strong> The tender's 2 MWh per MW must be usable: {nf(2 / win, 2)} MWh per MW nameplate within this window.</strong>}
+                  {nameplate !== null && (nameplate < need.energy - 1e-9 || (i.essMwPerMw || 0) < need.power - 1e-9) && <strong> The tender's 2 MWh per MW must reach the meter: {nf(need.energy, 2)} MWh and {nf(need.power, 2)} MW per MW nameplate{win < 1 ? " within this window" : ""}{need.meter < 1 ? ` after the ${((1 - need.meter) * 100).toFixed(1)}% lost to the meter` : ""}; "Fill up for me please" sets it.</strong>}
+                  {need.shortYear && <strong> Without augmentation the usable energy falls below the need from year {need.shortYear}; pick annual augmentation or more nameplate.</strong>}
                 </p>
               )}
             </div>

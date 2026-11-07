@@ -240,7 +240,7 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   const plain = run(base);
   assert.equal(plain.sim.loss, null, "no losses modelled: the factors are off");
   assert.equal(lossFactorsOfCfd(base), null);
-  const lossy = run({ ...base, losses: defaultLosses() });
+  const lossy = run(fillBenchmarks({ ...base, losses: defaultLosses() })); // Fill up grows the battery to what the losses need
   const lf = lossy.sim.loss;
   assert.ok(lf && lf.solar < 1 && lf.meter < 1 && lf.rteBus <= base.inputs.rte + 1e-9, `loss factors applied (solar ${lf.solar.toFixed(4)}, meter ${lf.meter.toFixed(4)}, RTE at bus ${lf.rteBus.toFixed(4)})`);
   assert.ok(sum(lossy.sim, "deliveredMwh") <= sum(plain.sim, "deliveredMwh") + 1e-6, "no more energy reaches the meter with losses");
@@ -312,4 +312,26 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.ok(pay.sp <= meet.sp + 1e-9, `pay: no dearer than the meet plant (₹${pay.sp.toFixed(4)} vs ₹${meet.sp.toFixed(4)})`);
   if (pay.short > 1e-6) assert.ok(pay.solarMw < meet.solarMw, "a smaller plant whose penalty is cheaper than more solar");
   console.log(`CfD design checks passed: losses ₹${plain.sp.toFixed(4)} → ₹${lossy.sp.toFixed(4)}; SoC 10–90% needs 2.5 MWh/MW nameplate; policy meet ${meet.solarMw} MW (${meet.ok ? "every day met" : `${Math.round(meet.short)} MWh short`}) vs pay ${pay.solarMw} MW (${Math.round(pay.short)} MWh short, ₹${pay.sp.toFixed(4)})`);
+}
+
+// ---- the battery the tender's 2 MWh per MW needs once the SoC window and the losses are in; Fill up sets it
+{
+  const { essRequiredPerMw } = await import("../web/src/cfd/model.js");
+  const { defaultLosses } = await import("../web/src/bid/model.js");
+  const base = fillBenchmarks(defaultCfdState());
+  base.inputs.contractedMw = 100;
+  base.inputs.effectiveDate = base.inputs.effectiveDate || "2026-12-01";
+  assert.equal(essRequiredPerMw(base).energy, 2, "no window, no losses: 2 MWh per MW");
+  const win = { ...base, inputs: { ...base.inputs, essSocMin: 0.1, essSocMax: 1 } };
+  assert.ok(missingInputs(win).some((m) => /2\.25 MWh per MW/.test(m)), `the window asks for 2.25 MWh per MW (${missingInputs(win).join(" | ")})`);
+  const filled = fillBenchmarks(win);
+  assert.ok(Math.abs(filled.inputs.essMwhPerMw - 2.25) < 1e-9 && filled.filled.essMwhPerMw && missingInputs(filled).length === 0, "Fill up sets the nameplate and nothing is missing");
+  const lossy = { ...filled, losses: defaultLosses() };
+  const need = essRequiredPerMw(lossy);
+  assert.ok(need.meter < 1 && need.energy >= 2.25 && need.power > 1, `losses to the meter raise the need (${need.energy} MWh, ${need.power} MW per MW)`);
+  const filled2 = fillBenchmarks(lossy);
+  assert.ok(filled2.inputs.essMwhPerMw >= need.energy - 1e-9 && filled2.inputs.essMwPerMw >= need.power - 1e-9 && missingInputs(filled2).length === 0, "Fill up covers the losses too");
+  const noAug = { ...base, inputs: { ...base.inputs, augmentation: "none", essDegradation: 0.02 } };
+  assert.ok(essRequiredPerMw(noAug).shortYear === 2, `without augmentation a 2 MWh per MW battery falls short from year 2 (${essRequiredPerMw(noAug).shortYear})`);
+  console.log(`CfD battery need: window 90% → ${essRequiredPerMw(win).energy} MWh/MW; with losses → ${need.energy} MWh and ${need.power} MW per MW; no augmentation at 2%/yr → short from year ${essRequiredPerMw(noAug).shortYear}`);
 }

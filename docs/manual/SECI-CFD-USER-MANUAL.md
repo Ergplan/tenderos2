@@ -253,6 +253,15 @@ price. The Pool does not settle it, so it keeps the market price. Its capex, O&M
 follow the installed MWh, and the What-if step shows whether it lowers the strike price. It pays
 only while evening prices hold up, which is the storage-flood case on F.9. 0 means none.
 
+*What the battery must be.* The tender's 2 MWh per MW is what must reach the billing meter. The
+model asks for nameplate = 2 ÷ (state-of-charge window × the share that reaches the meter) and
+power = 1 ÷ that share, rounded up to 0.05: with a 10–100% window 2.25 MWh per MW, and more once
+the losses to the meter are modelled. **Fill up for me please** sets both when yours are below.
+The round-trip efficiency does not change the size: it changes the charging power bought (1 ÷
+efficiency units in for every unit out). Degradation is met by augmentation (annual, the default:
+the faded MWh are replaced each year and costed; or on a schedule); with no augmentation the
+Size check names the year the usable energy falls below the need.
+
 ## Step 06 · Finance inputs *(Finance)*
 
 **Lender's minimum DSCR.** The floor your lender sets (1.1 by default). It does not change the model; the Minimum DSCR tile on the Financial model, What-if and F.5 Returns turns red below it.

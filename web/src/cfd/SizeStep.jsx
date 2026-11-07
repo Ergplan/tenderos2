@@ -4,7 +4,7 @@ import { Section, Stat, nf, pf } from "../rtc/ui";
 import { LiveChart } from "../rtc/charts";
 import Cite from "./Cite.jsx";
 import { TENDER } from "./terms.js";
-import { capShortfall, fmtDate, missingInputs, ownReCostRsPerKwh, penaltyCr, rfsAmounts, simulate, socWindow } from "./model.js";
+import { capShortfall, essRequiredPerMw, fmtDate, missingInputs, ownReCostRsPerKwh, penaltyCr, rfsAmounts, simulate, socWindow } from "./model.js";
 import { OptimiseBar } from "./DesignStep.jsx";
 
 const COLORS = { own: "#7ddc9a", market: "#3fa7d6", group: "#4fd1c5", sale: "#f2b84b", ess: "#a98bff", price: "#ff8a5f", wind: "#5fb3ff" };
@@ -31,13 +31,20 @@ export function sizingChecks(model) {
   const supply = years.reduce((a, y) => a + y.deliveredMwh, 0) / Math.max(1e-9, years.reduce((a, y) => a + y.requiredMwh, 0));
   const win = socWindow(i);
   const usable = i.essMwhPerMw * win;
-  const essOk = usable >= TENDER.essHoursMin - 1e-9 && i.essMwPerMw >= 1 - 1e-9;
+  const need = essRequiredPerMw(state);
+  const essOk = i.essMwhPerMw >= need.energy - 1e-9 && i.essMwPerMw >= need.power - 1e-9;
+  const essNote = [
+    win < 1 ? `${nf(X * usable)} MWh usable within the state-of-charge window` : null,
+    need.meter < 1 ? `${((1 - need.meter) * 100).toFixed(1)}% lost from the battery to the meter` : null,
+    essOk ? null : `${nf(need.energy, 2)} MWh and ${nf(need.power, 2)} MW per MW nameplate needed`,
+    need.shortYear ? `without augmentation the usable energy falls below the need from year ${need.shortYear}` : i.augmentation === "annual" ? "augmentation keeps the usable energy every year" : null,
+  ].filter(Boolean).join("; ");
   const pay = i.shortfallPolicy === "pay";
   const penaltyTerm = model.sp ? years.reduce((a, y) => a + penaltyCr(y, model.sp), 0) : null;
   const reOk = i.reCodMonths <= TENDER.reCodMonths - TENDER.essScdMonths;
   return [
     { id: "capacity", label: "Contracted capacity", status: Number.isInteger(X) && X >= TENDER.bidMinMw && X <= TENDER.bidMaxMw ? "met" : "failed", detail: `${nf(X)} MW; ${TENDER.bidMinMw} to ${TENDER.bidMaxMw} MW in whole MW`, cite: "capacityBid" },
-    { id: "ess", label: "Battery X MW / 2X MWh usable", status: essOk ? "met" : "failed", detail: `${nf(X * i.essMwPerMw)} MW / ${nf(X * i.essMwhPerMw)} MWh nameplate for ${nf(X)} MW${win < 1 ? `; ${nf(X * usable)} MWh usable within the state-of-charge window${usable < TENDER.essHoursMin - 1e-9 ? `: ${nf(TENDER.essHoursMin / win, 2)} MWh per MW nameplate needed` : ""}` : ""}`, cite: "ess" },
+    { id: "ess", label: "Battery X MW / 2X MWh usable at the meter", status: essOk ? "met" : need.shortYear ? "info" : "failed", detail: `${nf(X * i.essMwPerMw)} MW / ${nf(X * i.essMwhPerMw)} MWh nameplate for ${nf(X)} MW${essNote ? `; ${essNote}` : ""}`, cite: "ess" },
     { id: "reCod", label: "RE online by month 36", status: reOk ? "met" : "failed", detail: `${nf(i.reCodMonths)} months after the SCD (${fmtDate(sim.dates.reCod)}); at most ${TENDER.reCodMonths - TENDER.essScdMonths}`, cite: "reCod" },
     { id: "market", label: "Green market within 25% (+75% until month 36)", status: marketOk ? "met" : "failed", detail: after.length ? `highest after month 36: ${pf(Math.max(...after.map((y) => y.shareMarket)), 1)}` : "no Contract Year after month 36", cite: "market25" },
     { id: "group", label: "Group RE within 50% after month 36", status: groupOk ? "met" : "failed", detail: after.length ? `highest: ${pf(Math.max(...after.map((y) => y.shareGroup)), 1)}` : "not used", cite: "group50" },

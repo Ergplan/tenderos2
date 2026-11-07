@@ -205,6 +205,10 @@ export function fillBenchmarks(state) {
     inputs.solarMw = inputs.contractedMw; // a first guess; "Optimise own RE" refines it
     filled.solarMw = true;
   }
+  // the battery the tender's 2 MWh per MW needs once the state-of-charge window and the losses are in
+  const need = essRequiredPerMw({ ...state, inputs });
+  if (isNum(inputs.essMwhPerMw) && inputs.essMwhPerMw < need.energy - 1e-9) { inputs.essMwhPerMw = need.energy; filled.essMwhPerMw = true; }
+  if (isNum(inputs.essMwPerMw) && inputs.essMwPerMw < need.power - 1e-9) { inputs.essMwPerMw = need.power; filled.essMwPerMw = true; }
   return { ...state, inputs, filled };
 }
 
@@ -229,8 +233,10 @@ export function missingInputs(state) {
   if ((i.sellMarket === "DAM" || i.sellMarket === "RTM") && !isNum(i.recPrice)) out.push("REC price");
   if (i.afterTerm === "merchant" && !isNum(i.merchantYears)) out.push("Years of market sales after the term");
   if (isNum(i.essMwhPerMw) && i.essMwhPerMw < TENDER.essHoursMin) out.push("Battery energy: at least 2 MWh per contracted MW");
-  if (isNum(i.essMwhPerMw) && i.essMwhPerMw * socWindow(i) < TENDER.essHoursMin - 1e-9) out.push(`Battery energy: ${(TENDER.essHoursMin / socWindow(i)).toFixed(2)} MWh per MW nameplate for 2 MWh usable within the state-of-charge window`);
+  const need = essRequiredPerMw(state);
+  if (isNum(i.essMwhPerMw) && i.essMwhPerMw >= TENDER.essHoursMin && i.essMwhPerMw < need.energy - 1e-9) out.push(`Battery energy: ${need.energy.toFixed(2)} MWh per MW nameplate for 2 MWh usable at the meter${need.window < 1 ? ` (state-of-charge window ${Math.round(need.window * 100)}%` : " ("}${need.meter < 1 ? `${need.window < 1 ? ", " : ""}${((1 - need.meter) * 100).toFixed(1)}% lost to the meter` : ""}); "Fill up for me please" sets it`);
   if (isNum(i.essMwPerMw) && i.essMwPerMw < 1) out.push("Battery power: at least 1 MW per contracted MW");
+  else if (isNum(i.essMwPerMw) && i.essMwPerMw < need.power - 1e-9) out.push(`Battery power: ${need.power.toFixed(2)} MW per MW nameplate for 1 MW at the meter (${((1 - need.meter) * 100).toFixed(1)}% lost to the meter); "Fill up for me please" sets it`);
   if (isNum(i.reCodMonths) && i.reCodMonths > TENDER.reCodMonths - TENDER.essScdMonths) out.push("RE generation: commissioned by 21 months after the SCD");
   return out;
 }
@@ -381,6 +387,31 @@ export const socWindow = (i) => {
   const hi = isNum(i?.essSocMax) ? i.essSocMax : 1;
   return Math.max(0.05, Math.min(1, hi - lo));
 };
+
+/**
+ * The battery the tender's 2 MWh per MW needs as nameplate, once the state-of-charge window and the
+ * losses from the battery to the billing meter are in: energy 2 ÷ (window × to-meter factor) and
+ * power 1 ÷ to-meter factor per contracted MW, rounded up to 0.05. The round-trip efficiency does
+ * not change the size (it changes the charging bought); degradation is met by augmentation, or
+ * reported as the year the usable energy falls below the need when there is none.
+ */
+export function essRequiredPerMw(state) {
+  const i = state?.inputs || {};
+  const window = socWindow(i);
+  const lf = lossFactorsOfCfd(state, i.rte);
+  const meter = lf?.meter ?? 1;
+  const up = (v) => Math.ceil(v * 20 - 1e-9) / 20;
+  const energy = up(TENDER.essHoursMin / (window * meter));
+  const power = up(1 / meter);
+  let shortYear = null;
+  if (i.augmentation === "none" && isNum(i.essDegradation) && i.essDegradation > 0 && isNum(i.essMwhPerMw)) {
+    const need = TENDER.essHoursMin / meter; // usable energy at the bus
+    for (let y = 1; y <= TENDER.termYears; y += 1) {
+      if (i.essMwhPerMw * window * Math.max(0.4, 1 - i.essDegradation * (y - 1)) < need - 1e-9) { shortYear = y; break; }
+    }
+  }
+  return { energy, power, window, meter, shortYear };
+}
 
 /**
  * Hourly solar and wind capacity factors at the bidder's CUFs: the uploaded or library profile's
