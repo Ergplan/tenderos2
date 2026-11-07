@@ -108,12 +108,12 @@ def test_cfd_bid_end_to_end(tmp_path):
         assert page.locator("[data-testid=cfd-in-essSocMax] input").count() == 1
         assert page.locator("[data-testid=cfd-in-solarDcAc] input").count() == 1
         page.click("[data-testid=cfd-losses-on]")
-        assert page.locator("[data-testid=bid-loss-kinds]").count() == 1
+        page.wait_for_selector("[data-testid=bid-loss-kinds]", timeout=10_000)
         assert page.locator("[data-testid=bid-loss-kind-bess]").count() == 1
         page.click("[data-testid=bid-loss-kind-bess]")
         assert page.locator("[data-testid=bid-losses]").count() == 1
         page.click("[data-testid=cfd-losses-off]")
-        assert page.locator("[data-testid=bid-loss-kinds]").count() == 0
+        page.wait_for_selector("[data-testid=bid-loss-kinds]", state="detached", timeout=10_000)
 
         # 06 finance inputs: the repayment methods and the construction months, then size
         _step(page, "financeInputs")
