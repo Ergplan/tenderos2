@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ownReCostRsPerKwh, ArrowRight, CheckCircle2, Loader2, TriangleAlert, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, TriangleAlert, XCircle } from "lucide-react";
 import { Section, Stat, nf, pf } from "../rtc/ui";
 import { LiveChart } from "../rtc/charts";
 import Cite from "./Cite.jsx";
