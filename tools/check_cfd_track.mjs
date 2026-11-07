@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { defaultCfdState, fillBenchmarks, runModel } from "../web/src/cfd/model.js";
 import { runCfdFinance } from "../web/src/cfd/finance.js";
-import { cfdLeverEffects, leversOf } from "../web/src/cfd/levers.js";
+import { cfdLeverEffects, leversOf, withCfdLever } from "../web/src/cfd/levers.js";
 import { leverChance } from "../web/src/cfd/leverNotes.js";
 import { planTrack } from "../web/src/cfd/track.js";
 
@@ -72,4 +72,20 @@ assert.ok(above.above && above.reached && above.steps.length === 0, "a quote abo
     assert.ok(!s3.frozen.essCrPerMwh && !s3.locks.essCrPerMwh && s3.inputs.essCrPerMwh === 0.8, "unfreezing drops the record and the lock, the value stays");
   }
 }
-console.log("CfD track checks passed (frozen levers)");
+
+// ---- the bid size carries the plant: own solar and wind scale with the contracted MW, a locked
+// or frozen one stays, so the lever is the size of the bid and not the mix behind it
+{
+  const s0 = { ...state, inputs: { ...state.inputs, contractedMw: 150, solarMw: 240, windMw: 30 } };
+  const lever = { key: "contractedMw", min: 50, max: 150, int: true, value: 150 };
+  const s1 = withCfdLever(s0, lever, 50);
+  assert.equal(s1.inputs.contractedMw, 50);
+  assert.equal(s1.inputs.solarMw, 80, "own solar scales with the bid");
+  assert.equal(s1.inputs.windMw, 10, "own wind scales with the bid");
+  const s2 = withCfdLever({ ...s0, locks: { solarMw: true } }, lever, 100);
+  assert.equal(s2.inputs.solarMw, 240, "a locked solar size stays");
+  assert.equal(s2.inputs.windMw, 20);
+  const s3 = withCfdLever(s0, { key: "essMwhPerMw", min: 2, max: 3, value: 2 }, 2.5);
+  assert.equal(s3.inputs.solarMw, 240, "other levers leave the plant alone");
+}
+console.log("CfD track checks passed (frozen levers, the bid size carries the plant)");

@@ -8,7 +8,7 @@ const pf = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : "–
 export const LEVER_NOTES = {
   contractedMw: {
     what: "The MW you bid for (50 to 150, whole MW). Every other size follows it: 2 MWh of battery per MW, the daily 2 MWh per MW of supply, the EMD and PBG.",
-    why: "A bigger bid spreads the fixed costs (SECI's charges, scheduling and admin, the transmission line) over more energy, so the price needs a little less; it also needs more own solar to keep the same share of own power, which the optimiser re-sizes.",
+    why: "Nearly every cost scales with the MW (the battery, the own solar, SECI's per-MW charges, the EMD and PBG), so the size barely moves the price: what it changes is the money at stake and your share of the 500 MW. In the What-if the own solar and wind scale with the bid, so the move is the size alone and not a change of the mix behind it; any size from 50 to 150 MW is yours to choose.",
   },
   essMwhPerMw: {
     what: "Battery energy per contracted MW. The tender needs at least 2 (2 hours at full power).",

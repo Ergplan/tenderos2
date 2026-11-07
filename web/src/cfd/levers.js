@@ -45,7 +45,16 @@ export function withCfdLever(state, lever, value) {
   if (lever.key.startsWith("fin.")) return { ...state, fin: { ...(state.fin || {}), [lever.key.slice(4)]: v } };
   const filled = { ...(state.filled || {}) };
   delete filled[lever.key];
-  return { ...state, inputs: { ...state.inputs, [lever.key]: v }, filled };
+  const inputs = { ...state.inputs, [lever.key]: v };
+  // the bid size carries the plant with it: own solar and wind scale with the contracted MW (unless
+  // locked or frozen), so the move is the size of the bid, not a change of the mix behind it
+  if (lever.key === "contractedMw" && Number.isFinite(state.inputs?.contractedMw) && state.inputs.contractedMw > 0) {
+    const f = v / state.inputs.contractedMw;
+    for (const key of ["solarMw", "windMw"]) {
+      if (Number.isFinite(state.inputs[key]) && state.inputs[key] > 0 && !state.locks?.[key] && !state.frozen?.[key]) inputs[key] = Math.round(state.inputs[key] * f);
+    }
+  }
+  return { ...state, inputs, filled };
 }
 
 /** The strike price the target equity IRR needs for a case (re-simulated when the lever changes the operation). */

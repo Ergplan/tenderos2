@@ -9,6 +9,22 @@ import { Stat, nf, pf } from "../rtc/ui";
 const fmtV = (st, v) => (st.pct ? pf(v, 2) : nf(v, st.step < 0.01 ? 4 : st.step < 1 ? 2 : 0));
 const unitOf = (st) => (st.pct ? "" : ` ${st.unit}`);
 
+/**
+ * The band edges of a move as a sentence; edges that coincide are said once ("sure to 50 MW, the
+ * end of its range" rather than four times 50 MW).
+ */
+export function edgesText(st) {
+  const e = st.edges;
+  const same = (a, b) => Math.abs(a - b) < 1e-9;
+  const v = (x) => `${fmtV(st, x)}${unitOf(st)}`;
+  if (same(e.sure, e.likely) && same(e.likely, e.stretch) && same(e.stretch, e.zero)) return `sure all the way to ${v(e.sure)}, the end of its range: this one is yours to choose.`;
+  const parts = [`sure to ${v(e.sure)}`];
+  if (!same(e.likely, e.sure)) parts.push(`likely to ${v(e.likely)} (50%)`);
+  if (!same(e.stretch, e.likely)) parts.push(`a stretch to ${v(e.stretch)} (10%)`);
+  parts.push(same(e.zero, e.stretch) ? `nothing past ${v(e.zero)}, the end of its range` : `no chance past ${v(e.zero)}`);
+  return `${parts.join(", ")}.`;
+}
+
 /** The chance as a chip: sure, likely, a stretch, a long shot, none. */
 export function Chance({ p }) {
   const cls = p >= 0.999 ? "sure" : p >= 0.5 ? "likely" : p >= 0.1 ? "stretch" : p > 0 ? "long" : "none";
@@ -104,9 +120,7 @@ export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFr
               <div className="track-step-body">
                 {st.who && <span><b>Who decides:</b> {st.who}.</span>}
                 {st.why && <span> <b>Why it works:</b> {st.why}</span>}
-                {st.edges && (
-                  <span> <b>How far it can go:</b> sure to {fmtV(st, st.edges.sure)}{unitOf(st)}, likely to {fmtV(st, st.edges.likely)}{unitOf(st)} (50%), a stretch to {fmtV(st, st.edges.stretch)}{unitOf(st)} (10%), no chance past {fmtV(st, st.edges.zero)}{unitOf(st)}.</span>
-                )}
+                {st.edges && <span> <b>How far it can go:</b> {edgesText(st)}</span>}
                 {st.operation && <span> Re-simulated: this move changes the day-by-day operation.</span>}
               </div>
             </li>
