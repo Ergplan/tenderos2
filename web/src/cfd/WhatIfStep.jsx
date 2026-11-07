@@ -33,6 +33,8 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   const [freezing, setFreezing] = useState(null); // { lever, value }
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState("");
+  const [open, setOpen] = useState(() => new Set()); // the levers whose explanation is open
+  const [showAll, setShowAll] = useState(false);
   const teamCtx = useTeamContext();
   const me = teamCtx?.team?.me || null;
   const abortRef = useRef(null);
@@ -135,8 +137,6 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
       setDownloading(false);
     }
   }
-  const [open, setOpen] = useState(() => new Set());
-  const [showAll, setShowAll] = useState(false);
   const toggle = (key) => setOpen((o) => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n; });
   const noteOf = (key) => LEVER_NOTES[key] || LEVER_NOTES[key.replace(/^fin\./, "")] || null;
   const apply = (row) => { if (row.reachable) setState((s) => withCfdLever(s, row, row.reach)); };

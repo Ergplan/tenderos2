@@ -82,6 +82,11 @@ def test_cfd_bid_end_to_end(tmp_path):
         page.click("[data-testid=cfd-fill]")
         page.wait_for_timeout(300)
 
+        # the What-if step before the plant is sized: the "size first" note, and the step must survive the
+        # model appearing later (a hook-order crash once broke it in the browser)
+        _step(page, "whatif")
+        assert "size the plant first" in page.locator("main").inner_text().lower()
+
         # 06 finance inputs: the repayment methods and the construction months, then size
         _step(page, "financeInputs")
         if page.locator("[data-testid=cfd-fill]").count():
