@@ -166,7 +166,7 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 
 **Screen:** CfD bid › What-if › 6.0 The track to the price you want to quote  
 **Computed by:** `planTrack` (`web/src/cfd/track.js`) from `cfdLeverEffects` (one-step prices per lever through the full model) and `leverChance` (`leverNotes.js`: `LEVER_BANDS` sure / likely / stretch per lever, 100% / 50% / 10% / 0); the moves priced for real with `priceOf`; the floor with every candidate at the end of its chance  
-**Writes:** nothing until "Apply every move to the bid" (`withCfdLever` per move into state.inputs / state.fin); "Freeze" (`Freeze.jsx` `freezeLever`) writes the value, `state.locks[key]` and `state.frozen[key]` ({ value, at, by, note, evidence }) and POSTs the evidence to `/api/evidence` (tab `cfd`, box key `lever:<key>`); "Download What-if model" POSTs `/api/cfd/model` with the What-if case and a `whatIf` block  
+**Writes:** nothing until "Apply every move to the bid" (`withCfdLever` per move into state.inputs / state.fin); "Freeze" (`Freeze.jsx` `freezeLever`) writes the value, `state.locks[key]` and `state.frozen[key]` ({ value, at, by, note, evidence }) and POSTs the evidence to `/api/evidence` (tab `cfd`, box key `cfd:lever:<key>`); "Download What-if model" POSTs `/api/cfd/model` with the What-if case and a `whatIf` block  
 **Rests on:** state.inputs, state.fin, state.costs, the sized model, the target quote typed on the step  
 **Stored:** computed on request; not saved
 

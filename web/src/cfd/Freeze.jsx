@@ -8,7 +8,7 @@ import { withCfdLever } from "./levers.js";
 // locked against the benchmark fill and the optimiser, and left alone by every later track: the
 // next plan looks for the rest of the gap elsewhere. The record lives in state.frozen[key] and is
 // saved with the bid; the evidence goes to the evidence register of the CfD tab (POST /api/evidence,
-// box key "lever:<key>"), where the paperclip and the register CSV show it.
+// box key "cfd:lever:<key>"), where the paperclip and the register CSV show it.
 
 const fmtV = (st, v) => (st.pct ? pf(v, 2) : nf(v, (st.step ?? 1) < 0.01 ? 4 : (st.step ?? 1) < 1 ? 2 : 0));
 const unitOf = (st) => (st.pct ? "" : ` ${st.unit || ""}`);
@@ -34,7 +34,7 @@ export function unfreezeLever(state, key) {
 
 /** Attach the evidence of a frozen value to the CfD tab's evidence register; null when nothing was given. */
 async function attachEvidence({ lever, value, file, note, url }) {
-  const base = { fieldKey: `lever:${lever.key}`, fieldLabel: lever.label, place: "CfD Bid › What-if › frozen lever", valueAt: String(value), tab: "cfd" };
+  const base = { fieldKey: `cfd:lever:${lever.key}`, fieldLabel: lever.label, place: "CfD Bid › What-if › frozen lever", valueAt: String(value), tab: "cfd" };
   let res;
   if (file) {
     const form = new FormData();
@@ -79,7 +79,9 @@ export function FreezeDialog({ lever, value: initial, me, onFreeze, onClose }) {
     const record = {
       by: me?.name || "you",
       note: note || "",
-      evidence: evidence ? { id: evidence.id, kind: evidence.kind, name: evidence.file_name || evidence.url || evidence.note || "", warning: "" } : file || url ? { id: null, kind: file ? "file" : "link", name: file ? file.name : url, warning: warning || "not attached" } : null,
+      evidence: evidence
+        ? { id: evidence.id, kind: evidence.kind, name: evidence.file_name || evidence.url || (evidence.kind === "note" ? "note" : ""), warning: "" }
+        : file || url || note ? { id: null, kind: file ? "file" : url ? "link" : "note", name: file ? file.name : url || "note", warning: warning || "not in the register" } : null,
     };
     onFreeze(value, record);
     setBusy(false);
