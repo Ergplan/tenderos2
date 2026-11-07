@@ -151,6 +151,13 @@ def test_cfd_bid_end_to_end(tmp_path):
         page.click("[data-testid=cfd-levers-run]")
         page.wait_for_selector("[data-testid^=cfd-lever-]", timeout=600_000)
         assert page.locator("[data-testid^=cfd-lever-]").count() >= 11, "the table and at least ten levers"
+        # the reading guide and a lever's explanation
+        assert "how to read" in page.locator("[data-testid=cfd-lever-guide]").inner_text().lower()
+        page.click("[data-testid=cfd-lever-why-solarMw]")
+        note = page.locator("[data-testid=cfd-lever-note-solarMw]").inner_text().lower()
+        assert "what it is" in note and "why it moves the price" in note and "in this bid" in note and "₹" in note
+        page.click("[data-testid=cfd-lever-explain-all]")
+        assert page.locator("[data-testid^=cfd-lever-note-]").count() >= 10
 
         # 10 bid forms: the particulars, a format, the letters
         _step(page, "forms")

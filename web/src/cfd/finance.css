@@ -19,3 +19,13 @@
 .cfd-price-table { max-width: none; }
 .cfd-price-table td:not(:first-child), .cfd-price-table th:not(:first-child) { text-align: right; white-space: nowrap; }
 .cfd-price-table th:last-child, .cfd-price-table td:last-child { text-align: left; white-space: normal; }
+
+/* What-if: the reading guide and the per-lever explanations */
+.lever-guide { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; font-size: 13px; }
+.lever-guide p { margin: 0 0 6px; }
+.lever-guide ul { margin: 0 0 8px; padding-left: 18px; }
+.lever-guide li { margin: 3px 0; color: var(--ink-2, inherit); }
+.lever-why { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; vertical-align: -2px; }
+.lever-why:hover { color: var(--signal); }
+.lever-table tr.lever-note td { background: var(--panel, rgba(255,255,255,0.03)); font-size: 12.5px; line-height: 1.5; white-space: normal; padding: 8px 14px 10px 30px; }
+.lever-table tr.lever-note p { margin: 0 0 4px; }

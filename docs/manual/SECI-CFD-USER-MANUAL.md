@@ -358,6 +358,17 @@ input: its value now, one step, the price if up, the price if down, ₹/kWh per 
 that lever alone must move to reach your price (or "not within its range"). **Apply** moves the
 input there; recompute after changing the case.
 
+*Reading the table.* The box above it says what each column means: the model needs a price for
+your target equity IRR; each row moves one input one step up and one step down, everything else
+as in the bid, and solves the price again; **Price if up / if down** is the price after that move
+(green arrow lower, red higher); **₹/kWh per step** is the slope, bold where it matters; **To
+reach ... alone** is the straight-line distance for that lever on its own. The **?** on a row
+(or **Explain every lever**) opens three lines under it: what the input is, why it moves the
+price (for example own solar replaces bought charging power at about ₹2.2/kWh and sells its
+surplus, against ₹4 cr of capex per MWac, so the first MW lower the price a lot and the surplus
+past the battery's need turns it up again), and the row's own numbers in a sentence (now, one
+step up and down with the price each gives, how far it would have to go for your quote).
+
 ---
 
 ## Step 10 · Bid forms *(Tender / Legal)*

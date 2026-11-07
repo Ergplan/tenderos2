@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Crosshair, Loader2, SlidersHorizontal, Square } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Crosshair, HelpCircle, Loader2, SlidersHorizontal, Square } from "lucide-react";
 import { Field, Section, Stat, nf, pf } from "../rtc/ui";
 import { quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
 import { cfdLeverEffects, withCfdLever } from "./levers.js";
+import { LEVER_NOTES, explainLever } from "./leverNotes.js";
 import "./finance.css";
 
 const fmtV = (v, l) => (l.pct ? pf(v, 2) : nf(v, l.step < 0.01 ? 4 : l.step < 1 ? 2 : 0));
@@ -53,6 +54,10 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
     }
   }
   const res = computed?.result;
+  const [open, setOpen] = useState(() => new Set());
+  const [showAll, setShowAll] = useState(false);
+  const toggle = (key) => setOpen((o) => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  const noteOf = (key) => LEVER_NOTES[key] || LEVER_NOTES[key.replace(/^fin\./, "")] || null;
   const apply = (row) => { if (row.reachable) setState((s) => withCfdLever(s, row, row.reach)); };
   const irrText = (v) => (Number.isFinite(v) ? pf(v, 2) : "none");
 
@@ -69,7 +74,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
 
       <Section index="6.1" title="Strike-price levers for bid day" note="What moves the strike price you need, and how far each lever alone would have to go to reach the price you want to quote" className="lever-panel">
         <div className="lever-head">
-          <Field label="Strike price you want to quote" unit="₹/kWh" value={target ?? 0} onChange={(v) => setTarget(v)} step={0.01} min={0} digits={3} hint={`the model needs ₹${nf(base, 3)}: ${target !== null && target < base ? `₹${nf(base - target, 3)} to find` : "already there"}`} />
+          <Field label="Strike price you want to quote" unit="₹/kWh" value={target ?? 0} onChange={(v) => setTarget(v)} step={0.01} min={0} digits={3} hint={`the model needs ₹${nf(base, 3)}/kWh for your ${pf(finance.engine.fin.targetEquityIrr, 1)} equity IRR${target !== null && target < base ? `; to quote ₹${nf(target, 3)} the levers below must find ₹${nf(base - target, 3)}` : target !== null ? "; your quote is above it, so the equity earns more than its target" : ""}`} />
           <button type="button" className="primary" onClick={compute} disabled={Boolean(progress)} data-testid="cfd-levers-run">
             {progress ? <Loader2 className="spin" size={14} /> : <SlidersHorizontal size={14} />} {progress ? `Computing ${progress.done} of ${progress.total}` : res && !stale ? "Levers up to date" : res ? "Recompute the levers" : "Compute the levers"}
           </button>
@@ -77,15 +82,31 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
           {res && stale && !progress && <small className="lever-stale">The case changed: recompute</small>}
         </div>
         {res && (
+          <div className="lever-guide" data-testid="cfd-lever-guide">
+            <p><b>How to read the table.</b> The model needs <b>₹{nf(res.base, 3)}/kWh</b> on this bid to give the equity its {pf(finance.engine.fin.targetEquityIrr, 1)} IRR. Each row takes one input, moves it one step up and one step down with everything else as in the bid, and solves the price again.</p>
+            <ul>
+              <li><b>Now</b>: the input's value in the bid. <b>One step</b>: the move tried in each direction.</li>
+              <li><b>Price if up / if down</b>: the strike price the model needs after that one move. A green arrow is a lower price (good for winning), a red arrow a higher one.</li>
+              <li><b>₹/kWh per step</b>: how much one step moves the price; a plus sign means raising the input raises the price. The bold rows are the levers that matter.</li>
+              <li><b>To reach ₹{nf(target, 3)} alone</b>: how far that one lever would have to go, on its own, to bring the price to your quote, if its effect stayed in a straight line; "not within its range" means it cannot get there alone. <b>Apply</b> sets the input there, then recompute.</li>
+              <li><b>re-simulated</b>: the lever changes the day-by-day operation (charging, surplus, shortfalls), so every day of the term is run again before pricing; after applying one, size the own RE again.</li>
+            </ul>
+            <button type="button" className="secondary" onClick={() => setShowAll((v) => !v)} data-testid="cfd-lever-explain-all">{showAll ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {showAll ? "Hide the explanations" : "Explain every lever"}</button>
+          </div>
+        )}
+        {res && (
           <div className="table-wrap rtc-model fin-table lever-table">
             <table data-testid="cfd-lever-table">
               <thead><tr><th>Lever</th><th>Now</th><th>One step</th><th>Price if up</th><th>Price if down</th><th>₹/kWh per step</th><th>To reach ₹{nf(target, 3)} alone</th><th /></tr></thead>
               <tbody>
                 {res.levers.map((row) => {
                   const helps = (target - res.base) * row.slope;
+                  const note = noteOf(row.key);
+                  const isOpen = showAll || open.has(row.key);
                   return (
-                    <tr key={row.key} data-testid={`cfd-lever-${row.key}`}>
-                      <td>{row.label} <small>{row.unit}{row.operation ? " · re-simulated" : ""}</small></td>
+                    <React.Fragment key={row.key}>
+                    <tr data-testid={`cfd-lever-${row.key}`}>
+                      <td><button type="button" className="lever-why" onClick={() => toggle(row.key)} title="What this lever is and why it moves the price" data-testid={`cfd-lever-why-${row.key}`}><HelpCircle size={12} /></button> {row.label} <small>{row.unit}{row.operation ? " · re-simulated" : ""}</small></td>
                       <td>{fmtV(row.value, row)}</td>
                       <td>±{fmtV(row.step, row)}</td>
                       <td>{nf(row.priceUp, 3)} {row.priceUp > res.base ? <ArrowUp size={11} className="bad" /> : <ArrowDown size={11} className="good" />}</td>
@@ -94,6 +115,16 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
                       <td>{row.reach === null ? "–" : row.reachable ? <span>{fmtV(row.reach, row)} <small>({helps < 0 ? "down" : "up"} {fmtV(Math.abs(row.reach - row.value), row)})</small></span> : <small>not within its range</small>}</td>
                       <td>{row.reachable && Math.abs(row.reach - row.value) > 1e-9 && <button type="button" className="secondary" onClick={() => apply(row)} data-testid={`cfd-lever-apply-${row.key}`}><Crosshair size={11} /> Apply</button>}</td>
                     </tr>
+                    {isOpen && (
+                      <tr className="lever-note" data-testid={`cfd-lever-note-${row.key}`}>
+                        <td colSpan={8}>
+                          {note && <p><b>What it is.</b> {note.what}</p>}
+                          {note && <p><b>Why it moves the price.</b> {note.why}</p>}
+                          <p><b>In this bid.</b> {explainLever(row, res, target)}</p>
+                        </td>
+                      </tr>
+                    )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
