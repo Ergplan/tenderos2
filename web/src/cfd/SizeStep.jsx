@@ -148,7 +148,7 @@ export default function SizeStep({ state, model, optimise, optimising, stopOptim
         <OptimiseBar missing={missing} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} />
         <div className="rtc-grid rtc-grid-4" data-testid="cfd-plant">
           <Stat label="Contracted" value={`${nf(X)} MW`} detail={`${nf(X * TENDER.mwhPerMwDay)} MWh a day in 2 peak hours`} />
-          <Stat label="Battery" value={`${nf(X * i.essMwPerMw)} MW / ${nf(X * i.essMwhPerMw)} MWh`} detail={`${nf(i.essMwhPerMw, 2)} MWh per MW; round trip ${pf(i.rte, 1)}`} />
+          <Stat label="Battery" value={`${nf(X * i.essMwPerMw)} MW / ${nf(X * (i.essMwhPerMw + (i.extraEssMwhPerMw || 0)))} MWh`} detail={`${nf(i.essMwhPerMw, 2)} MWh per MW for the tender${i.extraEssMwhPerMw ? ` + ${nf(i.extraEssMwhPerMw, 2)} for evening sale` : ""}; round trip ${pf(i.rte, 1)}`} />
           <Stat label="Own solar" value={`${nf(i.solarMw || 0)} MWac`} detail={`${nf((i.solarMw || 0) / X, 2)} × contracted; CUF ${pf(i.solarCuf, 1)}`} />
           <Stat label="Own wind" value={`${nf(i.windMw || 0)} MW`} detail={i.windMw ? `${nf(i.windMw / X, 2)} × contracted; CUF ${pf(i.windCuf, 1)}` : "none"} />
           <Stat label="Strike price to bid" value={sp ? `₹${nf(sp, 3)}/kWh` : "–"} detail={sp ? `quote ₹${nf(model.bid, 2)} (rounded up to the paisa); equity IRR ${pf(i.targetEquityIrr, 1)}${model.finance ? ` · the full financial model, as on step 08 and in the workbook${model.screening?.sp ? `; fast screening ₹${nf(model.screening.sp, 3)}` : ""}` : ""}` : model.reason || ""} tone={sp ? undefined : "bad"} />

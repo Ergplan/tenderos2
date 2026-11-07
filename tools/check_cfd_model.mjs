@@ -191,3 +191,34 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.ok(ownReCostRsPerKwh({ ...s.inputs, discountRate: 0.14 }) > c, "a higher discount rate makes it dearer");
   assert.equal(ownReCostRsPerKwh({ ...s.inputs, solarMw: 0, windMw: 0 }), null, "no RE, no cost");
 }
+
+// ---- the extra battery for evening sale (Design: "Extra battery for evening sale")
+{
+  const { essTotalMwhPerMw } = await import("../web/src/cfd/model.js");
+  const base = fillBenchmarks(defaultCfdState());
+  base.inputs.contractedMw = 100;
+  base.inputs.effectiveDate = base.inputs.effectiveDate || "2026-12-01";
+  const real = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
+  const run = (patch) => runModel({ ...base, inputs: { ...base.inputs, ...patch } }, real);
+  const none = run({ extraEssMwhPerMw: 0 });
+  const plain = run({});
+  assert.ok(Math.abs(none.sp - plain.sp) < 1e-9 && none.sim.years.every((y) => y.extraSoldMwh === 0), "no extra battery: nothing changes");
+  const extra = run({ extraEssMwhPerMw: 2 });
+  assert.equal(essTotalMwhPerMw(extra.inputs), 4, "the whole battery is the tender's 2 MWh plus the extra");
+  const y3 = extra.sim.years[2];
+  assert.ok(y3.extraSoldMwh > 100 * 2 * 300 * 0.8, `the extra discharges most evenings (${Math.round(y3.extraSoldMwh)} MWh in CY3)`);
+  assert.ok(y3.extraRevCr > 0 && y3.merchantRevCr > plain.sim.years[2].merchantRevCr, "its sale adds to the merchant revenue");
+  assert.ok(y3.extraChargeOwnMwh + y3.extraChargeMarketMwh > 0.9 * y3.extraSoldMwh / extra.inputs.rte, "it is charged for what it sells");
+  assert.ok(capexOf(extra.inputs).ess > capexOf(plain.inputs).ess * 1.9, "its capex is in the project cost");
+  assert.ok(rfsAmounts(extra.inputs).emdCr > rfsAmounts(plain.inputs).emdCr, "the EMD and PBG cover the installed battery, the extra included");
+  const y1 = extra.sim.years[0];
+  assert.ok(y1.shortMwh <= plain.sim.years[0].shortMwh + 1e-6, "the day's commitment is charged first; the extra never starves it");
+  // every evening hour injects at most the contracted MW: the extra fills the connection outside the peak hours
+  const rec = simulate(extra.inputs, extra.book, extra.prof, { record: [800] }).days[800];
+  for (let h = TENDER.peakStart; h < TENDER.peakEnd; h += 1) {
+    const inj = (rec.windDirect[h] || 0) + (rec.chosen.includes(h) ? rec.essOut / rec.chosen.length : 0) + rec.extraOut[h] + (rec.sale[h] - rec.extraOut[h]);
+    assert.ok(inj <= 100 + 1e-6, `hour ${h} injects within the connection (${inj.toFixed(1)} MW)`);
+    if (rec.chosen.includes(h)) assert.ok(rec.extraOut[h] === 0, "the extra is not sold in the peak hours");
+  }
+  console.log(`CfD extra battery: 2 MWh/MW more sells ${Math.round(y3.extraSoldMwh / 1000)} GWh in CY3 for ₹${y3.extraRevCr.toFixed(1)} cr; strike price ₹${plain.sp.toFixed(3)} → ₹${extra.sp.toFixed(3)}`);
+}

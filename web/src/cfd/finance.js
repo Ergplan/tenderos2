@@ -11,7 +11,7 @@
 import * as E from "../rtc/engine.js";
 import { genSource } from "../model/generation.js";
 import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
-import { BENCHMARK_NOTE, BG_YEARS, CHOICES, FIELDS, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
+import { BENCHMARK_NOTE, BG_YEARS, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
 import { TENDER } from "./terms.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -35,7 +35,7 @@ export function cfdEngineInputs(state, model) {
   const rfs = rfsAmounts(i);
   // the EMD and PBG bank guarantees' cost over their validity, with SECI's charges: paid before the SCD
   const bgCostCr = rfs.emdCr * (i.pbgCostPct || 0) * BG_YEARS.emd + rfs.pbgCr * (i.pbgCostPct || 0) * BG_YEARS.pbg;
-  const sizes = { solarMw: i.solarMw || 0, windMw: i.windMw || 0, bessMw: X * i.essMwPerMw, bessMwh: X * i.essMwhPerMw };
+  const sizes = { solarMw: i.solarMw || 0, windMw: i.windMw || 0, bessMw: X * i.essMwPerMw, bessMwh: X * essTotalMwhPerMw(i) };
   const costs = {
     solarCrPerMw: i.solarCrPerMw || 0, windCrPerMw: i.windCrPerMw || 0, bessCrPerMwh: i.essCrPerMwh, bessPcsCrPerMw: 0,
     evacuationCr: X * (i.evacuationCrPerMw || 0),
@@ -76,7 +76,7 @@ export function cfdEngineInputs(state, model) {
     ...E.DEFAULT_BESS,
     rte: i.rte, annualDegradation: i.essDegradation || 0,
     augmentation: state.bess?.augmentation || (i.augmentation === "annual" ? "annual" : "none"), augmentationYears: state.bess?.augmentationYears || undefined, augmentationYear: state.bess?.augmentationYear, costDeclinePct: i.augDecline || 0,
-    durationH: i.essMwPerMw > 0 ? i.essMwhPerMw / i.essMwPerMw : 2,
+    durationH: i.essMwPerMw > 0 ? essTotalMwhPerMw(i) / i.essMwPerMw : 2,
   };
   const recShare = 1 - TENDER.recPoolShare; // the bidder keeps 50% of the REC proceeds (CfDA 9.2.vi)
   const ref = model.opYears[model.opYears.length - 1];
@@ -221,7 +221,7 @@ export function cfdModelExport({ state, model, finance }) {
   const plant = [
     ["Contracted capacity (MW)", X, "mw", "the bid"],
     ["Battery (MW)", eng.sizes.bessMw, "mw", `${i.essMwPerMw} MW per contracted MW`],
-    ["Battery (MWh)", eng.sizes.bessMwh, "mw", `${i.essMwhPerMw} MWh per contracted MW (at least 2, Amendment-02)`],
+    ["Battery (MWh)", eng.sizes.bessMwh, "mw", `${i.essMwhPerMw} MWh per contracted MW (at least 2, Amendment-02)${i.extraEssMwhPerMw ? ` plus ${i.extraEssMwhPerMw} MWh per MW for evening sale` : ""}`],
     ["Own solar (MWac)", eng.sizes.solarMw, "mw", state.filled?.solarMw ? "a first guess; Optimise own RE refines it" : "your size"],
     ["Own wind (MW)", eng.sizes.windMw, "mw"],
     ["Effective Date", fmtDate(dates.ed), "text"], ["SCD (battery, supply starts)", fmtDate(dates.scd), "text"], ["Own RE commissioned", fmtDate(model.sim.dates.reCod), "text"], ["Term ends", fmtDate(dates.end), "text"],

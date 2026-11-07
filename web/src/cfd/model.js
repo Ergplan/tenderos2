@@ -33,6 +33,7 @@ export const FIELDS = [
   // ---- the project
   { section: "project", key: "contractedMw", label: "Contracted capacity you bid", unit: "MW", min: TENDER.bidMinMw, max: TENDER.bidMaxMw, step: 1, hint: "50 to 150 MW in whole MW, one bid for your group (RfS 6.1)" },
   { section: "project", key: "essMwhPerMw", label: "Battery energy", unit: "MWh per contracted MW", min: 2, max: 6, step: 0.05, hint: "At least 2 (Amd-02: X MW / 2X MWh)" },
+  { section: "project", key: "extraEssMwhPerMw", label: "Extra battery for evening sale", unit: "MWh per contracted MW", min: 0, max: 6, step: 0.05, hint: "Beyond the tender's battery: discharged in the dearest evening hours outside your two peak hours, within the connection, once the day's supply is met (CfDA 4.4.1.v), at the sell market's price; charged from own RE first, then the green market within its limits. 0 = none" },
   { section: "project", key: "essMwPerMw", label: "Battery power", unit: "MW per contracted MW", min: 1, max: 3, step: 0.05, hint: "At least 1" },
   { section: "project", key: "solarMw", label: "Own solar", unit: "MWac", min: 0, max: 5000, step: 5, hint: "Co-located; “Optimise own RE” finds the least-tariff size" },
   { section: "project", key: "windMw", label: "Own wind", unit: "MW", min: 0, max: 5000, step: 5, hint: "0 for none" },
@@ -91,7 +92,7 @@ export const CHOICES = {
 
 export const BENCHMARKS = {
   effectiveDate: "2027-02-01",
-  essMwhPerMw: 2, essMwPerMw: 1, solarMw: null, windMw: 0, reCodMonths: 21, availability: 0.97,
+  essMwhPerMw: 2, extraEssMwhPerMw: 0, essMwPerMw: 1, solarMw: null, windMw: 0, reCodMonths: 21, availability: 0.97,
   solarCuf: 0.25, solarDegradation: 0.005, windCuf: 0.33, rte: 0.87, essDegradation: 0.02,
   marketCharges: 0.3, groupPrice: 3.0, groupCharges: 0.3, priceEscalation: 0, gdamShareCap: 0.2, recPrice: 150,
   essCrPerMwh: 1.0, solarCrPerMw: 4.0, windCrPerMw: 6.5, evacuationCrPerMw: 0.3, preopPct: 0.05, augDecline: 0.05,
@@ -197,7 +198,7 @@ export function missingInputs(state) {
   for (const key of ["sellMarket", "useMarket", "useGroup", "merchant", "augmentation", "afterTerm"]) {
     if (i[key] === null || i[key] === undefined) out.push(CHOICES[key].label);
   }
-  const optional = new Set(["windCuf", "windCrPerMw", "windOmLakhPerMw", "groupPrice", "groupCharges", "recPrice", "gdamShareCap"]);
+  const optional = new Set(["windCuf", "windCrPerMw", "windOmLakhPerMw", "groupPrice", "groupCharges", "recPrice", "gdamShareCap", "extraEssMwhPerMw"]);
   for (const f of FIELDS) {
     if (optional.has(f.key)) continue;
     if (!isNum(i[f.key])) out.push(f.label);
@@ -370,6 +371,7 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
   const X = inputs.contractedMw;
   const P = X * inputs.essMwPerMw;
   const capNominal = X * inputs.essMwhPerMw;
+  const extraNominal = X * (inputs.extraEssMwhPerMw || 0); // the extra battery for evening sale
   const S = inputs.solarMw || 0;
   const W = inputs.windMw || 0;
   const rte = inputs.rte;
@@ -389,6 +391,7 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     deliveredMwh: 0, windDirectMwh: 0, essOutMwh: 0, chargeOwnMwh: 0, chargeMarketMwh: 0, chargeGroupMwh: 0,
     marketCostCr: 0, groupCostCr: 0, merchantMwh: 0, merchantRevCr: 0, curtailedMwh: 0, shortMwh: 0, shortDays: 0,
     mcpDeliveredCr: 0, ownSuppliedMwh: 0, recMwh: 0, reDays: 0, solarMwh: 0, windMwh: 0, weeks: [],
+    extraSoldMwh: 0, extraRevCr: 0, extraChargeOwnMwh: 0, extraChargeMarketMwh: 0, extraMarketCostCr: 0,
   });
   const opYears = Array.from({ length: nOp }, (_, i) => {
     const start = addDays(dates.scd, i * 365);
@@ -487,6 +490,52 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     const essOut = charged * rte;
     const delivered = windDirect + essOut;
     const met = chargeLeft <= 1e-6;
+    // the extra battery for evening sale: charged after the day's commitment, own RE first (the spare
+    // generation, in the cheapest hours), then the green market within what is left of its limit and
+    // the depth cap; discharged only when the day's supply is met (CfDA 4.4.1.v), in the dearest
+    // evening hours outside the two peak hours, within the connection, at the sell market's price
+    const ownX = new Float64Array(TENDER.peakStart);
+    const mktX = new Float64Array(TENDER.peakStart);
+    let extraCost = 0;
+    let extraLeft = 0;
+    const extraCap = extraNominal > 0 ? extraNominal * (cap / Math.max(1e-9, capNominal)) : 0;
+    if (extraCap > 0 && met) {
+      extraLeft = extraCap / rte;
+      for (const h of book.chargeOrder[d]) {
+        if (extraLeft <= 1e-9) break;
+        const c = Math.min(Math.max(0, sol[h] + wnd[h] - own[h]), room[h], extraLeft);
+        ownX[h] = c; room[h] -= c; extraLeft -= c;
+      }
+      if (extraLeft > 1e-9 && inputs.useMarket) {
+        // the green-market limit is the commitment's first: the extra may buy only what the rest of
+        // the Contract Year's commitment will not need
+        const daysLeft = Math.max(0, Math.round((cy.end - t) / DAY_MS) - 1);
+        const reserved = daysLeft * X * TENDER.mwhPerMwDay * avail;
+        for (const h of book.buyOrder[d]) {
+          if (extraLeft <= 1e-9) break;
+          const budget = (cy.marketCapMwh - marketUsed - reserved) / rte;
+          const depth = shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + h] - mkt[h] - mktX[h]) : Infinity;
+          const c = Math.min(room[h], extraLeft, Math.max(0, budget), depth);
+          if (c <= 1e-9) continue;
+          room[h] -= c; extraLeft -= c; mktX[h] += c; marketUsed += c * rte;
+          extraCost += c * (book.buy[b + h] * escM + inputs.marketCharges) * 1e-4;
+        }
+      }
+    }
+    const extraOut = new Float64Array(24);
+    let extraSold = 0;
+    let extraRev = 0;
+    if (extraCap > 0 && met) {
+      let left = (extraCap / rte - Math.max(0, extraLeft)) * rte;
+      for (const h of book.peakOrder[d]) {
+        if (left <= 1e-9) break;
+        if (chosen.includes(h)) continue;
+        const o = Math.min(left, P, Math.max(0, X - (direct[h] || 0)));
+        if (o <= 1e-9) continue;
+        extraOut[h] = o; left -= o; extraSold += o;
+        extraRev += o * book.sell[b + h] * escE * 1e-4;
+      }
+    }
     // own RE not used: sold (within the connection, once the day's supply is met) or curtailed
     let merchantMwh = 0;
     let merchantRev = 0;
@@ -494,10 +543,10 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     const sale = new Float64Array(24);
     for (let h = 0; h < 24; h += 1) {
       const gen = sol[h] + wnd[h];
-      const used = h < TENDER.peakStart ? own[h] : (direct[h] || 0);
+      const used = h < TENDER.peakStart ? own[h] + ownX[h] : (direct[h] || 0);
       const spare = Math.max(0, gen - used);
       if (spare <= 0) continue;
-      const injected = h < TENDER.peakStart ? 0 : (direct[h] || 0) + (chosen.includes(h) ? essOut / chosen.length : 0);
+      const injected = h < TENDER.peakStart ? 0 : (direct[h] || 0) + (chosen.includes(h) ? essOut / chosen.length : 0) + extraOut[h];
       const s = inputs.merchant && met ? Math.min(spare, Math.max(0, X - injected)) : 0;
       sale[h] = s;
       merchantMwh += s;
@@ -514,13 +563,17 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     for (const h of chosen) mcp += book.sell[b + h] * escE * (direct[h] + essOut / chosen.length);
     const marketDay = mkt.reduce((a, v) => a + v, 0);
     const groupDay = grp.reduce((a, v) => a + v, 0);
+    const ownXDay = ownX.reduce((a, v) => a + v, 0);
+    const mktXDay = mktX.reduce((a, v) => a + v, 0);
+    cy.marketCostCr += extraCost;
     const marketCostDay = cy.marketCostCr - cyMarketCost;
     const groupCostDay = cy.groupCostCr - cyGroupCost;
     for (const row of [cy, oy]) {
       Object.assign(row, {
         deliveredMwh: row.deliveredMwh + delivered, windDirectMwh: row.windDirectMwh + windDirect, essOutMwh: row.essOutMwh + essOut,
-        chargeOwnMwh: row.chargeOwnMwh + ownCharged, chargeMarketMwh: row.chargeMarketMwh + marketDay, chargeGroupMwh: row.chargeGroupMwh + groupDay,
-        merchantMwh: row.merchantMwh + merchantMwh, merchantRevCr: row.merchantRevCr + merchantRev, curtailedMwh: row.curtailedMwh + curtailed,
+        chargeOwnMwh: row.chargeOwnMwh + ownCharged + ownXDay, chargeMarketMwh: row.chargeMarketMwh + marketDay + mktXDay, chargeGroupMwh: row.chargeGroupMwh + groupDay,
+        merchantMwh: row.merchantMwh + merchantMwh + extraSold, merchantRevCr: row.merchantRevCr + merchantRev + extraRev, curtailedMwh: row.curtailedMwh + curtailed,
+        extraSoldMwh: row.extraSoldMwh + extraSold, extraRevCr: row.extraRevCr + extraRev, extraChargeOwnMwh: row.extraChargeOwnMwh + ownXDay, extraChargeMarketMwh: row.extraChargeMarketMwh + mktXDay, extraMarketCostCr: row.extraMarketCostCr + extraCost,
         shortMwh: row.shortMwh + Math.max(0, chargeLeft) * rte, shortDays: row.shortDays + (met ? 0 : 1),
         mcpDeliveredCr: row.mcpDeliveredCr + mcp * 1e-4, ownSuppliedMwh: row.ownSuppliedMwh + ownSupplied,
         recMwh: row.recMwh + (brown ? ownSupplied : 0), solarMwh: row.solarMwh + solarDay, windMwh: row.windMwh + windDay,
@@ -538,8 +591,8 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     w.cy = cyIdx;
     weeks.set(wk, w);
     if (keep.has(k)) {
-      days[k] = { date: t, chosen, solar: Array.from(sol), wind: Array.from(wnd), own: [...own, ...new Array(6).fill(0)], market: [...mkt, ...new Array(6).fill(0)], group: [...grp, ...new Array(6).fill(0)],
-        sale: Array.from(sale), essOut, windDirect: direct, delivered, required: X * TENDER.mwhPerMwDay, price: Array.from({ length: 24 }, (_, h) => book.sell[b + h] * escOf(h)), buyPrice: Array.from({ length: 24 }, (_, h) => book.buy[b + h] * escOf(h)) };
+      days[k] = { date: t, chosen, solar: Array.from(sol), wind: Array.from(wnd), own: [...Array.from(own, (v, h) => v + ownX[h]), ...new Array(6).fill(0)], market: [...Array.from(mkt, (v, h) => v + mktX[h]), ...new Array(6).fill(0)], group: [...grp, ...new Array(6).fill(0)],
+        sale: Array.from(sale, (v, h) => v + extraOut[h]), extraOut: Array.from(extraOut), essOut, windDirect: direct, delivered, required: X * TENDER.mwhPerMwDay, price: Array.from({ length: 24 }, (_, h) => book.sell[b + h] * escOf(h)), buyPrice: Array.from({ length: 24 }, (_, h) => book.buy[b + h] * escOf(h)) };
     }
   }
   for (const w of weeks.values()) {
@@ -574,7 +627,7 @@ export const lcCr = (mw, sp) => (2000 * mw * Math.max(0, TENDER.lcMinPrice - sp)
  */
 export function rfsAmounts(inputs) {
   const X = isNum(inputs.contractedMw) ? inputs.contractedMw : 0;
-  const cap = { solarMw: inputs.solarMw || 0, windMw: inputs.windMw || 0, essMwh: X * (inputs.essMwhPerMw || TENDER.essHoursMin) };
+  const cap = { solarMw: inputs.solarMw || 0, windMw: inputs.windMw || 0, essMwh: X * ((inputs.essMwhPerMw || TENDER.essHoursMin) + (inputs.extraEssMwhPerMw || 0)) };
   const lakh = (rates) => Object.keys(rates).reduce((a, k) => a + rates[k] * cap[k], 0);
   const gst = isNum(inputs.gstRate) ? inputs.gstRate : 0;
   const rfsCost = TENDER.rfsCostLakh / 100;
@@ -605,6 +658,9 @@ export const BG_YEARS = {
  * generated per MW. Solar and wind weighted by their generation. Shown beside the exchange bill so
  * that charging from own RE is not read as free.
  */
+/** The whole battery per contracted MW: the tender's (at least 2 MWh) plus the extra for evening sale. */
+export const essTotalMwhPerMw = (inputs) => (inputs.essMwhPerMw || 0) + (inputs.extraEssMwhPerMw || 0);
+
 export function ownReCostRsPerKwh(inputs) {
   const r = inputs.discountRate || 0;
   const n = Math.max(1, inputs.reLifeYears || 25);
@@ -627,7 +683,7 @@ export function ownReCostRsPerKwh(inputs) {
 export function capex(inputs) {
   const X = inputs.contractedMw;
   const pre = 1 + inputs.preopPct;
-  const ess = X * inputs.essMwhPerMw * inputs.essCrPerMwh;
+  const ess = X * essTotalMwhPerMw(inputs) * inputs.essCrPerMwh;
   const evac = X * inputs.evacuationCrPerMw;
   const solar = (inputs.solarMw || 0) * inputs.solarCrPerMw;
   const wind = (inputs.windMw || 0) * (inputs.windCrPerMw || 0);
@@ -663,7 +719,7 @@ export function financials(inputs, sim, sp) {
   const { scd, reCod } = sim.dates;
   const tScd = 0.6; // equity and debt for the battery are spent on average ~7 months before the SCD
   const reCy = sim.years.findIndex((cy) => reCod < cy.end);
-  const essMwh = X * inputs.essMwhPerMw;
+  const essMwh = X * essTotalMwhPerMw(inputs);
   const lc = lcCr(X, sp);
   const rfs = rfsAmounts(inputs);
   const rows = [];

@@ -163,7 +163,7 @@ export function status(state, model, run = null) {
   return {
     step: state.step,
     bid: { contractedMw: i.contractedMw, effectiveDate: i.effectiveDate, sellMarket: i.sellMarket, useMarket: i.useMarket, useGroup: i.useGroup, merchant: i.merchant, afterTerm: i.afterTerm },
-    plant: isNum(i.contractedMw) ? { bessMw: r(i.contractedMw * (i.essMwPerMw || 0), 0), bessMwh: r(i.contractedMw * (i.essMwhPerMw || 0), 0), solarMw: r(i.solarMw, 0), windMw: r(i.windMw, 0) } : null,
+    plant: isNum(i.contractedMw) ? { bessMw: r(i.contractedMw * (i.essMwPerMw || 0), 0), bessMwh: r(i.contractedMw * ((i.essMwhPerMw || 0) + (i.extraEssMwhPerMw || 0)), 0), solarMw: r(i.solarMw, 0), windMw: r(i.windMw, 0) } : null,
     inputsMissing: missing.length ? missing.slice(0, 12) : "none",
     optimizer: run?.active ? `running (${run.done || 0}/${run.total || 0})` : "not running",
     strikePrice: model?.sp ? { forTargetIrr: r(model.sp, 3), quoteRoundedUp: r(model.bid, 2), equityIrrPct: r(model.fin.equityIrr * 100), projectIrrPct: r(model.fin.projectIrr * 100), minDscr: r(model.fin.minDscr) } : null,
@@ -292,7 +292,7 @@ export function createToolRunner(ctx) {
       const a = rfsAmounts(i);
       return {
         summary: explainResults(m),
-        plant: { contractedMw: i.contractedMw, bessMw: r(i.contractedMw * i.essMwPerMw, 0), bessMwh: r(i.contractedMw * i.essMwhPerMw, 0), solarMw: r(i.solarMw, 0), windMw: r(i.windMw, 0) },
+        plant: { contractedMw: i.contractedMw, bessMw: r(i.contractedMw * i.essMwPerMw, 0), bessMwh: r(i.contractedMw * ((i.essMwhPerMw || 0) + (i.extraEssMwhPerMw || 0)), 0), solarMw: r(i.solarMw, 0), windMw: r(i.windMw, 0) },
         strikePrice: m.sp ? { forTargetIrr: r(m.sp, 3), quoteRoundedUp: r(m.bid, 2) } : { reason: m.reason },
         supply: { daysShortOfCharging: years.reduce((s, y) => s + y.shortDays, 0), weeksPenalised: years.reduce((s, y) => s + y.weeks.filter((w) => w.beyondMwh > 1e-6).length, 0),
           ownShareAfterMonth36Pct: r(Math.min(...years.filter((y) => y.start >= m.sim.dates.extraUntil).map((y) => y.shareOwn * 100), 100), 1) },

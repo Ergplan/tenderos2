@@ -183,6 +183,14 @@ with every day's supply met within the sourcing limits; it is offered here and o
 
 ---
 
+**Extra battery for evening sale.** Beyond the tender's 2 MWh per MW you may add battery whose
+only job is to sell in the evening: it is charged after the day's commitment (your own RE first,
+then the green market within its limit) and, once the day's supply is met, discharged in the
+dearest evening hours outside your two peak hours, within the connection, at the sell market's
+price. The Pool does not settle it, so it keeps the market price. Its capex, O&M, EMD and PBG
+follow the installed MWh, and the What-if step shows whether it lowers the strike price. It pays
+only while evening prices hold up, which is the storage-flood case on F.9. 0 means none.
+
 ## Step 06 · Finance inputs *(Finance)*
 
 **Lender's minimum DSCR.** The floor your lender sets (1.1 by default). It does not change the model; the Minimum DSCR tile on the Financial model, What-if and F.5 Returns turns red below it.

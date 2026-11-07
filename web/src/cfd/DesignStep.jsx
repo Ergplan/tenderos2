@@ -30,8 +30,8 @@ export default function DesignStep({ state, setState, setInput, lockProps, optim
     <>
       <Section index="4" title="Battery" note="Mandatory: X MW / 2X MWh for X MW contracted, owned by you, co-located with the RE" actions={null}>
         <FillBar state={state} setState={setState} missing={missing} />
-        <Fields state={state} setInput={setInput} section="project" only={["essMwhPerMw", "essMwPerMw"]} lockProps={lockProps} />
-        {X > 0 && i.essMwhPerMw && <p className="rtc-note" data-testid="cfd-battery-size">Battery {nf(X * (i.essMwPerMw || 1))} MW / {nf(X * i.essMwhPerMw)} MWh for {nf(X)} MW contracted <Cite id="ess" /> <Cite id="essOwned" /> <Cite id="colocated" />.</p>}
+        <Fields state={state} setInput={setInput} section="project" only={["essMwhPerMw", "essMwPerMw", "extraEssMwhPerMw"]} lockProps={lockProps} />
+        {X > 0 && i.essMwhPerMw && <p className="rtc-note" data-testid="cfd-battery-size">Battery {nf(X * (i.essMwPerMw || 1))} MW / {nf(X * i.essMwhPerMw)} MWh for {nf(X)} MW contracted <Cite id="ess" /> <Cite id="essOwned" /> <Cite id="colocated" />{i.extraEssMwhPerMw > 0 && <>, plus {nf(X * i.extraEssMwhPerMw)} MWh for evening sale outside the peak hours, once the day's supply is met <Cite id="essOtherUse" /></>}.</p>}
         <Fields state={state} setInput={setInput} section="resource" only={["rte", "essDegradation"]} lockProps={lockProps} />
         <div className="rtc-grid rtc-grid-4 cfd-fields"><Choice state={state} setInput={setInput} k="augmentation" lockProps={lockProps} /></div>
       </Section>

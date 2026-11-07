@@ -112,6 +112,14 @@ also capped at `gdamShareCap` × the hour's cleared GDAM volume (`hourlyMcvMw` o
    first, within each Contract Year's limits (April–March; the SCD to 31 March for the first).
 4. Own RE not needed is sold in the GDAM within the connection (the Contracted MW) on days the
    supply is met (CfDA 4.4.1.v), or curtailed.
+4a. The **extra battery for evening sale** (`extraEssMwhPerMw`, Design; 0 by default): beyond the
+   tender's 2 MWh per MW, charged after the day's commitment (own RE first, then the green market
+   within what is left of its limit and the depth cap) and, only when the day's supply is met,
+   discharged in the dearest evening hours outside the two peak hours, within the connection, at
+   the sell market's price (CfDA 4.4.1.v; HP-DAM prices are not in the file, so the sell market's
+   price stands in). Its capex, O&M, augmentation, EMD and PBG follow the installed MWh. Per year:
+   `extraSoldMwh`, `extraRevCr`, `extraChargeOwnMwh`, `extraChargeMarketMwh`, `extraMarketCostCr`,
+   folded into the merchant and charging totals the financial model reads.
 5. Each Contract Week's shortfall beyond 10% is penalised at the strike price being solved.
 
 F.9 of the Financial model step (`MarketPrices.jsx`) draws the two bands (`priceBands` gives
