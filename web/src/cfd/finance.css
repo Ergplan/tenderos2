@@ -29,3 +29,4 @@
 .lever-why:hover { color: var(--signal); }
 .lever-table tr.lever-note td { background: var(--panel, rgba(255,255,255,0.03)); font-size: 12.5px; line-height: 1.5; white-space: normal; padding: 8px 14px 10px 30px; }
 .lever-table tr.lever-note p { margin: 0 0 4px; }
+.lever-note-body { position: sticky; left: 14px; max-width: min(1040px, calc(100vw - 360px)); }

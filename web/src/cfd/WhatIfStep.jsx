@@ -118,9 +118,11 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
                     {isOpen && (
                       <tr className="lever-note" data-testid={`cfd-lever-note-${row.key}`}>
                         <td colSpan={8}>
-                          {note && <p><b>What it is.</b> {note.what}</p>}
-                          {note && <p><b>Why it moves the price.</b> {note.why}</p>}
-                          <p><b>In this bid.</b> {explainLever(row, res, target)}</p>
+                          <div className="lever-note-body">
+                            {note && <p><b>What it is.</b> {note.what}</p>}
+                            {note && <p><b>Why it moves the price.</b> {note.why}</p>}
+                            <p><b>In this bid.</b> {explainLever(row, res, target)}</p>
+                          </div>
                         </td>
                       </tr>
                     )}
