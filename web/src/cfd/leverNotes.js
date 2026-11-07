@@ -1,7 +1,9 @@
 // Plain-words notes for the What-if levers of a CfD bid: what each input is, and why moving it moves
 // the strike price the model needs. The What-if step shows them under each row, with the row's own
 // numbers put into a sentence (explainLever). Keys are the inputs of FIELDS (model.js).
-import { nf, pf } from "../rtc/ui";
+// plain JavaScript (checked in Node): the formatters are the same as ../rtc/ui's
+const nf = (v, d = 0) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? "–" : new Intl.NumberFormat("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d }).format(Number(v)));
+const pf = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : "–");
 
 export const LEVER_NOTES = {
   contractedMw: {
@@ -200,4 +202,101 @@ export function explainLever(row, res, target) {
   }
   if (row.operation) parts.push("Moving it changes the day-by-day operation (the charging, the surplus, the shortfalls), so the model re-simulates every day of the term before pricing.");
   return parts.join(" ");
+}
+
+// ---- how far each lever can plausibly move (the track to a quote, track.js)
+//
+// Three bands per lever, in the input's own units (percent inputs as fractions): `sure` is where
+// the bidder can put the input at will, `likely` where it lands with normal effort or a fair
+// negotiation, `stretch` what takes luck or a hard bargain. Chance of a move: 100% inside the sure
+// band, 50% at the likely edge, 10% at the stretch edge, 0 one stretch-width beyond it (or at the
+// input's hard limit). Benchmark judgement for a 2028 project in India, not from the tender; a band
+// given as a function reads the bid (X = contracted MW). Levers with no band are not the bidder's
+// to choose (the tax rate, a market view).
+export const LEVER_BANDS = {
+  contractedMw: { sure: [50, 150], likely: [50, 150], stretch: [50, 150], who: "your bid" },
+  essMwhPerMw: { sure: [2, 2.2], likely: [2, 2.5], stretch: [2, 3], who: "your design (at least 2)" },
+  extraEssMwhPerMw: { sure: [0, 0], likely: [0, 1], stretch: [0, 2], who: "your design" },
+  essMwPerMw: { sure: [1, 1], likely: [1, 1.25], stretch: [1, 1.5], who: "your design (at least 1)" },
+  solarMw: { sure: (X) => [0, 1.5 * X], likely: (X) => [0, 2.5 * X], stretch: (X) => [0, 4 * X], who: "your design and land" },
+  windMw: { sure: (X) => [0, X], likely: (X) => [0, 1.5 * X], stretch: (X) => [0, 2 * X], who: "your design and site" },
+  reCodMonths: { sure: [18, 21], likely: [12, 21], stretch: [6, 21], who: "your construction plan" },
+  availability: { sure: [0.95, 0.97], likely: [0.93, 0.98], stretch: [0.9, 0.985], who: "your operations" },
+  solarCuf: { sure: [0.23, 0.26], likely: [0.21, 0.28], stretch: [0.19, 0.3], who: "the site you pick" },
+  solarDegradation: { sure: [0.004, 0.006], likely: [0.003, 0.007], stretch: [0.0025, 0.008], who: "the module warranty" },
+  windCuf: { sure: [0.3, 0.36], likely: [0.28, 0.4], stretch: [0.25, 0.45], who: "the site you pick" },
+  rte: { sure: [0.86, 0.88], likely: [0.85, 0.9], stretch: [0.83, 0.92], who: "the battery supplier" },
+  essDegradation: { sure: [0.02, 0.02], likely: [0.015, 0.025], stretch: [0.01, 0.03], who: "the battery warranty" },
+  marketCharges: { sure: [0.25, 0.35], likely: [0.15, 0.45], stretch: [0.08, 0.6], who: "the exchange and the ISTS waiver" },
+  groupPrice: { sure: [2.8, 3.2], likely: [2.5, 3.5], stretch: [2.2, 4], who: "your group" },
+  groupCharges: { sure: [0.25, 0.35], likely: [0.15, 0.45], stretch: [0.08, 0.6], who: "the transmission route" },
+  priceEscalation: { sure: [0, 0], likely: [-0.01, 0.02], stretch: [-0.03, 0.04], who: "the market, not you: a view, not a lever" },
+  gdamShareCap: { sure: [0.1, 0.3], likely: [0.05, 0.5], stretch: [0.02, 1], who: "the market's depth" },
+  recPrice: { sure: [100, 200], likely: [50, 400], stretch: [0, 1000], who: "the REC market" },
+  essCrPerMwh: { sure: [0.7, 0.85], likely: [0.6, 0.95], stretch: [0.5, 1.1], who: "the battery supplier, for 2028 delivery" },
+  solarCrPerMw: { sure: [3.8, 4.2], likely: [3.4, 4.6], stretch: [3, 5], who: "the EPC, with domestic modules" },
+  windCrPerMw: { sure: [6, 7], likely: [5.5, 7.5], stretch: [5, 8.5], who: "the turbine supplier" },
+  evacuationCrPerMw: { sure: [0.25, 0.35], likely: [0.15, 0.5], stretch: [0.1, 0.8], who: "the distance to the substation" },
+  preopPct: { sure: [0.04, 0.06], likely: [0.03, 0.08], stretch: [0.02, 0.1], who: "your construction schedule and drawdown" },
+  augDecline: { sure: [0.04, 0.06], likely: [0.02, 0.08], stretch: [0, 0.12], who: "the battery market" },
+  essOmLakhPerMwh: { sure: [1.1, 1.3], likely: [0.9, 1.6], stretch: [0.7, 2], who: "the O&M contract" },
+  solarOmLakhPerMw: { sure: [3.5, 4.5], likely: [3, 5.5], stretch: [2.5, 7], who: "the O&M contract" },
+  windOmLakhPerMw: { sure: [8, 10], likely: [7, 12], stretch: [6, 14], who: "the O&M contract" },
+  otherFixedLakhPerMw: { sure: [1.5, 2.5], likely: [1, 3], stretch: [0.5, 4], who: "your overheads" },
+  insurancePct: { sure: [0.0025, 0.0035], likely: [0.002, 0.004], stretch: [0.0015, 0.005], who: "the insurer" },
+  omEscalation: { sure: [0.045, 0.055], likely: [0.035, 0.06], stretch: [0.03, 0.07], who: "the O&M contract" },
+  pxFee: { sure: [0.02, 0.02], likely: [0.015, 0.025], stretch: [0.01, 0.03], who: "the exchange" },
+  lcCostPct: { sure: [0.008, 0.012], likely: [0.005, 0.015], stretch: [0.003, 0.02], who: "your bank" },
+  pbgCostPct: { sure: [0.008, 0.012], likely: [0.005, 0.015], stretch: [0.003, 0.02], who: "your bank" },
+  targetEquityIrr: { sure: [0.13, 0.15], likely: [0.12, 0.16], stretch: [0.1, 0.18], who: "your board" },
+  debtFraction: { sure: [0.7, 0.75], likely: [0.65, 0.8], stretch: [0.6, 0.85], who: "the lender (DSCR permitting)" },
+  interestRate: { sure: [0.0875, 0.0925], likely: [0.08, 0.1], stretch: [0.075, 0.11], who: "the lender" },
+  tenorYears: { sure: [10, 13], likely: [8, 15], stretch: [7, 15], who: "the lender, within the 15-year term" },
+  taxRate: null,
+  essLifeYears: { sure: [12, 15], likely: [10, 15], stretch: [8, 20], who: "your auditor" },
+  reLifeYears: { sure: [25, 25], likely: [20, 30], stretch: [15, 35], who: "your auditor" },
+  discountRate: null,
+  "fin.receivableDays": { sure: [30, 45], likely: [15, 60], stretch: [7, 90], who: "the exchange's settlement cycle" },
+  "fin.graceYears": { sure: [0, 0], likely: [0, 1], stretch: [0, 2], who: "the lender" },
+};
+
+const bandOf = (band, X) => (typeof band === "function" ? band(X) : band);
+
+/**
+ * The chance (0 to 1) that a lever ends up at `value`, from its value in the bid, by the bands
+ * above: 1 inside the sure band, 0.5 at the likely edge, 0.1 at the stretch edge, 0 one
+ * stretch-width beyond it or at the lever's hard limit. `edges` gives those four values for the
+ * direction of the move, so the screen can say "likely to X (50%), stretch to Y (10%)".
+ */
+export function leverChance(lever, value, inputs) {
+  const bands = LEVER_BANDS[lever.key];
+  if (!bands) return { p: Math.abs(value - lever.value) < 1e-12 ? 1 : 0, edges: null, fixed: true };
+  const X = inputs?.contractedMw || 100;
+  const dir = value > lever.value ? 1 : value < lever.value ? -1 : 0;
+  if (dir === 0) return { p: 1, edges: null, fixed: false };
+  const side = dir > 0 ? 1 : 0;
+  const edge = (b) => {
+    const e = bandOf(b, X)[side];
+    return dir > 0 ? Math.max(e, lever.value) : Math.min(e, lever.value); // the bid's own value counts as reachable
+  };
+  const sure = edge(bands.sure);
+  const likely = dir > 0 ? Math.max(edge(bands.likely), sure) : Math.min(edge(bands.likely), sure);
+  const stretch = dir > 0 ? Math.max(edge(bands.stretch), likely) : Math.min(edge(bands.stretch), likely);
+  const hard = dir > 0 ? lever.max : lever.min;
+  let zero = stretch + dir * Math.abs(stretch - likely);
+  zero = dir > 0 ? Math.min(zero, hard) : Math.max(zero, hard);
+  const d = (a, b) => Math.abs(b - a);
+  const dist = d(lever.value, value);
+  const seg = (from, to, pFrom, pTo) => {
+    const w = d(from, to);
+    if (w < 1e-12) return pTo;
+    return pFrom + ((pTo - pFrom) * (dist - d(lever.value, from))) / w;
+  };
+  let p;
+  if (dist <= d(lever.value, sure) + 1e-12) p = 1;
+  else if (dist <= d(lever.value, likely) + 1e-12) p = seg(sure, likely, 1, 0.5);
+  else if (dist <= d(lever.value, stretch) + 1e-12) p = seg(likely, stretch, 0.5, 0.1);
+  else if (dist <= d(lever.value, zero) + 1e-12) p = seg(stretch, zero, 0.1, 0);
+  else p = 0;
+  return { p: Math.max(0, Math.min(1, p)), edges: { sure, likely, stretch, zero, dir }, fixed: false, who: bands.who };
 }

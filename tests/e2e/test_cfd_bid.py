@@ -145,10 +145,26 @@ def test_cfd_bid_end_to_end(tmp_path):
         assert page.locator("[data-testid=cfd-price-table] tbody tr").count() == 4
         assert "₹" in page.locator("[data-testid=cfd-price-row-storageFlood]").inner_text()
 
-        # 09 what-if: the levers
+        # 09 what-if: the track to a quote (an impossible one first, then a reachable one), then the levers
         _step(page, "whatif")
         page.wait_for_selector("[data-testid=cfd-whatif]", timeout=60_000)
-        page.click("[data-testid=cfd-levers-run]")
+        quote = _field(page, "Strike price you want to quote").locator("input")
+        quote.fill("1")
+        quote.dispatch_event("change")
+        page.click("[data-testid=cfd-track-run]")
+        page.wait_for_selector("[data-testid=cfd-track-verdict]", timeout=900_000)
+        verdict = page.locator("[data-testid=cfd-track-verdict]").inner_text().lower()
+        assert "out of reach" in verdict and "0%" in verdict, verdict
+        assert page.locator("[data-testid=cfd-track-floor-toggle]").count() == 1
+        needs = float(re.search(r"needs ₹([\d.]+)", page.locator("[data-testid=cfd-whatif]").inner_text()).group(1))
+        quote.fill(f"{needs - 0.3:.2f}")
+        quote.dispatch_event("change")
+        page.click("[data-testid=cfd-track-run]")
+        page.wait_for_selector("[data-testid=cfd-track-steps]", timeout=900_000)
+        assert page.locator("[data-testid^=cfd-track-step-]").count() >= 1
+        assert page.locator("[data-testid=cfd-track-chance]").count() >= 1
+        assert page.locator("[data-testid=cfd-track-waterfall]").count() == 1
+        assert "chance" in page.locator("[data-testid=cfd-track-verdict]").inner_text().lower()
         page.wait_for_selector("[data-testid^=cfd-lever-]", timeout=600_000)
         assert page.locator("[data-testid^=cfd-lever-]").count() >= 11, "the table and at least ten levers"
         # the reading guide and a lever's explanation

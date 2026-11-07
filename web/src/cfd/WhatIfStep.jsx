@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Crosshair, HelpCircle, Loader2, SlidersHorizontal, Square } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Crosshair, HelpCircle, Loader2, Route, SlidersHorizontal, Square } from "lucide-react";
 import { Field, Section, Stat, nf, pf } from "../rtc/ui";
 import { quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
 import { cfdLeverEffects, withCfdLever } from "./levers.js";
 import { LEVER_NOTES, explainLever } from "./leverNotes.js";
+import { planTrack } from "./track.js";
+import TrackView from "./TrackView.jsx";
 import "./finance.css";
 
 const fmtV = (v, l) => (l.pct ? pf(v, 2) : nf(v, l.step < 0.01 ? 4 : l.step < 1 ? 2 : 0));
@@ -23,6 +25,8 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   const [tried, setTried] = useState(null);
   const [computed, setComputed] = useState(null); // { key, result }
   const [progress, setProgress] = useState(null);
+  const [track, setTrack] = useState(null); // { key, result }
+  const [tracking, setTracking] = useState(null);
   const abortRef = useRef(null);
   useEffect(() => { if (base !== null && target === null) setTarget(Number((quoteOf(base) * 0.95).toFixed(2))); }, [base, target]);
   const caseKey = useMemo(() => JSON.stringify([state.inputs, state.fin, state.costs, target]), [state.inputs, state.fin, state.costs, target]);
@@ -46,6 +50,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
     try {
       const result = await cfdLeverEffects(state, model, prices, { target, signal: abort.signal, onProgress: (done, total) => setProgress({ done, total }) });
       setComputed({ key: caseKey, result });
+      return result;
     } catch (err) {
       if (!/Stopped/.test(err.message)) window.alert(err.message);
     } finally {
@@ -54,6 +59,27 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
     }
   }
   const res = computed?.result;
+  const trackStale = !track || track.key !== caseKey;
+
+  async function plot() {
+    if (progress || tracking) return;
+    let effects = !stale ? res : null;
+    if (!effects) effects = await compute();
+    if (!effects) return;
+    const abort = new AbortController();
+    abortRef.current = abort;
+    setTracking({ done: 0, total: 1 });
+    try {
+      const result = await planTrack({ state, model, prices, effects, target, signal: abort.signal, onProgress: (done, total) => setTracking({ done, total }) });
+      setTrack({ key: caseKey, result });
+    } catch (err) {
+      if (!/Stopped/.test(err.message)) window.alert(err.message);
+    } finally {
+      setTracking(null);
+      abortRef.current = null;
+    }
+  }
+  const applyTrack = (steps) => setState((s) => steps.reduce((acc, st) => withCfdLever(acc, { key: st.key, min: -Infinity, max: Infinity, int: st.int }, st.to), s));
   const [open, setOpen] = useState(() => new Set());
   const [showAll, setShowAll] = useState(false);
   const toggle = (key) => setOpen((o) => { const n = new Set(o); if (n.has(key)) n.delete(key); else n.add(key); return n; });
@@ -72,9 +98,20 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
         </div>
       </Section>
 
+      <Section index="6.0" title="The track to the price you want to quote" note="Which levers to turn, how far, in what order, and the chance of each move happening; a quote no lever can reach is said so" className="lever-panel">
+        <div className="lever-head">
+          <Field label="Strike price you want to quote" unit="₹/kWh" value={target ?? 0} onChange={(v) => setTarget(v)} step={0.01} min={0} digits={3} hint={`the model needs ₹${nf(base, 3)}/kWh for your ${pf(finance.engine.fin.targetEquityIrr, 1)} equity IRR${target !== null && target < base ? `; to quote ₹${nf(target, 3)} the levers must find ₹${nf(base - target, 3)}` : target !== null ? "; your quote is above it, so the equity earns more than its target" : ""}`} />
+          <button type="button" className="primary" onClick={plot} disabled={Boolean(progress || tracking)} data-testid="cfd-track-run">
+            {progress || tracking ? <Loader2 className="spin" size={14} /> : <Route size={14} />} {progress ? `Measuring the levers ${progress.done} of ${progress.total}` : tracking ? `Pricing the moves ${tracking.done} of ${tracking.total}` : track && !trackStale ? "Track up to date" : track ? "Plot the track again" : "Plot the track"}
+          </button>
+          {(progress || tracking) && <button type="button" className="secondary" onClick={() => abortRef.current?.abort()}><Square size={12} /> Stop</button>}
+          {track && trackStale && !progress && !tracking && <small className="lever-stale">The case changed: plot again</small>}
+        </div>
+        {track && <TrackView track={track.result} targetIrr={finance.engine.fin.targetEquityIrr} onApply={applyTrack} />}
+      </Section>
+
       <Section index="6.1" title="Strike-price levers for bid day" note="What moves the strike price you need, and how far each lever alone would have to go to reach the price you want to quote" className="lever-panel">
         <div className="lever-head">
-          <Field label="Strike price you want to quote" unit="₹/kWh" value={target ?? 0} onChange={(v) => setTarget(v)} step={0.01} min={0} digits={3} hint={`the model needs ₹${nf(base, 3)}/kWh for your ${pf(finance.engine.fin.targetEquityIrr, 1)} equity IRR${target !== null && target < base ? `; to quote ₹${nf(target, 3)} the levers below must find ₹${nf(base - target, 3)}` : target !== null ? "; your quote is above it, so the equity earns more than its target" : ""}`} />
           <button type="button" className="primary" onClick={compute} disabled={Boolean(progress)} data-testid="cfd-levers-run">
             {progress ? <Loader2 className="spin" size={14} /> : <SlidersHorizontal size={14} />} {progress ? `Computing ${progress.done} of ${progress.total}` : res && !stale ? "Levers up to date" : res ? "Recompute the levers" : "Compute the levers"}
           </button>

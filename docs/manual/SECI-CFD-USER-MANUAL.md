@@ -352,7 +352,31 @@ model's simplifications (the whole capex spent before the SCD, operating years f
 
 **1 · Returns at a strike price.** Type a price: equity and project IRR, DSCR.
 
-**2 · Levers.** Enter the **strike price you want to quote** and click **Compute the levers**
+**2 · The track to the price you want to quote.** Type the **strike price you want to quote**
+and click **Plot the track**. The screen measures every lever (a minute), then plans the way
+from the price the model needs to your quote: which levers to turn, how far, in what order, and
+the chance of each move happening. Four tiles (the model needs, you want, where the track ends,
+the chance it all comes off), a one-line verdict, a waterfall from the model's price down to the
+quote, and the moves as a numbered story: the lever, from → to, a chance chip (sure, likely 50%,
+a stretch 10%, a long shot, no chance), the price after the move, the chance so far, who decides
+it (your board, the lender, the battery supplier, the EPC…), why it works, and how far it can
+plausibly go (sure to, likely to, a stretch to, no chance past). **Apply every move to the bid**
+writes them in. A quote no lever can reach, ₹1/kWh say, is said so: *Out of reach: with every
+lever at the end of its chance the price is still ₹X; chance 0%*, with the list of what that
+floor assumes.
+
+*How the chance is judged.* Each lever has three bands, benchmark judgement for a 2028 project
+in India (named under each move; not from the tender): where you can put it at will (sure,
+100%), where it lands with normal effort or a fair negotiation (likely, 50% at the edge), what
+takes luck or a hard bargain (a stretch, 10% at the edge); one stretch-width beyond that the
+chance is zero. The track picks, at every turn, the lever whose next step buys the most price for
+the least chance given up, orders the moves from the surest to the least likely, and prices
+them for real one after another through the full model, so the price after each move is the
+model's, not a straight line. The chance of the whole track is the moves' chances multiplied,
+as if they were independent. Levers that are not yours to choose (the tax rate, the market's
+prices) are left out.
+
+**3 · Levers.** Click **Compute the levers**
 (about a minute: operations levers re-simulate the term, finance levers re-price it). One row per
 input: its value now, one step, the price if up, the price if down, ₹/kWh per step, and how far
 that lever alone must move to reach your price (or "not within its range"). **Apply** moves the

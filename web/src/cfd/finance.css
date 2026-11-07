@@ -30,3 +30,33 @@
 .lever-table tr.lever-note td { background: var(--panel, rgba(255,255,255,0.03)); font-size: 12.5px; line-height: 1.5; white-space: normal; padding: 8px 14px 10px 30px; }
 .lever-table tr.lever-note p { margin: 0 0 4px; }
 .lever-note-body { position: sticky; left: 14px; max-width: min(1040px, calc(100vw - 360px)); }
+
+/* What-if: the track to a quote */
+.track { margin-top: 10px; }
+.track-verdict { font-size: 14px; line-height: 1.5; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); margin: 12px 0; }
+.track-verdict.good { border-color: var(--good, #4cc38a); }
+.track-verdict.warn { border-color: var(--warn, #f5b83d); }
+.track-verdict.bad { border-color: var(--bad, #e5484d); }
+.track-waterfall { width: 100%; max-width: 760px; height: auto; display: block; margin: 6px 0 12px; }
+.track-waterfall .axis { fill: var(--muted); font-family: var(--font-mono); font-size: 9.5px; }
+.track-waterfall .target { stroke: var(--signal); stroke-dasharray: 4 3; stroke-width: 1; }
+.track-waterfall .bar.base { fill: var(--line); }
+.track-waterfall .bar.drop { fill: var(--good, #4cc38a); }
+.track-waterfall .bar.rise { fill: var(--bad, #e5484d); }
+.track-waterfall .bar.quote { fill: var(--signal); }
+.track-waterfall .bar.short { fill: var(--bad, #e5484d); opacity: 0.6; }
+.track-steps { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.track-steps li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.track-step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13.5px; }
+.track-price, .track-cum { color: var(--muted); font-size: 12.5px; }
+.track-step-body { margin-top: 6px; font-size: 12.5px; line-height: 1.5; color: var(--ink-2, inherit); }
+.track-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; border: 1px solid var(--line); }
+.track-chip.sure { border-color: var(--good, #4cc38a); color: var(--good, #4cc38a); }
+.track-chip.likely { border-color: var(--good, #4cc38a); color: var(--good, #4cc38a); opacity: 0.85; }
+.track-chip.stretch { border-color: var(--warn, #f5b83d); color: var(--warn, #f5b83d); }
+.track-chip.long { border-color: var(--bad, #e5484d); color: var(--bad, #e5484d); }
+.track-chip.none { border-color: var(--muted); color: var(--muted); }
+.track-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.track-actions small { color: var(--muted); }
+.track-floor { margin: 6px 0 10px; font-size: 12.5px; }
+.track-floor ul { margin: 6px 0 0 18px; padding: 0; color: var(--muted); columns: 2; }

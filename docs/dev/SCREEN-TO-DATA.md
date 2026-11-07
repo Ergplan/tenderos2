@@ -162,6 +162,14 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | The Pool pays you, net / You pay the Pool, net *(label is an expression)* | `cfd/ExampleStep.jsx:186` | `cr(y.poolCr)` | `x.year.poolCr` = youCr − exchangeCr; `daysPoolPays`, `daysYouPay` | the strike price, the IEX prices | see the file's note above |
 | You receive | `cfd/ExampleStep.jsx:187` | `cr(y.youCr)` | `x.year.youCr` = SP × energy | the strike price | see the file's note above |
 
+### `web/src/cfd/TrackView.jsx` (6.0 of the What-if step)
+
+**Screen:** CfD bid › What-if › 6.0 The track to the price you want to quote  
+**Computed by:** `planTrack` (`web/src/cfd/track.js`) from `cfdLeverEffects` (one-step prices per lever through the full model) and `leverChance` (`leverNotes.js`: `LEVER_BANDS` sure / likely / stretch per lever, 100% / 50% / 10% / 0); the moves priced for real with `priceOf`; the floor with every candidate at the end of its chance  
+**Writes:** nothing until "Apply every move to the bid" (`withCfdLever` per move into state.inputs / state.fin)  
+**Rests on:** state.inputs, state.fin, state.costs, the sized model, the target quote typed on the step  
+**Stored:** computed on request; not saved
+
 ### `web/src/cfd/MarketPrices.jsx` (F.9 of the Financial model step)
 
 **Screen:** CfD bid › Financial model › F.9 Market prices  
