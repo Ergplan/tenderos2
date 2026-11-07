@@ -24,7 +24,7 @@ One web app with seven sidebar tabs (`web/lib/tabs.js` `TAB_CATALOG`, `web/src/m
 | Round the Clock (`rtc`) | RTC / FDRE sizing and finance from your own inputs; in-browser optimiser (Web Worker) plus the engine's HiGHS LP; same workbook | `rtc` | `web/src/rtc/` |
 | SECI RTC tender (`seciRtc`) | SECI FDRE-RTC-V (issued as RTC-TM-V): a curated tender pack with the RfS, 3 amendments, clarifications and PSA; ten steps by team from documents to bid forms, letters, the bid pack, the winning-bid bridge and a GPT-Live voice bid agent | `rtc`, `bid` | `web/src/seci/`, `docs/SECI_RTC.md` |
 | BESS Tender (`bessTender`) | Standalone battery tenders: read the tender, size the battery, capacity charge for the target IRR | `bess` | `web/src/bess/`, `engine/bess/` |
-| CfD Bid (`cfd`) | SECI CfD-I: eleven steps by team (explainer, documents and amendments, 251 conditions, bid inputs, design, finance inputs, own-RE sizing, the financial model through the shared engine with the nine-sheet workbook, What-if levers, the RfS's 17 formats as letters, reference bids), the voice agent | `POST /api/cfd/model`, `/api/cfd/forms`, `/api/cfd/letters`, `/api/seci/live` (tab `cfd`) | `web/src/cfd/`, `docs/CFD.md` |
+| CfD Bid (`cfd`) | SECI CfD-I: eleven steps by team (explainer, documents and amendments, 251 conditions, bid inputs, design, finance inputs, own-RE sizing, the financial model through the shared engine with the nine-sheet workbook, What-if levers, the RfS's 17 formats as letters, reference bids), the voice agent | `POST /api/cfd/model`, `POST /api/cfd/dispatch15`, `/api/cfd/forms`, `/api/cfd/letters`, `/api/seci/live` (tab `cfd`) | `web/src/cfd/`, `docs/CFD.md` |
 | What-if analysis (`whatIf`) | Your sizes, costs, financing and tariff in; IRRs, DSCR, LCOE, the tariff the target IRR needs, tender checks, tariff levers; rule-based hourly dispatch, no optimisation | none | `web/src/whatif/` |
 | Recent tenders (`recentTenders`) | SECI auction results as reported; CERC tariff-adoption orders uploaded and read by the engine | none (`/api/bid/cerc-order` goes through the `bid` family from this tab's upload) | `web/src/market/`, `engine/market/` |
 
@@ -311,7 +311,7 @@ out the cover, calls `addLiveModel` (`web/lib/liveModel.js`) for the Live model 
 a formula on the blue inputs and the green optimiser energy, with a cached value for viewers that
 do not recalculate), `addDispatchSheet` (`web/lib/dispatchSheets.js`) for the modelled years when
 the sizing returned its hours, the Construction sheet, and the app's own numbers for reference;
-`workbookResponse` streams the `.xlsx`. `POST /api/cfd/model` does the same for the CfD tab.
+`workbookResponse` streams the `.xlsx`. `POST /api/cfd/model` does the same for the CfD tab; `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) writes the CfD plant's 15-minute dispatch over the term as a ZIP of CSV files or a workbook with a sheet per Contract Year (ExcelJS streaming writer; about 45 MB).
 
 ### 4.6 The MCP route
 

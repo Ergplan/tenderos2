@@ -274,6 +274,10 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | Weekly penalties | `cfd/SizeStep.jsx:155` | `` `₹${nf(penalty, 2)} cr` `` | Σ `penaltyCr(year, model.sp)`; weeks with `beyondMwh` > 0 | the simulation, the strike price | see the file's note above |
 | EMD and PBG | `cfd/SizeStep.jsx:156` | `` `₹${nf(a.emdCr, 2)} cr / ₹${nf(a.pbgCr, 2)} cr` `` | `rfsAmounts(inputs).emdCr`, `pbgCr` | RFS rates, the sized plant | see the file's note above |
 
+| Hourly / 15-minute blocks (6.4) | `cfd/SizeStep.jsx` BlockChart | `dayBlocks(day, blockContext(model.inputs, model.sim))` | `web/src/cfd/dispatch15.js`: each hour of the day's record split into four blocks keeping its energy; the stored energy tracked block by block | the day's hourly record (`simulate` `record`), the battery's power, round trip, window and losses | computed |
+| Compute the 15-minute dispatch (6.5): tiles and the table by Contract Year | `cfd/SizeStep.jsx` Dispatch15Table | `dispatch15(model)` → `years[]`, `months[]`, `blocks` | `dispatch15.js`: `simulate` with `onDay`, `dayBlocks` per day, totals per Contract Year and month (blocks, peak blocks within the 10% tolerance, energy by source, highest charging, `overPower`, state-of-charge range) | the model | computed on request, cleared when the plant changes |
+| Download 15-minute dispatch (ZIP of CSV) / 15-year dispatch workbook (Excel) | `cfd/SizeStep.jsx` | `downloadFile("/api/cfd/dispatch15", { state, format })` | `web/lib/cfdDispatch.js` `buildCfdDispatchZip` / `buildCfdDispatchXlsx`: `mergeCfdState` → `runModel` on the IEX price year → `dispatch15` → one CSV or sheet per Contract Year plus the summaries | the saved bid state | written on request; logged in `activity_log` as `export` |
+
 ### `web/src/cfd/WhatIfStep.jsx`
 
 **Screen:** CfD bid › What-if (step 09): returns at a tried strike price and the levers  

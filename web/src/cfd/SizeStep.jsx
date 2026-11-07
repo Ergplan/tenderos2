@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Loader2, TriangleAlert, XCircle } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { ArrowRight, CheckCircle2, Clock3, Download, FileArchive, FileSpreadsheet, Loader2, TriangleAlert, XCircle } from "lucide-react";
 import { Section, Stat, nf, pf } from "../rtc/ui";
 import { LiveChart } from "../rtc/charts";
 import Cite from "./Cite.jsx";
 import { TENDER } from "./terms.js";
 import { capShortfall, essRequiredPerMw, fmtDate, missingInputs, ownReCostRsPerKwh, penaltyCr, rfsAmounts, simulate, socWindow } from "./model.js";
+import { BLOCKS_PER_DAY, blockContext, blockTime, dayBlocks, dispatch15 } from "./dispatch15.js";
+import { downloadFile } from "./finance.js";
 import { OptimiseBar } from "./DesignStep.jsx";
 
 const COLORS = { own: "#7ddc9a", market: "#3fa7d6", group: "#4fd1c5", sale: "#f2b84b", ess: "#a98bff", price: "#ff8a5f", wind: "#5fb3ff" };
@@ -71,6 +73,62 @@ function SourcesChart({ years }) {
   return <LiveChart option={option} height={300} />;
 }
 
+/** The day in 96 blocks: the same series as the hourly chart, plus the battery's stored energy. */
+function BlockChart({ blocks, meter }) {
+  const option = useMemo(() => {
+    if (!blocks) return null;
+    const c = blocks.cols;
+    const labels = Array.from({ length: BLOCKS_PER_DAY }, (_, b) => blockTime(b));
+    const r = (arr, f = 1) => Array.from(arr, (v) => Number((v * f).toFixed(2)));
+    return {
+      animation: false,
+      grid: { left: 56, right: 112, top: 34, bottom: 40 },
+      legend: { top: 0, right: 0 },
+      tooltip: { trigger: "axis", valueFormatter: (v) => (typeof v === "number" ? nf(v, 2) : v) },
+      xAxis: { type: "category", data: labels, axisLabel: { interval: 7 } },
+      yAxis: [{ type: "value", name: "MW" }, { type: "value", name: "₹/kWh", min: 0, splitLine: { show: false } }, { type: "value", name: "MWh stored", min: 0, offset: 56, splitLine: { show: false } }],
+      series: [
+        { name: "Solar + wind output", type: "line", areaStyle: { opacity: 0.18, color: COLORS.own }, lineStyle: { width: 1, color: COLORS.own }, symbol: "none", itemStyle: { color: COLORS.own }, data: Array.from(c.solar, (v, b) => Number((v + c.wind[b]).toFixed(2))),
+          markArea: { silent: true, itemStyle: { color: "rgba(212,255,63,0.07)" }, data: [[{ xAxis: labels[18 * 4] }, { xAxis: labels[95] }]] } },
+        { name: "Charging from own RE", type: "bar", stack: "c", barCategoryGap: "10%", data: r(c.chargeOwn, -1), itemStyle: { color: COLORS.own } },
+        { name: "Charging from green market", type: "bar", stack: "c", data: r(c.chargeMarket, -meter), itemStyle: { color: COLORS.market } },
+        { name: "Charging from group RE", type: "bar", stack: "c", data: r(c.chargeGroup, -meter), itemStyle: { color: COLORS.group } },
+        { name: "Supply to the exchange", type: "bar", data: r(c.delivered), itemStyle: { color: COLORS.ess } },
+        { name: "Surplus sold", type: "bar", data: r(c.sold), itemStyle: { color: COLORS.sale } },
+        { name: "Battery energy stored", type: "line", yAxisIndex: 2, symbol: "none", step: "end", data: r(c.stored), lineStyle: { color: "#f4f4f1", width: 1.2, type: "dotted" }, itemStyle: { color: "#f4f4f1" } },
+        { name: "Selling-market price", type: "line", yAxisIndex: 1, symbol: "none", data: r(c.sellPrice), lineStyle: { color: COLORS.price, width: 1.4 }, itemStyle: { color: COLORS.price } },
+        { name: "GDAM price (charging)", type: "line", yAxisIndex: 1, symbol: "none", data: r(c.buyPrice), lineStyle: { color: COLORS.market, width: 1, type: "dashed" }, itemStyle: { color: COLORS.market } },
+      ],
+    };
+  }, [blocks, meter]);
+  if (!blocks) return null;
+  return <LiveChart option={option} height={340} />;
+}
+
+/** The 15-minute dispatch's totals by Contract Year. */
+function Dispatch15Table({ out }) {
+  const gwh = (v) => nf(v / 1000, 2);
+  return (
+    <div className="cfd-statements" data-testid="cfd-d15-table">
+      <table>
+        <thead>
+          <tr><th>Contract Year</th><th>Blocks</th><th>Peak blocks</th><th>Within the 10% tolerance</th><th>Below it</th><th>Delivered GWh</th><th>Charged own RE GWh</th><th>Green market GWh</th><th>Group RE GWh</th><th>Surplus sold GWh</th><th>Highest charging MW</th><th>Over the rating</th><th>State of charge</th></tr>
+        </thead>
+        <tbody>
+          {out.years.map((y) => (
+            <tr key={y.cy} className={y.shortBlocks ? "bad" : ""}>
+              <td>CY {y.cy} <small>{fmtDate(y.start)} · {y.days} days</small></td>
+              <td>{nf(y.blocks)}</td><td>{nf(y.peakBlocks)}</td><td>{pf(y.peakFullShare, 1)}</td><td>{nf(y.shortBlocks)}</td>
+              <td>{gwh(y.deliveredMwh)}</td><td>{gwh(y.chargeOwnMwh)}</td><td>{gwh(y.chargeMarketMwh)}</td><td>{gwh(y.chargeGroupMwh)}</td><td>{gwh(y.soldMwh)}</td>
+              <td>{nf(y.maxChargeMw, 1)}</td><td>{nf(y.overPower)}</td><td>{nf(y.minSoc, 0)}–{nf(y.maxSoc, 0)}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function DayChart({ day }) {
   const option = useMemo(() => {
     if (!day) return null;
@@ -129,10 +187,34 @@ function EnergyMix({ model }) {
  */
 export default function SizeStep({ state, model, optimise, optimising, stopOptimise, goto }) {
   const [k, setK] = useState(200);
+  const [blockView, setBlockView] = useState(false);
+  const [d15, setD15] = useState(null); // the 15-minute dispatch's totals, computed on request
+  const [d15Busy, setD15Busy] = useState(false);
+  const [downloading, setDownloading] = useState("");
+  const [downloadError, setDownloadError] = useState("");
   const missing = missingInputs(state);
   const sim = model?.sim;
   const totalDays = sim ? Math.round((sim.dates.end - sim.dates.scd) / 86400000) : 0;
   const day = useMemo(() => (model ? simulate(model.inputs, model.book, model.prof, { record: [Math.min(k, totalDays - 1)] }).days[Math.min(k, totalDays - 1)] : null), [model, k, totalDays]);
+  const blocks = useMemo(() => (model && day && blockView ? dayBlocks(day, blockContext(model.inputs, model.sim)) : null), [model, day, blockView]);
+  useEffect(() => { setD15(null); }, [model]); // a new plant: the totals are computed again on request
+  const runD15 = () => {
+    setD15Busy(true);
+    setTimeout(() => { // off the click, so the button shows it is working
+      try { setD15(dispatch15(model)); } finally { setD15Busy(false); }
+    }, 30);
+  };
+  const download = async (format) => {
+    setDownloading(format);
+    setDownloadError("");
+    try {
+      await downloadFile("/api/cfd/dispatch15", { state, format }, format === "xlsx" ? `cfd-dispatch-15min-${TENDER.termYears}-years.xlsx` : `cfd-dispatch-15min-${TENDER.termYears}-years.zip`);
+    } catch (err) {
+      setDownloadError(err.message);
+    } finally {
+      setDownloading("");
+    }
+  };
   if (!model) {
     return (
       <Section index="6" title="Size" note="The own RE sized for the lowest strike price">
@@ -217,12 +299,38 @@ export default function SizeStep({ state, model, optimise, optimising, stopOptim
         </p>
       </Section>
 
-      <Section index="6.4" title="A day of operation" note="Pick any day of the term: the 2 peak hours chosen, the charging before them, the surplus sold">
+      <Section index="6.4" title="A day of operation" note="Pick any day of the term: the 2 peak hours chosen, the charging before them, the surplus sold; by the hour or in 15-minute blocks">
         <div className="cfd-day-pick">
           <input type="range" min="0" max={Math.max(0, totalDays - 1)} value={Math.min(k, totalDays - 1)} onChange={(e) => setK(Number(e.target.value))} aria-label="Day of the term" data-testid="cfd-day" />
           {day && <span><strong>{fmtDate(day.date)}</strong> · supplied {nf(day.delivered, 0)} of {nf(day.required, 0)} MWh in {day.chosen.map((h) => `${String(h).padStart(2, "0")}:00`).sort().join(" and ")}</span>}
+          <div className="seg" role="group" aria-label="Resolution">
+            <button type="button" className={blockView ? "" : "active"} onClick={() => setBlockView(false)} data-testid="cfd-day-hourly">Hourly</button>
+            <button type="button" className={blockView ? "active" : ""} onClick={() => setBlockView(true)} data-testid="cfd-day-blocks">15-minute blocks</button>
+          </div>
         </div>
-        <DayChart day={day} />
+        {blockView ? <BlockChart blocks={blocks} meter={sim.loss?.meter ?? 1} /> : <DayChart day={day} />}
+        {blockView && <p className="rtc-note">Each hour of the day's plan is split into four blocks that keep its energy: solar and wind along the hour's trend, own-RE charging following the generation, bought charging and the discharge even over the hour (the IEX prices are hourly). The dotted line is the battery's stored energy, block by block.</p>}
+      </Section>
+
+      <Section index="6.5" title={`15-minute dispatch, ${TENDER.termYears} years`} note={`Every day of the term in 96 blocks: ${nf(totalDays * BLOCKS_PER_DAY)} blocks, the scheduling resolution of the grid code`}>
+        <p className="rtc-note">The same operation as above, block by block for the whole term: in every block the generation, the charging by source, the battery's discharge and stored energy, what reaches the exchange against the supply due, the surplus sold, the prices. The totals of every Contract Year equal the model's; what the blocks add is the shape within the hour (where the battery runs at full power, how the state of charge builds, how the solar ramps sit against the charging). The files carry one row per block: a ZIP with one CSV per Contract Year and the summaries, or one Excel workbook (About, Summary, Monthly, one sheet per Contract Year; about 45 MB, half a minute to build).</p>
+        <div className="cfd-d15-actions">
+          <button type="button" className="secondary" onClick={runD15} disabled={d15Busy} data-testid="cfd-d15-run">{d15Busy ? <Loader2 size={12} className="spin" /> : <Clock3 size={12} />} {d15Busy ? "Dispatching every block…" : d15 ? "Compute again" : "Compute the 15-minute dispatch"}</button>
+          <button type="button" className="primary" onClick={() => download("zip")} disabled={Boolean(downloading)} data-testid="cfd-d15-zip">{downloading === "zip" ? <Loader2 size={12} className="spin" /> : <FileArchive size={12} />} {downloading === "zip" ? "Building the ZIP…" : "Download 15-minute dispatch (ZIP of CSV, one per Contract Year)"}</button>
+          <button type="button" className="primary" onClick={() => download("xlsx")} disabled={Boolean(downloading)} data-testid="cfd-d15-xlsx">{downloading === "xlsx" ? <Loader2 size={12} className="spin" /> : <FileSpreadsheet size={12} />} {downloading === "xlsx" ? "Building the workbook…" : `Download ${TENDER.termYears}-year dispatch workbook (Excel)`}</button>
+          {downloadError && <span className="bad"><XCircle size={12} /> {downloadError}</span>}
+        </div>
+        {d15 && (
+          <>
+            <div className="rtc-grid rtc-grid-4" data-testid="cfd-d15-tiles">
+              <Stat label="Blocks dispatched" value={nf(d15.blocks)} detail={`${nf(d15.years.reduce((a, y) => a + y.days, 0))} days in ${d15.years.length} Contract Years`} />
+              <Stat label="Peak blocks within tolerance" value={pf(d15.years.reduce((a, y) => a + y.peakBlocksFull, 0) / Math.max(1, d15.years.reduce((a, y) => a + y.peakBlocks, 0)), 1)} detail={`${nf(d15.years.reduce((a, y) => a + y.shortBlocks, 0))} of ${nf(d15.years.reduce((a, y) => a + y.peakBlocks, 0))} peak blocks below 90% of the supply due`} tone={d15.years.some((y) => y.shortBlocks) ? "bad" : "good"} />
+              <Stat label="Highest charging" value={`${nf(Math.max(...d15.years.map((y) => y.maxChargeMw)), 1)} MW`} detail={`battery rated ${nf(d15.ctx.P)} MW; ${nf(d15.years.reduce((a, y) => a + y.overPower, 0))} blocks over it on steep ramps`} />
+              <Stat label="State of charge" value={`${nf(Math.min(...d15.years.map((y) => y.minSoc)), 0)}–${nf(Math.max(...d15.years.map((y) => y.maxSoc)), 0)}%`} detail={`window ${pf(d15.ctx.socMin, 0)} to ${pf(d15.ctx.socMin + d15.ctx.window, 0)} of the nameplate`} />
+            </div>
+            <Dispatch15Table out={d15} />
+          </>
+        )}
       </Section>
     </>
   );

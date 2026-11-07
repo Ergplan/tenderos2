@@ -13,7 +13,7 @@ an administrator grants it like the other tabs.
 | 04 Bid inputs | Projects | Contracted MW (50–150, whole MW), the Effective Date with every date that follows it, the market to sell in, the sourcing choices, merchant sale, after the term; money at stake (EMD, PBG, CAC, fees, net worth, liquidity) | `BidInputsStep.jsx`, `inputs.jsx` |
 | 05 Design | Design | Battery MWh and MW per contracted MW, own solar and wind, RE commissioning, availability, CUFs, RTE, degradation, augmentation; **Fill up for me please**; **Optimise own RE** | `DesignStep.jsx` |
 | 06 Finance inputs | Finance | Costs and financing; debt repayment (six methods), moratorium, instalments, refinancing; construction months, drawdown, funding order; working capital and the debt service reserve; **Size the plant** | `FinanceInputsStep.jsx` |
-| 07 Size | Projects | The optimiser's own-RE sizes for the least strike price with every day met, each candidate priced by the full financial model (`runModel` and `optimiseOwnRe` take a `price` function; the screening price is kept beside it); the plant; seven tender checks; year-1 energy mix; every Contract Year; any day's hourly operation | `model.js optimiseOwnRe`, `finance.js runCfdFinance`, `SizeStep.jsx` |
+| 07 Size | Projects | The optimiser's own-RE sizes for the least strike price with every day met, each candidate priced by the full financial model (`runModel` and `optimiseOwnRe` take a `price` function; the screening price is kept beside it); the plant; seven tender checks; year-1 energy mix; every Contract Year; any day's operation by the hour or in 15-minute blocks; the 15-minute dispatch of the whole term (526,000 blocks: tiles, a table by Contract Year, a ZIP of one CSV per Contract Year, a workbook with a sheet per Contract Year) | `model.js optimiseOwnRe`, `finance.js runCfdFinance`, `dispatch15.js`, `SizeStep.jsx`, `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) |
 | 08 Financial model | Finance | The bid strike price from the shared financial engine (the same price as on Size; the fast screening figure beside it), IRRs, DSCR, project cost, LC, Pool pay-in, penalty, charging power; Your quote; money at stake; revenue stack; the Pool; F.1 Assumptions to F.4 the 15-year model with the traceable explorer; **Download financial model (Excel)**: Cover, Live model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, Depreciation and tax, Working capital, Sensitivity | `finance.js`, `FinanceModelStep.jsx`, `web/src/rtc/engine.js`, `web/lib/liveModel.js`, `POST /api/cfd/model` |
 | 09 What-if | Finance | Returns at a tried strike price; the track to the quote (which levers, how far, in what order, the chance of each move and of the whole track; out of reach when no lever can get there) with a waterfall and a story; every input one step up and down with the price it gives and how far it must move, a reading guide and a plain-words note per lever; Apply | `levers.js`, `leverNotes.js` (notes, plausibility bands, `leverChance`), `track.js` (`planTrack`, frozen levers left alone), `TrackView.jsx`, `Freeze.jsx` (freeze with evidence into `state.frozen` and the evidence register, unfreeze), the What-if workbook (`cfdModelExport` + a `whatIf` block → the "What-if track" sheet of `lib/modelWorkbook.js`), `WhatIfStep.jsx` |
 | 10 Bid forms | Tender / Legal | The RfS's 17 formats with their 224 blanks beside the RfS page, the particulars asked once, the letters in the RfS wording, eleven checks, Word and PDF | `forms.js`, `formats.js`, `letters/`, `BidForms.jsx`, `POST /api/cfd/forms`, `/api/cfd/letters` |
@@ -231,3 +231,21 @@ unchanged until one is filled.
   short, the strike price earning exactly the target IRR, debt repaid, the Pool flows, and the real
   IEX year with the optimiser.
 * `tests/engine/test_cfd_terms.py`: every quote on its page.
+
+## The 15-minute dispatch
+
+`web/src/cfd/dispatch15.js` turns the model's day plan into 96 blocks a day for every day of the
+term. `simulate` hands each day's hourly flows to an `onDay` callback; `dayBlocks` splits every
+hour into four blocks that keep its energy: solar and wind along the hour's trend (the engine's
+`split_hourly` shape), own-RE charging following the generation within the hour and held within
+the battery's power where the generation allows (a steep ramp that cannot be held is kept with
+the generation and counted as `overPower`), bought charging and the discharge even over the hour
+(the IEX prices are hourly), wind supplied directly following the wind. The battery's stored
+energy is tracked block by block (charging × ¼ h × round trip − discharge × ¼ h, from empty each
+day) and the state of charge is the window's minimum plus the stored energy over that year's
+nameplate. `dispatch15(model, { onDay })` streams the days and returns the totals per Contract
+Year and per month; `tools/check_cfd_dispatch15.mjs` proves every Contract Year's totals equal
+the model's. `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) runs the same on the saved
+bid state and answers with the ZIP (`format: "zip"`: one CSV per Contract Year, the two
+summaries, the inputs, a README) or the workbook (`format: "xlsx"`, written with ExcelJS's
+streaming writer: About, Summary, Monthly, one sheet per Contract Year).

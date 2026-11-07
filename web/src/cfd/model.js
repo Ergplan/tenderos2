@@ -461,9 +461,10 @@ export function lossFactorsOfCfd(state, rte = state?.inputs?.rte) {
 
 /**
  * Every day of the term. Returns totals per Contract Year (and the weeks for the penalty), plus
- * the hourly flows of the days asked for in `record` (day numbers from the SCD).
+ * the hourly flows of the days asked for in `record` (day numbers from the SCD). `onDay(k, day)`
+ * receives every day's hourly flows as they are computed (the 15-minute dispatch reads them).
  */
-export function simulate(inputs, book, prof, { record = [] } = {}) {
+export function simulate(inputs, book, prof, { record = [], onDay = null } = {}) {
   const X = inputs.contractedMw;
   const P = X * inputs.essMwPerMw;
   const win = socWindow(inputs); // the usable share of the nameplate
@@ -697,9 +698,11 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     w.ref = Math.max(w.ref, book.peakRef[d] * escE);
     w.cy = cyIdx;
     weeks.set(wk, w);
-    if (keep.has(k)) {
-      days[k] = { date: t, chosen, solar: Array.from(sol), wind: Array.from(wnd), own: [...Array.from(own, (v, h) => v + ownX[h]), ...new Array(6).fill(0)], market: [...Array.from(mkt, (v, h) => v + mktX[h]), ...new Array(6).fill(0)], group: [...grp, ...new Array(6).fill(0)],
+    if (keep.has(k) || onDay) {
+      const rec = { date: t, k, year, cy: cy.index, capFactor: cap / Math.max(1e-9, capNominal), chosen, solar: Array.from(sol), wind: Array.from(wnd), own: [...Array.from(own, (v, h) => v + ownX[h]), ...new Array(6).fill(0)], market: [...Array.from(mkt, (v, h) => v + mktX[h]), ...new Array(6).fill(0)], group: [...grp, ...new Array(6).fill(0)],
         sale: Array.from(sale, (v, h) => v + extraOut[h]), extraOut: Array.from(extraOut), essOut, windDirect: direct, delivered, required: X * TENDER.mwhPerMwDay, price: Array.from({ length: 24 }, (_, h) => book.sell[b + h] * escOf(h)), buyPrice: Array.from({ length: 24 }, (_, h) => book.buy[b + h] * escOf(h)) };
+      if (keep.has(k)) days[k] = rec;
+      if (onDay) onDay(k, rec);
     }
   }
   for (const w of weeks.values()) {

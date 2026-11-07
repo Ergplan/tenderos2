@@ -290,19 +290,24 @@ export function cfdModelExport({ state, model, finance }) {
 }
 
 /** POST the request and save the workbook (the browser). */
-export async function downloadCfdModel(payload) {
-  const res = await fetch("/api/cfd/model", { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify(payload) });
+export function downloadCfdModel(payload) {
+  return downloadFile("/api/cfd/model", payload, `${payload.fileName}.xlsx`);
+}
+
+/** POST a request and save the file it answers with (the workbooks, the 15-minute dispatch). */
+export async function downloadFile(url, payload, fileName) {
+  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, credentials: "same-origin", body: JSON.stringify(payload) });
   if (!res.ok) {
     let msg = `Download failed (${res.status})`;
     try { msg = (await res.json()).error || msg; } catch { /* not JSON */ }
     throw new Error(msg);
   }
-  const url = URL.createObjectURL(await res.blob());
+  const href = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
-  a.href = url;
-  a.download = `${payload.fileName}.xlsx`;
+  a.href = href;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  setTimeout(() => URL.revokeObjectURL(href), 2000);
 }

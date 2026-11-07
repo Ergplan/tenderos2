@@ -326,7 +326,27 @@ model instead of the exchange bill.
 
 **6.4 · A day's operation.** Pick any day: the hourly chart of solar and wind, charging from own
 RE, the market and group RE, the battery's discharge in the two peak hours, the sale, and the
-prices of the day.
+prices of the day. **Hourly / 15-minute blocks** switches the same day to 96 blocks, with the
+battery's stored energy as a dotted line: each hour of the plan is split into four blocks that
+keep its energy (solar and wind along the hour's trend, own-RE charging following the generation,
+bought charging and the discharge even over the hour; the IEX prices are hourly, so the four
+blocks of an hour carry one price).
+
+**6.5 · 15-minute dispatch, 15 years.** The whole term in 15-minute blocks, about 526,000 of
+them, the scheduling resolution of the grid code. **Compute the 15-minute dispatch** runs it in
+the browser (a second) and shows four tiles (blocks dispatched, peak blocks within the 10%
+tolerance, the highest charging against the battery's rating, the state-of-charge range) and a
+table by Contract Year: blocks, peak blocks within and below the tolerance, delivered energy,
+charging by source, surplus sold, the highest charging, blocks where a steep solar ramp packs the
+hour's charging over the rating, the state of charge. Every Contract Year's totals equal the
+model's; what the blocks add is the shape inside the hour. Two downloads: **ZIP of CSV** (one
+file per Contract Year with one row per block, the summary by Contract Year and by month, the
+inputs, a README; about 5 MB) and the **15-year dispatch workbook** (About, Summary, Monthly,
+then a sheet per Contract Year with its 35,040 blocks; about 45 MB, half a minute to build). Each
+block row carries: peak flag, solar and wind at the bus, charging from own RE, the green market
+and group RE, the battery's discharge, stored energy and state of charge, wind supplied directly,
+delivered against the supply due and the shortfall, surplus sold, curtailment, the selling-market
+and GDAM prices.
 
 ---
 

@@ -90,6 +90,10 @@
 .cfd-row .bad { color: var(--bad); display: inline-flex; gap: 4px; align-items: center; }
 .cfd-day-pick { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; font-size: 13px; }
 .cfd-day-pick input[type="range"] { flex: 1 1 280px; }
+.cfd-d15-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+.cfd-d15-actions .bad { color: var(--bad); display: inline-flex; gap: 4px; align-items: center; font-size: 12.5px; }
+.cfd-statements tr.bad td { background: rgba(255, 107, 95, 0.06); }
+.cfd-statements td small { display: block; color: var(--muted); font-size: 11px; }
 .cfd-statements { overflow-x: auto; border: 1px solid var(--line); }
 .cfd-statements table { border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; min-width: 100%; }
 .cfd-statements th, .cfd-statements td { padding: 6px 10px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }

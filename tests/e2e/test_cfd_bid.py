@@ -139,6 +139,41 @@ def test_cfd_bid_end_to_end(tmp_path):
         assert page.locator("[data-testid=cfd-ops-table]").count() == 1 and page.locator("[data-testid=cfd-day]").count() == 1
         assert "₹" in page.locator("[data-testid=cfd-own-cost-1]").inner_text(), "own RE charging valued at the plant's cost"
 
+        # 6.4 the day in 15-minute blocks; 6.5 the 15-minute dispatch of the whole term: the totals,
+        # the ZIP of one CSV per Contract Year, the workbook with a sheet per Contract Year
+        page.click("[data-testid=cfd-day-blocks]")
+        page.wait_for_timeout(500)
+        assert "15-minute" in page.locator("main").inner_text()
+        page.click("[data-testid=cfd-d15-run]")
+        page.wait_for_selector("[data-testid=cfd-d15-table]", timeout=120_000)
+        d15 = page.locator("[data-testid=cfd-d15-tiles]").inner_text()
+        assert "blocks dispatched" in d15.lower() and "peak blocks within tolerance" in d15.lower()
+        assert page.locator("[data-testid=cfd-d15-table] tbody tr").count() >= 15
+        with page.expect_download(timeout=300_000) as dl:
+            page.click("[data-testid=cfd-d15-zip]")
+        zpath = tmp_path / "dispatch15.zip"
+        dl.value.save_as(str(zpath))
+        import csv as _csv
+        import io as _io
+        import zipfile as _zipfile
+        with _zipfile.ZipFile(str(zpath)) as z:
+            names = z.namelist()
+            csvs = [n for n in names if n.startswith("dispatch_15min_CY")]
+            assert len(csvs) >= 15 and "summary_by_contract_year.csv" in names and "README.txt" in names, names
+            rows = list(_csv.reader(_io.TextIOWrapper(z.open("dispatch_15min_CY02.csv"), encoding="utf8")))
+            assert len(rows) - 1 in (35_040, 35_136), len(rows)  # 96 blocks a day
+            assert rows[0][4] == "Time" and rows[1][4] == "00:00" and rows[4][4] == "00:45"
+            assert sum(1 for r in rows[1:] if r[5] == "1") == 8 * ((len(rows) - 1) // 96), "eight peak blocks a day"
+        with page.expect_download(timeout=600_000) as dl:
+            page.click("[data-testid=cfd-d15-xlsx]")
+        xpath = tmp_path / "dispatch15.xlsx"
+        dl.value.save_as(str(xpath))
+        with _zipfile.ZipFile(str(xpath)) as z:
+            book = z.read("xl/workbook.xml").decode("utf8")
+            for name in ("About", "Summary", "Monthly", "CY01", "CY15"):
+                assert f'name="{name}"' in book, name
+        page.click("[data-testid=cfd-day-hourly]")
+
         # 08 financial model: the tiles, the trace, the workbook with nine sheets
         _step(page, "finance")
         page.wait_for_selector("[data-testid=cfd-finance]", timeout=120_000)
