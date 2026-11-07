@@ -60,7 +60,7 @@ export function agentInputs(state) {
     } });
   add({ key: "effectiveDate", label: "Effective Date of the CfDA", step: "bid", kind: "date", benchmark: BENCHMARKS.effectiveDate,
     get: (s) => s.inputs.effectiveDate, set: (s, v) => ({ ...s, inputs: { ...s.inputs, effectiveDate: v }, filled: unmark(s, "effectiveDate") }) });
-  for (const key of ["sellMarket", "useMarket", "useGroup", "merchant", "afterTerm", "augmentation"]) {
+  for (const key of ["sellMarket", "useMarket", "useGroup", "merchant", "afterTerm", "augmentation", "shortfallPolicy"]) {
     const c = CHOICES[key];
     const yesNo = !c.options;
     add({ key, label: c.label, step: key === "augmentation" ? "design" : "bid", kind: yesNo ? "boolean" : "choice", options: yesNo ? null : c.options, benchmark: BENCHMARKS[key] ?? null,

@@ -40,10 +40,14 @@ export const FIELDS = [
   { section: "project", key: "reCodMonths", label: "RE generation commissioned", unit: "months after the SCD", min: 0, max: 21, step: 1, hint: "Tender: by 36 months from the Effective Date = 21 months after the SCD" },
   { section: "project", key: "availability", label: "Plant availability", unit: "%", pct, min: 50, max: 100, step: 0.5, hint: "Share of the daily 2 MWh/MW actually delivered" },
   // ---- resource and battery
-  { section: "resource", key: "solarCuf", label: "Solar CUF (AC)", unit: "%", pct, min: 5, max: 40, step: 0.1 },
+  { section: "resource", key: "solarCuf", label: "Solar CUF (AC)", unit: "%", pct, min: 5, max: 40, step: 0.1, hint: "Annual energy ÷ (MWac × 8,760 h)" },
+  { section: "resource", key: "solarDcAc", label: "DC:AC ratio", unit: "MWp/MWac", min: 1, max: 2.5, step: 0.05, hint: "MWp = MWac × DC:AC, so capex per MWac ÷ DC:AC is the capex per MWp; at a given AC CUF the hourly shape is pinned by the CUF, so the ratio changes the cost and the studio's design, not the typical profile" },
   { section: "resource", key: "solarDegradation", label: "Solar degradation", unit: "%/yr", pct, min: 0, max: 3, step: 0.05 },
   { section: "resource", key: "windCuf", label: "Wind CUF", unit: "%", pct, min: 5, max: 60, step: 0.1, hint: "Needed only with own wind" },
-  { section: "resource", key: "rte", label: "Battery round-trip efficiency (AC)", unit: "%", pct, min: 60, max: 100, step: 0.5 },
+  { section: "resource", key: "windDegradation", label: "Wind degradation", unit: "%/yr", pct, min: 0, max: 3, step: 0.05, hint: "0 for none" },
+  { section: "resource", key: "rte", label: "Battery round-trip efficiency (AC)", unit: "%", pct, min: 60, max: 100, step: 0.5, hint: "Where it is quoted is set under Losses (the PCS output unless you change it)" },
+  { section: "resource", key: "essSocMin", label: "Minimum state of charge", unit: "%", pct, min: 0, max: 50, step: 1, hint: "Usable energy = (maximum − minimum) × nameplate; the tender's 2 MWh per MW must be usable" },
+  { section: "resource", key: "essSocMax", label: "Maximum state of charge", unit: "%", pct, min: 50, max: 100, step: 1, hint: "Usable energy = (maximum − minimum) × nameplate" },
   { section: "resource", key: "essDegradation", label: "Battery degradation", unit: "%/yr", pct, min: 0, max: 5, step: 0.1 },
   // ---- sourcing and markets
   { section: "sourcing", key: "marketCharges", label: "Charges on green-market power", unit: "₹/kWh", min: 0, max: 3, step: 0.01, hint: "Exchange fee, transmission charges and losses on power bought in the GDAM" },
@@ -87,20 +91,24 @@ export const CHOICES = {
   useGroup: { label: "Group-company RE for charging (after 36 months)", hint: "Up to 50% of each year's energy" },
   merchant: { label: "Sell surplus own RE in the market", hint: "In the GDAM, within the connection, on days the peak supply is met (CfDA 4.4.1.v)" },
   augmentation: { label: "Battery capacity over the term", options: [["annual", "Augment every year (keep the MWh)"], ["none", "No augmentation (capacity fades)"]] },
+  shortfallPolicy: { label: "Shortfall policy", options: [["meet", "Meet every day: no shortfall on any day of any Contract Year"], ["pay", "Pay the penalty: a day may fall short when that is cheaper than more plant"]], hint: "Beyond 10% in a Contract Week the shortfall costs 1.5 × (the week's highest evening price − the strike price), and that evening's revenue is lost (CfDA 4.4.3)" },
   afterTerm: { label: "After the 15-year term", options: [["none", "Nothing (value ends with the term)"], ["merchant", "Keep selling at market prices"]] },
 };
 
 export const BENCHMARKS = {
   effectiveDate: "2027-02-01",
   essMwhPerMw: 2, extraEssMwhPerMw: 0, essMwPerMw: 1, solarMw: null, windMw: 0, reCodMonths: 21, availability: 0.97,
-  solarCuf: 0.25, solarDegradation: 0.005, windCuf: 0.33, rte: 0.87, essDegradation: 0.02,
+  solarCuf: 0.25, solarDcAc: 1.4, solarDegradation: 0.005, windCuf: 0.33, windDegradation: 0, rte: 0.87, essDegradation: 0.02,
+  // the state-of-charge window is not benchmarked: the tender's 2 MWh per MW is read as usable energy
+  // (a supplier's usable rating) unless the bidder enters the window, which then grows the nameplate
+  essSocMin: null, essSocMax: null,
   marketCharges: 0.3, groupPrice: 3.0, groupCharges: 0.3, priceEscalation: 0, gdamShareCap: 0.2, recPrice: 150,
   essCrPerMwh: 1.0, solarCrPerMw: 4.0, windCrPerMw: 6.5, evacuationCrPerMw: 0.3, preopPct: 0.05, augDecline: 0.05,
   essOmLakhPerMwh: 1.2, solarOmLakhPerMw: 4, windOmLakhPerMw: 9, otherFixedLakhPerMw: 2, insurancePct: 0.003, omEscalation: 0.05,
   pxFee: 0.02, lcCostPct: 0.01, pbgCostPct: 0.01, gstRate: 0.18,
   targetEquityIrr: 0.14, debtFraction: 0.75, interestRate: 0.09, tenorYears: 12, taxRate: 0.2517, essLifeYears: 15, reLifeYears: 25, discountRate: 0.1,
   sellMarket: "DAM", useMarket: true, useGroup: false, merchant: true, augmentation: "annual", afterTerm: "none", merchantYears: 0,
-  priceScenario: "flat", pricePath: null,
+  priceScenario: "flat", pricePath: null, shortfallPolicy: "meet",
 };
 
 export const DEFAULT_CONTRACTED_MW = 100;
@@ -129,8 +137,16 @@ export function defaultCfdState() {
   return {
     version: 1,
     step: "model",
-    inputs: { ...inputs, contractedMw: DEFAULT_CONTRACTED_MW, effectiveDate: null, sellMarket: null, useMarket: null, useGroup: null, merchant: null, augmentation: null, afterTerm: null, merchantYears: null },
+    inputs: { ...inputs, contractedMw: DEFAULT_CONTRACTED_MW, effectiveDate: null, sellMarket: null, useMarket: null, useGroup: null, merchant: null, augmentation: null, afterTerm: null, merchantYears: null, shortfallPolicy: "meet" },
     filled: {}, // key -> true while the value is a benchmark
+    // the design detail of the SECI tab: the plant studios, the hourly profiles (an upload or a library
+    // pick, with the monthly redraw) and the losses to the billing meter (null: none modelled)
+    studio: {},
+    solarUpload: null,
+    windUpload: null,
+    solarMonthScale: new Array(12).fill(1),
+    windMonthScale: new Array(12).fill(1),
+    losses: null,
     fin: { ...CFD_FIN_DEFAULTS },
     costs: { ...CFD_COST_DEFAULTS },
     locks: {}, // "fin.repayment" -> true: the box is frozen (no refill overwrites it)
@@ -164,6 +180,10 @@ export function mergeCfdState(saved) {
     inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) },
     fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, bess: { ...(saved.bess || {}) }, locks: { ...(saved.locks || {}) },
     frozen: { ...(saved.frozen || {}) }, frozenBaseline: saved.frozenBaseline || null,
+    studio: { ...(saved.studio || {}) }, solarUpload: saved.solarUpload || null, windUpload: saved.windUpload || null,
+    solarMonthScale: Array.isArray(saved.solarMonthScale) && saved.solarMonthScale.length === 12 ? saved.solarMonthScale : new Array(12).fill(1),
+    windMonthScale: Array.isArray(saved.windMonthScale) && saved.windMonthScale.length === 12 ? saved.windMonthScale : new Array(12).fill(1),
+    losses: saved.losses && typeof saved.losses === "object" ? saved.losses : null,
     tariffLocked: Boolean(saved.tariffLocked),
   };
 }
@@ -199,7 +219,7 @@ export function missingInputs(state) {
   for (const key of ["sellMarket", "useMarket", "useGroup", "merchant", "augmentation", "afterTerm"]) {
     if (i[key] === null || i[key] === undefined) out.push(CHOICES[key].label);
   }
-  const optional = new Set(["windCuf", "windCrPerMw", "windOmLakhPerMw", "groupPrice", "groupCharges", "recPrice", "gdamShareCap", "extraEssMwhPerMw"]);
+  const optional = new Set(["windCuf", "windCrPerMw", "windOmLakhPerMw", "groupPrice", "groupCharges", "recPrice", "gdamShareCap", "extraEssMwhPerMw", "solarDcAc", "windDegradation", "essSocMin", "essSocMax"]);
   for (const f of FIELDS) {
     if (optional.has(f.key)) continue;
     if (!isNum(i[f.key])) out.push(f.label);
@@ -209,6 +229,7 @@ export function missingInputs(state) {
   if ((i.sellMarket === "DAM" || i.sellMarket === "RTM") && !isNum(i.recPrice)) out.push("REC price");
   if (i.afterTerm === "merchant" && !isNum(i.merchantYears)) out.push("Years of market sales after the term");
   if (isNum(i.essMwhPerMw) && i.essMwhPerMw < TENDER.essHoursMin) out.push("Battery energy: at least 2 MWh per contracted MW");
+  if (isNum(i.essMwhPerMw) && i.essMwhPerMw * socWindow(i) < TENDER.essHoursMin - 1e-9) out.push(`Battery energy: ${(TENDER.essHoursMin / socWindow(i)).toFixed(2)} MWh per MW nameplate for 2 MWh usable within the state-of-charge window`);
   if (isNum(i.essMwPerMw) && i.essMwPerMw < 1) out.push("Battery power: at least 1 MW per contracted MW");
   if (isNum(i.reCodMonths) && i.reCodMonths > TENDER.reCodMonths - TENDER.essScdMonths) out.push("RE generation: commissioned by 21 months after the SCD");
   return out;
@@ -354,12 +375,55 @@ export function priceBook(prices, sellMarket) {
 }
 
 /** Hourly own-RE output per MW (year 1) at the bidder's CUFs. */
+/** The usable share of the battery's nameplate: the state-of-charge window (1 when none is set). */
+export const socWindow = (i) => {
+  const lo = isNum(i?.essSocMin) ? i.essSocMin : 0;
+  const hi = isNum(i?.essSocMax) ? i.essSocMax : 1;
+  return Math.max(0.05, Math.min(1, hi - lo));
+};
+
+/**
+ * Hourly solar and wind capacity factors at the bidder's CUFs: the uploaded or library profile's
+ * shape when `inputs.profileSources` carries one (modelInputs puts the bid's there, with the monthly
+ * redraw), else the typical shape at the DC:AC ratio.
+ */
 export function profiles(inputs) {
   const flat = () => new Float64Array(E.HOURS);
+  const src = inputs.profileSources || {};
+  const dcAc = isNum(inputs.solarDcAc) && inputs.solarDcAc > 0 ? inputs.solarDcAc : 1.4;
+  const solarShape = Array.isArray(src.solarShape) && src.solarShape.length >= E.HOURS ? Float64Array.from(src.solarShape) : (isNum(inputs.solarCuf) ? E.synthSolarCf({ targetCuf: inputs.solarCuf, dcAc }) : null);
+  const windShape = Array.isArray(src.windShape) && src.windShape.length >= E.HOURS ? Float64Array.from(src.windShape) : (isNum(inputs.windCuf) ? E.synthWindCf({ targetCuf: inputs.windCuf }) : null);
+  const redraw = (shape, scale) => (Array.isArray(scale) && scale.length === 12 ? E.applyMonthlyScale(shape, scale) : shape);
   return {
-    solar: isNum(inputs.solarCuf) ? scaleToCuf(E.synthSolarCf({ targetCuf: inputs.solarCuf, dcAc: 1.4 }), inputs.solarCuf) : flat(),
-    wind: isNum(inputs.windCuf) && isNum(inputs.windMw) && inputs.windMw > 0 ? scaleToCuf(E.synthWindCf({ targetCuf: inputs.windCuf }), inputs.windCuf) : flat(),
+    solar: isNum(inputs.solarCuf) && solarShape ? scaleToCuf(redraw(solarShape, src.solarMonthScale), inputs.solarCuf) : flat(),
+    wind: isNum(inputs.windCuf) && isNum(inputs.windMw) && inputs.windMw > 0 && windShape ? scaleToCuf(redraw(windShape, src.windMonthScale), inputs.windCuf) : flat(),
   };
+}
+
+/** The bid's chosen hourly profiles (an upload or a library pick) and the monthly redraw, for profiles(); null when it uses the typical shapes. */
+export function profileSourcesOf(state) {
+  const ps = {
+    solarShape: state?.solarUpload?.values || null, windShape: state?.windUpload?.values || null,
+    solarMonthScale: Array.isArray(state?.solarMonthScale) ? state.solarMonthScale : null, windMonthScale: Array.isArray(state?.windMonthScale) ? state.windMonthScale : null,
+  };
+  const redrawn = (sc) => sc && sc.some((v) => v !== 1);
+  return ps.solarShape || ps.windShape || redrawn(ps.solarMonthScale) || redrawn(ps.windMonthScale) ? ps : null;
+}
+
+/** The hourly profiles the Design step shows: the bid's inputs with its profile sources (no sizing needed). */
+export function designProfiles(state) {
+  const i = { ...state.inputs, windMw: isNum(state.inputs?.windMw) ? state.inputs.windMw : 0 };
+  const ps = profileSourcesOf(state);
+  if (ps) i.profileSources = ps;
+  return profiles(i);
+}
+
+/** The bid's losses to the billing meter as factors (null when none are modelled): solar and wind to the 33 kV bus, the battery's round trip at the bus, bus to meter. */
+export function lossFactorsOfCfd(state, rte = state?.inputs?.rte) {
+  const l = state?.losses;
+  if (!l || typeof l !== "object") return null;
+  const f = E.lossFactors(l, isNum(rte) ? rte : E.DEFAULT_BESS.rte);
+  return { solar: f.solar, wind: f.wind, rteBus: f.rteBus, meter: f.meter, trafo: l.trafoLossPct || 0, line: l.lineLossPct || 0 };
 }
 
 // ---------------------------------------------------------------- operations
@@ -371,11 +435,20 @@ export function profiles(inputs) {
 export function simulate(inputs, book, prof, { record = [] } = {}) {
   const X = inputs.contractedMw;
   const P = X * inputs.essMwPerMw;
-  const capNominal = X * inputs.essMwhPerMw;
-  const extraNominal = X * (inputs.extraEssMwhPerMw || 0); // the extra battery for evening sale
+  const win = socWindow(inputs); // the usable share of the nameplate
+  const capNominal = X * inputs.essMwhPerMw * win;
+  const extraNominal = X * (inputs.extraEssMwhPerMw || 0) * win; // the extra battery for evening sale
   const S = inputs.solarMw || 0;
   const W = inputs.windMw || 0;
-  const rte = inputs.rte;
+  // the losses to the billing meter (inputs.loss, none: every factor 1): generation reaches the 33 kV
+  // bus at fS / fW of its output, the battery's round trip at the bus is rteB, and `meter` of what is
+  // injected at the bus reaches the meter, where the supply is measured; bought power is at the meter
+  const lf = inputs.loss || null;
+  const fS = lf?.solar ?? 1;
+  const fW = lf?.wind ?? 1;
+  const meter = lf?.meter ?? 1;
+  const rte = lf ? lf.rteBus : inputs.rte;
+  const windDeg = isNum(inputs.windDegradation) ? inputs.windDegradation : 0;
   const avail = inputs.availability;
   const dates = keyDates(inputs.effectiveDate);
   const reCod = addMonths(dates.scd, inputs.reCodMonths);
@@ -439,23 +512,24 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     const sol = new Float64Array(24);
     const wnd = new Float64Array(24);
     if (reOn) {
+      const windF = (1 - windDeg) ** (year - 1);
       for (let h = 0; h < 24; h += 1) {
-        sol[h] = S * prof.solar[b + h] * solarF;
-        wnd[h] = W * prof.wind[b + h];
+        sol[h] = S * prof.solar[b + h] * solarF * fS;
+        wnd[h] = W * prof.wind[b + h] * windF * fW;
       }
       cy.reDays += 1;
       oy.reDays += 1;
     }
     // the day's two peak hours and what each must supply
     const chosen = book.peakOrder[d].slice(0, TENDER.peakHours);
-    const perHour = X * avail;
-    let windDirect = 0;
-    let essNeed = 0;
-    const direct = {};
+    const perHour = X * avail; // at the meter
+    let windDirect = 0; // at the meter
+    let essNeed = 0; // at the bus
+    const direct = {}; // wind supplied directly in a peak hour, at the meter
     for (const h of chosen) {
-      direct[h] = Math.min(wnd[h], perHour);
+      direct[h] = Math.min(wnd[h] * meter, perHour);
       windDirect += direct[h];
-      essNeed += Math.min(P, perHour - direct[h]);
+      essNeed += Math.min(P, (perHour - direct[h]) / meter);
     }
     essNeed = Math.min(essNeed, cap);
     let chargeLeft = essNeed / rte;
@@ -479,17 +553,17 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
       offers.sort((x, y) => x.price - y.price || x.h - y.h);
       for (const o of offers) {
         if (chargeLeft <= 1e-9) break;
-        const budget = o.src === "m" ? (cy.marketCapMwh - marketUsed) / rte : (cy.groupCapMwh - groupUsed) / rte;
-        const depth = o.src === "m" && shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + o.h] - mkt[o.h]) : Infinity; // the GDAM depth cap, MWh in the hour
-        const c = Math.min(room[o.h], chargeLeft, Math.max(0, budget), depth);
+        const budget = o.src === "m" ? (cy.marketCapMwh - marketUsed) / (rte * meter) : (cy.groupCapMwh - groupUsed) / (rte * meter);
+        const depth = o.src === "m" && shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + o.h] * meter - mkt[o.h]) : Infinity; // the GDAM depth cap, MWh in the hour
+        const c = Math.min(room[o.h], chargeLeft, Math.max(0, budget), depth); // at the bus; bought at the meter is c / meter
         if (c <= 1e-9) continue;
         room[o.h] -= c; chargeLeft -= c;
-        if (o.src === "m") { mkt[o.h] += c; marketUsed += c * rte; cy.marketCostCr += c * o.price * 1e-4; } else { grp[o.h] += c; groupUsed += c * rte; cy.groupCostCr += c * o.price * 1e-4; }
+        if (o.src === "m") { mkt[o.h] += c; marketUsed += c * rte * meter; cy.marketCostCr += (c / meter) * o.price * 1e-4; } else { grp[o.h] += c; groupUsed += c * rte * meter; cy.groupCostCr += (c / meter) * o.price * 1e-4; }
       }
     }
     const charged = essNeed / rte - Math.max(0, chargeLeft);
-    const essOut = charged * rte;
-    const delivered = windDirect + essOut;
+    const essOut = charged * rte; // at the bus
+    const delivered = windDirect + essOut * meter; // at the meter
     const met = chargeLeft <= 1e-6;
     // the extra battery for evening sale: charged after the day's commitment, own RE first (the spare
     // generation, in the cheapest hours), then the green market within what is left of its limit and
@@ -514,12 +588,12 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
         const reserved = daysLeft * X * TENDER.mwhPerMwDay * avail;
         for (const h of book.buyOrder[d]) {
           if (extraLeft <= 1e-9) break;
-          const budget = (cy.marketCapMwh - marketUsed - reserved) / rte;
-          const depth = shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + h] - mkt[h] - mktX[h]) : Infinity;
+          const budget = (cy.marketCapMwh - marketUsed - reserved) / (rte * meter);
+          const depth = shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + h] * meter - mkt[h] - mktX[h]) : Infinity;
           const c = Math.min(room[h], extraLeft, Math.max(0, budget), depth);
           if (c <= 1e-9) continue;
-          room[h] -= c; extraLeft -= c; mktX[h] += c; marketUsed += c * rte;
-          extraCost += c * (book.buy[b + h] * escM + inputs.marketCharges) * 1e-4;
+          room[h] -= c; extraLeft -= c; mktX[h] += c; marketUsed += c * rte * meter;
+          extraCost += (c / meter) * (book.buy[b + h] * escM + inputs.marketCharges) * 1e-4;
         }
       }
     }
@@ -531,10 +605,10 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
       for (const h of book.peakOrder[d]) {
         if (left <= 1e-9) break;
         if (chosen.includes(h)) continue;
-        const o = Math.min(left, P, Math.max(0, X - (direct[h] || 0)));
+        const o = Math.min(left, P, Math.max(0, (X - (direct[h] || 0)) / meter)); // at the bus
         if (o <= 1e-9) continue;
-        extraOut[h] = o; left -= o; extraSold += o;
-        extraRev += o * book.sell[b + h] * escE * 1e-4;
+        extraOut[h] = o; left -= o; extraSold += o * meter;
+        extraRev += o * meter * book.sell[b + h] * escE * 1e-4;
       }
     }
     // own RE not used: sold (within the connection, once the day's supply is met) or curtailed
@@ -543,15 +617,16 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     let curtailed = 0;
     const sale = new Float64Array(24);
     for (let h = 0; h < 24; h += 1) {
-      const gen = sol[h] + wnd[h];
-      const used = h < TENDER.peakStart ? own[h] + ownX[h] : (direct[h] || 0);
+      const gen = sol[h] + wnd[h]; // at the bus
+      const used = h < TENDER.peakStart ? own[h] + ownX[h] : (direct[h] || 0) / meter;
       const spare = Math.max(0, gen - used);
       if (spare <= 0) continue;
-      const injected = h < TENDER.peakStart ? 0 : (direct[h] || 0) + (chosen.includes(h) ? essOut / chosen.length : 0) + extraOut[h];
-      const s = inputs.merchant && met ? Math.min(spare, Math.max(0, X - injected)) : 0;
+      const injected = h < TENDER.peakStart ? 0 : (direct[h] || 0) + (chosen.includes(h) ? (essOut * meter) / chosen.length : 0) + extraOut[h] * meter; // at the meter
+      const sMeter = inputs.merchant && met ? Math.min(spare * meter, Math.max(0, X - injected)) : 0;
+      const s = sMeter / meter;
       sale[h] = s;
-      merchantMwh += s;
-      merchantRev += s * book.merchant[b + h] * escOf(h) * 1e-4;
+      merchantMwh += sMeter;
+      merchantRev += sMeter * book.merchant[b + h] * escOf(h) * 1e-4;
       curtailed += spare - s;
     }
     let ownCharged = 0;
@@ -559,9 +634,9 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     let windDay = 0;
     for (let h = 0; h < 24; h += 1) { solarDay += sol[h]; windDay += wnd[h]; }
     for (let h = 0; h < TENDER.peakStart; h += 1) ownCharged += own[h];
-    const ownSupplied = windDirect + ownCharged * rte * (charged > 0 ? Math.min(1, essOut / (charged * rte)) : 0);
+    const ownSupplied = windDirect + ownCharged * rte * meter * (charged > 0 ? Math.min(1, essOut / (charged * rte)) : 0);
     let mcp = 0;
-    for (const h of chosen) mcp += book.sell[b + h] * escE * (direct[h] + essOut / chosen.length);
+    for (const h of chosen) mcp += book.sell[b + h] * escE * (direct[h] + (essOut * meter) / chosen.length);
     const marketDay = mkt.reduce((a, v) => a + v, 0);
     const groupDay = grp.reduce((a, v) => a + v, 0);
     const ownXDay = ownX.reduce((a, v) => a + v, 0);
@@ -571,11 +646,11 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
     const groupCostDay = cy.groupCostCr - cyGroupCost;
     for (const row of [cy, oy]) {
       Object.assign(row, {
-        deliveredMwh: row.deliveredMwh + delivered, windDirectMwh: row.windDirectMwh + windDirect, essOutMwh: row.essOutMwh + essOut,
-        chargeOwnMwh: row.chargeOwnMwh + ownCharged + ownXDay, chargeMarketMwh: row.chargeMarketMwh + marketDay + mktXDay, chargeGroupMwh: row.chargeGroupMwh + groupDay,
+        deliveredMwh: row.deliveredMwh + delivered, windDirectMwh: row.windDirectMwh + windDirect, essOutMwh: row.essOutMwh + essOut * meter,
+        chargeOwnMwh: row.chargeOwnMwh + ownCharged + ownXDay, chargeMarketMwh: row.chargeMarketMwh + (marketDay + mktXDay) / meter, chargeGroupMwh: row.chargeGroupMwh + groupDay / meter,
         merchantMwh: row.merchantMwh + merchantMwh + extraSold, merchantRevCr: row.merchantRevCr + merchantRev + extraRev, curtailedMwh: row.curtailedMwh + curtailed,
         extraSoldMwh: row.extraSoldMwh + extraSold, extraRevCr: row.extraRevCr + extraRev, extraChargeOwnMwh: row.extraChargeOwnMwh + ownXDay, extraChargeMarketMwh: row.extraChargeMarketMwh + mktXDay, extraMarketCostCr: row.extraMarketCostCr + extraCost,
-        shortMwh: row.shortMwh + Math.max(0, chargeLeft) * rte, shortDays: row.shortDays + (met ? 0 : 1),
+        shortMwh: row.shortMwh + Math.max(0, chargeLeft) * rte * meter, shortDays: row.shortDays + (met ? 0 : 1),
         mcpDeliveredCr: row.mcpDeliveredCr + mcp * 1e-4, ownSuppliedMwh: row.ownSuppliedMwh + ownSupplied,
         recMwh: row.recMwh + (brown ? ownSupplied : 0), solarMwh: row.solarMwh + solarDay, windMwh: row.windMwh + windDay,
       });
@@ -605,11 +680,11 @@ export function simulate(inputs, book, prof, { record = [] } = {}) {
   for (const cy of [...out, ...opYears]) {
     const supplied = Math.max(1e-9, cy.deliveredMwh);
     cy.shareOwn = cy.ownSuppliedMwh / supplied;
-    cy.shareMarket = (cy.chargeMarketMwh * rte) / supplied;
-    cy.shareGroup = (cy.chargeGroupMwh * rte) / supplied;
+    cy.shareMarket = (cy.chargeMarketMwh * meter * rte * meter) / supplied; // bought at the meter, round trip at the bus, back to the meter
+    cy.shareGroup = (cy.chargeGroupMwh * meter * rte * meter) / supplied;
     cy.supplyShare = cy.deliveredMwh / cy.requiredMwh;
   }
-  return { years: out, opYears, dates: { ...dates, reCod }, days };
+  return { years: out, opYears, dates: { ...dates, reCod }, days, loss: lf, socWindow: win };
 }
 
 // ---------------------------------------------------------------- finance
@@ -864,6 +939,12 @@ export function modelInputs(state) {
   const i = { ...state.inputs };
   if (!isNum(i.windMw)) i.windMw = 0;
   if (!isNum(i.recPrice)) i.recPrice = 0;
+  if (!i.shortfallPolicy) i.shortfallPolicy = "meet";
+  // the design detail: the chosen hourly profiles and the losses to the billing meter ride with the inputs
+  const ps = profileSourcesOf(state);
+  if (ps) i.profileSources = ps;
+  const loss = lossFactorsOfCfd(state, i.rte);
+  if (loss) i.loss = loss;
   return i;
 }
 
@@ -924,9 +1005,20 @@ export async function optimiseOwnRe(state, prices, { onProgress, signal, price =
     const short = capShortfall(sim);
     return { solarMw, windMw, sp: priceOf(inputs, sim), short, ok: short < 1e-3 * X };
   };
-  const better = (a, b) => (a.ok !== b.ok ? a.ok : a.sp < b.sp);
+  // "meet": a plant that meets every day beats one that does not, then the price; when none meets
+  // every day, the least short (then the price). "pay": the price alone, which already carries the
+  // weekly penalty and the lost revenue of the short days
+  const policy = base.shortfallPolicy === "pay" ? "pay" : "meet";
+  const better = (a, b) => {
+    if (policy === "meet") {
+      if (a.ok !== b.ok) return a.ok;
+      if (!a.ok && Math.abs(a.short - b.short) > 1e-6) return a.short < b.short;
+    }
+    return a.sp < b.sp;
+  };
   const tick = () => new Promise((r) => { setTimeout(r, 0); });
   let best = evaluate(base.solarMw || 0, base.windMw || 0);
+  best.policy = policy;
   const scan = async (key, values, total, done0) => {
     let done = done0;
     for (const v of values) {
@@ -949,7 +1041,7 @@ export async function optimiseOwnRe(state, prices, { onProgress, signal, price =
     await scan("wind", fine(best.windMw), total, done);
   }
   onProgress?.(total, total);
-  return best;
+  return { ...best, policy };
 }
 
 /** The CfD Pool at this strike price: this project's net pay-in each Contract Year (₹ cr, + = into the Pool). */

@@ -229,9 +229,11 @@ export default function CfdTab({ initialScenario = null }) {
         delete filled.windMw;
         return { ...st, inputs: { ...st.inputs, solarMw: best.solarMw, windMw: best.windMw }, filled };
       });
-      setMessage(best.ok
-        ? { ok: true, text: `Own RE optimised: solar ${nf(best.solarMw)} MWac${best.windMw ? `, wind ${nf(best.windMw)} MW` : ""} gives the lowest strike price, ₹${best.sp.toFixed(4)}/kWh, with every day's supply met.` }
-        : { ok: false, text: `No own-RE size up to 3 × the contracted capacity meets every day's supply within the sourcing limits; the closest is solar ${nf(best.solarMw)} MWac. Allow group-company RE or more wind.` });
+      setMessage(best.policy === "pay"
+        ? { ok: true, text: `Own RE optimised on the strike price alone (policy: pay the penalty): solar ${nf(best.solarMw)} MWac${best.windMw ? `, wind ${nf(best.windMw)} MW` : ""} gives ₹${best.sp.toFixed(4)}/kWh${best.ok ? ", with every day's supply met" : `, with ${nf(best.short, 0)} MWh of shortfall over the term paid for as penalty`}.` }
+        : best.ok
+          ? { ok: true, text: `Own RE optimised (policy: meet every day): solar ${nf(best.solarMw)} MWac${best.windMw ? `, wind ${nf(best.windMw)} MW` : ""} gives the lowest strike price, ₹${best.sp.toFixed(4)}/kWh, with every day's supply met.` }
+          : { ok: false, text: `No own-RE size up to 3 × the contracted capacity meets every day's supply within the sourcing limits; the closest is solar ${nf(best.solarMw)} MWac. Allow group-company RE or more wind, or set the policy to pay the penalty on Bid inputs.` });
       return best;
     } catch (err) {
       setMessage({ ok: false, text: err.message });
@@ -377,7 +379,7 @@ export default function CfdTab({ initialScenario = null }) {
         {step.id === "documents" && <DocumentsStep />}
         {step.id === "conditions" && <ConditionsStep state={state} />}
         {step.id === "bid" && <BidInputsStep {...props} />}
-        {step.id === "design" && <DesignStep {...props} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} />}
+        {step.id === "design" && <DesignStep {...props} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} model={model} />}
         {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={optimise} />}
         {step.id === "size" && <SizeStep {...props} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} />}
         {step.id === "finance" && <FinanceModelStep {...props} traceRequest={traceAsk} quoteTariff={state.quoteTariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, quoteTariff: v, forms: { ...(s.forms || {}), tariff: v } }))} />}

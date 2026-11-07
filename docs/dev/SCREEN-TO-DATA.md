@@ -229,6 +229,25 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | Against the peak tariff | `cfd/ReferenceBids.jsx:43` | `` gap === null ? "–" : `${gap >= 0 ? "+" : "−"}₹${nf(Math.abs(gap), 2)}/kWh` `` | `model.bid` − the lowest tariff of that result | the model, `SECI_RESULTS` | see the file's note above |
 | Round-the-clock ceiling | `cfd/ReferenceBids.jsx:44` | `` (() => { const r = results.find((x) => x.product === "FDRE-RTC"); const t = r ? tariffRange(r) : [null]; return t[0] !== null ? `₹${nf(t[0], 2)}/kWh`… `` | `tariffRange` of the FDRE-RTC result | `SECI_RESULTS` | see the file's note above |
 
+### `web/src/cfd/DesignStep.jsx`
+
+**Screen:** CfD bid › Design (step 05): the battery, the own RE with its studios and profiles, the losses to the billing meter, the site layout  
+**Computed by:** `designProfiles(state)` (`web/src/cfd/model.js`: `profileSourcesOf` → `profiles`) for the heat maps; `lossFactorsOfCfd(state)` for the loss chain's factors; `socWindow(inputs)` for the usable energy; the SECI components `plant/SolarStudio`, `plant/WindStudio`, `plant/ProfileView`, `rtc/ProfileLibrary`, `rtc/LossChain`, `bid/SiteSchematic` on shims of the CfD state  
+**Rests on:** state.inputs (the FIELDS of sections resource and costs: `essMwhPerMw`, `essMwPerMw`, `extraEssMwhPerMw`, `rte`, `essSocMin`, `essSocMax`, `essDegradation`, `solarMw`, `solarCuf`, `solarDcAc`, `solarDegradation`, `windMw`, `windCuf`, `windDegradation`, the capex and O&M boxes), state.studio, state.solarUpload / windUpload, state.solarMonthScale / windMonthScale, state.losses  
+**Stored:** the whole state in localStorage `fdre.cfd.v1` → `scenarios.inputs.state` on Save (module `cfd`); `mergeCfdState` merges every key on Open
+
+| Label as shown | Where | Value expression | Computed by | Inputs | Stored |
+| --- | --- | --- | --- | --- | --- |
+| Battery: <MW> MW / <MWh> MWh for <X> MW; discharge duration | `cfd/DesignStep.jsx:192` (`cfd-battery-size`) | `X × essMwPerMw`, `X × essMwhPerMw`, `essMwhPerMw ÷ essMwPerMw` h | the inputs | state.inputs | see the file's note above |
+| usable within the state-of-charge window / 2 MWh per MW must be usable: <n> MWh per MW nameplate | same | `essMwhPerMw × socWindow(i)`; `TENDER.essHoursMin ÷ socWindow(i)` | `socWindow` (`model.js`) | state.inputs.essSocMin, essSocMax | see the file's note above |
+| Round-trip efficiency quoted at: <point> | `cfd/DesignStep.jsx:186` | `POINTS.bess[losses.bessRteAt]` | `rtc/LossChain` POINTS | state.losses | see the file's note above |
+| CUF measured at: <point> | `cfd/DesignStep.jsx:69` | `POINTS.solar[losses.solarFileAt]` / `POINTS.wind[losses.windFileAt]` | same | state.losses | see the file's note above |
+| Capex ₹<a> cr/MWac is ₹<b> cr/MWp at DC:AC <r> | `cfd/DesignStep.jsx:70` | `solarCrPerMw ÷ solarDcAc` | the inputs | state.inputs.solarCrPerMw, solarDcAc | see the file's note above |
+| From the studio: ₹<capex> cr/MWac · <summary> | `cfd/DesignStep.jsx:80` (`studio-applied-<id>`) | `studio[id].applied.capex`, `.summary` | `SolarStudio`/`WindStudio` onApply, written by `applyStudio` into state.inputs and state.studio | state.studio | see the file's note above |
+| Profile on screen (heat map, monthly CUFs, a week, CUF by year) | `cfd/DesignStep.jsx:92` (`cfd-profile-<id>`) | `designProfiles(state).solar` / `.wind` | `profiles()` on the upload or typical shape, the monthly redraw, scaled to the CUF; `ProfileView` with the degradation | state.inputs CUFs, state.*Upload, state.*MonthScale | see the file's note above |
+| Losses to the billing meter (year-1 energy at each point) | `cfd/DesignStep.jsx:117` (`bid-losses`) | `lossFactorsOfCfd(state)`; `LossChain` on `{ inputs: { ...losses, solarDcAc, lossPct: 0 }, bess: { rte } }` | `E.lossFactors` (`rtc/engine.js`) | state.losses, state.inputs.rte, solarDcAc | see the file's note above |
+| Site layout schematic (share of bus energy reaching the meter) | `cfd/DesignStep.jsx:153` | `SiteSchematic` on `{ sources, sites: { split: false }, losses, src: { bess: { rte } } }`; `energy.meterMu` = CY1 `deliveredMwh ÷ 1000` when sized | `bid/model` `lossFactorsOf` | state.losses, model.sim | see the file's note above |
+
 ### `web/src/cfd/SizeStep.jsx`
 
 **Screen:** CfD bid › Size (step 07): the own RE sized for the least strike price, the checks and the operations  

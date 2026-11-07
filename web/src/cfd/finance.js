@@ -165,8 +165,8 @@ export function cfdLiveRequest({ state, model, finance }) {
   const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o?.[k]]));
   const prof = model.prof;
   const gen = {
-    solar: eng.sizes.solarMw > 0 && prof?.solar ? genSource({ cf: prof.solar, toBus: 0, degradation: eng.fin.solarDegradation, cufAt: "AC side", profile: "Typical solar profile at your CUF" }) : null,
-    wind: eng.sizes.windMw > 0 && prof?.wind ? genSource({ cf: prof.wind, toBus: 0, degradation: 0, cufAt: "AC side", profile: "Typical wind profile at your CUF" }) : null,
+    solar: eng.sizes.solarMw > 0 && prof?.solar ? genSource({ cf: prof.solar, toBus: 0, degradation: eng.fin.solarDegradation, cufAt: "AC side", profile: state.solarUpload?.name ? `${state.solarUpload.name}, scaled to your CUF` : `Typical solar profile at your CUF, DC:AC ${i.solarDcAc || 1.4}` }) : null,
+    wind: eng.sizes.windMw > 0 && prof?.wind ? genSource({ cf: prof.wind, toBus: 0, degradation: i.windDegradation || 0, cufAt: "AC side", profile: state.windUpload?.name ? `${state.windUpload.name}, scaled to your CUF` : "Typical wind profile at your CUF" }) : null,
   };
   return {
     title: `SECI CfD-I bid financial model · ${Math.round(i.contractedMw)} MW × 2 h`,

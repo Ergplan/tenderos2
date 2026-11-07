@@ -42,6 +42,22 @@ export const LEVER_NOTES = {
     what: "Capacity utilisation of your solar, on the AC side: the share of the year it runs at full power.",
     why: "A better site makes more energy from the same capex: more free charging and more surplus to sell, so the price falls.",
   },
+  solarDcAc: {
+    what: "The DC:AC ratio of the solar plant: MWp of modules per MWac of inverters. It shapes the hourly profile (clipping at midday) and converts capex per MWac to per MWp.",
+    why: "A higher ratio gives a flatter, fuller day at the same CUF, so more of the energy falls in the hours the battery charges in; it costs more modules per MWac, which the studio prices.",
+  },
+  windDegradation: {
+    what: "How much the wind output falls each year.",
+    why: "Faster degradation means less own energy in the later years, more bought power and less surplus sold, so the price rises slightly.",
+  },
+  essSocMin: {
+    what: "The lowest state of charge the battery is run to. Usable energy = (maximum − minimum) × nameplate.",
+    why: "A wider window frees more of the nameplate for the 2 MWh per MW, so less battery is bought for the same supply and the price falls; the supplier's warranty sets the floor.",
+  },
+  essSocMax: {
+    what: "The highest state of charge the battery is run to.",
+    why: "As for the minimum: a wider window means less nameplate for the same usable energy, so the price falls.",
+  },
   solarDegradation: {
     what: "How much the solar output falls each year.",
     why: "Faster degradation means less own energy in the later years, more bought power and less surplus sold, so the price rises slightly.",
@@ -224,6 +240,10 @@ export const LEVER_BANDS = {
   availability: { sure: [0.95, 0.97], likely: [0.93, 0.98], stretch: [0.9, 0.985], who: "your operations" },
   solarCuf: { sure: [0.23, 0.26], likely: [0.21, 0.28], stretch: [0.19, 0.3], who: "the site you pick" },
   solarDegradation: { sure: [0.004, 0.006], likely: [0.003, 0.007], stretch: [0.0025, 0.008], who: "the module warranty" },
+  solarDcAc: { sure: [1.3, 1.5], likely: [1.2, 1.7], stretch: [1.1, 2], who: "your design" },
+  windDegradation: { sure: [0, 0.005], likely: [0, 0.01], stretch: [0, 0.015], who: "the turbine warranty" },
+  essSocMin: { sure: [0.08, 0.12], likely: [0.05, 0.15], stretch: [0.02, 0.2], who: "the battery supplier's warranty" },
+  essSocMax: { sure: [0.93, 0.97], likely: [0.9, 1], stretch: [0.85, 1], who: "the battery supplier's warranty" },
   windCuf: { sure: [0.3, 0.36], likely: [0.28, 0.4], stretch: [0.25, 0.45], who: "the site you pick" },
   rte: { sure: [0.86, 0.88], likely: [0.85, 0.9], stretch: [0.83, 0.92], who: "the battery supplier" },
   essDegradation: { sure: [0.02, 0.02], likely: [0.015, 0.025], stretch: [0.01, 0.03], who: "the battery warranty" },

@@ -9,7 +9,7 @@ import { FIELDS, runModel } from "./model.js";
 import { runCfdFinance } from "./finance.js";
 
 /** The inputs whose change alters the operation (the rest only re-price it). */
-const OPERATION_KEYS = new Set(["contractedMw", "essMwhPerMw", "essMwPerMw", "solarMw", "windMw", "reCodMonths", "availability", "solarCuf", "solarDegradation", "windCuf", "rte", "essDegradation", "marketCharges", "groupPrice", "groupCharges", "priceEscalation", "gdamShareCap", "extraEssMwhPerMw"]);
+const OPERATION_KEYS = new Set(["contractedMw", "essMwhPerMw", "essMwPerMw", "solarMw", "windMw", "reCodMonths", "availability", "solarCuf", "solarDegradation", "windCuf", "rte", "essDegradation", "marketCharges", "groupPrice", "groupCharges", "priceEscalation", "gdamShareCap", "extraEssMwhPerMw", "solarDcAc", "windDegradation", "essSocMin", "essSocMax"]);
 /** Inputs that are not levers (fixed by the tender, or a choice rather than a number). */
 const NOT_LEVERS = new Set(["gstRate"]);
 

@@ -222,3 +222,94 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   }
   console.log(`CfD extra battery: 2 MWh/MW more sells ${Math.round(y3.extraSoldMwh / 1000)} GWh in CY3 for ₹${y3.extraRevCr.toFixed(1)} cr; strike price ₹${plain.sp.toFixed(3)} → ₹${extra.sp.toFixed(3)}`);
 }
+
+// ---- the Design step's plant detail: losses to the billing meter, the battery's state-of-charge
+// window, the bid's own hourly profiles (an upload, the monthly redraw, the DC:AC ratio) and the
+// shortfall policy
+{
+  const { BENCHMARKS, lossFactorsOfCfd, profileSourcesOf, designProfiles, socWindow, essTotalMwhPerMw } = await import("../web/src/cfd/model.js");
+  const { defaultLosses } = await import("../web/src/bid/model.js");
+  const base = fillBenchmarks(defaultCfdState());
+  base.inputs.contractedMw = 100;
+  base.inputs.effectiveDate = base.inputs.effectiveDate || "2026-12-01";
+  base.inputs.solarMw = 30;
+  const run = (state) => runModel(state, prices);
+  const sum = (sim, k) => sim.years.reduce((a, y) => a + y[k], 0);
+
+  // (a) losses: none set leaves every figure; set, less reaches the meter and the price rises
+  const plain = run(base);
+  assert.equal(plain.sim.loss, null, "no losses modelled: the factors are off");
+  assert.equal(lossFactorsOfCfd(base), null);
+  const lossy = run({ ...base, losses: defaultLosses() });
+  const lf = lossy.sim.loss;
+  assert.ok(lf && lf.solar < 1 && lf.meter < 1 && lf.rteBus <= base.inputs.rte + 1e-9, `loss factors applied (solar ${lf.solar.toFixed(4)}, meter ${lf.meter.toFixed(4)}, RTE at bus ${lf.rteBus.toFixed(4)})`);
+  assert.ok(sum(lossy.sim, "deliveredMwh") <= sum(plain.sim, "deliveredMwh") + 1e-6, "no more energy reaches the meter with losses");
+  assert.ok(sum(lossy.sim, "merchantMwh") < sum(plain.sim, "merchantMwh"), "less surplus is sold at the meter");
+  assert.ok(sum(lossy.sim, "chargeMarketMwh") + sum(lossy.sim, "shortMwh") > sum(plain.sim, "chargeMarketMwh") + sum(plain.sim, "shortMwh") - 1e-6, "more is bought, or falls short, to fill the same 2 MWh per MW at the meter");
+  assert.ok(lossy.sp > plain.sp, `losses raise the strike price (₹${plain.sp.toFixed(4)} → ₹${lossy.sp.toFixed(4)})`);
+  const same = run({ ...base, losses: null });
+  near(same.sp, plain.sp, 1e-12, "losses null: the figures stay");
+
+  // (b) the state-of-charge window: usable = (max − min) × nameplate; the tender's 2 MWh per MW must be usable
+  assert.equal(socWindow({}), 1, "no window entered: the nameplate is usable");
+  near(socWindow({ essSocMin: 0.1, essSocMax: 0.9 }), 0.8, 1e-12, "10% to 90%: 80% usable");
+  const windowed = { ...base, inputs: { ...base.inputs, essSocMin: 0.1, essSocMax: 0.9 } };
+  const warn = missingInputs(windowed).find((m) => /Battery energy/.test(m));
+  assert.ok(warn && /2\.50 MWh per MW nameplate/.test(warn), `the Size check demands 2 / 0.8 = 2.5 MWh per MW nameplate: ${warn}`);
+  assert.equal(run(windowed), null, "the bid is not complete until the nameplate covers the window");
+  const wi = { ...modelInputs({ ...windowed, inputs: { ...windowed.inputs, essMwhPerMw: 2.5 } }), essMwhPerMw: 2 };
+  const wSim = simulate(wi, plain.book, profiles(wi));
+  assert.equal(wSim.socWindow, 0.8);
+  assert.ok(sum(wSim, "deliveredMwh") < sum(plain.sim, "deliveredMwh") - 1, "2 MWh per MW nameplate with 80% usable delivers less than the mandate");
+  const sized = run({ ...windowed, inputs: { ...windowed.inputs, essMwhPerMw: 2.5 } });
+  assert.deepEqual(missingInputs({ ...windowed, inputs: { ...windowed.inputs, essMwhPerMw: 2.5 } }).filter((m) => /Battery energy/.test(m)), []);
+  near(sum(sized.sim, "deliveredMwh"), sum(plain.sim, "deliveredMwh"), 1e-6, "2.5 MWh nameplate at 80% usable delivers what 2 MWh fully usable does");
+  assert.ok(sized.sp > plain.sp, "and costs more: the nameplate is bought");
+  assert.equal(essTotalMwhPerMw(sized.inputs), 2.5, "capex and EMD follow the nameplate");
+
+  // (c) an uploaded 8,760-hour profile is the shape profiles() uses, scaled to the CUF, with the monthly redraw
+  const morning = Array.from({ length: 8760 }, (_, t) => { const h = t % 24; return h >= 6 && h < 18 ? 0.6 : 0; }); // a flat day block, as no typical shape is
+  const up = { ...base, solarUpload: { name: "site-2024.csv", values: morning } };
+  assert.ok(profileSourcesOf(base) === null && profileSourcesOf(up)?.solarShape === morning, "the upload is the solar shape");
+  const pu = designProfiles(up);
+  const cufOf = (cf) => cf.reduce((a, v) => a + v, 0) / cf.length;
+  near(cufOf(pu.solar), base.inputs.solarCuf, 1e-9, "scaled to the bid's CUF");
+  assert.ok(pu.solar[19] === 0 && pu.solar[5] === 0 && pu.solar[8] > 0 && Math.abs(pu.solar[8] - pu.solar[15]) < 1e-9, "the upload's shape (a flat block from 06:00 to 18:00), not the typical day");
+  assert.ok(Math.abs(pu.solar[8] - designProfiles(base).solar[8]) > 1e-6, "which differs from the typical shape");
+  const uJan = designProfiles({ ...up, solarMonthScale: [2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] });
+  near(cufOf(uJan.solar), base.inputs.solarCuf, 1e-9, "the redraw keeps the CUF");
+  const jan = (cf) => cf.slice(0, 31 * 24).reduce((a, v) => a + v, 0) / cf.reduce((a, v) => a + v, 0);
+  assert.ok(jan(uJan.solar) > jan(pu.solar) * 1.5, "January's share rises with the monthly redraw");
+  const sUp = run(up);
+  assert.ok(sUp.prof.solar[19] === 0 && Math.abs(sUp.prof.solar[8] - sUp.prof.solar[15]) < 1e-9 && Math.abs(sUp.sp - plain.sp) > 1e-6, "the model prices the uploaded shape");
+
+  // (d) the DC:AC ratio: it is read by profiles() and sets the MWp and the capex per MWp; at the same
+  // AC CUF the hourly shape is the same whatever the ratio, because the typical profile is a site
+  // irradiance scaled and clipped to the CUF, and only the product (irradiance × DC:AC) is pinned by
+  // the CUF: a plant at 1.2 with the same CUF as one at 1.4 sits on a sunnier site and clips as much.
+  // (The engine's synthSolarCf multiplies the irradiance by dcAc before that scaling, so its dcAc has
+  // no effect on the shape either; the RTC tab's hint that it does is corrected here.)
+  const p12 = designProfiles({ ...base, inputs: { ...base.inputs, solarDcAc: 1.2 } });
+  const p14 = designProfiles({ ...base, inputs: { ...base.inputs, solarDcAc: 1.4 } });
+  near(cufOf(p12.solar), cufOf(p14.solar), 1e-9, "same CUF");
+  assert.ok(p12.solar.every((v, t) => Math.abs(v - p14.solar[t]) < 1e-9), "the same hourly shape at the same AC CUF, whatever the ratio");
+  near(cufOf(designProfiles(base).solar), cufOf(p14.solar), 1e-12, "1.4 is the ratio used when none is entered");
+  assert.equal(BENCHMARKS.solarDcAc, 1.4);
+  near(capexOf({ ...base.inputs, solarMw: 10, solarDcAc: 1.2 }).solar, 10 * base.inputs.solarCrPerMw, 1e-9, "the capex is per MWac; 10 MWac at 1.2 is 12 MWp, so ₹/MWp = ₹/MWac ÷ 1.2 (the Design card's note)");
+
+  // (e) the shortfall policy: "meet" keeps only plants that meet every day; "pay" prices the penalty
+  const small = { ...base, inputs: { ...base.inputs, solarMw: 5, useMarket: false } };
+  const sSmall = run(small);
+  assert.ok(capShortfall(sSmall.sim) > 0 && sum(sSmall.sim, "shortDays") > 0, "5 MW of solar without market power falls short");
+  const pen = sSmall.sim.years.reduce((a, y) => a + penaltyCr(y, sSmall.sp), 0);
+  assert.ok(pen > 0, `the weekly penalty is charged (₹${pen.toFixed(1)} cr over the term)`);
+  assert.ok(financials(sSmall.inputs, sSmall.sim, sSmall.sp).rows.some((r) => r.penalty > 0), "and sits in the financial model's rows");
+  const meet = await optimiseOwnRe({ ...small, inputs: { ...small.inputs, shortfallPolicy: "meet" } }, prices);
+  const pay = await optimiseOwnRe({ ...small, inputs: { ...small.inputs, shortfallPolicy: "pay" } }, prices);
+  assert.equal(meet.policy, "meet");
+  assert.equal(pay.policy, "pay");
+  assert.ok(meet.ok || meet.short <= pay.short + 1e-6, "meet: a plant that meets every day, else the least short");
+  assert.ok(pay.sp <= meet.sp + 1e-9, `pay: no dearer than the meet plant (₹${pay.sp.toFixed(4)} vs ₹${meet.sp.toFixed(4)})`);
+  if (pay.short > 1e-6) assert.ok(pay.solarMw < meet.solarMw, "a smaller plant whose penalty is cheaper than more solar");
+  console.log(`CfD design checks passed: losses ₹${plain.sp.toFixed(4)} → ₹${lossy.sp.toFixed(4)}; SoC 10–90% needs 2.5 MWh/MW nameplate; policy meet ${meet.solarMw} MW (${meet.ok ? "every day met" : `${Math.round(meet.short)} MWh short`}) vs pay ${pay.solarMw} MW (${Math.round(pay.short)} MWh short, ₹${pay.sp.toFixed(4)})`);
+}

@@ -157,6 +157,19 @@ charging** after month 36 (up to 50%) with its price and charges; **Sell surplus
 market**; **After the 15-year term** (nothing, or keep selling at market prices for a number of
 years); the charges on bought power, the market price escalation, the REC price.
 
+**Shortfall policy** (3.1) decides how the plant is sized against the daily 2 MWh per MW:
+* **Meet every day** (the default): no shortfall on any day of any Contract Year. The optimiser
+  keeps only own-RE sizes that meet the supply within the sourcing limits and picks the cheapest
+  of them; when none does, the least short. Size shows "2 MWh/MW every day" as a check that fails
+  while any day is short.
+* **Pay the penalty**: a day may fall short when that is cheaper than more plant. The shortfall
+  beyond 10% in a Contract Week costs 1.5 × (the week's highest evening price − the strike
+  price), and that evening's revenue is lost (CfDA 4.4.3). The optimiser then sizes on the strike
+  price alone, which already carries the penalty and the lost revenue; Size shows the short days
+  and the penalty over the term as information ("allowed by your policy"), not as a failure.
+The note under the choice says which reading is in force; the Size step's optimiser message says
+which policy sized the plant.
+
 **3.2 · Money at stake.** What the RfS asks of this bid on the installed sizes: EMD, PBG, Contract
 Administration Charges, the RfS cost and bid fee, net worth, and the liquidity test (turnover,
 PBDIT or a line of credit).
@@ -170,16 +183,65 @@ PBDIT or a line of credit).
 **Fill up for me please** puts industry benchmarks in every empty box, marked until you replace
 them.
 
-**4 · Battery.** **Battery energy** (MWh per contracted MW, at least 2) and **Battery power** (MW
-per contracted MW, at least 1), **Round-trip efficiency**, **Battery degradation**, **Battery
-capacity over the term** (augment every year, or let it fade).
+**Purpose.** The plant behind the bid: the battery the tender mandates, the own RE that charges
+it, the losses to the billing meter and the site layout. The chip says how many inputs are still
+needed; the tender sets the battery's minimum, nothing else.
 
-**4.1 · Own RE.** **Own solar** (MWac) and **Own wind** (MW), **RE generation commissioned**
-(months after the SCD, at most 21), **Plant availability**, the CUFs and solar degradation.
-**Optimise own RE** finds the solar (and wind, if you have it) that gives the lowest strike price
-with every day's supply met within the sourcing limits; it is offered here and on Size.
+**4 · Battery.**
+* **Size.** **Battery energy** (MWh per contracted MW, at least 2 usable), **Battery power** (MW
+  per contracted MW, at least 1), **Extra battery for evening sale** (see below). The note under
+  the boxes gives the plant for your contracted MW, the **discharge duration** (energy ÷ power,
+  hours) and, when a state-of-charge window is set, the usable energy within it: the tender's
+  2 MWh per MW must be usable, so with a 10–90% window the nameplate has to be 2.5 MWh per MW; the
+  note and the Size check say so.
+* **Operation.** **Round-trip efficiency** with where it is quoted (the Losses section below sets
+  the point; the model applies the round trip at the 33 kV bus), **Minimum** and **Maximum state
+  of charge** (usable = (maximum − minimum) × nameplate; empty means the whole nameplate is
+  usable), **Battery degradation**, **Battery capacity over the term** (augment every year, or let
+  it fade).
+* **Costs.** Capex per MWh (all-in), O&M per MWh, the yearly decline of augmentation cost.
 
-**Continue to Finance inputs.**
+**4.1 · Own RE.** **Optimise own RE** finds the solar (and wind, if you have it) that gives the
+lowest strike price under your shortfall policy; it is offered here and on Size. **RE generation
+commissioned** (months after the SCD, at most 21) and **Plant availability**, then one card per
+source:
+* **Own solar.** **Own solar** (MWac), **CUF (AC)** with where it is measured (the hint names the
+  point; change it under Losses), **DC:AC ratio** (MWp = MWac × DC:AC; the hint converts the capex
+  per MWac to ₹ cr/MWp; at a given AC CUF the hourly shape is pinned by the CUF, so the ratio
+  changes the cost and the studio's design, not the typical profile), **Solar degradation**,
+  **Capex per MWac**, **O&M per MWac**.
+* **Solar plant studio** opens the layout and cost build-up (modules, mounting, string or central
+  inverters, ₹/Wp); **Use this cost** writes the capex and the DC:AC into the boxes and the card
+  notes "From the studio" with the design summary.
+* **Own wind.** **Own wind** (MW), **CUF**, **Wind degradation** (0 by default), **Capex per MW**,
+  **O&M per MW**; the **Wind farm studio** (turbines by make, the site's CUF and the farm cost)
+  writes the capex and the CUF likewise.
+* **Profiles** on each card. The table lists the hourly profiles available (the typical shape
+  tuned to the CUF, the library's measured profiles, your uploads) with their quality, CUF,
+  monthly CUFs, measuring point, period and plant MW; **Use** picks one, **Upload file** adds your
+  own 8,760-hour file, **Library (n)** opens the list. The chosen profile is scaled to your CUF and
+  redrawn month by month if you drag the monthly CUFs; the model simulates every day of the term on
+  it. Under *Profile on screen* you see the heat map, the monthly CUFs and a week, with the CUF by
+  year after degradation.
+
+**4.3 · Losses to the billing meter.** Off until you click **Model the losses to the billing
+meter**; without it every figure is at the meter, as before. On, tabs **Solar / Wind / Battery**
+show, for each technology, the chain of stages from the measuring point to the 33 kV bus (inverter
+and WTG transformers, cables, MV transformers), each with its loss, then the shared 33/220 kV
+transformer and the 220 kV line. Pick **where your CUF is measured**: the stages above that point
+are already in the CUF, the ones below are applied. The model then takes the generation to the bus,
+runs the battery's round trip at the bus, and applies the bus-to-meter factor to everything
+injected (the day's supply, the surplus sold, the extra battery's sale); power bought in the market
+or from the group is measured at the meter, so more of it is needed to fill the same 2 MWh per MW.
+**Remove** switches the losses off again.
+
+**4.4 · Site layout.** The single-line schematic of the one site: solar, wind and the battery on
+one 33 kV bus with one pooling station; set the **Power transformer loss** and the **220 kV line
+loss** on it, which are the shared stages of the loss chains above. The tender takes one
+connection at the contracted MW, so there is no split-site option here.
+
+**4.5 · Continue.** The bar counts the inputs still needed and offers **Fill up for me please**;
+**Continue to Finance inputs** moves on.
 
 ---
 

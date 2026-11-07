@@ -122,6 +122,53 @@ also capped at `gdamShareCap` × the hour's cleared GDAM volume (`hourlyMcvMw` o
    folded into the merchant and charging totals the financial model reads.
 5. Each Contract Week's shortfall beyond 10% is penalised at the strike price being solved.
 
+**The plant detail of the Design step** (state keys beside `state.inputs`, all merged by
+`mergeCfdState` and saved with the bid):
+
+* **Losses to the billing meter** (`state.losses`, null until the bidder switches them on; the
+  SECI tab's `defaultLosses()` shape: `solarLoss`/`solarFileAt`, `windLoss`/`windFileAt`,
+  `bessLoss`/`bessRteAt`, `trafoLossPct`, `lineLossPct`). `lossFactorsOfCfd(state, rte)` turns them
+  into `{ solar, wind, rteBus, meter }` through the RTC engine's `lossFactors`; `modelInputs`
+  puts them on `inputs.loss` and `simulate` applies them: generation reaches the 33 kV bus as
+  MW × profile × `solar`/`wind`; the battery's round trip at the bus is `rteBus` (the quoted RTE
+  moved to the bus from where it is quoted); everything injected (own wind in the peak hours, the
+  battery's discharge, the surplus and the extra battery's sale) is multiplied by `meter` on its
+  way to the meter, and the connection limit is applied at the meter; power bought in the market
+  or from the group is measured at the meter, so a bus MWh costs `1/meter` MWh bought and the
+  sourcing caps count delivered-equivalent energy (`c × rte × meter`). With `losses` null every
+  factor is 1 and `rte` is the input RTE, so the figures are exactly the earlier ones (checked).
+  `sim.loss` carries the factors used.
+* **The state-of-charge window** (`inputs.essSocMin`, `inputs.essSocMax`, empty by default):
+  `socWindow(inputs)` = max − min, clamped to 5–100%; `simulate` runs the battery (and the extra
+  battery) on nameplate × window, while capex, O&M, EMD and PBG stay on the nameplate. The tender's
+  2 MWh per MW is read as usable energy: `missingInputs` and the Size check "Battery X MW / 2X MWh
+  usable" demand nameplate ≥ 2 ÷ window (2.5 MWh per MW for 10–90%). `sim.socWindow` carries it.
+* **Profiles** (`state.solarUpload`, `state.windUpload`: `{ name, values[8760], … }` from the
+  profile library or an upload; `state.solarMonthScale`, `state.windMonthScale`: twelve monthly
+  multipliers drawn on the heat map). `profileSourcesOf(state)` hands them to `profiles(inputs)`
+  as `inputs.profileSources`: the upload's shape, else the typical shape (`E.synthSolarCf` at the
+  DC:AC, `E.synthWindCf`), redrawn by the monthly multipliers (`E.applyMonthlyScale`) and scaled
+  to the entered CUF (`scaleToCuf`). `designProfiles(state)` gives the same series to the Design
+  step's heat maps without a sized plant. At a given AC CUF the hourly shape does not depend on
+  the DC:AC ratio (the ratio and the site irradiance enter the clipping only as a product, which
+  the CUF pins); `inputs.solarDcAc` (benchmark 1.4) sets the MWp and the capex per MWp and goes
+  to the studio.
+* **The studios** (`state.studio.solar`, `state.studio.wind`: the studio's design and, once
+  applied, `applied: { capex, dcAc, cuf, summary, at }`): *Use this cost* writes
+  `solarCrPerMw`/`solarDcAc` or `windCrPerMw`/`windCuf` into `state.inputs` and clears their
+  benchmark marks.
+* **Wind degradation** (`inputs.windDegradation`, 0 by default) lowers the wind output year by
+  year as `solarDegradation` does the solar.
+
+**The shortfall policy** (`inputs.shortfallPolicy`, a choice on Bid inputs 3.1, `meet` by
+default; a choice, not a lever). `optimiseOwnRe` compares candidate plants under `meet` by
+feasibility first (a plant that meets every day beats one that does not; when none does, the
+least short), then by price; under `pay` by price alone, which already carries the weekly
+penalty (`penaltyCr`, in the financial model's `penalty` row) and the lost revenue of the short
+evenings (revenue runs on `deliveredMwh`). The result carries `policy`; the Size step's "2 MWh/MW
+every day" check is a failure under `meet` and information under `pay` ("N days short, ₹X cr of
+penalty over the term, allowed by your policy"), and the optimiser's message names the policy.
+
 F.9 of the Financial model step (`MarketPrices.jsx`) draws the two bands (`priceBands` gives
 today's levels: the cheapest three charging hours and the two dearest evening hours), lets the
 bidder drag a year's dot, smooth or pick a scenario, re-runs the full financial model on every

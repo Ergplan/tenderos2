@@ -81,11 +81,39 @@ def test_cfd_bid_end_to_end(tmp_path):
         mw = _field(page, "Contracted capacity you bid").locator("input")
         mw.fill("100")
         mw.dispatch_event("change")
+        # the shortfall policy is a choice on 3.1, meet every day by default
+        policy = page.locator("[data-testid=cfd-in-shortfallPolicy] select")
+        assert policy.count() == 1
+        assert policy.input_value() == "meet"
+        assert "meet every day" in page.locator("[data-testid=cfd-policy-note]").inner_text().lower()
 
-        # 05 design: benchmarks
+        # 05 design: benchmarks, then the plant detail of the SECI tab's Design step: the solar studio
+        # opens, prices the plant and writes its capex and DC:AC into the bid; the profiles and their
+        # library; the losses to the billing meter; the battery's state-of-charge window
         _step(page, "design")
         page.click("[data-testid=cfd-fill]")
         page.wait_for_timeout(300)
+        page.click("[data-testid=studio-solar]")
+        page.locator("[data-testid=solar-studio]").wait_for()
+        page.click("[data-testid=solar-apply]")
+        assert page.locator("[data-testid=solar-studio]").count() == 0
+        assert "From the studio" in page.locator("[data-testid=studio-applied-solar]").inner_text()
+        page.click("[data-testid=studio-wind]")
+        page.wait_for_selector("[data-testid=wind-studio]")
+        page.click("[data-testid=wind-studio] [aria-label='Close the studio']")
+        assert page.locator("[data-testid=wind-studio]").count() == 0
+        assert page.locator("[data-testid=cfd-profile-solar]").count() == 1
+        assert page.locator("[data-testid=cfd-profile-library-solar]").count() == 1
+        assert page.locator("[data-testid=cfd-in-essSocMin] input").count() == 1
+        assert page.locator("[data-testid=cfd-in-essSocMax] input").count() == 1
+        assert page.locator("[data-testid=cfd-in-solarDcAc] input").count() == 1
+        page.click("[data-testid=cfd-losses-on]")
+        assert page.locator("[data-testid=bid-loss-kinds]").count() == 1
+        assert page.locator("[data-testid=bid-loss-kind-bess]").count() == 1
+        page.click("[data-testid=bid-loss-kind-bess]")
+        assert page.locator("[data-testid=bid-losses]").count() == 1
+        page.click("[data-testid=cfd-losses-off]")
+        assert page.locator("[data-testid=bid-loss-kinds]").count() == 0
 
         # 06 finance inputs: the repayment methods and the construction months, then size
         _step(page, "financeInputs")

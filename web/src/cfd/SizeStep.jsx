@@ -4,7 +4,7 @@ import { Section, Stat, nf, pf } from "../rtc/ui";
 import { LiveChart } from "../rtc/charts";
 import Cite from "./Cite.jsx";
 import { TENDER } from "./terms.js";
-import { capShortfall, fmtDate, missingInputs, ownReCostRsPerKwh, penaltyCr, rfsAmounts, simulate } from "./model.js";
+import { capShortfall, fmtDate, missingInputs, ownReCostRsPerKwh, penaltyCr, rfsAmounts, simulate, socWindow } from "./model.js";
 import { OptimiseBar } from "./DesignStep.jsx";
 
 const COLORS = { own: "#7ddc9a", market: "#3fa7d6", group: "#4fd1c5", sale: "#f2b84b", ess: "#a98bff", price: "#ff8a5f", wind: "#5fb3ff" };
@@ -29,15 +29,19 @@ export function sizingChecks(model) {
   const shortDays = years.reduce((a, y) => a + y.shortDays, 0);
   const penaltyWeeks = years.reduce((a, y) => a + y.weeks.filter((w) => w.beyondMwh > 1e-6).length, 0);
   const supply = years.reduce((a, y) => a + y.deliveredMwh, 0) / Math.max(1e-9, years.reduce((a, y) => a + y.requiredMwh, 0));
-  const essOk = i.essMwhPerMw >= TENDER.essHoursMin - 1e-9 && i.essMwPerMw >= 1 - 1e-9;
+  const win = socWindow(i);
+  const usable = i.essMwhPerMw * win;
+  const essOk = usable >= TENDER.essHoursMin - 1e-9 && i.essMwPerMw >= 1 - 1e-9;
+  const pay = i.shortfallPolicy === "pay";
+  const penaltyTerm = model.sp ? years.reduce((a, y) => a + penaltyCr(y, model.sp), 0) : null;
   const reOk = i.reCodMonths <= TENDER.reCodMonths - TENDER.essScdMonths;
   return [
     { id: "capacity", label: "Contracted capacity", status: Number.isInteger(X) && X >= TENDER.bidMinMw && X <= TENDER.bidMaxMw ? "met" : "failed", detail: `${nf(X)} MW; ${TENDER.bidMinMw} to ${TENDER.bidMaxMw} MW in whole MW`, cite: "capacityBid" },
-    { id: "ess", label: "Battery X MW / 2X MWh", status: essOk ? "met" : "failed", detail: `${nf(X * i.essMwPerMw)} MW / ${nf(X * i.essMwhPerMw)} MWh for ${nf(X)} MW`, cite: "ess" },
+    { id: "ess", label: "Battery X MW / 2X MWh usable", status: essOk ? "met" : "failed", detail: `${nf(X * i.essMwPerMw)} MW / ${nf(X * i.essMwhPerMw)} MWh nameplate for ${nf(X)} MW${win < 1 ? `; ${nf(X * usable)} MWh usable within the state-of-charge window${usable < TENDER.essHoursMin - 1e-9 ? `: ${nf(TENDER.essHoursMin / win, 2)} MWh per MW nameplate needed` : ""}` : ""}`, cite: "ess" },
     { id: "reCod", label: "RE online by month 36", status: reOk ? "met" : "failed", detail: `${nf(i.reCodMonths)} months after the SCD (${fmtDate(sim.dates.reCod)}); at most ${TENDER.reCodMonths - TENDER.essScdMonths}`, cite: "reCod" },
     { id: "market", label: "Green market within 25% (+75% until month 36)", status: marketOk ? "met" : "failed", detail: after.length ? `highest after month 36: ${pf(Math.max(...after.map((y) => y.shareMarket)), 1)}` : "no Contract Year after month 36", cite: "market25" },
     { id: "group", label: "Group RE within 50% after month 36", status: groupOk ? "met" : "failed", detail: after.length ? `highest: ${pf(Math.max(...after.map((y) => y.shareGroup)), 1)}` : "not used", cite: "group50" },
-    { id: "daily", label: "2 MWh/MW every day", status: shortDays ? "failed" : "met", detail: shortDays ? `${nf(shortDays)} days short of charging power: more own RE needed` : `every day; ${pf(supply, 1)} of the mandate supplied`, cite: "mandate" },
+    { id: "daily", label: "2 MWh/MW every day", status: shortDays ? (pay ? "info" : "failed") : "met", detail: shortDays ? (pay ? `${nf(shortDays)} days short, ₹${nf(penaltyTerm ?? 0, 1)} cr of penalty over the term, allowed by your policy (pay the penalty); ${pf(supply, 1)} of the mandate supplied` : `${nf(shortDays)} days short of charging power: more own RE needed, or set the policy to pay the penalty`) : `every day; ${pf(supply, 1)} of the mandate supplied`, cite: "mandate" },
     { id: "weekly", label: "Weekly shortfall within 10%", status: penaltyWeeks ? "info" : "met", detail: penaltyWeeks ? `${nf(penaltyWeeks)} weeks penalised at 1.5 × (highest evening MCP − SP)` : "no week below 90% of 14 MWh/MW", cite: "tolerance" },
   ];
 }

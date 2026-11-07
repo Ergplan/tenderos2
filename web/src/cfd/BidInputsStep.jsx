@@ -82,6 +82,13 @@ export default function BidInputsStep({ state, setState, setInput, lockProps }) 
           <Choice state={state} setInput={setInput} k="merchant" yesNo lockProps={lockProps} />
         </div>
         <div className="rtc-grid rtc-grid-4 cfd-fields">
+          <Choice state={state} setInput={setInput} k="shortfallPolicy" lockProps={lockProps} />
+          <div className="rtc-field cfd-policy-note" data-testid="cfd-policy-note">
+            <div className="rtc-field-top"><span>What the policy means</span></div>
+            <small>{i.shortfallPolicy === "pay"
+              ? <>Pay the penalty: a day may fall short when that is cheaper than more plant; beyond 10% in a Contract Week the shortfall costs 1.5 × (the week's highest evening price − the strike price) and that evening's revenue is lost <Cite id="tolerance" compact /> <Cite id="shortfall" compact />. The optimiser then sizes the own RE on the strike price alone.</>
+              : <>Meet every day: no shortfall on any day of any Contract Year; the optimiser only keeps plants that meet the supply within the sourcing limits <Cite id="tolerance" compact /> <Cite id="shortfall" compact />.</>}</small>
+          </div>
           <Choice state={state} setInput={setInput} k="afterTerm" lockProps={lockProps} />
           {i.afterTerm === "merchant" && (
             <div className="has-assign" data-testid="cfd-in-merchantYears" data-voice="inputs.merchantYears">
