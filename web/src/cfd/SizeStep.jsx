@@ -13,7 +13,7 @@ const COLORS = { own: "#7ddc9a", market: "#3fa7d6", group: "#4fd1c5", sale: "#f2
  * The tender's conditions on the sized plant: { id, label, status: met | failed | info, detail,
  * cite }. Plain data, so the agent reads the same list the screen shows.
  */
-export function sizingChecks(model) {
+export function sizingChecks(model, state = { inputs: model.inputs, losses: null }) {
   if (!model) return [];
   const i = model.inputs;
   const sim = model.sim;
@@ -146,7 +146,7 @@ export default function SizeStep({ state, model, optimise, optimising, stopOptim
   const ownCost = ownReCostRsPerKwh(i);
   const years = sim.years;
   const sp = model.sp;
-  const checks = sizingChecks(model);
+  const checks = sizingChecks(model, state);
   const failed = checks.filter((c) => c.status === "failed").length;
   const a = rfsAmounts(i);
   const shortMwh = capShortfall(sim);
