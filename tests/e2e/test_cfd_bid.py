@@ -104,6 +104,7 @@ def test_cfd_bid_end_to_end(tmp_path):
         assert "MW" in sized and "₹" in sized
         assert page.locator("[data-testid^=cfd-check-]").count() >= 6
         assert page.locator("[data-testid=cfd-ops-table]").count() == 1 and page.locator("[data-testid=cfd-day]").count() == 1
+        assert "₹" in page.locator("[data-testid=cfd-own-cost-1]").inner_text(), "own RE charging valued at the plant's cost"
 
         # 08 financial model: the tiles, the trace, the workbook with nine sheets
         _step(page, "finance")

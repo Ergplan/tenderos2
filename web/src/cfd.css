@@ -81,7 +81,7 @@
 .cfd-rfs-cites { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
 .cfd-optimise { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
 .cfd-table { display: grid; margin-top: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.cfd-row { display: grid; grid-template-columns: minmax(120px, 1.1fr) repeat(7, minmax(84px, 1fr)); gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); }
+.cfd-row { display: grid; grid-template-columns: minmax(120px, 1.1fr) repeat(8, minmax(80px, 1fr)); gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); }
 .cfd-row.head { border-top: 0; color: var(--muted); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
 .cfd-row > span { display: grid; gap: 2px; }
 .cfd-row small { color: var(--muted); font-size: 11px; }

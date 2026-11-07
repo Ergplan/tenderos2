@@ -236,8 +236,14 @@ online: own RE, the green market, group RE; own generation, charged from own RE,
 curtailed.
 
 **6.3 · Every Contract Year.** The table of Contract Years (April to March from the SCD): required
-and delivered energy, the shares by source against the limits, charging costs, surplus sales,
-weeks with a penalty.
+and delivered energy, the shares by source against the limits, **Charging bought** (what you pay
+the exchange and group companies), **Own RE at cost** (the energy your own plant put into the
+battery, valued at what the plant costs you per unit: the RE capex annualised at the discount
+rate over its life plus O&M, over the energy it makes, about ₹2.2/kWh on the benchmarks; the
+total of both beneath), surplus sales, weeks with a penalty. The exchange bill falls once your
+own RE is in (for example ₹16 cr in CY1 to ₹3 cr in CY3 on the benchmark bid) but the total
+hardly moves: the own-RE cost sits in the depreciation, interest and O&M lines of the financial
+model instead of the exchange bill.
 
 **6.4 · A day's operation.** Pick any day: the hourly chart of solar and wind, charging from own
 RE, the market and group RE, the battery's discharge in the two peak hours, the sale, and the

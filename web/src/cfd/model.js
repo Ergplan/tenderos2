@@ -599,6 +599,31 @@ export const BG_YEARS = {
   pbg: (TENDER.essScdMonths + TENDER.pbgAfterScdMonths) / 12 + (TENDER.loaToEdDays - TENDER.docsDueDays + TENDER.bgClaimDays) / 365,
 };
 
+/**
+ * What a unit of the bidder's own RE costs to make, ₹/kWh: the capex annualised at the discount
+ * rate over the RE life, plus the O&M (escalating, levelised at the same rate), over the energy
+ * generated per MW. Solar and wind weighted by their generation. Shown beside the exchange bill so
+ * that charging from own RE is not read as free.
+ */
+export function ownReCostRsPerKwh(inputs) {
+  const r = inputs.discountRate || 0;
+  const n = Math.max(1, inputs.reLifeYears || 25);
+  const annuity = r > 0 ? (1 - (1 + r) ** -n) / r : n;
+  const g = inputs.omEscalation || 0;
+  // the levelised O&M: PV of an escalating stream over PV of a flat one
+  const omLevel = r > 0 && Math.abs(r - g) > 1e-9 ? ((1 - ((1 + g) / (1 + r)) ** n) / (r - g)) / annuity : 1;
+  const part = (mw, crPerMw, omLakh, cuf) => {
+    if (!(mw > 0) || !(cuf > 0)) return null;
+    const mwh = mw * E.HOURS * cuf;
+    const crPerYear = (mw * (crPerMw || 0)) / annuity + (mw * (omLakh || 0) * omLevel) / 100;
+    return { mwh, cr: crPerYear };
+  };
+  const parts = [part(inputs.solarMw, inputs.solarCrPerMw, inputs.solarOmLakhPerMw, inputs.solarCuf), part(inputs.windMw, inputs.windCrPerMw, inputs.windOmLakhPerMw, inputs.windCuf)].filter(Boolean);
+  const mwh = parts.reduce((a, x) => a + x.mwh, 0);
+  const cr = parts.reduce((a, x) => a + x.cr, 0);
+  return mwh > 0 ? (cr * 1e7) / (mwh * 1000) : null;
+}
+
 export function capex(inputs) {
   const X = inputs.contractedMw;
   const pre = 1 + inputs.preopPct;

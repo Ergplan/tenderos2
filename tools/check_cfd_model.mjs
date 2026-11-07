@@ -181,3 +181,13 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.ok(Math.abs(wide.sp - flat.sp) < 1e-9, "0 = no cap; 20% does not bind for 100 MW");
   console.log(`CfD market price paths: flat ₹${flat.sp.toFixed(3)}, storage flood ₹${flood.sp.toFixed(3)}, tight grid ₹${tight.sp.toFixed(3)}; bands ₹${bands.midday.toFixed(2)} midday, ₹${bands.evening.toFixed(2)} evening`);
 }
+
+// ---- what a unit of own RE costs (the "Own RE at cost" column of the Contract Years table)
+{
+  const { ownReCostRsPerKwh } = await import("../web/src/cfd/model.js");
+  const s = fillBenchmarks(defaultCfdState());
+  const c = ownReCostRsPerKwh(s.inputs);
+  assert.ok(c > 1.8 && c < 2.8, `own solar on the benchmarks costs about ₹2.3/kWh (${c.toFixed(3)})`);
+  assert.ok(ownReCostRsPerKwh({ ...s.inputs, discountRate: 0.14 }) > c, "a higher discount rate makes it dearer");
+  assert.equal(ownReCostRsPerKwh({ ...s.inputs, solarMw: 0, windMw: 0 }), null, "no RE, no cost");
+}

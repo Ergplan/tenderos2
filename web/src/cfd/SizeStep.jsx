@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Loader2, TriangleAlert, XCircle } from "lucide-react";
+import { ownReCostRsPerKwh, ArrowRight, CheckCircle2, Loader2, TriangleAlert, XCircle } from "lucide-react";
 import { Section, Stat, nf, pf } from "../rtc/ui";
 import { LiveChart } from "../rtc/charts";
 import Cite from "./Cite.jsx";
 import { TENDER } from "./terms.js";
-import { capShortfall, fmtDate, missingInputs, penaltyCr, rfsAmounts, simulate } from "./model.js";
+import { capShortfall, fmtDate, missingInputs, ownReCostRsPerKwh, penaltyCr, rfsAmounts, simulate } from "./model.js";
 import { OptimiseBar } from "./DesignStep.jsx";
 
 const COLORS = { own: "#7ddc9a", market: "#3fa7d6", group: "#4fd1c5", sale: "#f2b84b", ess: "#a98bff", price: "#ff8a5f", wind: "#5fb3ff" };
@@ -132,6 +132,7 @@ export default function SizeStep({ state, model, optimise, optimising, stopOptim
   }
   const i = model.inputs;
   const X = i.contractedMw;
+  const ownCost = ownReCostRsPerKwh(i);
   const years = sim.years;
   const sp = model.sp;
   const checks = sizingChecks(model);
@@ -180,7 +181,7 @@ export default function SizeStep({ state, model, optimise, optimising, stopOptim
       <Section index="6.3" title="Operations over the term" note={`Day by day from the SCD (${fmtDate(sim.dates.scd)}) to the end of the term (${fmtDate(sim.dates.end)}), with the IEX prices of the price year`}>
         <SourcesChart years={years} />
         <div className="cfd-table" data-testid="cfd-ops-table">
-          <div className="cfd-row head"><span>Contract Year</span><span>Supplied</span><span>Own RE</span><span>Green market</span><span>Group RE</span><span>Charging cost</span><span>Surplus sold</span><span>Weeks penalised</span></div>
+          <div className="cfd-row head"><span>Contract Year</span><span>Supplied</span><span>Own RE</span><span>Green market</span><span>Group RE</span><span>Charging bought</span><span>Own RE at cost</span><span>Surplus sold</span><span>Weeks penalised</span></div>
           {years.map((y) => {
             const extraDays = y.marketCapMwh / (X * TENDER.mwhPerMwDay) - TENDER.marketShare * y.days;
             const cap = y.days ? (TENDER.marketShare * y.days + Math.max(0, extraDays)) / y.days : TENDER.marketShare;
@@ -192,14 +193,17 @@ export default function SizeStep({ state, model, optimise, optimising, stopOptim
                 <span>{pf(y.shareOwn, 1)}</span>
                 <span className={marketOk ? "ok" : "bad"}>{marketOk ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {pf(y.shareMarket, 1)}<small>limit {pf(cap, 0)}</small></span>
                 <span>{pf(y.shareGroup, 1)}<small>limit {pf(y.groupCapMwh / Math.max(1, y.requiredMwh), 0)}</small></span>
-                <span>₹{nf(y.marketCostCr + y.groupCostCr, 2)} cr</span>
+                <span>₹{nf(y.marketCostCr + y.groupCostCr, 2)} cr<small>paid to the market</small></span>
+                <span data-testid={`cfd-own-cost-${y.index}`}>₹{nf(ownCost === null ? 0 : (y.chargeOwnMwh * ownCost) / 1e4, 2)} cr<small>total ₹{nf(y.marketCostCr + y.groupCostCr + (ownCost === null ? 0 : (y.chargeOwnMwh * ownCost) / 1e4), 1)} cr</small></span>
                 <span>{nf(y.merchantMwh / 1000, 1)} GWh<small>₹{nf(y.merchantRevCr, 1)} cr</small></span>
                 <span>{y.weeks.filter((w) => w.beyondMwh > 1e-6).length}{y.shortDays ? <small><TriangleAlert size={11} /> {y.shortDays} days short</small> : null}</span>
               </div>
             );
           })}
         </div>
-        <p className="rtc-note">Limits: green market 25% all term plus 75% until month 36 <Cite id="market75" />; group RE 50% after month 36 <Cite id="group50" />; shortfall beyond 10% a week is penalised <Cite id="tolerance" />.</p>
+        <p className="rtc-note">Limits: green market 25% all term plus 75% until month 36 <Cite id="market75" />; group RE 50% after month 36 <Cite id="group50" />; shortfall beyond 10% a week is penalised <Cite id="tolerance" />.
+          {ownCost !== null && <> Own RE is not free: its charging is valued at what the plant costs you, ₹{nf(ownCost, 2)}/kWh (the RE capex annualised at the discount rate over its life, plus O&amp;M, over the energy it makes); that cost sits in the depreciation, interest and O&amp;M lines of the financial model, not in the exchange bill.</>}
+        </p>
       </Section>
 
       <Section index="6.4" title="A day of operation" note="Pick any day of the term: the 2 peak hours chosen, the charging before them, the surplus sold">
