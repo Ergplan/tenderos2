@@ -159,6 +159,38 @@ export async function buildModelWorkbook(body, { preparedBy, product }) {
   }
   pairs(model, (body.cover?.outputs || []).filter(([label]) => /IRR|DSCR|NPV|payback/i.test(label)));
 
+  // ---- the What-if track (the CfD tab): the moves to the quote, their chances, the frozen levers
+  if (body.whatIf && typeof body.whatIf === "object") {
+    const w = body.whatIf;
+    const ws = wb.addWorksheet("What-if track", { properties: { tabColor: { argb: ACCENT } } });
+    ws.addRow([str(w.title, 200) || "The track to the price you want to quote"]).font = { bold: true, size: 14 };
+    ws.addRow([str(w.verdict, 600)]).font = { italic: true };
+    ws.addRow([]);
+    band(ws.addRow([]), "Summary");
+    pairs(ws, [
+      ["The model needs (₹/kWh)", num(w.base), "tariff", "the strike price for the target equity IRR on the bid as it stands"],
+      ["You want to quote (₹/kWh)", num(w.target), "tariff", ""],
+      ["The track ends at (₹/kWh)", num(w.final), "tariff", w.reached ? "with the moves below applied" : "every lever at the end of its chance"],
+      ["Chance it all comes off", num(w.chance), "pct", "the moves' chances multiplied, as if independent"],
+    ]);
+    ws.addRow([]);
+    band(ws.addRow([]), "The moves, surest first");
+    header(ws.addRow(["#", "Lever", "From", "To", "Unit", "Chance", "Price after (₹/kWh)", "Chance so far", "Who decides", "Why it works", "Frozen with evidence"]));
+    (w.steps || []).slice(0, 200).forEach((s, k) => {
+      const row = ws.addRow([k + 1, str(s.label, 80), num(s.from), num(s.to), str(s.unit, 40), num(s.p), num(s.price), num(s.cum), str(s.who, 120), str(s.why, 400), str(s.frozen, 120)]);
+      row.getCell(6).numFmt = "0%";
+      row.getCell(8).numFmt = "0.0%";
+      row.getCell(7).numFmt = "0.000";
+      row.alignment = { vertical: "top", wrapText: true };
+    });
+    ws.addRow([]);
+    band(ws.addRow([]), "Frozen levers (kept as they are in every track)");
+    header(ws.addRow(["Lever", "Value", "Unit", "Frozen on", "By", "Evidence", "Note"]));
+    for (const f of (w.frozen || []).slice(0, 200)) ws.addRow([str(f.label, 80), num(f.value), str(f.unit, 40), str(f.at, 30), str(f.by, 80), str(f.evidence, 200), str(f.note, 400)]);
+    [5, 34, 12, 12, 22, 10, 18, 13, 30, 70, 30].forEach((wd, i) => { ws.getColumn(i + 1).width = wd; });
+    ws.views = [{ state: "frozen", ySplit: 0 }];
+  }
+
   const buffer = await wb.xlsx.writeBuffer();
   const file = `${str(body.fileName, 80).replace(/[^\w.-]+/g, "_") || "bid_financial_model"}.xlsx`;
   return { buffer, file };

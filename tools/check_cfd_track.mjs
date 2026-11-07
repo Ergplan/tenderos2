@@ -55,4 +55,21 @@ console.log(`₹1/kWh: out of reach; every lever at the end of its chance gives 
 // above the model's price: nothing to do
 const above = await planTrack({ state, model, prices, effects, target: effects.base + 1, tick: async () => {} });
 assert.ok(above.above && above.reached && above.steps.length === 0, "a quote above the model's price needs no move");
-console.log("CfD track checks passed");
+// ---- frozen levers: left alone by the track, the gap found elsewhere
+{
+  const { freezeLever, unfreezeLever } = await import("../web/src/cfd/Freeze.jsx").catch(() => ({}));
+  const before = await planTrack({ state, model, prices, effects, target: Number((effects.base - 0.4).toFixed(2)), tick: async () => {} });
+  const first = before.steps[0];
+  const frozenState = { ...state, frozen: { [first.key]: { key: first.key, label: first.label, value: first.from, at: "2026-11-07T00:00:00Z", by: "test" } }, locks: { ...(state.locks || {}), [first.key]: true } };
+  const after = await planTrack({ state: frozenState, model, prices, effects, target: Number((effects.base - 0.4).toFixed(2)), tick: async () => {} });
+  assert.ok(!after.steps.some((s) => s.key === first.key), `the frozen lever ${first.key} is not moved`);
+  assert.ok(after.reached && after.frozenKeys.length === 1, "the gap is found elsewhere; the frozen lever is reported");
+  console.log(`frozen ${first.label}: the track now uses ${after.steps.map((s) => s.label).join(", ")} (chance ${(after.chance * 100).toFixed(0)}%)`);
+  if (freezeLever) {
+    const s2 = freezeLever(state, { key: "essCrPerMwh", label: "Battery capex (all-in)", unit: "₹ cr/MWh", step: 0.01 }, 0.8, { by: "test", note: "quote", evidence: null });
+    assert.ok(s2.inputs.essCrPerMwh === 0.8 && s2.locks.essCrPerMwh && s2.frozen.essCrPerMwh.value === 0.8, "freezing writes the value, locks it and keeps the record");
+    const s3 = unfreezeLever(s2, "essCrPerMwh");
+    assert.ok(!s3.frozen.essCrPerMwh && !s3.locks.essCrPerMwh && s3.inputs.essCrPerMwh === 0.8, "unfreezing drops the record and the lock, the value stays");
+  }
+}
+console.log("CfD track checks passed (frozen levers)");

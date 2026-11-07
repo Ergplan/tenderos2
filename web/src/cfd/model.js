@@ -163,6 +163,7 @@ export function mergeCfdState(saved) {
     ...base, ...saved,
     inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) },
     fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, bess: { ...(saved.bess || {}) }, locks: { ...(saved.locks || {}) },
+    frozen: { ...(saved.frozen || {}) },
     tariffLocked: Boolean(saved.tariffLocked),
   };
 }

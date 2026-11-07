@@ -376,6 +376,20 @@ model's, not a straight line. The chance of the whole track is the moves' chance
 as if they were independent. Levers that are not yours to choose (the tax rate, the market's
 prices) are left out.
 
+*Freezing a lever.* When you are sure of a value (a signed battery quote, a term sheet, a board
+minute on the equity target), click **Freeze at this value** on the move, or **Freeze** on the
+lever's row, type the value, attach the evidence (a file, a link or a note) and confirm. The
+value is written into the bid and locked, the record appears under **Frozen levers** with who
+froze it, when and the evidence, and every later track leaves it alone and looks for the rest
+of the gap elsewhere. The evidence also lands in the tab's evidence register. **Unfreeze**
+lets the plan move it again (the value stays).
+
+*Download What-if model (Excel).* Once a track is plotted, the button builds the full financial
+model of the What-if case: the bid with every move applied, priced through the full model, the
+same sheets as the Financial model step, plus a **What-if track** sheet with the summary, the
+moves (from, to, chance, price after, chance so far, who decides, why, frozen with evidence) and
+the frozen levers.
+
 **3 · Levers.** Click **Compute the levers**
 (about a minute: operations levers re-simulate the term, finance levers re-price it). One row per
 input: its value now, one step, the price if up, the price if down, ₹/kWh per step, and how far

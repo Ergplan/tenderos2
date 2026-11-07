@@ -28,15 +28,18 @@ function moved(lever, n, dir) {
  */
 export async function planTrack({ state, model, prices, effects, target, onProgress = null, signal = null, tick = () => new Promise((r) => { setTimeout(r, 0); }) }) {
   const base = effects.base;
+  const frozen = state.frozen || {}; // levers the bidder has frozen (with evidence): kept as they are
   const inputs = model?.inputs || state.inputs;
   const gap = base - target;
-  if (!(gap > 1e-6)) return { base, target, gap, above: true, reached: true, chance: 1, floor: null, steps: [], floorLevers: [], tried: 0 };
+  const frozenKeys = Object.keys(frozen);
+  if (!(gap > 1e-6)) return { base, target, gap, above: true, reached: true, chance: 1, floor: null, steps: [], floorLevers: [], tried: 0, frozenKeys };
 
   // the candidates: levers that lower the price when moved, with their helpful direction. The
   // one-step price in each direction decides (not the secant): a lever sitting at its best value,
   // where both directions raise the price, is no candidate
   const cands = [];
   for (const lever of effects.levers) {
+    if (frozen[lever.key]) continue;
     const gainUp = base - lever.priceUp;
     const gainDown = base - lever.priceDown;
     if (!(gainUp > 1e-6) && !(gainDown > 1e-6)) continue;
@@ -154,5 +157,5 @@ export async function planTrack({ state, model, prices, effects, target, onProgr
     onProgress?.(steps.length + 1, steps.length + 1);
   }
   const reached = final <= target + 0.005;
-  return { base, target, gap, above: false, reached, chance: reached ? cum : 0, floor, steps: steps.map(({ lever, ...rest }) => rest), floorLevers, tried, final };
+  return { base, target, gap, above: false, reached, chance: reached ? cum : 0, floor, steps: steps.map(({ lever, ...rest }) => rest), floorLevers, tried, final, frozenKeys };
 }

@@ -1,0 +1,132 @@
+import React, { useState } from "react";
+import { Lock, Paperclip, Unlock, X } from "lucide-react";
+import { nf, pf } from "../rtc/ui";
+import { withCfdLever } from "./levers.js";
+
+// Freezing a lever: the bidder is sure of a value (a signed quote, a term sheet, a board minute)
+// and pins it, with the evidence attached. A frozen lever is written into the bid at that value,
+// locked against the benchmark fill and the optimiser, and left alone by every later track: the
+// next plan looks for the rest of the gap elsewhere. The record lives in state.frozen[key] and is
+// saved with the bid; the evidence goes to the evidence register of the CfD tab (POST /api/evidence,
+// box key "lever:<key>"), where the paperclip and the register CSV show it.
+
+const fmtV = (st, v) => (st.pct ? pf(v, 2) : nf(v, (st.step ?? 1) < 0.01 ? 4 : (st.step ?? 1) < 1 ? 2 : 0));
+const unitOf = (st) => (st.pct ? "" : ` ${st.unit || ""}`);
+
+/** Freeze a lever at a value: the bid updated, locked, and the record kept. */
+export function freezeLever(state, lever, value, record) {
+  const s = withCfdLever(state, { key: lever.key, min: -Infinity, max: Infinity, int: Boolean(lever.int) }, value);
+  return {
+    ...s,
+    locks: { ...(s.locks || {}), [lever.key]: true },
+    frozen: { ...(s.frozen || {}), [lever.key]: { key: lever.key, label: lever.label, unit: lever.unit || "", pct: Boolean(lever.pct), step: lever.step ?? 1, value, at: new Date().toISOString(), ...record } },
+  };
+}
+
+/** Unfreeze: the record and the lock go; the value stays as it is. */
+export function unfreezeLever(state, key) {
+  const frozen = { ...(state.frozen || {}) };
+  delete frozen[key];
+  const locks = { ...(state.locks || {}) };
+  delete locks[key];
+  return { ...state, frozen, locks };
+}
+
+/** Attach the evidence of a frozen value to the CfD tab's evidence register; null when nothing was given. */
+async function attachEvidence({ lever, value, file, note, url }) {
+  const base = { fieldKey: `lever:${lever.key}`, fieldLabel: lever.label, place: "CfD Bid › What-if › frozen lever", valueAt: String(value), tab: "cfd" };
+  let res;
+  if (file) {
+    const form = new FormData();
+    for (const [k, v] of Object.entries({ ...base, kind: "file" })) form.set(k, v);
+    form.set("file", file);
+    res = await fetch("/api/evidence", { method: "POST", credentials: "same-origin", body: form });
+  } else if (url) {
+    res = await fetch("/api/evidence", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...base, kind: "link", url, note: note || "" }) });
+  } else if (note) {
+    res = await fetch("/api/evidence", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...base, kind: "note", note }) });
+  } else {
+    return null;
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Evidence could not be attached (${res.status})`);
+  return data.item || null;
+}
+
+/**
+ * The freeze dialog: the value to freeze at (the move's, or the current), a note, a file or a link
+ * as evidence, then Freeze. onFreeze(value, record) writes the bid.
+ */
+export function FreezeDialog({ lever, value: initial, me, onFreeze, onClose }) {
+  const [value, setValue] = useState(initial);
+  const [note, setNote] = useState("");
+  const [url, setUrl] = useState("");
+  const [file, setFile] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const shown = lever.pct ? Math.round(value * 10000) / 100 : value;
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    let evidence = null;
+    let warning = "";
+    try {
+      evidence = await attachEvidence({ lever, value, file, note, url });
+    } catch (err) {
+      warning = err.message; // the freeze still happens; the evidence is noted as not attached
+    }
+    const record = {
+      by: me?.name || "you",
+      note: note || "",
+      evidence: evidence ? { id: evidence.id, kind: evidence.kind, name: evidence.file_name || evidence.url || evidence.note || "", warning: "" } : file || url ? { id: null, kind: file ? "file" : "link", name: file ? file.name : url, warning: warning || "not attached" } : null,
+    };
+    onFreeze(value, record);
+    setBusy(false);
+    onClose();
+  };
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <form className="modal freeze-dialog" onSubmit={submit} data-testid="cfd-freeze-dialog">
+        <div className="modal-head">
+          <h3><Lock size={14} /> Freeze {lever.label}</h3>
+          <button type="button" className="rtc-icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
+        </div>
+        <p className="freeze-note">A frozen lever is written into the bid at this value, locked, and left alone by every later track: the next plan looks for the rest of the gap elsewhere. Attach what the value rests on: the quote, the term sheet, the board note.</p>
+        <label>Value{lever.pct ? " (%)" : lever.unit ? ` (${lever.unit})` : ""}
+          <input type="number" step="any" value={shown} onChange={(e) => setValue(lever.pct ? Number(e.target.value) / 100 : Number(e.target.value))} required data-testid="cfd-freeze-value" />
+        </label>
+        <label>Evidence file<input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} data-testid="cfd-freeze-file" /></label>
+        <label>Or a link<input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" /></label>
+        <label>Note<input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Who gave it, when, on what terms" maxLength={500} data-testid="cfd-freeze-note" /></label>
+        {error && <div className="alert">{error}</div>}
+        <div className="modal-actions">
+          <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" className="primary" disabled={busy || !Number.isFinite(value)} data-testid="cfd-freeze-confirm"><Lock size={12} /> {busy ? "Freezing…" : `Freeze at ${fmtV(lever, value)}${unitOf(lever)}`}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/** The frozen levers of the bid, with their evidence, and Unfreeze. */
+export function FrozenPanel({ frozen, onUnfreeze }) {
+  const list = Object.values(frozen || {});
+  if (!list.length) return null;
+  return (
+    <div className="frozen-panel" data-testid="cfd-frozen">
+      <div className="frozen-head"><Lock size={13} /> <b>Frozen levers</b> <small>kept as they are in every track; unfreeze to let the plan move them again</small></div>
+      <ul>
+        {list.map((f) => (
+          <li key={f.key} data-testid={`cfd-frozen-${f.key}`}>
+            <b>{f.label}</b> at <b>{fmtV(f, f.value)}{unitOf(f)}</b>
+            <small> · {f.by || "you"}, {new Date(f.at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</small>
+            {f.evidence ? <small className={f.evidence.warning ? "bad" : ""}> · <Paperclip size={11} /> {f.evidence.name}{f.evidence.warning ? ` (${f.evidence.warning})` : ""}</small> : <small className="bad"> · no evidence attached</small>}
+            {f.note && <small> · {f.note}</small>}
+            <button type="button" className="secondary" onClick={() => onUnfreeze(f.key)} data-testid={`cfd-unfreeze-${f.key}`}><Unlock size={11} /> Unfreeze</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}

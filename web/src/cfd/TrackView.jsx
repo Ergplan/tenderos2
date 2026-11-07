@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, Crosshair } from "lucide-react";
+import { ChevronDown, ChevronRight, Crosshair, Download, Loader2, Lock } from "lucide-react";
 import { Stat, nf, pf } from "../rtc/ui";
 
 // The track to a quote, as a story: the verdict, a waterfall from the price the model needs down to
@@ -55,7 +55,7 @@ function Waterfall({ track }) {
   );
 }
 
-export default function TrackView({ track, targetIrr, onApply }) {
+export default function TrackView({ track, targetIrr, onApply, frozen = {}, onFreeze = null, onDownload = null, downloading = false }) {
   const [showFloor, setShowFloor] = useState(false);
   if (track.above) {
     return (
@@ -90,6 +90,7 @@ export default function TrackView({ track, targetIrr, onApply }) {
                 <b>{k + 1}. {st.label}</b>: {fmtV(st, st.from)}{unitOf(st)} → <b>{fmtV(st, st.to)}{unitOf(st)}</b> <Chance p={st.p} />
                 <span className="track-price">price {st.drop >= 0 ? "falls" : "rises"} ₹{nf(Math.abs(st.drop), 3)} to <b>₹{nf(st.price, 3)}</b></span>
                 <span className="track-cum">chance so far {pf(st.cum, st.cum > 0 && st.cum < 0.01 ? 1 : 0)}</span>
+                {frozen[st.key] ? <span className="frozen-mark"><Lock size={11} /> frozen</span> : onFreeze && <button type="button" className="secondary freeze-btn" onClick={() => onFreeze(st)} title="Sure of this value? Freeze it with the evidence; the next track leaves it alone" data-testid={`cfd-track-freeze-${st.key}`}><Lock size={11} /> Freeze at this value</button>}
               </div>
               <div className="track-step-body">
                 {st.who && <span><b>Who decides:</b> {st.who}.</span>}
@@ -103,10 +104,12 @@ export default function TrackView({ track, targetIrr, onApply }) {
           ))}
         </ol>
       )}
-      {track.steps.length > 0 && onApply && (
+      {track.frozenKeys?.length > 0 && <p className="track-note">{track.frozenKeys.length} frozen {track.frozenKeys.length === 1 ? "lever was" : "levers were"} left as they are; the track found the gap elsewhere.</p>}
+      {track.steps.length > 0 && (onApply || onDownload) && (
         <div className="track-actions">
-          <button type="button" className="secondary" onClick={() => onApply(track.steps)} data-testid="cfd-track-apply"><Crosshair size={12} /> Apply every move to the bid</button>
-          <small>Then size the plant again if any move was re-simulated, and plot the track again.</small>
+          {onApply && <button type="button" className="secondary" onClick={() => onApply(track.steps)} data-testid="cfd-track-apply"><Crosshair size={12} /> Apply every move to the bid</button>}
+          {onDownload && <button type="button" className="primary" onClick={onDownload} disabled={downloading} data-testid="cfd-whatif-download">{downloading ? <Loader2 size={12} className="spin" /> : <Download size={12} />} {downloading ? "Building the workbook…" : "Download What-if model (Excel)"}</button>}
+          <small>The workbook is the bid with every move applied, priced through the full model, with a What-if track sheet (the moves, their chances, the frozen levers). Apply writes the moves into the bid; then size the plant again if any move was re-simulated.</small>
         </div>
       )}
       {!track.reached && track.floorLevers.length > 0 && (

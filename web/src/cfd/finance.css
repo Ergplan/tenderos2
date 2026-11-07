@@ -61,3 +61,18 @@
 .track-floor { margin: 6px 0 10px; font-size: 12.5px; }
 .track-floor ul { margin: 6px 0 0 18px; padding: 0; color: var(--muted); columns: 2; }
 .track-note { color: var(--muted); font-size: 12px; line-height: 1.5; max-width: 900px; }
+
+/* What-if: frozen levers and the freeze dialog */
+.frozen-panel { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 10px 0 12px; font-size: 13px; }
+.frozen-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.frozen-head small { color: var(--muted); }
+.frozen-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.frozen-panel li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.frozen-panel li small { color: var(--muted); }
+.frozen-panel li small.bad { color: var(--bad, #e5484d); }
+.frozen-panel li button { margin-left: auto; }
+.freeze-dialog .freeze-note { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 0 0 10px; }
+.freeze-dialog label { display: block; margin-bottom: 8px; font-size: 12.5px; }
+.freeze-dialog input { display: block; width: 100%; margin-top: 4px; }
+.track-step-head .freeze-btn, .lever-table .freeze-btn { display: inline-flex; align-items: center; gap: 4px; }
+.track-step-head .frozen-mark { color: var(--good, #4cc38a); display: inline-flex; align-items: center; gap: 3px; font-size: 12px; }
