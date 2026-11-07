@@ -61,11 +61,11 @@ export async function planTrack({ state, model, prices, effects, target, onProgr
         const v2 = moved(c.lever, c.n + 1, c.dir);
         if (Math.abs(v2 - c.v) < 1e-12) continue; // at its limit
         const p2 = leverChance(c.lever, v2, inputs).p;
-        if (p2 <= 0 && c.p <= 0) continue;
+        if (p2 < 0.01) continue; // below a one-in-a-hundred chance the plan stops; the floor says what lies beyond
         const gain = Math.abs(c.lever.slope) * Math.abs(v2 - c.v);
         if (gain <= 1e-12) continue;
-        // the chance given up by this step, per rupee gained; a step into zero chance is last resort
-        const cost = p2 > 0 ? Math.log(c.p / p2) : 1e6;
+        // the chance given up by this step, per rupee gained
+        const cost = Math.log(c.p / p2);
         const ratio = cost / gain;
         if (!best || ratio < best.ratio - 1e-12 || (Math.abs(ratio - best.ratio) < 1e-12 && gain > best.gain)) best = { c, v2, p2, gain, ratio };
       }

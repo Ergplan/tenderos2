@@ -40,11 +40,11 @@
 .track-waterfall { width: 100%; max-width: 760px; height: auto; display: block; margin: 6px 0 12px; }
 .track-waterfall .axis { fill: var(--muted); font-family: var(--font-mono); font-size: 9.5px; }
 .track-waterfall .target { stroke: var(--signal); stroke-dasharray: 4 3; stroke-width: 1; }
-.track-waterfall .bar.base { fill: var(--line); }
-.track-waterfall .bar.drop { fill: var(--good, #4cc38a); }
-.track-waterfall .bar.rise { fill: var(--bad, #e5484d); }
-.track-waterfall .bar.quote { fill: var(--signal); }
-.track-waterfall .bar.short { fill: var(--bad, #e5484d); opacity: 0.6; }
+.track-waterfall .wf-bar.base { fill: var(--line); }
+.track-waterfall .wf-bar.drop { fill: var(--good, #4cc38a); }
+.track-waterfall .wf-bar.rise { fill: var(--bad, #e5484d); }
+.track-waterfall .wf-bar.quote { fill: var(--signal); }
+.track-waterfall .wf-bar.short { fill: var(--bad, #e5484d); opacity: 0.6; }
 .track-steps { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
 .track-steps li { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
 .track-step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 13.5px; }
@@ -60,3 +60,4 @@
 .track-actions small { color: var(--muted); }
 .track-floor { margin: 6px 0 10px; font-size: 12.5px; }
 .track-floor ul { margin: 6px 0 0 18px; padding: 0; color: var(--muted); columns: 2; }
+.track-note { color: var(--muted); font-size: 12px; line-height: 1.5; max-width: 900px; }

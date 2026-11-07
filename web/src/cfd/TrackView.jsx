@@ -17,7 +17,9 @@ export function Chance({ p }) {
 }
 
 function Waterfall({ track }) {
-  const steps = track.steps;
+  const shown = track.steps.slice(0, 8);
+  const rest = track.steps.slice(8);
+  const steps = rest.length ? [...shown, { label: `${rest.length} more moves`, price: track.steps[track.steps.length - 1].price, drop: shown[shown.length - 1].price - track.steps[track.steps.length - 1].price }] : shown;
   const top = track.base;
   const bottom = Math.min(track.target, ...steps.map((s) => s.price), track.floor ?? track.target);
   const span = Math.max(1e-6, top - bottom);
@@ -32,7 +34,7 @@ function Waterfall({ track }) {
   let prev = top;
   bars.push({ label: "Model needs", from: top, to: top, kind: "base" });
   for (const s of steps) { bars.push({ label: s.label, from: prev, to: s.price, kind: s.drop >= 0 ? "drop" : "rise" }); prev = s.price; }
-  bars.push({ label: track.reached ? "Your quote" : "Still short", from: prev, to: track.target, kind: track.reached ? "quote" : "short" });
+  bars.push({ label: track.reached ? "Your quote" : "Still short", from: prev, to: bottom, kind: track.reached ? "quote" : "short", full: true });
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="track-waterfall" data-testid="cfd-track-waterfall">
       <line x1={padL} x2={W - 12} y1={y(track.target)} y2={y(track.target)} className="target" />
@@ -44,7 +46,7 @@ function Waterfall({ track }) {
         const h = Math.max(2, Math.abs(y(b.from) - y(b.to)));
         return (
           <g key={k}>
-            <rect x={x} y={b.kind === "base" ? y(top) : yTop} width={colW - 8} height={b.kind === "base" ? H - padB - y(top) : h} className={`bar ${b.kind}`} />
+            <rect x={x} y={b.kind === "base" || b.full ? y(b.from) : yTop} width={colW - 8} height={b.kind === "base" || b.full ? Math.max(2, H - padB - y(b.from)) : h} className={`wf-bar ${b.kind}`} />
             <text x={x + (colW - 8) / 2} y={H - 6} textAnchor="middle" className="axis">{b.label.length > 14 ? `${b.label.slice(0, 13)}…` : b.label}</text>
           </g>
         );
@@ -117,7 +119,7 @@ export default function TrackView({ track, targetIrr, onApply }) {
           )}
         </div>
       )}
-      <p className="rtc-note">
+      <p className="track-note">
         How the track is found: every lever that lowers the price is a candidate; at each turn the one whose next step buys the most price for the least chance given up is moved, until the gap is closed; the moves are then ordered from the surest to the least likely and priced for real, one after another, through the full financial model. The chance of a move comes from three bands per lever (sure, likely, a stretch; benchmark judgement for a 2028 project, named under each move), and the chance of the whole track is the product of the moves' chances, as if they were independent. Levers that are not yours to choose (the tax rate, the market's prices) are left out.
       </p>
     </div>
