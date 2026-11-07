@@ -111,8 +111,8 @@ function LossesAndSite({ state, setState, profiles, model }) {
   const [pick, setPick] = useState("solar");
   const kind = kinds.some((k) => k.id === pick) ? pick : "solar";
   const meta = kinds.find((k) => k.id === kind);
-  const X = i.contractedMw || 100;
-  const sizes = { solarMw: i.solarMw || 0, windMw: i.windMw || 0, bessMw: X * (i.essMwPerMw || 1), bessMwh: X * (i.essMwhPerMw || 2) };
+  const mw = i.contractedMw || 100; // not X: that is the close icon
+  const sizes = { solarMw: i.solarMw || 0, windMw: i.windMw || 0, bessMw: mw * (i.essMwPerMw || 1), bessMwh: mw * (i.essMwhPerMw || 2) };
   const discharged = model?.sim?.years?.[0]?.essOutMwh || 0;
   const lf = lossFactorsOfCfd(state);
   const shim = { inputs: { ...(state.losses || {}), solarDcAc: i.solarDcAc || 1, lossPct: 0 }, bess: { rte: i.rte ?? E.DEFAULT_BESS.rte } };
