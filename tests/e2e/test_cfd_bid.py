@@ -71,6 +71,11 @@ def test_cfd_bid_end_to_end(tmp_path):
         assert page.locator("[data-testid^=cfd-term-]").count() >= 120
         assert "251 conditions" in page.locator("[data-testid=cfd-cond-summary]").inner_text() or "conditions" in page.locator("[data-testid=cfd-cond-summary]").inner_text()
 
+        # the What-if step before the inputs are complete: the "size first" note; the step must survive the
+        # model appearing later (a hook-order crash once broke it in the browser)
+        _step(page, "whatif")
+        assert "size the plant first" in page.locator("main").inner_text().lower()
+
         # 04 bid inputs
         _step(page, "bid")
         mw = _field(page, "Contracted capacity you bid").locator("input")
@@ -81,11 +86,6 @@ def test_cfd_bid_end_to_end(tmp_path):
         _step(page, "design")
         page.click("[data-testid=cfd-fill]")
         page.wait_for_timeout(300)
-
-        # the What-if step before the plant is sized: the "size first" note, and the step must survive the
-        # model appearing later (a hook-order crash once broke it in the browser)
-        _step(page, "whatif")
-        assert "size the plant first" in page.locator("main").inner_text().lower()
 
         # 06 finance inputs: the repayment methods and the construction months, then size
         _step(page, "financeInputs")
