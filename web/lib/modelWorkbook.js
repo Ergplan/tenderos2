@@ -185,8 +185,8 @@ export async function buildModelWorkbook(body, { preparedBy, product }) {
     });
     ws.addRow([]);
     band(ws.addRow([]), "Frozen levers (kept as they are in every track)");
-    header(ws.addRow(["Lever", "Value", "Unit", "Frozen on", "By", "Evidence", "Note"]));
-    for (const f of (w.frozen || []).slice(0, 200)) ws.addRow([str(f.label, 80), num(f.value), str(f.unit, 40), str(f.at, 30), str(f.by, 80), str(f.evidence, 200), str(f.note, 400)]);
+    header(ws.addRow(["Lever", "Value", "Unit", "Price impact (₹/kWh, fall)", "Frozen on", "By", "Evidence", "Note"]));
+    for (const f of (w.frozen || []).slice(0, 200)) { const r = ws.addRow([str(f.label, 80), num(f.value), str(f.unit, 40), num(f.impact), str(f.at, 30), str(f.by, 80), str(f.evidence, 200), str(f.note, 400)]); r.getCell(4).numFmt = "0.000"; }
     [5, 34, 12, 12, 22, 10, 18, 13, 30, 70, 30].forEach((wd, i) => { ws.getColumn(i + 1).width = wd; });
     ws.views = [{ state: "frozen", ySplit: 0 }];
   }

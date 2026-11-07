@@ -380,21 +380,21 @@ prices) are left out.
 minute on the equity target), click **Freeze at this value** on the move, or **Freeze** on the
 lever's row, type the value, attach the evidence (a file, a link or a note) and confirm. The
 value is written into the bid and locked, the record appears in the **Frozen levers** table
-(lever, frozen value, who and when, evidence, note) with a bar that says how much of the gap to
+(lever, frozen value, price impact, who and when, evidence, note; the biggest impact first) with a bar that says how much of the gap to
 your quote the frozen values have secured and how much is still to find, and every later track
 leaves it alone and looks for the rest of the gap elsewhere. Click a bar of the waterfall to jump
 to its move. The evidence also lands in the tab's evidence register. **Unfreeze**
 lets the plan move it again (the value stays).
 
-*Download What-if model (Excel).* Once a track is plotted, the button builds the full financial
-model of the What-if case: the bid with every move applied, priced through the full model, the
+*Download What-if model (Excel).* The button is always there under the track section: with a
+track plotted it builds the full financial model of the What-if case: the bid with every move applied, priced through the full model, the
 same sheets as the Financial model step, plus a **What-if track** sheet with the summary, the
 moves (from, to, chance, price after, chance so far, who decides, why, frozen with evidence) and
 the frozen levers.
 
-**3 · Behind the track: every lever, one step at a time.** Folded by default (**Show every
-lever**): the measurements the track is built from. Open it to see the levers the track did not
-pick, how much each moves the price per step, and to apply or freeze one by hand. Click **Compute the levers**
+**3 · Every lever, one step at a time.** A fold at the end of the track section: the
+measurements the track is built from. Open it to see the levers the track did not pick, how much
+each moves the price per step, and to apply or freeze one by hand. Click **Compute the levers**
 (about a minute: operations levers re-simulate the term, finance levers re-price it). One row per
 input: its value now, one step, the price if up, the price if down, ₹/kWh per step, and how far
 that lever alone must move to reach your price (or "not within its range"). **Apply** moves the

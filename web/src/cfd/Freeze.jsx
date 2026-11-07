@@ -120,7 +120,7 @@ export function FreezeDialog({ lever, value: initial, me, onFreeze, onClose }) {
  * quote (`target`), so the bar reads "₹x of the ₹y gap found, ₹z still to find".
  */
 export function FrozenPanel({ frozen, onUnfreeze, baseline = null, now = null, target = null }) {
-  const list = Object.values(frozen || {});
+  const list = Object.values(frozen || {}).sort((a, b) => (Number.isFinite(b.impact) ? b.impact : -Infinity) - (Number.isFinite(a.impact) ? a.impact : -Infinity) || String(b.at || "").localeCompare(String(a.at || "")));
   if (!list.length) return null;
   const gap = Number.isFinite(baseline) && Number.isFinite(target) ? baseline - target : null;
   const secured = Number.isFinite(baseline) && Number.isFinite(now) ? baseline - now : null;
@@ -141,12 +141,13 @@ export function FrozenPanel({ frozen, onUnfreeze, baseline = null, now = null, t
         </div>
       )}
       <table className="frozen-table" data-testid="cfd-frozen-table">
-        <thead><tr><th>Lever</th><th>Frozen at</th><th>By · on</th><th>Evidence</th><th>Note</th><th /></tr></thead>
+        <thead><tr><th>Lever</th><th>Frozen at</th><th>Price impact</th><th>By · on</th><th>Evidence</th><th>Note</th><th /></tr></thead>
         <tbody>
           {list.map((f) => (
             <tr key={f.key} data-testid={`cfd-frozen-${f.key}`}>
               <td><b>{f.label}</b></td>
               <td><b>{fmtV(f, f.value)}</b>{unitOf(f)}</td>
+              <td className={Number.isFinite(f.impact) && f.impact < 0 ? "bad" : ""}>{Number.isFinite(f.impact) ? `${f.impact >= 0 ? "−" : "+"}₹${nf(Math.abs(f.impact), 3)}` : "–"}</td>
               <td>{f.by || "you"} · {dateOf(f.at)}</td>
               <td className={f.evidence?.warning || !f.evidence ? "bad" : ""}>{f.evidence ? <><Paperclip size={11} /> {f.evidence.name}{f.evidence.warning ? ` (${f.evidence.warning})` : ""}</> : "none attached"}</td>
               <td>{f.note || ""}</td>

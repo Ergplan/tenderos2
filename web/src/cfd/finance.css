@@ -93,3 +93,4 @@
 .lever-details > summary { cursor: pointer; color: var(--signal); font-size: 13px; margin-bottom: 10px; list-style: none; }
 .lever-details > summary::before { content: "▸ "; }
 .lever-details[open] > summary::before { content: "▾ "; }
+.frozen-table td:nth-child(3) { font-family: var(--font-mono); white-space: nowrap; }

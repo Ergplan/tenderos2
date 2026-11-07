@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Crosshair, HelpCircle, Loader2, Lock, Route, SlidersHorizontal, Square } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Crosshair, Download, HelpCircle, Loader2, Lock, Route, SlidersHorizontal, Square } from "lucide-react";
 import { Field, Section, Stat, nf, pf } from "../rtc/ui";
 import { cfdModelExport, downloadCfdModel, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
 import { runModel } from "./model.js";
@@ -92,9 +92,13 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   // the price before the first freeze is kept, so the panel can say how much of the gap the frozen values secured
   const onFreeze = (value, record) => {
     if (!freezing) return;
+    const lv = freezing.lever;
+    let impact = null; // ₹/kWh the price falls by at this value (a rise is negative)
+    if (Number.isFinite(freezing.drop) && Number.isFinite(freezing.from) && Number.isFinite(freezing.to) && Math.abs(freezing.to - freezing.from) > 1e-12) impact = freezing.drop * ((value - freezing.from) / (freezing.to - freezing.from));
+    else if (Number.isFinite(lv.slope)) impact = -(lv.slope * (value - lv.value));
     setState((s) => {
       const first = !Object.keys(s.frozen || {}).length;
-      const next = freezeLever(s, freezing.lever, value, record);
+      const next = freezeLever(s, lv, value, { ...record, impact });
       return first || !Number.isFinite(s.frozenBaseline?.price) ? { ...next, frozenBaseline: { price: base, at: new Date().toISOString() } } : next;
     });
   };
@@ -106,23 +110,23 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   // the What-if case as a workbook: the bid with the track's moves applied, priced through the full
   // model, with a What-if track sheet (the moves, their chances, the frozen levers)
   async function downloadWhatIf() {
-    if (!track?.result || downloading) return;
+    if (downloading) return;
     setDownloading(true);
     setDownloadError("");
     try {
-      const t = track.result;
+      const t = track?.result || { steps: [], target, base, reached: base <= target, final: base, floor: null, chance: 1 };
       const s2 = t.steps.reduce((acc, st) => withCfdLever(acc, { key: st.key, min: -Infinity, max: Infinity, int: st.int }, st.to), state);
       const pricer = (inputs, sim) => runCfdFinance({ ...s2, tariffLocked: false }, { inputs, sim, opYears: sim.opYears, sp: null });
       const m2 = t.steps.length ? runModel(s2, prices, { price: pricer }) : model;
       const f2 = runCfdFinance({ ...s2, tariffLocked: false }, m2);
       const payload = cfdModelExport({ state: s2, model: m2, finance: f2 });
-      const verdict = document.querySelector("[data-testid=cfd-track-verdict]")?.textContent || "";
+      const verdict = document.querySelector("[data-testid=cfd-track-verdict]")?.textContent || (Object.keys(frozen).length ? `The bid with ${Object.keys(frozen).length} frozen levers: the model needs ₹${nf(base, 3)}/kWh.` : "");
       payload.fileName = `${payload.fileName}_what-if_${String(t.target).replace(".", "p")}`;
       payload.title = `${payload.title} · What-if case at ₹${nf(t.target, 2)}/kWh`;
       payload.whatIf = {
         title: `The track to ₹${nf(t.target, 3)}/kWh`, verdict, base: t.base, target: t.target, final: t.reached ? t.final : t.floor, reached: t.reached, chance: t.chance,
         steps: t.steps.map((st) => ({ label: st.label, from: st.from, to: st.to, unit: st.pct ? "%" : st.unit, p: st.p, price: st.price, cum: st.cum, who: st.who, why: st.why, frozen: frozen[st.key] ? `yes · ${frozen[st.key].evidence?.name || "no evidence"}` : "" })),
-        frozen: Object.values(frozen).map((f) => ({ label: f.label, value: f.value, unit: f.pct ? "%" : f.unit, at: f.at?.slice(0, 10), by: f.by, evidence: f.evidence?.name || "", note: f.note || "" })),
+        frozen: Object.values(frozen).sort((a, b) => (b.impact ?? -1e9) - (a.impact ?? -1e9)).map((f) => ({ label: f.label, value: f.value, unit: f.pct ? "%" : f.unit, impact: f.impact ?? null, at: f.at?.slice(0, 10), by: f.by, evidence: f.evidence?.name || "", note: f.note || "" })),
       };
       await downloadCfdModel(payload);
     } catch (err) {
@@ -159,14 +163,17 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
           {track && trackStale && !progress && !tracking && <small className="lever-stale">The case changed: plot again</small>}
         </div>
         <FrozenPanel frozen={frozen} onUnfreeze={onUnfreeze} baseline={state.frozenBaseline?.price ?? null} now={base} target={target} />
-        {track && <TrackView track={track.result} targetIrr={finance.engine.fin.targetEquityIrr} onApply={applyTrack} frozen={frozen} onFreeze={(st) => setFreezing({ lever: st, value: st.to })} onDownload={downloadWhatIf} downloading={downloading} />}
+        {track && <TrackView track={track.result} targetIrr={finance.engine.fin.targetEquityIrr} onApply={applyTrack} frozen={frozen} onFreeze={(st) => setFreezing({ lever: st, value: st.to, drop: st.drop, from: st.from, to: st.to })} onDownload={downloadWhatIf} downloading={downloading} />}
+        {(!track || track.result.above || !track.result.steps.length) && (
+          <div className="track-actions" data-testid="cfd-whatif-download-row">
+            <button type="button" className="primary" onClick={downloadWhatIf} disabled={downloading} data-testid="cfd-whatif-download"><Download size={12} /> {downloading ? "Building the workbook…" : "Download What-if model (Excel)"}</button>
+            <small>{Object.keys(frozen).length ? "The bid with the frozen values, priced through the full model, with the What-if track sheet listing them." : "The bid as it stands, priced through the full model; plot a track first to carry its moves."}</small>
+          </div>
+        )}
         {downloadError && <div className="alert">{downloadError}</div>}
         {freezing && <FreezeDialog lever={freezing.lever} value={freezing.value} me={me} onFreeze={onFreeze} onClose={() => setFreezing(null)} />}
-      </Section>
-
-      <Section index="6.1" title="Behind the track: every lever, one step at a time" note="The measurements the track is built from. Open it to see the levers the track did not pick, how much each moves the price per step, and to apply or freeze one by hand" className="lever-panel">
         <details className="lever-details" data-testid="cfd-levers-details">
-        <summary>Show every lever</summary>
+          <summary>Every lever, one step at a time: the measurements behind the track, the levers it did not pick, and Apply or Freeze by hand</summary>
         <div className="lever-head">
           <button type="button" className="primary" onClick={compute} disabled={Boolean(progress)} data-testid="cfd-levers-run">
             {progress ? <Loader2 className="spin" size={14} /> : <SlidersHorizontal size={14} />} {progress ? `Computing ${progress.done} of ${progress.total}` : res && !stale ? "Levers up to date" : res ? "Recompute the levers" : "Compute the levers"}
@@ -236,6 +243,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
         )}
         </details>
       </Section>
+
     </div>
   );
 }

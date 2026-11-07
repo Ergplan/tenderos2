@@ -176,7 +176,8 @@ def test_cfd_bid_end_to_end(tmp_path):
         page.fill("[data-testid=cfd-freeze-note]", "Signed quote of 6 November")
         page.click("[data-testid=cfd-freeze-confirm]")
         page.wait_for_selector(f"[data-testid=\"cfd-frozen-{first}\"]", timeout=10_000)
-        assert page.locator("[data-testid=cfd-frozen-table] thead th").count() >= 5, "the frozen levers as a table"
+        assert page.locator("[data-testid=cfd-frozen-table] thead th").count() >= 6, "the frozen levers as a table"
+        assert "price impact" in page.locator("[data-testid=cfd-frozen-table] thead").inner_text().lower()
         assert "secured" in page.locator("[data-testid=cfd-frozen-progress]").inner_text().lower()
         page.click("[data-testid=cfd-track-run]")
         page.wait_for_selector("[data-testid=cfd-track-verdict]", timeout=900_000)
