@@ -161,12 +161,6 @@ const CASES = [
     fin: { codDate: "2028-04-01", parts: [{ share: 0.5, offsetMonths: 0 }, { share: 0.5, offsetMonths: 6 }], bridge: { months: 6, rate: 0.11, feePct: 0.005 } },
     costs: { constructionMonths: 18, drawdown: "sCurve", phasing: { solar: { start: 6, months: 12 }, bess: { start: 10, months: 8 } } },
   })],
-  // the uploaded CfD workbook of 10 Nov 2026: phasing windows set with no construction months
-  // divided by a zero window (#DIV/0! in the Construction sheet and the Model checks cell)
-  ["phasing windows set but no construction months: the Construction sheet spends nothing and no formula errors", bid({
-    ...V3,
-    costs: { constructionMonths: 0, drawdown: "linear", phasing: { solar: { start: 45, months: 51 }, bess: { start: 7, months: 15 }, evacuation: { start: 3, months: 14 } } },
-  })],
   ["v3 generation: P90 case, carbon credits, a five-year life extension with its capex, solar repowering in year 12, battery augmentation on a schedule", bid({
     ...V3,
     fin: { generationCase: "p90", carbon: { enabled: true, tPerMwh: 0.71, pricePerT: 500, years: 10, escalation: 0.03 }, extension: { years: 5, capexCr: 40, tariffRsPerKwh: 3, omFactor: 1.1, degradation: 0.01 }, repower: { year: 12, capexCr: 80, upliftPct: 0.1 } },
@@ -195,6 +189,12 @@ const CASES = [
     ...V3,
     fin: { holdco: { expensesCrPerYear: 2, promoterShare: 0.6 }, lenderReinvestRate: 0.07, quasi: { amountCr: 100, rate: 0.12, lenderMinDscr: 1.1, repayFromYear: 1 }, dsraMonths: 3, dsraInterestRate: 0.04, bookDepreciation: "wdv", bookWdvRate: 0.1 },
     costs: { constructionMonths: 12, drawOrder: "equityFirst" },
+  })],
+  // the uploaded CfD workbook of 10 Nov 2026: phasing windows set with no construction months
+  // divided by a zero window (#DIV/0! in the Construction sheet and the Model checks cell)
+  ["phasing windows set but no construction months: the Construction sheet spends nothing and no formula errors", bid({
+    ...V3,
+    costs: { constructionMonths: 0, drawdown: "linear", phasing: { solar: { start: 45, months: 51 }, bess: { start: 7, months: 15 }, evacuation: { start: 3, months: 14 } } },
   })],
 ];
 // the second bid uses a one-time augmentation in year 10, with the battery price falling 3% a year
