@@ -27,6 +27,7 @@ import { defaultBidState, modelInputs, opsFromLp } from "../web/src/bid/model.js
 import { liveModelRequest } from "../web/src/bid/liveModelRequest.js";
 import { FORMULA_SHEETS, INPUTS_SHEET, LIVE_SHEET, addLiveModel, liveModelInput } from "../web/lib/liveModel.js";
 import { buildModelWorkbook } from "../web/lib/modelWorkbook.js";
+import { defaultLosses } from "../web/src/bid/model.js";
 import { rtcModelExport } from "../web/src/rtc/exportModel.js";
 import { defaultCfdState, fillBenchmarks, runModel as runCfdModel } from "../web/src/cfd/model.js";
 import { cfdLiveRequest, runCfdFinance } from "../web/src/cfd/finance.js";
@@ -190,6 +191,29 @@ const CASES = [
     fin: { holdco: { expensesCrPerYear: 2, promoterShare: 0.6 }, lenderReinvestRate: 0.07, quasi: { amountCr: 100, rate: 0.12, lenderMinDscr: 1.1, repayFromYear: 1 }, dsraMonths: 3, dsraInterestRate: 0.04, bookDepreciation: "wdv", bookWdvRate: 0.1 },
     costs: { constructionMonths: 12, drawOrder: "equityFirst" },
   })],
+  // the uploaded 150 MW CfD bid of 10 Nov 2026 (SECI_CfD-I_bid_150MW_financial_model.xlsx), rebuilt
+  // from its inputs: a 50% state-of-charge window and losses to the meter (Fill up sized the battery
+  // to 4.1 MWh and 1.05 MW per MW), 2 MWh per MW more for evening sale, 14 MWac of own solar left
+  // unoptimised, battery at ₹1.2 cr/MWh, O&M typed, 16% equity, 9.5% debt stepping down after two
+  // years and refinanced after year 1 at 8%, sculpted to a 1.25 DSCR, augmentation in year 4 only,
+  // phasing windows set with no construction months (the #DIV/0! of the uploaded file)
+  ["the uploaded 150 MW CfD bid: a 915 MWh battery, 14 MWac of solar, refinanced debt, phasing without construction months", (() => {
+    const prices = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
+    const d = defaultCfdState();
+    const s = fillBenchmarks({ ...d, losses: { ...defaultLosses(), lineLossPct: 0.01 }, inputs: { ...d.inputs, contractedMw: 150, effectiveDate: "2027-04-01", essSocMin: 0.1, essSocMax: 0.6 } });
+    assert.equal(s.inputs.essMwhPerMw, 4.1, "Fill up sizes the battery to the file's 4.1 MWh per MW");
+    assert.equal(s.inputs.essMwPerMw, 1.05, "and 1.05 MW per MW");
+    s.inputs = { ...s.inputs, extraEssMwhPerMw: 2, solarMw: 14, useGroup: true, essCrPerMwh: 1.2, essOmLakhPerMwh: 2, solarOmLakhPerMw: 2, interestRate: 0.095, targetEquityIrr: 0.16 };
+    s.filled = { ...s.filled, solarMw: false };
+    s.bess = { augmentation: "schedule", augmentationYears: [4] };
+    s.fin = { ...s.fin, repayment: "sculpted", targetDscr: 1.25, refiYear: 1, refiRate: 0.08, refiTenorYears: 12, refiFeePct: 0.002, rateStepDown: { afterYears: 2, rate: 0.085 }, dsraMonths: 6, receivableDays: 45, omStockMonths: 1, sparesPctOm: 0.15, wcInterestRate: 0.07 };
+    s.costs = { constructionMonths: 0, drawdown: "linear", drawOrder: "proRata", phasing: { solar: { start: 45, months: 51 }, bess: { start: 7, months: 15 }, evacuation: { start: 3, months: 14 } } };
+    const model = runCfdModel(s, prices);
+    const finance = runCfdFinance(s, model);
+    const req = cfdLiveRequest({ state: s, model, finance });
+    const run = (over = {}) => runCfdFinance({ ...s, fin: over.fin ? { ...s.fin, ...over.fin } : s.fin }, model, { tariffLocked: over.tariffLocked ?? false });
+    return { name: "", s, m: { fin: finance.engine.fin, costs: finance.engine.costs, bess: finance.engine.bess }, lp: { sizes: finance.engine.sizes }, ops: finance.engine.ops, finance, req, run, dfrTarget: 0, uploaded: true };
+  })()],
   // the uploaded CfD workbook of 10 Nov 2026: phasing windows set with no construction months
   // divided by a zero window (#DIV/0! in the Construction sheet and the Model checks cell)
   ["phasing windows set but no construction months: the Construction sheet spends nothing and no formula errors", bid({
@@ -434,6 +458,20 @@ const numberAt = (ws, addr) => {
   const v = resultOf(ws.getCell(addr.replace(/^'[^']+'!/, "").replace(/\$/g, "")));
   return typeof v === "object" && v !== null && "error" in v ? v.error : v;
 };
+
+{
+  // the uploaded bid reproduced: the strike price the file carried (₹25.53/kWh), its project cost
+  // (₹1,262 cr, ₹1,098 cr of it battery), the refinancing and the year-4 augmentation
+  const c = CASES.find(([, x]) => x.uploaded)[1];
+  const f = c.finance;
+  assert.ok(Math.abs(f.tariff - 25.53) < 0.6, `the uploaded bid's strike price: ₹${f.tariff.toFixed(3)}/kWh vs the file's ₹25.534`);
+  assert.ok(Math.abs(f.capex.total - 1262.47) < 15, `project cost ₹${f.capex.total.toFixed(1)} cr vs the file's ₹1,262.5 cr`);
+  assert.ok(Math.abs(f.engine.sizes.bessMwh - 915) < 1e-9 && Math.abs(f.engine.sizes.bessMw - 157.5) < 1e-9 && f.engine.sizes.solarMw === 14, "the file's plant");
+  assert.ok(f.rows.every((r) => r.dscr === null || r.dscr >= 1.25 - 1e-6), "sculpted to 1.25");
+  assert.ok(f.rows[3].augCapex > 0 && f.rows.filter((r) => r.augCapex > 0).length === 1, "augmentation in year 4 only");
+  assert.ok(c.finance.engine.fin.refiYear === 1 && c.finance.engine.costs.constructionMonths === 0, "refinanced after year 1; no construction months");
+  console.log(`ok   values  the uploaded 150 MW CfD bid rebuilt: strike price ₹${f.tariff.toFixed(4)}/kWh (file ₹25.5339), project cost ₹${f.capex.total.toFixed(1)} cr (file ₹1,262.5 cr), equity IRR ${(f.equityIrr * 100).toFixed(2)}%`);
+}
 
 for (const [name, c] of CASES) {
   const { wb, live } = await build(c);
