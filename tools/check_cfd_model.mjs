@@ -381,3 +381,21 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.ok(/changed since/.test(ownReSource(st).label));
   console.log("own-RE size labelled by its source: ok");
 }
+
+// ---- a mistyped state-of-charge window is warned about, with the nameplate it causes
+{
+  const { socWindowWarning } = await import("../web/src/cfd/model.js");
+  assert.equal(socWindowWarning({ essSocMin: null, essSocMax: null }), null, "no window: no warning");
+  assert.equal(socWindowWarning({ essSocMin: 0.1, essSocMax: 0.9 }), null, "10–90%: fine");
+  assert.equal(socWindowWarning({ essSocMin: 0.05, essSocMax: 0.95 }), null, "5–95%: fine");
+  const w = socWindowWarning({ essSocMin: 0.0005, essSocMax: 0.5 });
+  assert.ok(w && w.problems.length === 2, JSON.stringify(w));
+  assert.ok(/fraction typed into a percent box/.test(w.problems[0]) && /maximum of 50%/.test(w.problems[1]), w.text);
+  assert.ok(Math.abs(w.nameplatePerMw - 4.05) < 1e-9 && /4\.05 MWh of nameplate/.test(w.text), w.text);
+  const n = socWindowWarning({ essSocMin: 0.2, essSocMax: 0.7 });
+  assert.ok(n && /maximum of 70%/.test(n.text) && n.problems.length === 1, n.text);
+  const w2 = socWindowWarning({ essSocMin: 0.2, essSocMax: 0.75 });
+  assert.ok(w2 && /maximum of 75%/.test(w2.text), "a 75% top is still flagged");
+  assert.equal(socWindowWarning({ essSocMin: 0.15, essSocMax: 0.85 }), null, "15–85%: a plain 70% window passes");
+  console.log("state-of-charge window warning: ok");
+}

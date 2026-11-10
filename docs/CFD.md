@@ -340,3 +340,11 @@ on the mandate itself: a plant at 97% availability that used 25% of the mandate 
 of its supply. Measured ex post against the energy actually supplied, a year with short days can
 sit a few tenths of a point over the budget; the Size step's checks allow half a point for that
 before calling it a breach (`checks.js`, 10 Nov 2026).
+
+## The state-of-charge window warning
+
+`socWindowWarning(inputs)` in `model.js` flags a window that looks mistyped (a minimum under 1%,
+a maximum under 80%, a minimum above 30%, or a window under 60%) with the nameplate it forces;
+the Design step shows it beside the boxes (`cfd-soc-warning`), the Bid review carries it as a
+cost finding, and the agent's `set_input` answers with it. Added after the uploaded bid of 10 Nov
+2026, whose 0.05%–50% window doubled the battery to 4.1 MWh per MW.

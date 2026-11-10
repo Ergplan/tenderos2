@@ -116,6 +116,14 @@ def test_cfd_bid_end_to_end(tmp_path):
         page.wait_for_selector("[data-testid=bid-loss-kinds]", state="detached", timeout=10_000)
 
         # 06 finance inputs: the repayment methods and the construction months, then size
+        # a mistyped state-of-charge window is warned about beside the boxes, then cleared
+        _field(page, "Minimum state of charge").locator("input").fill("0.05")
+        _field(page, "Maximum state of charge").locator("input").fill("50")
+        page.wait_for_selector("[data-testid=cfd-soc-warning]", timeout=10_000)
+        assert "percent box" in page.locator("[data-testid=cfd-soc-warning]").inner_text()
+        _field(page, "Minimum state of charge").locator("input").fill("")
+        _field(page, "Maximum state of charge").locator("input").fill("")
+        page.wait_for_selector("[data-testid=cfd-soc-warning]", state="detached", timeout=10_000)
         _step(page, "financeInputs")
         if page.locator("[data-testid=cfd-fill]").count():
             page.click("[data-testid=cfd-fill]")

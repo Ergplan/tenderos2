@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { ArrowRight, BatteryCharging, LayoutGrid, Loader2, Square, Sun, Wand2, Wind, X } from "lucide-react";
+import { ArrowRight, BatteryCharging, LayoutGrid, Loader2, Square, Sun, Wand2, Wind, X, TriangleAlert } from "lucide-react";
 import { Section, nf, pf } from "../rtc/ui";
 import { DATA_COLORS } from "../chartTheme";
 import * as E from "../rtc/engine";
@@ -12,7 +12,7 @@ import SiteSchematic from "../bid/SiteSchematic";
 import { defaultLosses } from "../bid/model";
 import { useTeamContext } from "../team/useTeam";
 import Cite from "./Cite.jsx";
-import { designProfiles, essRequiredPerMw, lossFactorsOfCfd, missingInputs, socWindow } from "./model.js";
+import { designProfiles, essRequiredPerMw, lossFactorsOfCfd, missingInputs, socWindow, socWindowWarning } from "./model.js";
 import { Choice, Fields, FillBar } from "./inputs.jsx";
 
 const COLORS = { solar: DATA_COLORS.solar, wind: DATA_COLORS.wind, bess: DATA_COLORS.bess };
@@ -174,6 +174,7 @@ export default function DesignStep({ state, setState, setInput, set, lockProps, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [i.solarCuf, i.solarDcAc, i.windCuf, i.windMw, state.solarUpload, state.windUpload, state.solarMonthScale, state.windMonthScale]);
   const win = socWindow(i);
+  const socWarn = socWindowWarning(i);
   const nameplate = isNum(i.essMwhPerMw) ? i.essMwhPerMw : null;
   const usable = nameplate !== null ? nameplate * win : null;
   const need = essRequiredPerMw(state);
@@ -201,6 +202,7 @@ export default function DesignStep({ state, setState, setInput, set, lockProps, 
             <div className="bid-src-group">
               <h4>Operation</h4>
               <Fields state={state} setInput={setInput} section="resource" only={["rte", "essSocMin", "essSocMax", "essDegradation"]} lockProps={lockProps} />
+              {socWarn && <div className="alert soc-warning" data-testid="cfd-soc-warning"><TriangleAlert size={14} /> <span><b>Check the state-of-charge window:</b> {socWarn.text}</span></div>}
               <div className="rtc-grid rtc-grid-4 cfd-fields"><Choice state={state} setInput={setInput} k="augmentation" lockProps={lockProps} /></div>
             </div>
             <div className="bid-src-group">

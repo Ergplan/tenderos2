@@ -6,7 +6,7 @@
 //   block  the bid fails the tender or cannot win as it stands
 //   warn   the price carries a cost the bidder can take out
 //   note   worth knowing before bid day; not a defect by itself
-import { BENCHMARKS, FIELDS, essRequiredPerMw, poolFlows, runModel, socWindow } from "./model.js";
+import { BENCHMARKS, FIELDS, essRequiredPerMw, poolFlows, runModel, socWindow, socWindowWarning } from "./model.js";
 import { TENDER } from "./terms.js";
 import { sizingChecks } from "./checks.js";
 import { SECI_RESULTS, tariffRange } from "../market/seed.js";
@@ -130,7 +130,9 @@ export function reviewBid({ state, model, finance = null, prices = null }) {
   // ---- 5. the battery: nameplate, window, fade
   const need = essRequiredPerMw(state);
   const win = socWindow(i);
-  if (win < 0.6) add({ id: "soc-window", severity: "note", title: `A narrow state-of-charge window (${pf(win, 0)}) makes the nameplate ${nf(need.energy, 2)} MWh per MW for the tender's 2 MWh usable`, detail: `Minimum ${pf(i.essSocMin || 0, 1)} to maximum ${pf(isNum(i.essSocMax) ? i.essSocMax : 1, 1)}. Suppliers quote usable energy at the rated window (typically 10–90% or wider), so check whether the 2 MWh per MW is already usable; if it is, leave the window empty and the nameplate falls to ${nf(2 / (need.meter || 1) <= 2 ? 2 : Math.ceil((2 / (need.meter || 1)) * 20) / 20, 2)} MWh per MW.`, step: "design" });
+  const socWarn = socWindowWarning(i);
+  if (socWarn) add({ id: "soc-window", severity: "warn", title: `The state-of-charge window looks mistyped: ${pf(i.essSocMin || 0, 2)} to ${pf(isNum(i.essSocMax) ? i.essSocMax : 1, 0)} makes the nameplate ${nf(need.energy, 2)} MWh per MW`, detail: socWarn.text, step: "design" });
+  else if (win < 0.6) add({ id: "soc-window", severity: "note", title: `A narrow state-of-charge window (${pf(win, 0)}) makes the nameplate ${nf(need.energy, 2)} MWh per MW for the tender's 2 MWh usable`, detail: `Minimum ${pf(i.essSocMin || 0, 1)} to maximum ${pf(isNum(i.essSocMax) ? i.essSocMax : 1, 1)}. Suppliers quote usable energy at the rated window (typically 10–90% or wider), so check whether the 2 MWh per MW is already usable; if it is, leave the window empty and the nameplate falls to ${nf(2 / (need.meter || 1) <= 2 ? 2 : Math.ceil((2 / (need.meter || 1)) * 20) / 20, 2)} MWh per MW.`, step: "design" });
   if (isNum(i.essMwhPerMw) && i.essMwhPerMw > need.energy + 1e-9) add({ id: "battery-oversized", severity: "warn", title: `Battery energy ${nf(i.essMwhPerMw, 2)} MWh per MW is above the ${nf(need.energy, 2)} the tender needs`, detail: `${nf(X * (i.essMwhPerMw - need.energy))} MWh beyond the need at ₹${nf(i.essCrPerMwh || 0, 2)} cr/MWh is ₹${nf(X * (i.essMwhPerMw - need.energy) * (i.essCrPerMwh || 0), 0)} cr of capex that earns nothing on a normal day.`, step: "bid" });
   const last = ops[ops.length - 1];
   const faded = last && last.supplyShare < 0.9 && last.shortDays > 0;

@@ -192,6 +192,14 @@ PBDIT or a line of credit).
 
 ![Design](img/cfd-05-design-full.jpg)
 
+*The state-of-charge window.* Leave the minimum and maximum empty when the supplier's quote is in
+usable energy (the usual case): the tender's 2 MWh per MW is then the nameplate. Enter the window
+only for a quote in raw nameplate, in percent (10 and 90 for a 10–90% window). A window that
+looks mistyped draws a warning beside the boxes: a minimum under 1% (a fraction typed into a
+percent box), a maximum under 80% (a depth-of-discharge figure or a width, not the top of the
+window), a minimum above 30%, or a window under 60%; the warning gives the nameplate the entry
+would force. The uploaded bid of 10 November had 0.05% to 50%, which doubled the battery.
+
 **Fill up for me please** puts a competitive bidder's value in every empty box where there is one
 (battery ₹0.85 cr/MWh, solar ₹3.6 cr/MWac, group RE at ₹2.5/kWh with no charges after month 36,
 13% equity, 8.75% debt over 15 years sculpted to a 1.2 DSCR, no extra battery, no state-of-charge

@@ -9,7 +9,7 @@
 // the numbers from the model on screen. Nothing the agent says changes a term.
 import { readValue } from "../seci/agent.js";
 import * as E from "../rtc/engine.js";
-import { BENCHMARKS, CHOICES, FIELDS, fillWinning, financials, keyDates, lcCr, missingInputs, rfsAmounts } from "./model.js";
+import { BENCHMARKS, CHOICES, FIELDS, fillWinning, financials, socWindowWarning, keyDates, lcCr, missingInputs, rfsAmounts } from "./model.js";
 import { DOCUMENTS, RFS, TENDER, TERMS, docById } from "./terms.js";
 import { buildScript, explainCfd, explainFinance, explainResults, tenderBrief } from "./voice.js";
 
@@ -261,6 +261,7 @@ export function createToolRunner(ctx) {
       ctx.highlight?.(key.includes(".") ? key : `inputs.${key}`);
       const out = { ok: true, key, value: shown(x, x.get(next)) };
       if (key === "quoteTariff" && isNum(v)) { const q = checkTariff(model(), v); if (q) out.quote = q; }
+      if (key === "essSocMin" || key === "essSocMax") { const w = socWindowWarning(ctx.getState().inputs); if (w) out.warning = `Check the state-of-charge window: ${w.text}`; }
       return out;
     },
     use_benchmarks: () => {

@@ -41,7 +41,7 @@ const sev = (out, id) => out.findings.find((f) => f.id === id)?.severity;
   const drivers = out.findings.find((f) => f.id === "price-drivers");
   assert.ok(drivers && /battery's capex ₹\d/.test(drivers.title), `the battery's capex named first: ${drivers?.title}`);
   assert.equal(sev(out, "extra-battery"), "warn", "the extra battery does not pay");
-  assert.equal(sev(out, "soc-window"), "note", "the 50% window");
+  assert.equal(sev(out, "soc-window"), "warn", "the 50% window looks mistyped: a warning, not a note");
   assert.equal(sev(out, "battery-fade"), "warn", "augmentation in year 4 only leaves the last years short");
   assert.equal(sev(out, "inputs-above-benchmark"), "warn");
   const above = out.findings.find((f) => f.id === "inputs-above-benchmark").detail;

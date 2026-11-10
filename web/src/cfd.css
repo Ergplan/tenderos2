@@ -196,3 +196,5 @@
 .review-item .review-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .review-item p { margin: 6px 0 8px; color: var(--muted); line-height: 1.45; }
 .review-item button { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; }
+
+.soc-warning { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; font-size: 12.5px; line-height: 1.45; }

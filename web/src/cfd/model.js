@@ -464,6 +464,34 @@ export const socWindow = (i) => {
 };
 
 /**
+ * A state-of-charge window that looks mistyped or is far from how batteries are run, as a warning
+ * the Design step shows beside the boxes (null when the window is fine or empty). The usual
+ * operating window of an LFP battery is 5–95% or 10–90%; suppliers quote usable energy with the
+ * window already inside the rating, so the boxes are normally left empty.
+ */
+export function socWindowWarning(inputs) {
+  const lo = inputs?.essSocMin;
+  const hi = inputs?.essSocMax;
+  if (!isNum(lo) && !isNum(hi)) return null;
+  const min = isNum(lo) ? lo : 0;
+  const max = isNum(hi) ? hi : 1;
+  const win = max - min;
+  const need = Math.ceil((TENDER.essHoursMin / Math.max(0.05, win)) * 20 - 1e-9) / 20;
+  const problems = [];
+  if (isNum(lo) && lo > 0 && lo < 0.01) problems.push(`a minimum of ${(lo * 100).toFixed(2)}% reads like a fraction typed into a percent box (0.05 for 5%): enter 5 for 5%`);
+  if (isNum(hi) && hi < 0.8) problems.push(`a maximum of ${(hi * 100).toFixed(0)}% leaves ${((1 - hi) * 100).toFixed(0)}% of the cells never charged; batteries are run to 90–100%, so this is probably a depth-of-discharge figure or a window width, not the top of the window`);
+  if (isNum(lo) && lo > 0.3) problems.push(`a minimum of ${(lo * 100).toFixed(0)}% keeps a third of the cells idle; the usual floor is 5–10%`);
+  if (win < 0.6 && !problems.length) problems.push(`a window of ${(win * 100).toFixed(0)}% is far narrower than the 80–90% batteries are run in`);
+  if (!problems.length) return null;
+  return {
+    problems,
+    window: win,
+    nameplatePerMw: need,
+    text: `${problems.join("; ")}. As entered, the tender's ${TENDER.essHoursMin} MWh usable per MW needs ${need.toFixed(2)} MWh of nameplate per MW (${Math.round((need / TENDER.essHoursMin - 1) * 100)}% more cells to buy). Leave both boxes empty when the supplier's quote is in usable energy, or enter the supplier's rated window, typically 10 to 90.`,
+  };
+}
+
+/**
  * The battery the tender's 2 MWh per MW needs as nameplate, once the state-of-charge window and the
  * losses from the battery to the billing meter are in: energy 2 ÷ (window × to-meter factor) and
  * power 1 ÷ to-meter factor per contracted MW, rounded up to 0.05. The round-trip efficiency does
