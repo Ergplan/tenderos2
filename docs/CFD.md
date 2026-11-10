@@ -17,7 +17,7 @@ an administrator grants it like the other tabs.
 | 08 Financial model | Finance | The bid strike price from the shared financial engine (the same price as on Size; the fast screening figure beside it), IRRs, DSCR, project cost, LC, Pool pay-in, penalty, charging power; Your quote; money at stake; revenue stack; the Pool; F.1 Assumptions to F.4 the 15-year model with the traceable explorer; **Download financial model (Excel)**: Cover, Live model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, Depreciation and tax, Working capital, Sensitivity | `finance.js`, `FinanceModelStep.jsx`, `web/src/rtc/engine.js`, `web/lib/liveModel.js`, `POST /api/cfd/model` |
 | 09 What-if | Finance | Returns at a tried strike price; the track to the quote (which levers, how far, in what order, the chance of each move and of the whole track; out of reach when no lever can get there) with a waterfall and a story; every input one step up and down with the price it gives and how far it must move, a reading guide and a plain-words note per lever; Apply; **Not for us** on a move turns the lever down (`state.rejected`, the track plotted again without it); a frozen value better than the suggestion is priced through the full model and the dialog gives the bands' chance of it; the bid size is not a lever | `levers.js`, `leverNotes.js` (notes, plausibility bands, `leverChance`), `track.js` (`planTrack`, frozen levers left alone), `TrackView.jsx`, `Freeze.jsx` (freeze with evidence into `state.frozen` and the evidence register, unfreeze), the What-if workbook (`cfdModelExport` + a `whatIf` block → the "What-if track" sheet of `lib/modelWorkbook.js`), `WhatIfStep.jsx` |
 | 10 Bid forms | Tender / Legal | The RfS's 17 formats with their 224 blanks beside the RfS page, the particulars asked once, the letters in the RfS wording, eleven checks, Word and PDF | `forms.js`, `formats.js`, `letters/`, `BidForms.jsx`, `POST /api/cfd/forms`, `/api/cfd/letters` |
-| 11 Reference bids | Projects | No CfD-I result yet: SECI's eight results that compare, the gap to the lowest peak-power award, why a strike price sits where it does | `ReferenceBids.jsx`, `web/src/market/seed.js` |
+| 11 Reference bids | Projects | No CfD-I result yet: SECI's eight results that compare, the gap to the lowest peak-power award, why a strike price sits where it does; 11.1 What wins: the evening price of the chosen hours, the Pool's net flow at strike prices around it and at the quote (your MW and the full 500 MW against the ₹76 cr corpus), the verdict under Amendment-04's award test, the bidding logic; 11.2 the risks that are yours (DSM sized by the CERC-style model, availability per point, SECI-designated hours, fees, the weekly penalty, fade, a part award; the evening price as the Pool's) | `ReferenceBids.jsx`, `winning.js`, `web/src/market/seed.js` |
 
 Across the steps: Save / Open (library module `cfd`), the Team panel with assignments on boxes, formats and conditions, pings and evidence on every box, feedback, and the voice bid agent (GPT-Live) with sixteen tools (`agent.js`, `voice.js`; the session from `POST /api/seci/live` with `tab: "cfd"`).
 
@@ -297,3 +297,15 @@ Eleven conditions carry it (`terms.js`, the Amd-03 wording of 9.2.c marked repla
 explainer's picture cites it, the voice brief says it, and the Bid review sizes the Pool's pay-out
 at the bid's strike price against the ₹76 cr corpus (`corpus-cap`). Two points to raise with SECI
 are added (the deemed 100% against the 2 MWh/MW obligation; how a restricted award is cut).
+
+## What wins and the risks
+
+`web/src/cfd/winning.js`: `eveningMcp` (the average MCP in the two chosen evening hours over the
+full Contract Years), `eveningAverage` (every evening hour of the price year), `poolAt(model, sp)`
+(the Pool's net flow a year from `poolFlows`, per MW and for the whole tender, against
+`TENDER.poolCr`), `poolTable`, `whatWins` (the verdict in three tones: below the evening market,
+within the corpus at today's prices, beyond it) and `cfdRisks` (DSM from `web/src/dsm/dsm.js`
+with storage firming at the bid's strike price on the scheduled energy; availability per point;
+designated hours; exchange fees; the weekly penalty against the year's highest evening price;
+fade; the award; the market as the Pool's). `tools/check_cfd_winning.mjs` asserts the Pool
+collects below the evening price and pays above it, the verdicts, and the sized DSM.

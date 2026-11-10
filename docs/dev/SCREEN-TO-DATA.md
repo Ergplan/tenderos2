@@ -280,6 +280,8 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 
 | Review the bid (6.6): findings in three groups with Go-to buttons | `cfd/BidReview.jsx` | `reviewBid({ state, model, finance: model.finance, prices })` | `web/src/cfd/review.js`: `sizingChecks` (`checks.js`), the peak-power award (`market/seed.js`), two re-simulations for the own-solar test, the extra battery's annualised cost against its earnings, `essRequiredPerMw`, the inputs against `BENCHMARKS`, the finance engine's inputs | the bid state and the model | computed on request; the findings also go into the workbook's "Bid review" sheet |
 
+| What wins (11.1): tiles, the verdict, the Pool table; Risks that are yours (11.2) | `cfd/ReferenceBids.jsx` WhatWins | `whatWins({ model, finance })`, `poolTable(model, quote)`, `cfdRisks({ state, model, finance })` | `web/src/cfd/winning.js`: `poolFlows` over the full Contract Years, the price book's evening hours, `dsmUnitCharge`/`dsmChargeCr` (`web/src/dsm/dsm.js`) on the year-2 scheduled energy at the strike price | the model and its finance | computed |
+
 ### `web/src/cfd/WhatIfStep.jsx`
 
 **Screen:** CfD bid › What-if (step 09): returns at a tried strike price and the levers  

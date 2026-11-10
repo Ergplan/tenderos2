@@ -604,6 +604,87 @@ penalties, no ceiling).
 
 ---
 
+**11.1 · What wins: the Pool's flow at your price.** Four tiles and a table, priced from your
+own bid once the plant is sized. *The evening market* is the average clearing price in the two
+evening hours your plant chooses each day, over the price year (₹8.30/kWh on IEX DAM, September
+2025 to September 2026, against ₹6.73 for every evening hour). *Your quote* sits above or below
+it. *The Pool pays or collects, net*: every 15-minute block you sell at the market price; below
+your strike price the Pool pays you the difference, above it you pass the excess to the Pool,
+and since Amendment-03 that is a full pass-through, so you net the strike price on every kWh and
+the Pool carries the whole gap both ways. The table gives the Pool's net flow at strike prices
+around the market and at your quote, for your MW and for the full 500 MW, against the ₹76 cr
+corpus. On the benchmark bid:
+
+| Strike price | Pool's net flow a year, 500 MW | Against the ₹76 cr corpus |
+| --- | --- | --- |
+| ₹7.00 | collects ₹46 cr | feeds it |
+| ₹7.50 | collects ₹28 cr | feeds it |
+| ₹8.00 | collects ₹11 cr | about neutral |
+| ₹8.50 | pays ₹7 cr | 0.1× a year |
+| ₹10.00 | pays ₹60 cr | 0.8× a year |
+| ₹26 (the uploaded bid) | pays ₹553 cr | 7× a year |
+
+*The award test Amendment-04 added.* RfS 42.2.b now lets SECI award only the capacity whose cost
+to the Pool stays within the corpus at the discovered tariff. SECI will not use last year's two
+dearest hours for that test; it will use its own expected evening price over 15 years, and the
+Financial model step's "storage flood" path shows why that is lower (midday rising, the evening
+falling 3% a year as batteries arrive). On a ₹6.5 to 7 evening view, a ₹8.5 bid costs the Pool
+₹55 to 75 cr a year on 500 MW, the whole corpus, so SECI cuts the award; a ₹7 to 7.5 bid costs
+it little or nothing, so it can award all of it. The verdict under the tiles says which of the
+three your quote is: below the evening market (costs the corpus nothing), above it but within
+the corpus at today's prices (SECI may cut on a lower view), or beyond the corpus (SECI will
+restrict the award).
+
+*Nearest the market, not lowest in the band.* The auction awards everyone within L1 + 2% in
+tariff order. Two things change once the corpus test exists. Going below your cost of capital
+buys nothing: any gain above the strike price goes to the Pool, so a low quote is never
+recovered from a strong market. Going above the market costs the award, not just the rank. The
+target is the lowest price your capital accepts; the three bidder profiles the model prices
+(benchmark ₹10.11; an efficient developer with group RE and a ₹0.85 cr/MWh battery ₹8.40; an
+aggressive one at 12% equity, 80% debt and a ₹0.75 battery ₹7.39) put that at ₹7.4 to 8.4, close
+to where the Pool is neutral. Our expectation for L1 is ₹7.0 to 7.5, and a quote of ₹7.2 to 7.4
+on a 100 to 150 MW bid, with the battery contract frozen as evidence.
+
+*Bid what your balance sheet carries.* The strike price barely moves with the MW (every cost
+scales with it), so the size is set by the net worth and guarantees you can show, not by the
+price. If SECI restricts the award in tariff order the marginal bidder gets a part, and RfS 42.4
+lets a bidder refuse a part below half its bid: a quote you are sure is inside the band gets its
+full MW; one at the edge may come back as half.
+
+*Freeze the battery contract.* The battery's capex is the largest line of the price (₹2.8 to 3.7
+of every rupee per kWh; the Bid review names it). A signed supply contract turns the biggest
+assumption into evidence: the lender accepts the leverage, the What-if track stops treating it as
+a stretch, and the review stops flagging it.
+
+**11.2 · Risks that are yours.** Once the market price risk is the Pool's, what remains is
+operational, and Amendment-04 spells it out. Each is sized from your bid where the model can:
+
+- *Deviation settlement (DSM).* Every block you schedule and miss, or exceed, is settled under the
+  DSM regulations at the market reference rates, and Amendment-04 (f) puts the whole of it on you
+  with an indemnity to SECI. The app's CERC-style DSM model (a battery firming the forecast error)
+  prices it per kWh of scheduled energy and in ₹ cr a year: small on a plant whose battery is
+  charged before the declared blocks (about ₹0.2 cr a year on 100 MW), the full under-injection
+  rate on a plant that declares more than it holds.
+- *Availability.* Each 1% below what you declare costs the strike price on that energy (about
+  ₹0.7 cr a year per point on 100 MW at ₹10), counts towards the weekly shortfall and draws the
+  DSM charge. Declare by 06:00 on D-1; silence means 100% of the contracted capacity, deemed.
+- *SECI-designated hours.* Your revenue is the strike price either way; the gap between your two
+  dearest hours and the evening average (₹8.30 against ₹6.73) is the Pool's cost, which SECI will
+  weigh when it sets the hours. What is yours is readiness: the battery must be charged for the
+  blocks SECI names by 08:00 on D-1, which may not be the blocks your day plan charges for.
+- *Exchange, transaction and scheduling charges.* All yours under Amendment-04 (h), including what
+  SECI pays on your behalf and recovers from your next bill; the exchange fee input carries them.
+- *The weekly shortfall penalty.* 1.5 × (the highest evening MCP − the strike price) on energy
+  beyond 10% short in a week: nil at a strike price above every evening price of the year, biting
+  in short weeks below it. The energy not supplied earns nothing either way.
+- *Battery fade.* A battery that fades below the need in the last years supplies less than the
+  mandate; the risk card gives the revenue not earned.
+- *A part award, or none.* SECI sizes the award to the corpus at the discovered tariff; the last
+  winner may refuse a part below half its bid.
+- *Not yours: the evening price over 15 years.* The strike price is fixed and the Pool carries the
+  gap in every block; a softening market raises the Pool's cost, not your revenue, and reaches you
+  only through the award test and the Pool's replenishment, which SECI undertakes.
+
 ## The bid agent
 
 ![The bid agent](img/cfd-agent.jpg)

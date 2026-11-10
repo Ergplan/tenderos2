@@ -305,6 +305,13 @@ def test_cfd_bid_end_to_end(tmp_path):
         # 11 reference bids
         _step(page, "reference")
         assert page.locator("[data-testid^=cfd-reference-seci-]").count() >= 5
+        # 11.1 what wins: the Pool's flow at the quote against the evening market and the corpus; 11.2 the risks
+        page.wait_for_selector("[data-testid=cfd-winning]", timeout=30_000)
+        assert "corpus" in page.locator("[data-testid=cfd-winning-verdict]").inner_text().lower()
+        assert page.locator("[data-testid=cfd-pool-table] tbody tr").count() >= 8
+        assert "your quote" in page.locator("[data-testid=cfd-pool-table]").inner_text()
+        assert page.locator("[data-testid=cfd-risk-dsm]").count() == 1 and "DSM" in page.locator("[data-testid=cfd-risk-dsm]").inner_text()
+        assert page.locator("[data-testid^=cfd-risk-]").count() >= 6
         assert "FDRE" in page.locator("[data-testid=cfd-reference-table]").inner_text()
 
         # save to the library and reopen it
