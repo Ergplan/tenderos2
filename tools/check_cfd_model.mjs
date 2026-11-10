@@ -360,3 +360,24 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.deepEqual(mi.augmentationYears, [4]);
   console.log("CfD battery augmentation schedule reaches the operation: ok");
 }
+
+// ---- the own-RE size is labelled by its source: the optimiser's result (recorded on the bid),
+// a first guess from the fill, or typed; the Inputs sheet carries the same
+{
+  const { ownReSource } = await import("../web/src/cfd/model.js");
+  const { cfdLiveRequest, runCfdFinance } = await import("../web/src/cfd/finance.js");
+  const st = fillBenchmarks(defaultCfdState());
+  assert.equal(ownReSource(st).kind, "guess", "the fill's solar is a first guess");
+  st.inputs.solarMw = 40; st.filled.solarMw = false;
+  assert.equal(ownReSource(st).kind, "typed");
+  st.sized = { solarMw: 40, windMw: 0, sp: 9.9, policy: "meet", at: "2026-11-10T10:00:00.000Z" };
+  assert.equal(ownReSource(st).kind, "optimised");
+  assert.ok(/sized by the optimiser on 2026-11-10/.test(ownReSource(st).label), ownReSource(st).label);
+  const m = runModel(st, prices);
+  const req = cfdLiveRequest({ state: st, model: m, finance: runCfdFinance(st, m) });
+  assert.ok(/CfD optimiser/.test(req.sizedLabel), req.sizedLabel);
+  st.inputs.solarMw = 50;
+  assert.equal(ownReSource(st).kind, "typed");
+  assert.ok(/changed since/.test(ownReSource(st).label));
+  console.log("own-RE size labelled by its source: ok");
+}

@@ -227,7 +227,7 @@ export default function CfdTab({ initialScenario = null }) {
         const filled = { ...st.filled };
         delete filled.solarMw;
         delete filled.windMw;
-        return { ...st, inputs: { ...st.inputs, solarMw: best.solarMw, windMw: best.windMw }, filled };
+        return { ...st, inputs: { ...st.inputs, solarMw: best.solarMw, windMw: best.windMw }, filled, sized: { solarMw: best.solarMw, windMw: best.windMw, sp: best.sp, policy: best.policy, at: new Date().toISOString() } };
       });
       setMessage(best.policy === "pay"
         ? { ok: true, text: `Own RE optimised on the strike price alone (policy: pay the penalty): solar ${nf(best.solarMw)} MWac${best.windMw ? `, wind ${nf(best.windMw)} MW` : ""} gives ₹${best.sp.toFixed(4)}/kWh${best.ok ? ", with every day's supply met" : `, with ${nf(best.short, 0)} MWh of shortfall over the term paid for as penalty`}.` }

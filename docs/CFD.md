@@ -322,3 +322,12 @@ and the industry benchmark otherwise (marked `true`); the finance team's repayme
 sized at once. The Inputs sheet and the Bid review read the mark (`WINNING_NOTE`). On 100 MW the
 fill prices at about ₹8.4/kWh against ₹10.1 on `fillBenchmarks`, which the checks keep
 (`tools/check_cfd_winning.mjs`). The agent's `use_benchmarks` does the same.
+
+## Where the own-RE size came from
+
+The optimiser records its result on the bid (`state.sized`: solarMw, windMw, the price, the
+policy, when). `ownReSource(state)` in `model.js` reads it against the inputs as they stand:
+"sized by the optimiser on <date>" while they match, "a first guess" when the fill put the size
+in, "your size" when typed (with a note when the optimiser's result was changed since). The
+workbook's cover and its Inputs sheet (`sizedLabel` on the live request) say the same, so a size
+the optimiser chose is never labelled as the bidder's own.

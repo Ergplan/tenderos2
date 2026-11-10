@@ -180,6 +180,7 @@ export function mergeCfdState(saved) {
     inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) },
     fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, bess: { ...(saved.bess || {}) }, locks: { ...(saved.locks || {}) },
     frozen: { ...(saved.frozen || {}) }, frozenBaseline: saved.frozenBaseline || null, rejected: { ...(saved.rejected || {}) },
+    sized: saved.sized && typeof saved.sized === "object" ? saved.sized : null, // the optimiser's last result (solarMw, windMw, sp, at)
     studio: { ...(saved.studio || {}) }, solarUpload: saved.solarUpload || null, windUpload: saved.windUpload || null,
     solarMonthScale: Array.isArray(saved.solarMonthScale) && saved.solarMonthScale.length === 12 ? saved.solarMonthScale : new Array(12).fill(1),
     windMonthScale: Array.isArray(saved.windMonthScale) && saved.windMonthScale.length === 12 ? saved.windMonthScale : new Array(12).fill(1),
@@ -275,6 +276,15 @@ export function fillBenchmarks(state) {
   if (isNum(inputs.essMwhPerMw) && inputs.essMwhPerMw < need.energy - 1e-9) { inputs.essMwhPerMw = need.energy; filled.essMwhPerMw = true; }
   if (isNum(inputs.essMwPerMw) && inputs.essMwPerMw < need.power - 1e-9) { inputs.essMwPerMw = need.power; filled.essMwPerMw = true; }
   return { ...state, inputs, filled };
+}
+
+/** How the own RE size came about: the optimiser's (and when), a first guess from the fill, or typed. */
+export function ownReSource(state) {
+  const i = state?.inputs || {};
+  const z = state?.sized;
+  if (z && isNum(z.solarMw) && z.solarMw === i.solarMw && (z.windMw || 0) === (i.windMw || 0)) return { kind: "optimised", at: z.at || null, label: `sized by the optimiser${z.at ? ` on ${new Date(z.at).toISOString().slice(0, 10)}` : ""} for the least strike price${z.policy === "pay" ? " (policy: pay the penalty)" : " with every day met"}` };
+  if (state?.filled?.solarMw) return { kind: "guess", at: null, label: "a first guess; Optimise own RE refines it" };
+  return { kind: "typed", at: null, label: z ? "your size (the optimiser's result was changed since)" : "your size" };
 }
 
 /** The inputs still needed, as readable lines (the model runs once this is empty). */

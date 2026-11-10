@@ -12,7 +12,7 @@ import * as E from "../rtc/engine.js";
 import { genSource } from "../model/generation.js";
 import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
 import { reviewBid } from "./review.js";
-import { BENCHMARK_NOTE, WINNING_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
+import { BENCHMARK_NOTE, WINNING_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, ownReSource, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
 import { TENDER } from "./terms.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -178,6 +178,7 @@ export function cfdLiveRequest({ state, model, finance }) {
     wind: eng.sizes.windMw > 0 && prof?.wind ? genSource({ cf: prof.wind, toBus: 0, degradation: i.windDegradation || 0, cufAt: "AC side", profile: state.windUpload?.name ? `${state.windUpload.name}, scaled to your CUF` : "Typical wind profile at your CUF" }) : null,
   };
   return {
+    sizedLabel: ownReSource(state).kind === "optimised" ? "CfD optimiser: the least strike price with every day met" : ownReSource(state).kind === "guess" ? "A first guess (Fill up); Optimise own RE refines it" : "Your size",
     title: `SECI CfD-I bid financial model · ${Math.round(i.contractedMw)} MW × 2 h`,
     tariff: finance.tariff,
     tariffLocked: finance.tariffLocked,
@@ -231,7 +232,7 @@ export function cfdModelExport({ state, model, finance, review = null }) {
     ["Contracted capacity (MW)", X, "mw", "the bid"],
     ["Battery (MW)", eng.sizes.bessMw, "mw", `${i.essMwPerMw} MW per contracted MW`],
     ["Battery (MWh)", eng.sizes.bessMwh, "mw", `${i.essMwhPerMw} MWh per contracted MW (at least 2, Amendment-02)${i.extraEssMwhPerMw ? ` plus ${i.extraEssMwhPerMw} MWh per MW for evening sale` : ""}`],
-    ["Own solar (MWac)", eng.sizes.solarMw, "mw", state.filled?.solarMw ? "a first guess; Optimise own RE refines it" : "your size"],
+    ["Own solar (MWac)", eng.sizes.solarMw, "mw", ownReSource(state).label],
     ["Own wind (MW)", eng.sizes.windMw, "mw"],
     ["Effective Date", fmtDate(dates.ed), "text"], ["SCD (battery, supply starts)", fmtDate(dates.scd), "text"], ["Own RE commissioned", fmtDate(model.sim.dates.reCod), "text"], ["Term ends", fmtDate(dates.end), "text"],
   ];

@@ -537,7 +537,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   // where each input came from: the request names some; sourceAll (Round the clock: the tab) names the rest
   const src = (key, fallback = "Your input") => m.sources?.[key] || m.sourceAll || fallback;
   const sim = m.engine === "simulation";
-  const sized = sim ? "Round the clock plant" : "HiGHS sizing";
+  const sized = m.sizedLabel || (sim ? "Round the clock plant" : "HiGHS sizing");
   const meter = m.ops.some((o) => finite(o.meterMWh) && o.meterMWh > 0);
   const blocky = m.ops.some((o) => finite(o.blockShortfallMWh) && o.blockShortfallMWh > 0) || (fi.blockPenaltyMultiple || 0) > 0;
   const cfd = m.ops.some((o) => (o.lcMw || 0) > 0 || (o.penaltyWeeks || []).length > 0 || (o.chargingCostCr || 0) !== 0 || (o.pxFeesCr || 0) !== 0);
@@ -3146,6 +3146,7 @@ export function liveModelInput(raw) {
     dfrTarget: n(raw.dfrTarget),
     split: Boolean(raw.split),
     market: typeof raw.market === "string" ? raw.market.replace(/[^\w -]/g, "").slice(0, 20) : null,
+    sizedLabel: text(raw.sizedLabel, 80) || null, // who sized the plant (the CfD optimiser, a first guess, the bidder)
     on: Object.fromEntries(["solar", "wind", "hydro", "biomass", "thermal", "bess"].map((k) => [k, Boolean(raw.on?.[k])])),
     sizes: nums(raw.sizes, ["solarMw", "windMw", "bessMw", "bessMwh", "biomassMw", "hydroMw", "thermalMw"]),
     costs: {
