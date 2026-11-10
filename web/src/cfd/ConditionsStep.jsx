@@ -10,7 +10,7 @@ import "./pack.css";
 const ORDER = ["Scheme and bid", "Bid documents", "Eligibility", "Auction", "Bid security and charges", "Dates", "Plant", "Energy sourcing", "Daily supply", "CfD settlement", "Penalties and security"];
 // the amended term each replaced (original) term belongs under, for "as issued" beside the rule in force
 const WAS = { bid: ["ceiling"], settlement: ["slabs", "rfsSlabs", "over10"], essOwned: ["essThirdParty"], term: ["rfsTerm12"], essScd: ["rfsScd15"], emdValidityAmd: ["emdShortfall"] };
-const AMENDMENTS = new Set(["amd1", "amd2", "amd3"]);
+const AMENDMENTS = new Set(["amd1", "amd2", "amd3", "amd4"]);
 const clauseOf = (t) => t.clause.replace(/ \((amended|original.*|addendum.*)\)$/, "");
 
 function badge(t) {
@@ -45,7 +45,7 @@ export default function ConditionsStep({ state = null }) {
   const shown = (t) => only === "all" || (only === "amended" && (AMENDMENTS.has(t.doc) || t.status === "replaced")) || (only === "conflict" && t.status === "conflict") || (only === "rfs" && t.doc === "rfs" && !t.status) || (only === "cfda" && t.doc === "cfda");
   const provided = DOCUMENTS.filter((d) => d.file).map((d) => d.short).join(", ");
   return (
-    <Section index="2" title="Bid conditions" note="The RfS and the CfDA as they stand after Amendment-01, Amendment-02 and Amendment-03"
+    <Section index="2" title="Bid conditions" note="The RfS and the CfDA as they stand after Amendments 01 to 04"
       actions={(
         <div className="cfd-cond-filter" role="tablist">
           {[["all", "All"], ["amended", "Amended"], ["conflict", "Differ"], ["rfs", "RfS"], ["cfda", "CfDA"]].map(([id, label]) => (

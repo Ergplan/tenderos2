@@ -68,7 +68,7 @@ def test_conditions_have_sources_unless_missing():
         assert c["group"] in {"The tender", "What you bid", "Supply", "Plant", "Dates", "Money at stake", "Eligibility", "Bid process"}, c["id"]
         assert bool(c["sources"]) == (c["status"] != "missing"), c["id"]
         if c["status"] in {"amended", "removed", "ambiguous"}:
-            assert c.get("by") in {"amd1", "amd2", "amd3"}, c["id"]
+            assert c.get("by") in {"amd1", "amd2", "amd3", "amd4"}, c["id"]
 
 
 def test_the_sizing_terms_match_the_conditions():

@@ -22,7 +22,7 @@ export function QuoteLink({ quote, label = null }) {
   );
 }
 
-const FILTERS = [["all", "All"], ["amd1", "Amendment-01"], ["amd2", "Amendment-02"], ["amd3", "Amendment-03"]];
+const FILTERS = [["all", "All"], ["amd1", "Amendment-01"], ["amd2", "Amendment-02"], ["amd3", "Amendment-03"], ["amd4", "Amendment-04"]];
 
 /** A quote, or the parts of one that runs over a page break (each with its own page link). */
 function Quotes({ quote }) {

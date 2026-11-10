@@ -20,8 +20,9 @@ for (const t of TERMS) {
   assert.ok(doc && Number.isInteger(t.page) && t.page >= 1 && t.page <= doc.pages, `${t.id}: page within ${t.doc}`);
   assert.ok(t.quote.split(" ").length >= 6 && t.display && t.label, `${t.id}: quote and display`);
 }
-assert.deepEqual(TERMS.filter((t) => t.status === "replaced").map((t) => t.id), ["ceiling", "slabs", "essThirdParty", "rfsTerm12", "over10", "rfsSlabs", "rfsScd15", "emdShortfall"]);
-for (const t of TERMS.filter((t) => t.status === "replaced")) assert.ok(["amd2", "amd3"].includes(t.by), `${t.id}: which amendment replaced it`);
+assert.deepEqual(TERMS.filter((t) => t.status === "replaced").map((t) => t.id), ["ceiling", "seciHours", "lowPrices", "slabs", "essThirdParty", "rfsTerm12", "over10", "rfsSlabs", "rfsScd15", "emdShortfall"]);
+assert.ok(DOCUMENTS.some((d) => d.id === "amd4" && d.pages === 6) && TERMS.filter((t) => t.doc === "amd4").length >= 11, "Amendment-04 in the documents and the conditions");
+for (const t of TERMS.filter((t) => t.status === "replaced")) assert.ok(["amd2", "amd3", "amd4"].includes(t.by), `${t.id}: which amendment replaced it`);
 assert.deepEqual(TERMS.filter((t) => t.status === "conflict").map((t) => t.id), ["existingProjects", "essRemote", "essRecognised"], "where the RfS and the CfDA (or the RfS and Amendment-02) still differ");
 assert.ok(TERMS.length >= 240, "the audit against the RfS and the three amendments");
 assert.ok(TERMS.filter((t) => t.doc === "amd1").length >= 2 && DOCUMENTS.some((d) => d.id === "amd1"), "Amendment-01 is in the pack");

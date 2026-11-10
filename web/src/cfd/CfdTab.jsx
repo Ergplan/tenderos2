@@ -308,7 +308,7 @@ export default function CfdTab({ initialScenario = null }) {
   };
   const summary = {
     explain: `${nf(exampleMw(state))} MW, step by step`,
-    documents: "RfS, CfDA, Amendments 01–03",
+    documents: "RfS, CfDA, Amendments 01–04",
     conditions: "From the RfS, CfDA and amendments",
     bid: i.contractedMw ? `${nf(i.contractedMw)} MW` : "Not entered",
     design: designMissing.length ? `${designMissing.length} input${designMissing.length > 1 ? "s" : ""} needed` : `${nf(i.solarMw || 0)} MW solar${i.windMw ? `, ${nf(i.windMw)} MW wind` : ""}`,

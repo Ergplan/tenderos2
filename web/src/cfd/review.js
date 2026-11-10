@@ -6,7 +6,7 @@
 //   block  the bid fails the tender or cannot win as it stands
 //   warn   the price carries a cost the bidder can take out
 //   note   worth knowing before bid day; not a defect by itself
-import { BENCHMARKS, FIELDS, essRequiredPerMw, runModel, socWindow } from "./model.js";
+import { BENCHMARKS, FIELDS, essRequiredPerMw, poolFlows, runModel, socWindow } from "./model.js";
 import { TENDER } from "./terms.js";
 import { sizingChecks } from "./checks.js";
 import { SECI_RESULTS, tariffRange } from "../market/seed.js";
@@ -61,6 +61,15 @@ export function reviewBid({ state, model, finance = null, prices = null }) {
     const ratio = sp / award.hi;
     if (ratio > 1.5) add({ id: "price-market", severity: "block", title: `A strike price of ₹${nf(sp, 2)}/kWh is ${nf(ratio, 1)}× the highest FDRE peak-power award`, detail: `${award.tender} awarded ₹${nf(award.lo, 2)}–${nf(award.hi, 2)}/kWh for 4 hours of assured evening supply over 25 years. The CfD asks 2 hours for 15 years and pays through the market, so a quote far above those awards will not clear the auction. Find what carries the price in the findings below, then size again.`, step: "reference" });
     else if (sp > award.hi) add({ id: "price-market", severity: "warn", title: `₹${nf(sp, 2)}/kWh is above the highest FDRE peak-power award (₹${nf(award.hi, 2)})`, detail: `${award.tender}: ₹${nf(award.lo, 2)}–${nf(award.hi, 2)}/kWh for 4 hours a day over 25 years. A 2-hour CfD can sit above it, but the gap is what the auction will test.`, step: "reference" });
+  }
+
+  // ---- 2b. the award: what the CfD Pool pays at this price against its corpus (Amendment-04, RfS 42.2.b)
+  if (isNum(sp) && years.length) {
+    const flows = poolFlows(sim, sp);
+    const payYear = flows.reduce((a, f) => a + Math.max(0, -f.netCr), 0) / flows.length; // ₹ cr a year the Pool pays this plant, net
+    const perMw = payYear / X;
+    const all = perMw * TENDER.totalMw;
+    if (all > TENDER.poolCr) add({ id: "corpus-cap", severity: all > 3 * TENDER.poolCr ? "warn" : "note", title: `At ₹${nf(sp, 2)} the Pool pays about ₹${nf(payYear, 0)} cr a year for your ${nf(X)} MW; the full ${nf(TENDER.totalMw)} MW would need ₹${nf(all, 0)} cr a year against a ₹${nf(TENDER.poolCr)} cr corpus`, detail: `Amendment-04 (RfS 42.2.b) lets SECI restrict the capacity awarded to what the CfD corpus can carry at the discovered tariff. The Pool's pay-out is the strike price less the evening market price on every kWh settled (₹${nf(flows.reduce((a, f) => a + f.mcpAvg, 0) / flows.length, 2)}/kWh average MCP in your two best evening hours at the price year); the lower the strike price, the more of the 500 MW SECI can afford to award. A bid near the market price needs little from the Pool and is the one most likely to be awarded in full.`, step: "reference", cite: "corpusCap" });
   }
 
   // ---- 3. the plant: own RE not at its best

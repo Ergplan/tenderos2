@@ -57,9 +57,9 @@ def test_cfd_bid_end_to_end(tmp_path):
         assert "strike price" in text and "15" in text
         assert page.locator("[data-testid=cfd-flow]").count() == 1
 
-        # 02 documents: five documents, every amendment's changes, the filter
+        # 02 documents: six documents, every amendment's changes, the filter
         _step(page, "documents")
-        assert page.locator("[data-testid^=cfd-doc-]").count() == 5
+        assert page.locator("[data-testid^=cfd-doc-]").count() == 6
         assert page.locator("[data-testid^=cfd-change-]").count() >= 35
         page.click(".bid-filter button:has-text('Amendment-01')")
         assert 2 <= page.locator("[data-testid^=cfd-change-]").count() <= 6
@@ -325,7 +325,7 @@ def test_tender_to_bid_hands_a_cfd_set_to_the_cfd_tab():
     from pathlib import Path
 
     base = Path(__file__).resolve().parents[2] / "web" / "public" / "tenders" / "seci-cfd-i"
-    files = [str(base / n) for n in ("RfS.pdf", "Amendment-01.pdf", "Amendment-02.pdf", "Amendment-03.pdf")]
+    files = [str(base / n) for n in ("RfS.pdf", "Amendment-01.pdf", "Amendment-02.pdf", "Amendment-03.pdf", "Amendment-04.pdf")]
     with _session() as page:
         page.set_input_files("[data-testid=bid-file]", files)
         page.click("[data-testid=bid-read]")

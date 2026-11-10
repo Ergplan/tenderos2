@@ -8,8 +8,8 @@ an administrator grants it like the other tabs.
 | Step | Team | What it shows | Where |
 | --- | --- | --- | --- |
 | 01 What is a CfD | Tender / Legal | A plain-words explainer with a three-evening ₹5.70 table (every claim cites a term), the tender as a picture (energy and money flows, the timeline, a day of supply, the obligations in order), and the worked example for 50–150 MW | `ExplainStep.jsx`, `VisualModel.jsx`, `example.js`, `ExampleStep.jsx` |
-| 02 Tender & amendments | Tender / Legal | The five documents (RfS of 15.07.2026, the standard CfDA, Amendments 01–03), how the bid goes, the 37 changes clause by clause (was / now, with the page link), the points to raise with SECI | `pack.js`, `DocumentsStep.jsx`; the PDFs under `web/public/tenders/seci-cfd-i/` |
-| 03 Bid conditions | Tender / Legal | 251 conditions in 11 groups, each quoted word for word with its document, clause and page; the amended ones with "As issued"; the three where the RfS and the CfDA differ; Assign to Legal | `terms.js`, `ConditionsStep.jsx` |
+| 02 Tender & amendments | Tender / Legal | The six documents (RfS of 15.07.2026, the standard CfDA, Amendments 01–04), how the bid goes, the 40 changes clause by clause (was / now, with the page link), the points to raise with SECI | `pack.js`, `DocumentsStep.jsx`; the PDFs under `web/public/tenders/seci-cfd-i/` |
+| 03 Bid conditions | Tender / Legal | 249 conditions in force (262 with the superseded ones) in 11 groups, each quoted word for word with its document, clause and page; the amended ones with "As issued"; the three where the RfS and the CfDA differ; Assign to Legal | `terms.js`, `ConditionsStep.jsx` |
 | 04 Bid inputs | Projects | Contracted MW (50–150, whole MW), the Effective Date with every date that follows it, the market to sell in, the sourcing choices, merchant sale, after the term; money at stake (EMD, PBG, CAC, fees, net worth, liquidity) | `BidInputsStep.jsx`, `inputs.jsx` |
 | 05 Design | Design | Battery MWh and MW per contracted MW, own solar and wind, RE commissioning, availability, CUFs, RTE, degradation, augmentation; **Fill up for me please**; **Optimise own RE** | `DesignStep.jsx` |
 | 06 Finance inputs | Finance | Costs and financing; debt repayment (six methods), moratorium, instalments, refinancing; construction months, drawdown, funding order; working capital and the debt service reserve; **Size the plant** | `FinanceInputsStep.jsx` |
@@ -283,3 +283,17 @@ refinancing, an equity target above 15%, short days under the pay policy). The S
 `modelWorkbook.js`), the agent answers from it (`review_bid`), and `tools/check_cfd_review.mjs`
 asserts the uploaded 150 MW bid's findings and that the optimised benchmark bid has none of the
 plant findings.
+
+## Amendment-04 (05.11.2026)
+
+Three changes in the pack (`pack.js`, `a4-*`), the PDF under `web/public/tenders/seci-cfd-i/`:
+RfS 9.2.c and CfDA 4.4.2.iv rewritten as a procedure for SECI-designated hours (availability
+declared in MWh by 06:00 on D-1, else 100% of the contracted capacity deemed; SECI's blocks, price
+and quantum by 08:00 on D-1, or SECI bids on the RPD's behalf; up to 80% of the availability
+through TAM/G-TAM and the balance day-ahead, never above the contracted capacity in a block;
+deviations, DSM and every exchange charge the RPD's; sale elsewhere when MCPs stay low with
+SECI/MNRE approval), and RfS 42.2.b letting SECI restrict the capacity awarded to the CfD corpus.
+Eleven conditions carry it (`terms.js`, the Amd-03 wording of 9.2.c marked replaced), the
+explainer's picture cites it, the voice brief says it, and the Bid review sizes the Pool's pay-out
+at the bid's strike price against the ₹76 cr corpus (`corpus-cap`). Two points to raise with SECI
+are added (the deemed 100% against the 2 MWh/MW obligation; how a restricted award is cut).

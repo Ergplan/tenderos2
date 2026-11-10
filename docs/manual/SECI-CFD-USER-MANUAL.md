@@ -2,7 +2,7 @@
 
 *The CfD Bid tab, step by step: what is on each screen, what every button and box does, and what
 to click. Pictures are of the demo installation (SECI CfD-I, RfS No. SECI/C&P/IPP/13/0002/26-27
-dated 15.07.2026, 1,000 MWh of assured peak supply, Amendments 01 to 03 in force).*
+dated 15.07.2026, 1,000 MWh of assured peak supply, Amendments 01 to 04 in force).*
 
 The tab follows the SECI RTC tender tab exactly: the same sidebar, heading tools (Save, Team,
 Open, Reset inputs), step chips with the owning team, boxes with pings, evidence and feedback, the
@@ -100,7 +100,7 @@ real IEX evenings settled, a Contract Week with a missed evening, a year of even
 
 **1 · Documents.** The RfS of 15.07.2026 (it replaces the one of 17.04.2026), the standard CfD
 Agreement (not provided to the demo: its quotes are kept from the standard text), Amendment-01
-(17.07.2026), Amendment-02 (03.08.2026) and Amendment-03 (08.10.2026). **Open the PDF** on each
+(17.07.2026), Amendment-02 (03.08.2026), Amendment-03 (08.10.2026) and Amendment-04 (05.11.2026). **Open the PDF** on each
 card.
 
 **1.1 · How the bid goes.** From registration on ISN-ETS to the RfS cost and bid fee, the pre-bid
@@ -108,13 +108,25 @@ meeting, the bid with the EMD, evaluation, the financial bid, the e-Reverse Auct
 PBG and Contract Administration Charges within 20 days, the CfDA within 30 days, financial
 closure, the SCD; each with its page.
 
-**1.2 · What the amendments changed.** All 37 changes (4 in Amendment-01, 11 in Amendment-02, 22
-in Amendment-03) as the clause stood and as amended, quoted, with the page link and one sentence
-on what it means for you. Filter **All / Amendment-01 / Amendment-02 / Amendment-03**. The big
+**1.2 · What the amendments changed.** All 40 changes (4 in Amendment-01, 11 in Amendment-02, 22
+in Amendment-03, 3 in Amendment-04) as the clause stood and as amended, quoted, with the page link and one sentence
+on what it means for you. Filter **All / Amendment-01 / Amendment-02 / Amendment-03 / Amendment-04**. The big
 ones: the battery is now mandatory and yours (Amd-02), the RE may come 36 months in with 75% of
 charging power from the market meanwhile (Amd-02), the settlement is full pass-through so you
 always net the strike price (Amd-03), the term is 15 years (Amd-03), the ₹5.80 ceiling is gone
 (Amd-03), TAM and G-TAM are allowed markets (Amd-03).
+
+*Amendment-04 (05.11.2026).* The operating routine behind SECI's right to designate the Peak
+Hours: you declare the day's availability in MWh by 06:00 on D-1 (silence means 100% of the
+contracted capacity, and you must deliver it); SECI tells you the time blocks, price and quantum
+by 08:00 on D-1, or bids on your behalf; up to 80% of the availability may be sold term-ahead
+(TAM/G-TAM) and the balance day-ahead, never more than the contracted MW in any block and never
+the same energy twice; every deviation, DSM charge and exchange fee is yours (SECI recovers what
+it pays from your next monthly bill); selling elsewhere when prices stay below the strike price
+needs SECI/MNRE approval. And RfS 42.2.b now lets SECI award less than 500 MW: the capacity
+awarded is what the CfD corpus can carry at the discovered strike price. The Bid review (6.6)
+sizes the Pool's pay-out at your price against the ₹76 cr corpus; the lower your strike price,
+the more of the 500 MW SECI can afford to award.
 
 **1.3 · Clarifications.** None issued so far.
 
@@ -129,7 +141,7 @@ for existing projects that points to a clause reading "Not used"; and others).
 
 ![Bid conditions](img/cfd-03-conditions-full.jpg)
 
-**2 · Bid conditions.** All 251 conditions in eleven groups (Scheme and bid, Bid documents,
+**2 · Bid conditions.** All 249 conditions in force in eleven groups (Scheme and bid, Bid documents,
 Auction, Daily supply, CfD settlement, Plant, Energy sourcing, Dates, Bid security and charges,
 Penalties and security, Eligibility): the rule in one line, the quote word for word, the document,
 clause and page link. Badges: *As issued*, *Amended · Amd-0x*, *Replaced · Amd-0x* (the original

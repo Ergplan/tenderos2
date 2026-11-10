@@ -141,9 +141,9 @@ export function tenderLookup(query, limit = 6) {
   return scored.slice(0, limit).map((x) => termOut(x.t));
 }
 
-/** What one amendment (amd1, amd2, amd3, or "all") changed: the terms it states, and the ones it replaced. */
+/** What one amendment (amd1 to amd4, or "all") changed: the terms it states, and the ones it replaced. */
 export function amendmentChanges(which = "all") {
-  const ids = which === "all" ? ["amd1", "amd2", "amd3"] : [String(which).toLowerCase().replace(/amendment[- ]?0?/, "amd").replace(/^0?(\d)$/, "amd$1")];
+  const ids = which === "all" ? ["amd1", "amd2", "amd3", "amd4"] : [String(which).toLowerCase().replace(/amendment[- ]?0?/, "amd").replace(/^0?(\d)$/, "amd$1")];
   const out = [];
   for (const id of ids) {
     const doc = docById[id];
@@ -194,10 +194,10 @@ const obj = (properties = {}, required = []) => ({ type: "object", properties, r
 export const AGENT_TOOLS = [
   { type: "function", name: "get_status", description: "The bid as it stands on screen: the step shown, what is bid, the plant, inputs still needed, whether the optimiser runs, the strike price for the target IRR and the quoted strike price. Call it first and whenever unsure.", parameters: obj() },
   { type: "function", name: "explain_cfd", description: "What a Contract for Difference is in plain words, with this bid's strike price when there is one. Use when the user asks what a CfD is or how they get paid.", parameters: obj() },
-  { type: "function", name: "tender_brief", description: "The key conditions of SECI CfD-I after Amendments 01 to 03, as short spoken paragraphs. Use at the start of the guided exercise.", parameters: obj() },
+  { type: "function", name: "tender_brief", description: "The key conditions of SECI CfD-I after Amendments 01 to 04, as short spoken paragraphs. Use at the start of the guided exercise.", parameters: obj() },
   { type: "function", name: "tender_lookup", description: "Search the tender's conditions (RfS, CfD Agreement, amendments), each with document, clause, page and quote. Pass words (e.g. 'EMD', 'peak hours', 'net worth', 'penalty') or an exact condition id.", parameters: obj({ query: { type: "string" } }, ["query"]) },
   { type: "function", name: "list_conditions", description: "Every condition in force, by group, with document, clause and page. Pass a group to narrow (e.g. 'Dates', 'Plant', 'Energy sourcing', 'CfD settlement').", parameters: obj({ group: { type: ["string", "null"] } }, ["group"]) },
-  { type: "function", name: "amendment_changes", description: "What an amendment changed: the terms it states and the ones it replaced. amendment: 'amd1', 'amd2', 'amd3' or 'all'.", parameters: obj({ amendment: { type: "string", enum: ["amd1", "amd2", "amd3", "all"] } }, ["amendment"]) },
+  { type: "function", name: "amendment_changes", description: "What an amendment changed: the terms it states and the ones it replaced. amendment: 'amd1', 'amd2', 'amd3', 'amd4' or 'all'.", parameters: obj({ amendment: { type: "string", enum: ["amd1", "amd2", "amd3", "amd4", "all"] } }, ["amendment"]) },
   { type: "function", name: "next_question", description: "The next input of the guided exercise, in order: the question to ask, its current value and the benchmark. Inputs set with set_input count as answered. Pass `keep` with an input key when the bidder keeps its current value ('next', 'same'), or keep_rest true to accept every remaining value as it stands.", parameters: obj({ keep: { type: ["string", "null"] }, keep_rest: { type: "boolean" } }, ["keep", "keep_rest"]) },
   { type: "function", name: "list_inputs", description: "The inputs of one step with their keys, current values, units, ranges and benchmarks. Percent inputs are in percent.", parameters: obj({ part: { type: "string", enum: ["bid", "design", "financeInputs", "finance", "all"] } }, ["part"]) },
   { type: "function", name: "set_input", description: "Change one input on screen and show it. `value` is what the bidder said: a number (percent inputs in percent, 24 means 24%), a choice key or label, a date (YYYY-MM-DD), yes/no.", parameters: obj({ key: { type: "string" }, value: { type: ["string", "number", "boolean"] } }, ["key", "value"]) },
