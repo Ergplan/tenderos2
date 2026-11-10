@@ -18,7 +18,7 @@ export function Fields({ state, setInput, section, only, lockProps = null }) {
     <div className="rtc-grid rtc-grid-4 cfd-fields">
       {list.map((f) => (
         <div key={f.key} className={`has-assign ${state.filled[f.key] ? "bid-benchmark" : ""}`} data-testid={`cfd-in-${f.key}`} data-voice={`inputs.${f.key}`}>
-          <Field label={f.label} unit={f.pct ? undefined : f.unit} pct={Boolean(f.pct)} value={state.inputs[f.key]} step={f.step} min={f.min} max={f.max}
+          <Field label={f.label} unit={f.pct ? undefined : f.unit} pct={Boolean(f.pct)} value={state.inputs[f.key]} step={f.step} min={f.min} max={f.max} allowEmpty={Boolean(f.optional)}
             onChange={(v) => setInput(f.key, v)} hint={[f.pct && f.unit !== "%" ? f.unit : null, state.filled[f.key] ? "benchmark" : null, f.hint].filter(Boolean).join(" · ")}
             {...(lockProps ? lockProps(`inputs.${f.key}`) : {})} />
           <AssignButton compact target={{ kind: f.section === "fin" ? "finance" : f.section === "costs" ? "cost" : "field", key: `inputs.${f.key}`, label: f.label, context: { unit: f.unit, pct: Boolean(f.pct), type: "number" } }} />

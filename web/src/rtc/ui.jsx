@@ -35,7 +35,7 @@ export function LockButton({ locked, onToggle, title }) {
   );
 }
 
-export function NumberInput({ value, onCommit, disabled, step = "any", scale = 1, digits = 4, min, max }) {
+export function NumberInput({ value, onCommit, disabled, step = "any", scale = 1, digits = 4, min, max, allowEmpty = false }) {
   const [draft, setDraft] = useState(null);
   const shown = Number.isFinite(value) ? String(Number((value * scale).toFixed(digits))) : "";
   return (
@@ -47,6 +47,8 @@ export function NumberInput({ value, onCommit, disabled, step = "any", scale = 1
       onChange={(e) => {
         setDraft(e.target.value);
         const n = parseFloat(e.target.value);
+        // an optional input emptied is "not set" (null), so a typed value can be taken back
+        if (allowEmpty && e.target.value === "") { onCommit(null); return; }
         if (Number.isFinite(n)) {
           let v = n;
           if (min !== undefined) v = Math.max(min, v);
@@ -60,7 +62,7 @@ export function NumberInput({ value, onCommit, disabled, step = "any", scale = 1
 }
 
 /** Label + number input + lock toggle. Locked fields cannot be edited. */
-export function Field({ label, value, onChange, locked, onLock, unit, pct = false, step, min, max, hint, disabled, digits, lockDisables = true }) {
+export function Field({ label, value, onChange, locked, onLock, unit, pct = false, step, min, max, hint, disabled, digits, lockDisables = true, allowEmpty = false }) {
   return (
     <div className={`rtc-field ${locked ? "is-locked" : ""}`}>
       <div className="rtc-field-top">
@@ -68,7 +70,7 @@ export function Field({ label, value, onChange, locked, onLock, unit, pct = fals
         {onLock && <LockButton locked={locked} onToggle={onLock} />}
       </div>
       <div className="rtc-field-input">
-        <NumberInput value={value} onCommit={onChange} disabled={disabled || (locked && lockDisables)} step={step} scale={pct ? 100 : 1} digits={digits ?? 4} min={min} max={max} />
+        <NumberInput value={value} onCommit={onChange} disabled={disabled || (locked && lockDisables)} step={step} scale={pct ? 100 : 1} digits={digits ?? 4} min={min} max={max} allowEmpty={allowEmpty} />
         {(unit || pct) && <em>{pct ? "%" : unit}</em>}
       </div>
       {hint && <small>{hint}</small>}

@@ -46,8 +46,8 @@ export const FIELDS = [
   { section: "resource", key: "windCuf", label: "Wind CUF", unit: "%", pct, min: 5, max: 60, step: 0.1, hint: "Needed only with own wind" },
   { section: "resource", key: "windDegradation", label: "Wind degradation", unit: "%/yr", pct, min: 0, max: 3, step: 0.05, hint: "0 for none" },
   { section: "resource", key: "rte", label: "Battery round-trip efficiency (AC)", unit: "%", pct, min: 60, max: 100, step: 0.5, hint: "Where it is quoted is set under Losses (the PCS output unless you change it)" },
-  { section: "resource", key: "essSocMin", label: "Minimum state of charge", unit: "%", pct, min: 0, max: 50, step: 1, hint: "Usable energy = (maximum − minimum) × nameplate; the tender's 2 MWh per MW must be usable" },
-  { section: "resource", key: "essSocMax", label: "Maximum state of charge", unit: "%", pct, min: 50, max: 100, step: 1, hint: "Usable energy = (maximum − minimum) × nameplate" },
+  { section: "resource", key: "essSocMin", label: "Minimum state of charge", unit: "%", pct, min: 0, max: 50, step: 1, optional: true, hint: "Leave empty for a quote in usable energy; else the supplier's window in percent (10 for 10%). Usable energy = (maximum − minimum) × nameplate" },
+  { section: "resource", key: "essSocMax", label: "Maximum state of charge", unit: "%", pct, min: 50, max: 100, step: 1, optional: true, hint: "Leave empty for a quote in usable energy; else the supplier's window in percent (90 for 90%)" },
   { section: "resource", key: "essDegradation", label: "Battery degradation", unit: "%/yr", pct, min: 0, max: 5, step: 0.1 },
   // ---- sourcing and markets
   { section: "sourcing", key: "marketCharges", label: "Charges on green-market power", unit: "₹/kWh", min: 0, max: 3, step: 0.01, hint: "Exchange fee, transmission charges and losses on power bought in the GDAM" },
