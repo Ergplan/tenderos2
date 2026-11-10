@@ -335,3 +335,27 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.ok(essRequiredPerMw(noAug).shortYear === 2, `without augmentation a 2 MWh per MW battery falls short from year 2 (${essRequiredPerMw(noAug).shortYear})`);
   console.log(`CfD battery need: window 90% → ${essRequiredPerMw(win).energy} MWh/MW; with losses → ${need.energy} MWh and ${need.power} MW per MW; no augmentation at 2%/yr → short from year ${essRequiredPerMw(noAug).shortYear}`);
 }
+
+// ---- the finance team's augmentation schedule reaches the day-by-day operation: the battery's usable
+// capacity is restored in the scheduled years (the shared engine's convention), not faded from year 1
+{
+  const { bessCapFactor } = await import("../web/src/cfd/model.js");
+  const base = { essDegradation: 0.02, augmentation: "none" };
+  near(bessCapFactor(base, 1), 1, 1e-12, "year 1 at nameplate");
+  near(bessCapFactor(base, 6), 0.9, 1e-12, "no augmentation: faded from year 1");
+  near(bessCapFactor({ ...base, augmentation: "annual" }, 10), 1, 1e-12, "annual: kept");
+  const sched = { ...base, augmentationMode: "schedule", augmentationYears: [4, 8] };
+  near(bessCapFactor(sched, 3), 0.96, 1e-12, "schedule: fading before the first augmentation");
+  near(bessCapFactor(sched, 4), 1, 1e-12, "schedule: restored in the augmentation year");
+  near(bessCapFactor(sched, 7), 0.94, 1e-12, "schedule: fading since year 4");
+  near(bessCapFactor(sched, 9), 0.98, 1e-12, "schedule: fading since year 8");
+  near(bessCapFactor({ ...base, augmentationMode: "oneTime", augmentationYear: 5 }, 5), 1, 1e-12, "one-time: restored in its year");
+  near(bessCapFactor({ ...base, augmentationMode: "oneTime", augmentationYear: 5 }, 4), 0.94, 1e-12, "one-time: faded before it");
+  const st = fillBenchmarks(defaultCfdState());
+  st.inputs.solarMw = 160;
+  st.bess = { augmentation: "schedule", augmentationYears: [4] };
+  const mi = modelInputs(st);
+  assert.equal(mi.augmentationMode, "schedule");
+  assert.deepEqual(mi.augmentationYears, [4]);
+  console.log("CfD battery augmentation schedule reaches the operation: ok");
+}

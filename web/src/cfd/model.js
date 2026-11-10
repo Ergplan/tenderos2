@@ -460,6 +460,27 @@ export function lossFactorsOfCfd(state, rte = state?.inputs?.rte) {
 // ---------------------------------------------------------------- operations
 
 /**
+ * The battery's usable capacity in an operating year as a share of nameplate: 1 with annual
+ * augmentation; faded by the degradation since the last augmentation with a one-time year or a
+ * schedule (the finance team's choice, inputs.augmentationMode / augmentationYears, the same
+ * convention as the shared financial engine); faded from year 1 with none. Never below 40%.
+ */
+export function bessCapFactor(inputs, year) {
+  const deg = isNum(inputs.essDegradation) ? inputs.essDegradation : 0;
+  const mode = inputs.augmentationMode || inputs.augmentation;
+  if (mode === "annual") return 1;
+  if (mode === "oneTime" && isNum(inputs.augmentationYear) && inputs.augmentationYear > 1) {
+    const since = year >= inputs.augmentationYear ? year - inputs.augmentationYear : year - 1;
+    return Math.max(0.4, 1 - deg * since);
+  }
+  if (mode === "schedule") {
+    const last = (inputs.augmentationYears || []).map((v) => Math.round(v)).filter((v) => v > 1 && v <= year).reduce((a, b) => Math.max(a, b), 1);
+    return Math.max(0.4, 1 - deg * (year - last));
+  }
+  return Math.max(0.4, 1 - deg * (year - 1));
+}
+
+/**
  * Every day of the term. Returns totals per Contract Year (and the weeks for the penalty), plus
  * the hourly flows of the days asked for in `record` (day numbers from the SCD). `onDay(k, day)`
  * receives every day's hourly flows as they are computed (the 15-minute dispatch reads them).
@@ -536,7 +557,7 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
     const escE = path.evening[year - 1]; // the evening band (the peak hours)
     const escOf = (h) => (h < TENDER.peakStart ? escM : escE);
     const solarF = (1 - inputs.solarDegradation) ** (year - 1);
-    const cap = inputs.augmentation === "annual" ? capNominal : capNominal * Math.max(0.4, 1 - inputs.essDegradation * (year - 1));
+    const cap = capNominal * bessCapFactor(inputs, year);
     const reOn = t >= reCod;
     const extra = t < dates.extraUntil;
     const d = priceDay(t);
@@ -979,6 +1000,12 @@ export function modelInputs(state) {
   if (ps) i.profileSources = ps;
   const loss = lossFactorsOfCfd(state, i.rte);
   if (loss) i.loss = loss;
+  // the finance team's augmentation choice (one-time or a schedule) reaches the day-by-day operation
+  if (state.bess?.augmentation) {
+    i.augmentationMode = state.bess.augmentation;
+    if (Array.isArray(state.bess.augmentationYears)) i.augmentationYears = state.bess.augmentationYears.filter(isNum);
+    if (isNum(state.bess.augmentationYear)) i.augmentationYear = state.bess.augmentationYear;
+  }
   return i;
 }
 

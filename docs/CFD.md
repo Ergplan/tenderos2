@@ -249,3 +249,13 @@ the model's. `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) runs the same
 bid state and answers with the ZIP (`format: "zip"`: one CSV per Contract Year, the two
 summaries, the inputs, a README) or the workbook (`format: "xlsx"`, written with ExcelJS's
 streaming writer: About, Summary, Monthly, one sheet per Contract Year).
+
+## Battery augmentation in the operation
+
+The finance team's augmentation choice (annual, none, one-time year, or a schedule of years on the
+Finance inputs step) reaches the day-by-day operation as well as the financial model:
+`bessCapFactor(inputs, year)` in `model.js` gives the usable capacity of an operating year as a
+share of nameplate by the shared engine's convention (restored in an augmentation year, faded by
+the degradation since the last one, never below 40%), and `simulate` sizes each day's charging to
+it. Before 10 Nov 2026 the operation faded the battery from year 1 whenever the choice was not
+annual, while the financial model paid for the scheduled augmentation: the two now agree.

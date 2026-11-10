@@ -449,8 +449,10 @@ function addConstructionSheet(wb, sheets, S, { base, months, profile, order, deb
       } else v = pr.amountV * share;
       by[k] = v;
       cost += v;
+      // a window of zero months (no construction months set) spends nothing here: the IDC is then
+      // inside the pre-operative share, and the division by the window must not be reached
       const win = pr.has
-        ? `IF(${pr.has}=1,IF(OR(${A}>${P.months},(${A}-${pr.start})/${pr.months}<=0,(${A}-1-${pr.start})/${pr.months}>=1),0,${pr.amount}*(${cumF(`MIN(1,(${A}-${pr.start})/${pr.months})`)}-${cumF(`MAX(0,(${A}-1-${pr.start})/${pr.months})`)})),${pr.amount}*$B${row})`
+        ? `IF(${pr.has}=1,IF(OR(${P.months}<=0,${pr.months}<=0),0,IF(OR(${A}>${P.months},(${A}-${pr.start})/${pr.months}<=0,(${A}-1-${pr.start})/${pr.months}>=1),0,${pr.amount}*(${cumF(`MIN(1,(${A}-${pr.start})/${pr.months})`)}-${cumF(`MAX(0,(${A}-1-${pr.start})/${pr.months})`)}))),${pr.amount}*$B${row})`
         : `${pr.amount}*$B${row}`;
       S.put(rr.getCell(C0 + i), { f: win, v, fmt: "cr" });
     });

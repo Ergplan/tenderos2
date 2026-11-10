@@ -11,7 +11,7 @@
 import * as E from "../rtc/engine.js";
 import { genSource } from "../model/generation.js";
 import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
-import { BENCHMARK_NOTE, BG_YEARS, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
+import { BENCHMARK_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
 import { TENDER } from "./terms.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -148,7 +148,15 @@ export function quotedStrikeReturns(state, model, finance, quote) {
 /** The input-source labels the Live model reads, by the engine's keys. */
 function liveSources(state) {
   const s = (k) => sourceOf(state, k);
+  // every finance input that differs from the model's default is the bidder's (fin.refiYear and
+  // the like), so the Inputs sheet does not call a changed value "Model default"
+  const fin = {};
+  for (const [k, v] of Object.entries(state.fin || {})) {
+    if (v === undefined || v === null) continue;
+    if (JSON.stringify(v) !== JSON.stringify(CFD_FIN_DEFAULTS[k]) && JSON.stringify(v) !== JSON.stringify(E.DEFAULT_FINANCE[k])) fin[`fin.${k}`] = "Your input";
+  }
   return {
+    ...fin,
     "solar.capex": s("solarCrPerMw"), "wind.capex": s("windCrPerMw"), "bess.capex": s("essCrPerMwh"), "costs.evacuationCr": s("evacuationCrPerMw"), "costs.preopPct": s("preopPct"),
     "solar.om": s("solarOmLakhPerMw"), "wind.om": s("windOmLakhPerMw"), "bess.om": s("essOmLakhPerMwh"), "fin.omEscalation": s("omEscalation"), "fin.insurancePct": s("insurancePct"), "fin.otherFixedCr": s("otherFixedLakhPerMw"),
     "market.sell": s("merchant"), "bess.augmentation": s("augmentation"), "bess.degradation": s("essDegradation"), "bess.costDeclinePct": s("augDecline"),
