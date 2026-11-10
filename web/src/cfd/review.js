@@ -143,7 +143,7 @@ export function reviewBid({ state, model, finance = null, prices = null }) {
   const after = years.filter((y) => y.start >= sim.dates.extraUntil && y.reDays > 0);
   if (after.length) {
     const hi = Math.max(...after.map((y) => y.shareMarket));
-    if (hi > 0.9 * TENDER.marketShare) add({ id: "market-near-cap", severity: "note", title: `Green-market charging reaches ${pf(hi, 1)} of the supply after month 36 (limit ${pf(TENDER.marketShare, 0)})`, detail: "Close to the cap, a dear day or a thin GDAM leaves the battery short. More own RE, or group RE within its 50% limit, gives room.", step: "size", cite: "market25" });
+    if (hi > 0.9 * TENDER.marketShare && hi <= TENDER.marketShare + 0.005) add({ id: "market-near-cap", severity: "note", title: `Green-market charging reaches ${pf(hi, 1)} of the supply after month 36 (limit ${pf(TENDER.marketShare, 0)})`, detail: "Close to the cap, a dear day or a thin GDAM leaves the battery short. More own RE, or group RE within its 50% limit, gives room.", step: "size", cite: "market25" });
   }
 
   // ---- 7. inputs far from the benchmarks

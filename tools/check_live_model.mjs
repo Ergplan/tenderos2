@@ -469,8 +469,12 @@ const numberAt = (ws, addr) => {
   // financial model paid for a year-4 augmentation only. With the same inputs and the battery kept,
   // the rebuild lands within ₹0.15 of it; with the fade reaching the operation (as now), the last
   // year delivers under 90% of the mandate and the price is about ₹0.9 higher
+  // The file's build also set the sourcing limits on the mandate; since 10 Nov 2026 they are set on
+  // the planned supply (the mandate at the plant's availability, as Amendment-02 reads them), which
+  // buys 3% less charging power on this bid and adds about ₹0.5/kWh to it. With the battery kept
+  // the rebuild therefore lands near ₹26.06 against the file's ₹25.534, the gap being that basis.
   const kept = runCfdFinance(c.s, runCfdModel({ ...c.s, bess: null }, JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"))));
-  assert.ok(Math.abs(kept.tariff - 25.534) < 0.15, `the file's strike price reproduced with the battery kept: ₹${kept.tariff.toFixed(3)}/kWh vs ₹25.534`);
+  assert.ok(kept.tariff > 25.534 && kept.tariff < 25.534 + 0.7, `the file's strike price reproduced with the battery kept, up to the sourcing limits' basis: ₹${kept.tariff.toFixed(3)}/kWh vs ₹25.534`);
   assert.ok(f.tariff > kept.tariff + 0.5 && f.tariff < kept.tariff + 1.2, `the fade's cost: ₹${f.tariff.toFixed(3)} vs ₹${kept.tariff.toFixed(3)} with the battery kept`);
   assert.ok(f.rows[f.rows.length - 1].deliveredMu < 0.9 * f.rows[f.rows.length - 1].demandMu, "the last year delivers under 90% of the mandate once the battery has faded");
   assert.ok(Math.abs(f.capex.total - 1262.47) < 15, `project cost ₹${f.capex.total.toFixed(1)} cr vs the file's ₹1,262.5 cr`);

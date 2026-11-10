@@ -18,12 +18,17 @@ export function sizingChecks(model, state = { inputs: model.inputs, losses: null
   const years = sim.years;
   const X = i.contractedMw;
   const after = years.filter((y) => y.start >= sim.dates.extraUntil);
+  // the shares are measured on the energy supplied, as Amendment-02 reads them; the model budgets
+  // the purchases day by day on the planned supply (the mandate at the plant's availability), so
+  // on a year with short days the ex-post share can sit a few tenths of a point over the budget:
+  // half a point of tolerance separates that from a real breach
+  const TOL = 0.005;
   const marketOk = years.every((y) => {
-    const extraDays = y.marketCapMwh / (X * TENDER.mwhPerMwDay) - TENDER.marketShare * y.days;
+    const extraDays = y.marketCapMwh / (X * TENDER.mwhPerMwDay * i.availability) - TENDER.marketShare * y.days;
     const cap = y.days ? (TENDER.marketShare * y.days + Math.max(0, extraDays)) / y.days : TENDER.marketShare;
-    return y.shareMarket <= cap + 1e-6;
+    return y.shareMarket <= cap + TOL;
   });
-  const groupOk = years.every((y) => y.shareGroup * y.requiredMwh <= y.groupCapMwh + 1e-6);
+  const groupOk = years.every((y) => y.shareGroup <= (y.days ? y.groupCapMwh / (y.requiredMwh * i.availability) : TENDER.groupShare) + TOL);
   const shortDays = years.reduce((a, y) => a + y.shortDays, 0);
   const penaltyWeeks = years.reduce((a, y) => a + y.weeks.filter((w) => w.beyondMwh > 1e-6).length, 0);
   const supply = years.reduce((a, y) => a + y.deliveredMwh, 0) / Math.max(1e-9, years.reduce((a, y) => a + y.requiredMwh, 0));

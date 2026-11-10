@@ -234,16 +234,16 @@ export default function SizeStep({ state, model, prices, optimise, optimising, s
         <div className="cfd-table" data-testid="cfd-ops-table">
           <div className="cfd-row head"><span>Contract Year</span><span>Supplied</span><span>Own RE</span><span>Green market</span><span>Group RE</span><span>Charging bought</span><span>Own RE at cost</span><span>Surplus sold</span><span>Weeks penalised</span></div>
           {years.map((y) => {
-            const extraDays = y.marketCapMwh / (X * TENDER.mwhPerMwDay) - TENDER.marketShare * y.days;
+            const extraDays = y.marketCapMwh / (X * TENDER.mwhPerMwDay * i.availability) - TENDER.marketShare * y.days;
             const cap = y.days ? (TENDER.marketShare * y.days + Math.max(0, extraDays)) / y.days : TENDER.marketShare;
-            const marketOk = y.shareMarket <= cap + 1e-6;
+            const marketOk = y.shareMarket <= cap + 0.005;
             return (
               <div key={y.index} className={`cfd-row ${y.shortDays ? "bad" : ""}`}>
                 <span><strong>CY {y.index}</strong><small>{fmtDate(y.start)} · {y.days} days</small></span>
                 <span>{pf(y.supplyShare, 1)}<small>{nf(y.deliveredMwh / 1000, 1)} GWh</small></span>
                 <span>{pf(y.shareOwn, 1)}</span>
                 <span className={marketOk ? "ok" : "bad"}>{marketOk ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {pf(y.shareMarket, 1)}<small>limit {pf(cap, 0)}</small></span>
-                <span>{pf(y.shareGroup, 1)}<small>limit {pf(y.groupCapMwh / Math.max(1, y.requiredMwh), 0)}</small></span>
+                <span>{pf(y.shareGroup, 1)}<small>limit {pf(y.groupCapMwh / Math.max(1, y.requiredMwh * i.availability), 0)}</small></span>
                 <span>₹{nf(y.marketCostCr + y.groupCostCr, 2)} cr<small>paid to the market</small></span>
                 <span data-testid={`cfd-own-cost-${y.index}`}>₹{nf(ownCost === null ? 0 : (y.chargeOwnMwh * ownCost) / 1e4, 2)} cr<small>total ₹{nf(y.marketCostCr + y.groupCostCr + (ownCost === null ? 0 : (y.chargeOwnMwh * ownCost) / 1e4), 1)} cr</small></span>
                 <span>{nf(y.merchantMwh / 1000, 1)} GWh<small>₹{nf(y.merchantRevCr, 1)} cr</small></span>

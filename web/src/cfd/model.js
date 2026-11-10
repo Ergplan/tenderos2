@@ -609,11 +609,15 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
       if (t < dates.extraUntil) extraDays += 1; else groupDays += 1;
     }
     const daily = X * TENDER.mwhPerMwDay;
+    // the sourcing limits are shares of the energy supplied (Amendment-02: on the energy
+    // discharged), so they are set on the mandate at the plant's availability, which is what the
+    // plant supplies; measured against the supply they then sit at 25% and 50%, not above
+    const supplied = daily * avail;
     return {
       ...cy,
       requiredMwh: daily * cy.days,
-      marketCapMwh: inputs.useMarket ? daily * (TENDER.marketShare * cy.days + TENDER.extraMarketShare * extraDays) : 0,
-      groupCapMwh: inputs.useGroup ? daily * TENDER.groupShare * groupDays : 0,
+      marketCapMwh: inputs.useMarket ? supplied * (TENDER.marketShare * cy.days + TENDER.extraMarketShare * extraDays) : 0,
+      groupCapMwh: inputs.useGroup ? supplied * TENDER.groupShare * groupDays : 0,
       ...blank(),
     };
   });
@@ -673,7 +677,11 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
       const c = Math.min(sol[h] + wnd[h], room[h], chargeLeft);
       own[h] = c; room[h] -= c; chargeLeft -= c;
     }
-    // then bought power, cheapest first, within the Contract Year's limits (MWh supplied)
+    // then bought power, cheapest first, within the Contract Year's limits (MWh supplied): the
+    // year's budget on the planned supply, open from the first day as an operator working to an
+    // annual limit on a forecast would (a budget that follows the supply to date spirals: one short
+    // day shrinks the next day's budget); on a year with short days the share measured on the
+    // energy actually supplied sits a few tenths of a point over, which the checks allow for
     if (chargeLeft > 1e-9 && (inputs.useMarket || (inputs.useGroup && !extra))) {
       const offers = [];
       if (inputs.useMarket) for (const h of book.buyOrder[d]) offers.push({ h, src: "m", price: book.buy[b + h] * escM + inputs.marketCharges });
@@ -1172,10 +1180,16 @@ export async function optimiseOwnRe(state, prices, { onProgress, signal, price =
   const coarse = (maxMul) => Array.from({ length: 41 }, (_, i) => Math.round((i / 40) * maxMul * X));
   const fine = (center) => Array.from({ length: 21 }, (_, i) => Math.max(0, Math.round(center + (i - 10) * 0.01 * X)));
   const hasWind = (base.windMw || 0) > 0 && isNum(base.windCuf);
-  const total = 41 + 21 + (hasWind ? 62 : 0);
-  let done = await scan("solar", coarse(3), total, 0);
-  done = await scan("solar", fine(best.solarMw), total, done);
-  if (hasWind) {
+  // a locked size is the bidder's decision (the lock on the Bid inputs step): the optimiser keeps it
+  const solarLocked = Boolean(state.locks?.solarMw);
+  const windLocked = Boolean(state.locks?.windMw);
+  const total = (solarLocked ? 0 : 62) + (hasWind && !windLocked ? 62 : 0);
+  let done = 0;
+  if (!solarLocked) {
+    done = await scan("solar", coarse(3), total, 0);
+    done = await scan("solar", fine(best.solarMw), total, done);
+  }
+  if (hasWind && !windLocked) {
     done = await scan("wind", coarse(2), total, done);
     await scan("wind", fine(best.windMw), total, done);
   }

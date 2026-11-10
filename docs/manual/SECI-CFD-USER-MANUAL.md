@@ -334,7 +334,9 @@ online: own RE, the green market, group RE; own generation, charged from own RE,
 curtailed.
 
 **6.3 · Every Contract Year.** The table of Contract Years (April to March from the SCD): required
-and delivered energy, the shares by source against the limits, **Charging bought** (what you pay
+and delivered energy, the shares by source against the limits (shares of the energy supplied, as
+Amendment-02 reads them; the model budgets the purchases on the planned supply, so a year with
+short days can sit a few tenths of a point over, which the checks allow for), **Charging bought** (what you pay
 the exchange and group companies), **Own RE at cost** (the energy your own plant put into the
 battery, valued at what the plant costs you per unit: the RE capex annualised at the discount
 rate over its life plus O&M, over the energy it makes, about ₹2.2/kWh on the benchmarks; the

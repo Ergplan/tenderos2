@@ -331,3 +331,12 @@ policy, when). `ownReSource(state)` in `model.js` reads it against the inputs as
 in, "your size" when typed (with a note when the optimiser's result was changed since). The
 workbook's cover and its Inputs sheet (`sizedLabel` on the live request) say the same, so a size
 the optimiser chose is never labelled as the bidder's own.
+
+## The sourcing limits' basis
+
+The green-market and group-RE limits are shares of the energy supplied (Amendment-02), so
+`simulate` budgets them on the planned supply, the daily mandate at the plant's availability, not
+on the mandate itself: a plant at 97% availability that used 25% of the mandate would show 25.8%
+of its supply. Measured ex post against the energy actually supplied, a year with short days can
+sit a few tenths of a point over the budget; the Size step's checks allow half a point for that
+before calling it a breach (`checks.js`, 10 Nov 2026).
