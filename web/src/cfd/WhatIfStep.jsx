@@ -35,6 +35,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   const [downloadError, setDownloadError] = useState("");
   const [open, setOpen] = useState(() => new Set()); // the levers whose explanation is open
   const [showAll, setShowAll] = useState(false);
+  const [replan, setReplan] = useState(0); // bumped when a move is turned down: the track is plotted again
   const teamCtx = useTeamContext();
   const me = teamCtx?.team?.me || null;
   const abortRef = useRef(null);
@@ -43,6 +44,7 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
   const stale = !computed || computed.key !== caseKey;
   const quoted = useMemo(() => (finance && tried !== null ? quotedStrikeReturns(state, model, finance, tried) : null), [state, model, finance, tried]);
 
+  useEffect(() => { if (replan > 0 && track && !progress && !tracking) plot(); }, [replan]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!model?.sim || !finance) {
     return (
       <Section index="6" title="What-if">
@@ -118,10 +120,9 @@ export default function WhatIfStep({ state, setState, model, prices, goto }) {
     return Object.keys(next.frozen || {}).length ? next : { ...next, frozenBaseline: null };
   });
   // a move turned down: recorded with the bid, and the track plotted again without that lever
-  const [replan, setReplan] = useState(0);
+  // (the state and the effect sit above the early return with the other hooks)
   const onReject = (st) => { setState((s) => rejectLever(s, st, me?.name)); setReplan((n) => n + 1); };
   const onAllow = (key) => setState((s) => allowLever(s, key));
-  useEffect(() => { if (replan > 0 && track && !progress && !tracking) plot(); }, [replan]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the What-if case as a workbook: the bid with the track's moves applied, priced through the full
   // model, with a What-if track sheet (the moves, their chances, the frozen levers)
