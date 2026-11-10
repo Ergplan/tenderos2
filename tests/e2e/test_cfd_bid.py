@@ -273,7 +273,7 @@ def test_cfd_bid_end_to_end(tmp_path):
         page.wait_for_function("() => !document.querySelector('[data-testid=cfd-track-run]').disabled", timeout=900_000)
         assert page.locator(f"[data-testid=\"cfd-track-step-{turned}\"]").count() == 0, "a turned-down lever is not moved"
         assert "turned down" in page.locator("[data-testid=cfd-track]").inner_text().lower()
-        assert page.locator("[data-testid^=cfd-track-step-]").count() == 0 or "contracted" not in page.locator("[data-testid=cfd-track-steps]").inner_text().lower(), "the bid size is not a move"
+        assert page.locator("[data-testid=cfd-track-step-contractedMw]").count() == 0, "the bid size is not a move"
         page.click(f"[data-testid=\"cfd-allow-{turned}\"]")
         page.wait_for_selector(f"[data-testid=\"cfd-rejected-{turned}\"]", state="detached", timeout=10_000)
         page.locator("[data-testid=cfd-levers-details] summary").click()
