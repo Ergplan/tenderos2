@@ -193,17 +193,18 @@ const CASES = [
   })],
   // the uploaded 150 MW CfD bid of 10 Nov 2026 (SECI_CfD-I_bid_150MW_financial_model.xlsx), rebuilt
   // from its inputs: a 50% state-of-charge window and losses to the meter (Fill up sized the battery
-  // to 4.1 MWh and 1.05 MW per MW), 2 MWh per MW more for evening sale, 14 MWac of own solar left
+  // to 4.1 MWh and 1.05 MW per MW; its list of inputs: SoC 0.05% to 50%, round trip 85%, ₹0.65/kWh of
+  // market charges, group RE at ₹2.5, no GDAM depth cap, RECs at ₹360), 2 MWh per MW more for evening sale, 14 MWac of own solar left
   // unoptimised, battery at ₹1.2 cr/MWh, O&M typed, 16% equity, 9.5% debt stepping down after two
   // years and refinanced after year 1 at 8%, sculpted to a 1.25 DSCR, augmentation in year 4 only,
   // phasing windows set with no construction months (the #DIV/0! of the uploaded file)
   ["the uploaded 150 MW CfD bid: a 915 MWh battery, 14 MWac of solar, refinanced debt, phasing without construction months", (() => {
     const prices = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
     const d = defaultCfdState();
-    const s = fillBenchmarks({ ...d, losses: { ...defaultLosses(), lineLossPct: 0.01 }, inputs: { ...d.inputs, contractedMw: 150, effectiveDate: "2027-04-01", essSocMin: 0.1, essSocMax: 0.6 } });
+    const s = fillBenchmarks({ ...d, losses: { ...defaultLosses(), lineLossPct: 0.01 }, inputs: { ...d.inputs, contractedMw: 150, effectiveDate: "2027-04-01", essSocMin: 0.0005, essSocMax: 0.5, rte: 0.85 } });
     assert.equal(s.inputs.essMwhPerMw, 4.1, "Fill up sizes the battery to the file's 4.1 MWh per MW");
     assert.equal(s.inputs.essMwPerMw, 1.05, "and 1.05 MW per MW");
-    s.inputs = { ...s.inputs, extraEssMwhPerMw: 2, solarMw: 14, useGroup: true, essCrPerMwh: 1.2, essOmLakhPerMwh: 2, solarOmLakhPerMw: 2, interestRate: 0.095, targetEquityIrr: 0.16 };
+    s.inputs = { ...s.inputs, extraEssMwhPerMw: 2, solarMw: 14, useGroup: true, marketCharges: 0.65, groupPrice: 2.5, groupCharges: 0, gdamShareCap: 0, recPrice: 360, essCrPerMwh: 1.2, essOmLakhPerMwh: 2, solarOmLakhPerMw: 2, interestRate: 0.095, targetEquityIrr: 0.16 };
     s.filled = { ...s.filled, solarMw: false };
     s.bess = { augmentation: "schedule", augmentationYears: [4] };
     s.fin = { ...s.fin, repayment: "sculpted", targetDscr: 1.25, refiYear: 1, refiRate: 0.08, refiTenorYears: 12, refiFeePct: 0.002, rateStepDown: { afterYears: 2, rate: 0.085 }, dsraMonths: 6, receivableDays: 45, omStockMonths: 1, sparesPctOm: 0.15, wcInterestRate: 0.07 };
@@ -464,7 +465,14 @@ const numberAt = (ws, addr) => {
   // (₹1,262 cr, ₹1,098 cr of it battery), the refinancing and the year-4 augmentation
   const c = CASES.find(([, x]) => x.uploaded)[1];
   const f = c.finance;
-  assert.ok(Math.abs(f.tariff - 25.53) < 0.6, `the uploaded bid's strike price: ₹${f.tariff.toFixed(3)}/kWh vs the file's ₹25.534`);
+  // the file carried ₹25.534: it was built when the operation kept the battery at nameplate while the
+  // financial model paid for a year-4 augmentation only. With the same inputs and the battery kept,
+  // the rebuild lands within ₹0.15 of it; with the fade reaching the operation (as now), the last
+  // year delivers under 90% of the mandate and the price is about ₹0.9 higher
+  const kept = runCfdFinance(c.s, runCfdModel({ ...c.s, bess: null }, JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"))));
+  assert.ok(Math.abs(kept.tariff - 25.534) < 0.15, `the file's strike price reproduced with the battery kept: ₹${kept.tariff.toFixed(3)}/kWh vs ₹25.534`);
+  assert.ok(f.tariff > kept.tariff + 0.5 && f.tariff < kept.tariff + 1.2, `the fade's cost: ₹${f.tariff.toFixed(3)} vs ₹${kept.tariff.toFixed(3)} with the battery kept`);
+  assert.ok(f.rows[f.rows.length - 1].deliveredMu < 0.9 * f.rows[f.rows.length - 1].demandMu, "the last year delivers under 90% of the mandate once the battery has faded");
   assert.ok(Math.abs(f.capex.total - 1262.47) < 15, `project cost ₹${f.capex.total.toFixed(1)} cr vs the file's ₹1,262.5 cr`);
   assert.ok(Math.abs(f.engine.sizes.bessMwh - 915) < 1e-9 && Math.abs(f.engine.sizes.bessMw - 157.5) < 1e-9 && f.engine.sizes.solarMw === 14, "the file's plant");
   assert.ok(f.rows.every((r) => r.dscr === null || r.dscr >= 1.25 - 1e-6), "sculpted to 1.25");

@@ -259,3 +259,9 @@ share of nameplate by the shared engine's convention (restored in an augmentatio
 the degradation since the last one, never below 40%), and `simulate` sizes each day's charging to
 it. Before 10 Nov 2026 the operation faded the battery from year 1 whenever the choice was not
 annual, while the financial model paid for the scheduled augmentation: the two now agree.
+A day is short when less than the 2 MWh per MW (at the plant's availability) reaches the meter,
+whatever the cause: charging power missing within the sourcing limits, or a battery faded below
+the need. `tools/check_live_model.mjs` rebuilds the uploaded 150 MW bid of 10 Nov 2026 from its
+listed inputs: with the battery kept at nameplate (as that file's build did) the strike price
+reproduces within ₹0.15 of the file's ₹25.53; with the fade reaching the operation the last year
+delivers under 90% of the mandate and the price is about ₹0.9 higher.

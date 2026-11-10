@@ -617,7 +617,10 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
     const charged = essNeed / rte - Math.max(0, chargeLeft);
     const essOut = charged * rte; // at the bus
     const delivered = windDirect + essOut * meter; // at the meter
-    const met = chargeLeft <= 1e-6;
+    // the day is short when less than the 2 MWh per MW (at the plant's availability) reaches the meter:
+    // for lack of charging power within the sourcing limits, or of battery capacity (a faded battery)
+    const shortDay = Math.max(0, X * TENDER.mwhPerMwDay * avail - delivered);
+    const met = shortDay <= 1e-6;
     // the extra battery for evening sale: charged after the day's commitment, own RE first (the spare
     // generation, in the cheapest hours), then the green market within what is left of its limit and
     // the depth cap; discharged only when the day's supply is met (CfDA 4.4.1.v), in the dearest
@@ -703,7 +706,7 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
         chargeOwnMwh: row.chargeOwnMwh + ownCharged + ownXDay, chargeMarketMwh: row.chargeMarketMwh + (marketDay + mktXDay) / meter, chargeGroupMwh: row.chargeGroupMwh + groupDay / meter,
         merchantMwh: row.merchantMwh + merchantMwh + extraSold, merchantRevCr: row.merchantRevCr + merchantRev + extraRev, curtailedMwh: row.curtailedMwh + curtailed,
         extraSoldMwh: row.extraSoldMwh + extraSold, extraRevCr: row.extraRevCr + extraRev, extraChargeOwnMwh: row.extraChargeOwnMwh + ownXDay, extraChargeMarketMwh: row.extraChargeMarketMwh + mktXDay, extraMarketCostCr: row.extraMarketCostCr + extraCost,
-        shortMwh: row.shortMwh + Math.max(0, chargeLeft) * rte * meter, shortDays: row.shortDays + (met ? 0 : 1),
+        shortMwh: row.shortMwh + shortDay, shortDays: row.shortDays + (met ? 0 : 1),
         mcpDeliveredCr: row.mcpDeliveredCr + mcp * 1e-4, ownSuppliedMwh: row.ownSuppliedMwh + ownSupplied,
         recMwh: row.recMwh + (brown ? ownSupplied : 0), solarMwh: row.solarMwh + solarDay, windMwh: row.windMwh + windDay,
       });
@@ -1038,7 +1041,7 @@ export function runModel(state, prices, opts = {}) {
   return out;
 }
 
-/** Feasible when no day after the RE is online falls short for lack of charging energy. */
+/** The energy short of the daily 2 MWh per MW over the term (charging power or battery capacity), MWh. */
 export const capShortfall = (sim) => sim.years.reduce((a, cy) => a + cy.shortMwh, 0);
 
 /**

@@ -303,7 +303,7 @@ minute: the model simulates every day of the 15 years for each candidate size an
 with the full financial model). The banner then says what it found. Tiles: **Contracted**,
 **Battery**, **Own solar**, **Own wind**, **Strike price to bid** (the full financial model's
 price, the same figure as on the Financial model step and in the workbook, with the quote rounded
-up to the paisa), **Days short of charging power**, **Weekly penalties**, **EMD and PBG**. **Optimise own
+up to the paisa), **Days short of the daily supply** (for lack of charging power within the sourcing limits, or of battery capacity once the battery has faded without augmentation), **Weekly penalties**, **EMD and PBG**. **Optimise own
 RE** reruns it; **Financial model** jumps on.
 
 **6.1 · Tender conditions.** Seven checks, met or not, each with its page: capacity 50–150 MW,
