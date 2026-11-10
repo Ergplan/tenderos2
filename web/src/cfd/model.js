@@ -190,6 +190,71 @@ export function mergeCfdState(saved) {
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
+export const WINNING_NOTE = "Competitive-bidder value (what a bidder who wins SECI's 2026 auctions shows a lender), not from the tender";
+
+/**
+ * What a competitive bidder shows in 2026, on top of the industry benchmarks: the values that
+ * price a CfD-I bid near the winning range (about ₹8.4/kWh on 100 MW against ₹10.1 on the plain
+ * benchmarks), each one a lender has seen in a recent SECI award. "Fill up for me please" puts
+ * them in every empty box and sizes the own RE; the Reference bids step says why they win.
+ */
+export const WINNING = {
+  essCrPerMwh: 0.85, // LFP cells at 2026 prices: all-in quotes of ₹0.8–0.9 cr/MWh with 2 hours of inverters
+  solarCrPerMw: 3.6, // ISTS solar at ₹3.5–3.7 cr/MWac behind SECI's ₹2.86–3.13 solar-plus-storage awards
+  groupPrice: 2.5, // group-company RE at marginal cost after month 36 (Amendment-02), not a market price
+  groupCharges: 0, // intra-group supply: no trading margin
+  useGroup: true, // the 50% group-RE allowance after month 36 is the cheapest charging there is
+  targetEquityIrr: 0.13, // the equity return behind SECI's 2026 awards: 13–14%
+  interestRate: 0.0875, // project debt for contracted RE with storage, 2026
+  tenorYears: 15, // 15 years on a 15-year CfDA: what lenders give contracted storage
+  extraEssMwhPerMw: 0, // the evening-sale battery earns less than it costs within the market limits
+  essSocMin: null, essSocMax: null, // the tender's 2 MWh per MW read as usable energy (a supplier's rating)
+  augmentation: "annual", // the usable MWh kept every year: no faded last years, no silent shortfall
+};
+export const WINNING_WHY = {
+  essCrPerMwh: "LFP cells at 2026 prices: all-in quotes of ₹0.8–0.9 cr/MWh",
+  solarCrPerMw: "ISTS solar at ₹3.5–3.7 cr/MWac, the capex behind SECI's ₹2.86–3.13 solar-plus-storage awards",
+  groupPrice: "group-company RE at marginal cost after month 36, not a market price",
+  groupCharges: "intra-group supply carries no trading margin",
+  useGroup: "the 50% group-RE allowance after month 36 is the cheapest charging the tender allows",
+  targetEquityIrr: "the equity return behind SECI's 2026 awards, 13–14%",
+  interestRate: "project debt for contracted RE with storage in 2026",
+  tenorYears: "a 15-year loan on a 15-year CfDA",
+  extraEssMwhPerMw: "an evening-sale battery earns less than it costs within the green-market limits",
+  essSocMin: "the 2 MWh per MW read as usable energy, as suppliers rate it",
+  essSocMax: "the 2 MWh per MW read as usable energy, as suppliers rate it",
+  augmentation: "the usable MWh kept every year: no faded last years",
+};
+/** The finance team's inputs a competitive bidder shows: debt sculpted to the lender's DSCR. */
+export const WINNING_FIN = { repayment: "sculpted", targetDscr: 1.2 };
+
+/**
+ * "Fill up for me please": every empty input gets the competitive bidder's value where there is
+ * one (marked "winning") and the industry benchmark otherwise (marked "benchmark"); the finance
+ * team's repayment is sculpted to the lender's DSCR when it is still at the default; the own
+ * solar gets a first guess for the optimiser to refine. Typed values are never touched.
+ */
+export function fillWinning(state) {
+  const filled = { ...state.filled };
+  const base = fillBenchmarks({ ...state, inputs: { ...state.inputs }, filled });
+  const inputs = { ...base.inputs };
+  const empty = (k) => state.inputs[k] === null || state.inputs[k] === undefined || state.inputs[k] === "";
+  for (const [key, value] of Object.entries(WINNING)) {
+    if (!empty(key)) continue;
+    inputs[key] = value;
+    base.filled[key] = value === null ? undefined : "winning";
+  }
+  // the battery the tender needs, once more with the winning window (none) in
+  const need = essRequiredPerMw({ ...state, inputs });
+  if (isNum(inputs.essMwhPerMw) && base.filled.essMwhPerMw && inputs.essMwhPerMw > need.energy + 1e-9) inputs.essMwhPerMw = need.energy;
+  if (isNum(inputs.essMwPerMw) && base.filled.essMwPerMw && inputs.essMwPerMw > need.power + 1e-9) inputs.essMwPerMw = need.power;
+  const fin = { ...(state.fin || {}) };
+  for (const [key, value] of Object.entries(WINNING_FIN)) {
+    if (fin[key] === undefined || fin[key] === null || fin[key] === CFD_FIN_DEFAULTS[key]) fin[key] = value;
+  }
+  return { ...base, inputs, fin };
+}
+
 /** Fill every empty input with its benchmark; the solar size stays empty (the optimiser sets it). */
 export function fillBenchmarks(state) {
   const inputs = { ...state.inputs };

@@ -323,7 +323,7 @@ export default function CfdTab({ initialScenario = null }) {
   const step = CFD_STEPS[Math.max(0, index)];
   const next = CFD_STEPS[index + 1];
   const prev = CFD_STEPS[index - 1];
-  const props = { state, setState, setInput, patch, set, lockProps, isLocked, goto, prices, model, missing };
+  const props = { state, setState, setInput, patch, set, lockProps, isLocked, goto, prices, model, missing, optimise };
   // the agent opens the traceable model at a line: the Financial model step shows it
   const [traceAsk, setTraceAsk] = useState(null);
   const onTrace = useCallback((t) => setTraceAsk({ ...t, at: Date.now() }), []);

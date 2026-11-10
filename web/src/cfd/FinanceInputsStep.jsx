@@ -3,7 +3,7 @@ import { ArrowRight, CheckCircle2, Sparkles, TriangleAlert, Zap } from "lucide-r
 import { Field, Section, SelectBox } from "../rtc/ui";
 import * as E from "../rtc/engine";
 import Cite from "./Cite.jsx";
-import { cfdBessAug, fillBenchmarks, keyDates, missingInputs, patchCfdBess } from "./model.js";
+import { cfdBessAug, fillWinning, keyDates, missingInputs, patchCfdBess } from "./model.js";
 import FinanceInputsV3 from "../rtc/FinanceInputsV3";
 import { Fields, FillBar } from "./inputs.jsx";
 
@@ -13,21 +13,21 @@ import { Fields, FillBar } from "./inputs.jsx";
  * repayment and refinancing, construction and IDC, working capital and reserves) in state.fin and
  * state.costs; then "Size the plant" once every team's inputs are in.
  */
-export default function FinanceInputsStep({ state, setState, setInput, lockProps, goto, startSizing, index = "5" }) {
+export default function FinanceInputsStep({ state, setState, setInput, lockProps, goto, startSizing, optimise = startSizing, index = "5" }) {
   const missing = missingInputs(state);
   const fin = state.fin || {};
   const costs = state.costs || {};
   const setFin = (values) => setState((s) => ({ ...s, fin: { ...(s.fin || {}), ...values } }));
   const setCosts = (values) => setState((s) => ({ ...s, costs: { ...(s.costs || {}), ...values } }));
   const fillButton = (
-    <button type="button" className="primary" onClick={() => setState((s) => fillBenchmarks(s))} data-testid="cfd-fill-finance">
+    <button type="button" className="primary" onClick={() => { setState((s) => fillWinning(s)); if (optimise) setTimeout(() => optimise(), 120); }} data-testid="cfd-fill-finance">
       <Sparkles size={14} /> Fill up for me please
     </button>
   );
   return (
     <>
       <Section index={index} title="Costs" note="Capex, running costs and the tender's own costs">
-        <FillBar state={state} setState={setState} missing={missing} />
+        <FillBar state={state} setState={setState} missing={missing} optimise={optimise} />
         <Fields state={state} setInput={setInput} section="costs" lockProps={lockProps} />
         <p className="rtc-note">Exchange fees <Cite id="pxCharges" />, transmission to the Delivery Point <Cite id="ists" /> <Cite id="lineCost" />, the Letter of Credit <Cite id="lc" />, the bank guarantees and SECI's charges are yours. Augmentation replaces the battery's degraded MWh each year at the battery price, falling by the rate above.</p>
       </Section>

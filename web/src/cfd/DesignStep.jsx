@@ -182,7 +182,7 @@ export default function DesignStep({ state, setState, setInput, set, lockProps, 
   return (
     <>
       <Section index="4" title="Battery" note="Mandatory: X MW / 2X MWh for X MW contracted, owned by you, co-located with the RE" actions={null}>
-        <FillBar state={state} setState={setState} missing={missing} />
+        <FillBar state={state} setState={setState} missing={missing} optimise={optimise} />
         <div className="bid-source" style={{ "--chapter": COLORS.bess }} data-testid="source-bess">
           <header><span className="bid-source-icon"><BatteryCharging size={16} /></span><strong>Battery</strong><span className="rtc-note">Round-trip efficiency quoted at: {rteAt}</span></header>
           <div className="bid-source-body">

@@ -37,14 +37,14 @@ export function RfsAmounts({ inputs }) {
  * follows it, where the peak supply is sold, where the charging power may come from, the sale of
  * surplus RE and what happens after the term; then what the RfS asks of this bid.
  */
-export default function BidInputsStep({ state, setState, setInput, lockProps }) {
+export default function BidInputsStep({ state, setState, setInput, lockProps, optimise = null }) {
   const i = state.inputs;
   const missing = missingInputs(state);
   const dates = i.effectiveDate && /^\d{4}-\d{2}-\d{2}$/.test(i.effectiveDate) ? keyDates(i.effectiveDate) : null;
   return (
     <>
       <Section index="3" title="What you bid" note="The Projects team's decisions; the tender's own numbers stand beside them">
-        <FillBar state={state} setState={setState} missing={missing} />
+        <FillBar state={state} setState={setState} missing={missing} optimise={optimise} />
         <div className="rtc-grid rtc-grid-4 cfd-fields">
           <div className="has-assign" data-testid="cfd-in-contractedMw" data-voice="inputs.contractedMw">
             <Field label="Contracted capacity you bid" unit="MW" value={i.contractedMw} step={1} min={TENDER.bidMinMw} max={TENDER.bidMaxMw} onChange={(v) => setInput("contractedMw", v)}

@@ -192,8 +192,14 @@ PBDIT or a line of credit).
 
 ![Design](img/cfd-05-design-full.jpg)
 
-**Fill up for me please** puts industry benchmarks in every empty box, marked until you replace
-them.
+**Fill up for me please** puts a competitive bidder's value in every empty box where there is one
+(battery ₹0.85 cr/MWh, solar ₹3.6 cr/MWac, group RE at ₹2.5/kWh with no charges after month 36,
+13% equity, 8.75% debt over 15 years sculpted to a 1.2 DSCR, no extra battery, no state-of-charge
+window, annual augmentation), the industry benchmark elsewhere, and then sizes the own RE for the
+least strike price. The values are marked "winning" or "benchmark" until your own figures replace
+them, and the workbook's Inputs sheet says which is which. Why these win is on the Reference bids
+step (11.1): on 100 MW they price at about ₹8.4/kWh against ₹10.1 on the plain benchmarks. Typed
+values are never touched.
 
 **Purpose.** The plant behind the bid: the battery the tender mandates, the own RE that charges
 it, the losses to the billing meter and the site layout. The chip says how many inputs are still
@@ -252,7 +258,8 @@ one 33 kV bus with one pooling station; set the **Power transformer loss** and t
 loss** on it, which are the shared stages of the loss chains above. The tender takes one
 connection at the contracted MW, so there is no split-site option here.
 
-**4.5 · Continue.** The bar counts the inputs still needed and offers **Fill up for me please**;
+**4.5 · Continue.** The bar counts the inputs still needed and offers **Fill up for me please**
+(the competitive bidder's values, then the sizing);
 **Continue to Finance inputs** moves on.
 
 ---

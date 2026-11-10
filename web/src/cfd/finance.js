@@ -12,7 +12,7 @@ import * as E from "../rtc/engine.js";
 import { genSource } from "../model/generation.js";
 import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
 import { reviewBid } from "./review.js";
-import { BENCHMARK_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
+import { BENCHMARK_NOTE, WINNING_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
 import { TENDER } from "./terms.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -24,7 +24,7 @@ export const MODEL_NOTES = [
 ];
 
 /** Where an input came from, for the workbook: typed, or filled as a benchmark. */
-const sourceOf = (state, key) => (state.filled?.[key] ? BENCHMARK_NOTE : "Your input");
+const sourceOf = (state, key) => (state.filled?.[key] === "winning" ? WINNING_NOTE : state.filled?.[key] ? BENCHMARK_NOTE : "Your input");
 
 /**
  * The engine's inputs for the bid: { sizes, costs, fin, bess, ops, dfrTarget }. `model` is
@@ -249,7 +249,7 @@ export function cfdModelExport({ state, model, finance, review = null }) {
     ["Settlement", "The strike price on every kWh supplied; the market price risk is the CfD Pool's (Amendment-03)", "text"],
     ["Ceiling tariff", "None (removed by Amendment-03)", "text"],
   ];
-  const notes = [...MODEL_NOTES, `Inputs marked "Industry benchmark" are ${BENCHMARK_NOTE.charAt(0).toLowerCase()}${BENCHMARK_NOTE.slice(1)}; the rest are the bidder's own (sheet Inputs).`];
+  const notes = [...MODEL_NOTES, `Inputs marked "Industry benchmark" are ${BENCHMARK_NOTE.charAt(0).toLowerCase()}${BENCHMARK_NOTE.slice(1)}; those marked "Competitive-bidder value" are what a bidder who wins SECI's 2026 auctions shows a lender; the rest are the bidder's own (sheet Inputs).`];
   const inputs = FIELDS.map((f) => ({ group: f.section, input: f.label, value: i[f.key], unit: f.pct ? "%" : f.unit, source: sourceOf(state, f.key) }));
   for (const k of ["effectiveDate", "sellMarket", "useMarket", "useGroup", "merchant", "augmentation", "afterTerm"]) {
     inputs.push({ group: "choice", input: CHOICES[k].label, value: String(i[k]), unit: "", source: sourceOf(state, k) });

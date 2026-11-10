@@ -11,7 +11,7 @@ an administrator grants it like the other tabs.
 | 02 Tender & amendments | Tender / Legal | The six documents (RfS of 15.07.2026, the standard CfDA, Amendments 01–04), how the bid goes, the 40 changes clause by clause (was / now, with the page link), the points to raise with SECI | `pack.js`, `DocumentsStep.jsx`; the PDFs under `web/public/tenders/seci-cfd-i/` |
 | 03 Bid conditions | Tender / Legal | 249 conditions in force (262 with the superseded ones) in 11 groups, each quoted word for word with its document, clause and page; the amended ones with "As issued"; the three where the RfS and the CfDA differ; Assign to Legal | `terms.js`, `ConditionsStep.jsx` |
 | 04 Bid inputs | Projects | Contracted MW (50–150, whole MW), the Effective Date with every date that follows it, the market to sell in, the sourcing choices, merchant sale, after the term; money at stake (EMD, PBG, CAC, fees, net worth, liquidity) | `BidInputsStep.jsx`, `inputs.jsx` |
-| 05 Design | Design | Battery MWh and MW per contracted MW, own solar and wind, RE commissioning, availability, CUFs, RTE, degradation, augmentation; **Fill up for me please**; **Optimise own RE** | `DesignStep.jsx` |
+| 05 Design | Design | Battery MWh and MW per contracted MW, own solar and wind, RE commissioning, availability, CUFs, RTE, degradation, augmentation; **Fill up for me please** (`fillWinning`: the competitive bidder's values of `WINNING` where empty, benchmarks elsewhere, the finance sculpted, then the optimiser); **Optimise own RE** | `DesignStep.jsx` |
 | 06 Finance inputs | Finance | Costs and financing; debt repayment (six methods), moratorium, instalments, refinancing; construction months, drawdown, funding order; working capital and the debt service reserve; **Size the plant** | `FinanceInputsStep.jsx` |
 | 07 Size | Projects | The optimiser's own-RE sizes for the least strike price with every day met, each candidate priced by the full financial model (`runModel` and `optimiseOwnRe` take a `price` function; the screening price is kept beside it); the plant; seven tender checks; year-1 energy mix; every Contract Year; any day's operation by the hour or in 15-minute blocks; the 15-minute dispatch of the whole term (526,000 blocks: tiles, a table by Contract Year, a ZIP of one CSV per Contract Year, a workbook with a sheet per Contract Year); the Bid review (6.6): why the bid is not optimal, as findings in three groups (blocks the bid, carries cost, to note) with where to fix each | `model.js optimiseOwnRe`, `finance.js runCfdFinance`, `dispatch15.js`, `checks.js` (the tender checks as plain data), `review.js`, `BidReview.jsx`, `SizeStep.jsx`, `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) |
 | 08 Financial model | Finance | The bid strike price from the shared financial engine (the same price as on Size; the fast screening figure beside it), IRRs, DSCR, project cost, LC, Pool pay-in, penalty, charging power; Your quote; money at stake; revenue stack; the Pool; F.1 Assumptions to F.4 the 15-year model with the traceable explorer; **Download financial model (Excel)**: Cover, Live model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, Depreciation and tax, Working capital, Sensitivity | `finance.js`, `FinanceModelStep.jsx`, `web/src/rtc/engine.js`, `web/lib/liveModel.js`, `POST /api/cfd/model` |
@@ -309,3 +309,16 @@ with storage firming at the bid's strike price on the scheduled energy; availabi
 designated hours; exchange fees; the weekly penalty against the year's highest evening price;
 fade; the award; the market as the Pool's). `tools/check_cfd_winning.mjs` asserts the Pool
 collects below the evening price and pays above it, the verdicts, and the sized DSM.
+
+## Fill up for me please
+
+`fillWinning(state)` in `model.js`: every empty input gets the competitive bidder's value from
+`WINNING` (battery ₹0.85 cr/MWh, solar ₹3.6 cr/MWac, group RE at ₹2.5 with no charges and
+`useGroup` on, 13% equity, 8.75% debt over 15 years, no extra battery, no SoC window, annual
+augmentation; one line of reasoning each in `WINNING_WHY`), marked `"winning"` in `state.filled`,
+and the industry benchmark otherwise (marked `true`); the finance team's repayment is sculpted to a
+1.2 DSCR when still at the default (`WINNING_FIN`); typed values are never touched. The fill bars
+(`inputs.jsx FillBar`, the Finance inputs button) then call the tab's `optimise`, so the own RE is
+sized at once. The Inputs sheet and the Bid review read the mark (`WINNING_NOTE`). On 100 MW the
+fill prices at about ₹8.4/kWh against ₹10.1 on `fillBenchmarks`, which the checks keep
+(`tools/check_cfd_winning.mjs`). The agent's `use_benchmarks` does the same.

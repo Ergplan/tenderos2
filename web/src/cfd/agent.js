@@ -9,7 +9,7 @@
 // the numbers from the model on screen. Nothing the agent says changes a term.
 import { readValue } from "../seci/agent.js";
 import * as E from "../rtc/engine.js";
-import { BENCHMARKS, CHOICES, FIELDS, fillBenchmarks, financials, keyDates, lcCr, missingInputs, rfsAmounts } from "./model.js";
+import { BENCHMARKS, CHOICES, FIELDS, fillWinning, financials, keyDates, lcCr, missingInputs, rfsAmounts } from "./model.js";
 import { DOCUMENTS, RFS, TENDER, TERMS, docById } from "./terms.js";
 import { buildScript, explainCfd, explainFinance, explainResults, tenderBrief } from "./voice.js";
 
@@ -201,7 +201,7 @@ export const AGENT_TOOLS = [
   { type: "function", name: "next_question", description: "The next input of the guided exercise, in order: the question to ask, its current value and the benchmark. Inputs set with set_input count as answered. Pass `keep` with an input key when the bidder keeps its current value ('next', 'same'), or keep_rest true to accept every remaining value as it stands.", parameters: obj({ keep: { type: ["string", "null"] }, keep_rest: { type: "boolean" } }, ["keep", "keep_rest"]) },
   { type: "function", name: "list_inputs", description: "The inputs of one step with their keys, current values, units, ranges and benchmarks. Percent inputs are in percent.", parameters: obj({ part: { type: "string", enum: ["bid", "design", "financeInputs", "finance", "all"] } }, ["part"]) },
   { type: "function", name: "set_input", description: "Change one input on screen and show it. `value` is what the bidder said: a number (percent inputs in percent, 24 means 24%), a choice key or label, a date (YYYY-MM-DD), yes/no.", parameters: obj({ key: { type: "string" }, value: { type: ["string", "number", "boolean"] } }, ["key", "value"]) },
-  { type: "function", name: "use_benchmarks", description: "Fill every empty input with industry benchmarks (2025-26 prices and norms), marked as benchmarks on screen.", parameters: obj() },
+  { type: "function", name: "use_benchmarks", description: "Fill every empty input with a competitive bidder's values (battery ₹0.85 cr/MWh, solar ₹3.6 cr/MWac, group RE at ₹2.5, 13% equity, 8.75% debt over 15 years sculpted, no extra battery, annual augmentation) and industry benchmarks elsewhere, marked on screen; then call run_optimizer to size the own RE.", parameters: obj() },
   { type: "function", name: "go_to_step", description: "Show a step of the tab.", parameters: obj({ step: { type: "string", enum: STEPS } }, ["step"]) },
   { type: "function", name: "run_optimizer", description: "Size the own RE: tries solar (and wind) sizes for the lowest strike price with every day's supply met within the sourcing limits (one to three minutes); returns the result when done. Run again after inputs change.", parameters: obj() },
   { type: "function", name: "stop_optimizer", description: "Stop a sizing that is running.", parameters: obj() },
@@ -265,7 +265,7 @@ export function createToolRunner(ctx) {
     },
     use_benchmarks: () => {
       const before = missingInputs(ctx.getState()).length;
-      ctx.apply((s) => fillBenchmarks(s));
+      ctx.apply((s) => fillWinning(s));
       confirmed.add("fill");
       ctx.goto("design");
       return { ok: true, filled: before, stillMissing: missingInputs(ctx.getState()) };

@@ -370,7 +370,7 @@ separate sites with their own pooling station and line); the tender's supply rul
 (annual, monthly, block floors, peak hours as a mask from `peakMask`/`anyMask`, shortfall penalty);
 market sale series (`marketSeries`); financing; and a `seed` (`seedFor`, the last sizing scaled to
 the bid size, or the pack's typical design). `missingInputs` refuses a sizing until each source
-has all its inputs; `fillBenchmarks` fills what is empty from `BENCHMARKS`, marked as benchmarks.
+has all its inputs; `fillWinning` fills what is empty from `WINNING` (a competitive bidder's values, marked "winning") and `BENCHMARKS` (marked as benchmarks), sculpts the repayment and starts the optimiser; `fillBenchmarks` is the plain-benchmark fill the checks use.
 `opsFromLp` turns the result into the year-by-year energy the financial model reads. The same
 payload is used by the SECI tab (terms from `seciTerms`), the MCP server and the 15-minute
 dispatch (`dispatch15Request`). Check: `tools/check_bid_model.mjs`.

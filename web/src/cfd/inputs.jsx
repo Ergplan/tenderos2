@@ -2,7 +2,7 @@ import React from "react";
 import { Sparkles, TriangleAlert } from "lucide-react";
 import { Field, SelectBox } from "../rtc/ui";
 import AssignButton from "../team/AssignButton";
-import { BENCHMARK_NOTE, CHOICES, FIELDS, fillBenchmarks } from "./model.js";
+import { BENCHMARK_NOTE, CHOICES, FIELDS, WINNING, fillWinning } from "./model.js";
 
 /**
  * The input boxes of the CfD tab, shared by the Bid inputs, Design and Finance inputs steps. Every
@@ -54,13 +54,18 @@ export function DateBox({ label, value, onChange, hint, testId, voice }) {
 }
 
 /** "Fill up for me please" with what it does and how many inputs are still needed. */
-export function FillBar({ state, setState, missing, testId = "cfd-fill" }) {
+export function FillBar({ state, setState, missing, optimise = null, testId = "cfd-fill" }) {
+  const fill = () => {
+    setState((s) => fillWinning(s));
+    // the own RE sized for the least strike price once the fill is in (the tab reads the new state)
+    if (optimise) setTimeout(() => optimise(), 120);
+  };
   return (
     <div className="cfd-fill-bar">
-      <button type="button" className="secondary" onClick={() => setState((s) => fillBenchmarks(s))} data-testid={testId}>
+      <button type="button" className="secondary" onClick={fill} data-testid={testId}>
         <Sparkles size={14} /> Fill up for me please
       </button>
-      <span className="rtc-note">Puts an industry benchmark in every empty box, marked “benchmark” ({BENCHMARK_NOTE.toLowerCase()}). Your own figures replace them.</span>
+      <span className="rtc-note">Puts a competitive bidder's value in every empty box (battery ₹{WINNING.essCrPerMwh} cr/MWh, solar ₹{WINNING.solarCrPerMw} cr/MWac, group RE at ₹{WINNING.groupPrice} after month 36, {Math.round(WINNING.targetEquityIrr * 100)}% equity, {(WINNING.interestRate * 100).toFixed(2)}% debt over {WINNING.tenorYears} years sculpted to the lender's DSCR, no extra battery, annual augmentation), the industry benchmark elsewhere, then sizes the own RE for the least strike price. Marked until your own figures replace them; the Reference bids step says why these win.</span>
       {missing.length > 0 && <span className="cfd-missing" data-testid="cfd-missing"><TriangleAlert size={12} /> {missing.length} input{missing.length > 1 ? "s" : ""} needed</span>}
     </div>
   );
