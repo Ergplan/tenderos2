@@ -183,3 +183,16 @@
   .cfd-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .cfd-row.head { display: none; }
 }
+
+/* the Bid review (Size step 6.6) */
+.bid-review { display: grid; gap: 12px; margin-top: 8px; }
+.review-group h4 { display: flex; gap: 6px; align-items: center; margin: 0 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.review-group.block h4 { color: var(--bad); }
+.review-group.warn h4 { color: #f2b84b; }
+.review-item { border: 1px solid var(--line); border-left-width: 3px; background: var(--surface); padding: 10px 12px; margin-bottom: 8px; font-size: 13px; }
+.review-item.block { border-left-color: var(--bad); }
+.review-item.warn { border-left-color: #f2b84b; }
+.review-item.note { border-left-color: var(--line-2); }
+.review-item .review-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.review-item p { margin: 6px 0 8px; color: var(--muted); line-height: 1.45; }
+.review-item button { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; }

@@ -278,6 +278,8 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | Compute the 15-minute dispatch (6.5): tiles and the table by Contract Year | `cfd/SizeStep.jsx` Dispatch15Table | `dispatch15(model)` → `years[]`, `months[]`, `blocks` | `dispatch15.js`: `simulate` with `onDay`, `dayBlocks` per day, totals per Contract Year and month (blocks, peak blocks within the 10% tolerance, energy by source, highest charging, `overPower`, state-of-charge range) | the model | computed on request, cleared when the plant changes |
 | Download 15-minute dispatch (ZIP of CSV) / 15-year dispatch workbook (Excel) | `cfd/SizeStep.jsx` | `downloadFile("/api/cfd/dispatch15", { state, format })` | `web/lib/cfdDispatch.js` `buildCfdDispatchZip` / `buildCfdDispatchXlsx`: `mergeCfdState` → `runModel` on the IEX price year → `dispatch15` → one CSV or sheet per Contract Year plus the summaries | the saved bid state | written on request; logged in `activity_log` as `export` |
 
+| Review the bid (6.6): findings in three groups with Go-to buttons | `cfd/BidReview.jsx` | `reviewBid({ state, model, finance: model.finance, prices })` | `web/src/cfd/review.js`: `sizingChecks` (`checks.js`), the peak-power award (`market/seed.js`), two re-simulations for the own-solar test, the extra battery's annualised cost against its earnings, `essRequiredPerMw`, the inputs against `BENCHMARKS`, the finance engine's inputs | the bid state and the model | computed on request; the findings also go into the workbook's "Bid review" sheet |
+
 ### `web/src/cfd/WhatIfStep.jsx`
 
 **Screen:** CfD bid › What-if (step 09): returns at a tried strike price and the levers  

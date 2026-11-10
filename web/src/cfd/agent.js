@@ -207,6 +207,7 @@ export const AGENT_TOOLS = [
   { type: "function", name: "stop_optimizer", description: "Stop a sizing that is running.", parameters: obj() },
   { type: "function", name: "get_results", description: "The modelled plant: the battery and own RE sizes, the strike price for the target IRR, the tender's conditions met or not, days short, penalised weeks, EMD, PBG, net worth and the dates.", parameters: obj() },
   { type: "function", name: "get_financials", description: "The financial model over the 15-year term: the strike price for the target equity IRR, equity and project IRR, DSCR, project cost, debt, the Letter of Credit.", parameters: obj() },
+  { type: "function", name: "review_bid", description: "Why the bid is not optimal: findings from the tender's conditions, the price against SECI's peak-power awards, the plant (own RE at its best, the extra battery, the battery's window and fade), the inputs far from the benchmarks and the financing, each with where to fix it. Use when asked whether the bid is good, what is wrong with it, or what to improve.", parameters: obj() },
   { type: "function", name: "check_tariff", description: "What a strike price the bidder may quote earns: equity and project IRR against the target, with a warning when it is below the strike price the target needs. Records it as the quoted strike price when record is true.", parameters: obj({ tariff: { type: "number", description: "₹/kWh" }, record: { type: "boolean" } }, ["tariff", "record"]) },
 ];
 
@@ -317,6 +318,18 @@ export function createToolRunner(ctx) {
         minDscr: r(f.minDscr), avgDscr: r(f.avgDscr), projectCostCr: r(f.capex.total, 0), debtCr: r(full ? full.debt : f.capex.total * m.inputs.debtFraction, 0),
         letterOfCreditCr: r(lcCr(m.inputs.contractedMw, full?.tariff ?? m.sp)), model: full ? "the full financial model (shared engine)" : "the CfD model",
       };
+    },
+    review_bid: async () => {
+      const m = model();
+      if (!m) return { ok: false, error: "The inputs are not complete yet." };
+      ctx.goto("size");
+      const { reviewBid } = await import("./review.js");
+      let finance = m.finance || null;
+      if (!finance) {
+        try { const fin = await import("./finance.js"); finance = fin.runCfdFinance(ctx.getState(), m); } catch { finance = null; }
+      }
+      const out = reviewBid({ state: ctx.getState(), model: m, finance, prices: ctx.getPrices?.() || null });
+      return { summary: out.summary, counts: out.counts, findings: out.findings.map((f) => ({ severity: f.severity, title: f.title, detail: f.detail, fixOn: f.step })) };
     },
     check_tariff: ({ tariff, record = false }) => {
       const m = model();

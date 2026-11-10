@@ -348,6 +348,42 @@ and group RE, the battery's discharge, stored energy and state of charge, wind s
 delivered against the supply due and the shortfall, surplus sold, curtailment, the selling-market
 and GDAM prices.
 
+**6.6 · Bid review: why this bid is not optimal.** Click **Review the bid**. The model reads the
+bid as a reviewer would and lists findings in three groups, each with a button to the step where
+it is fixed:
+
+- *Blocks the bid*: a tender condition not met (the seven checks of 6.1), a strike price far
+  above what SECI has paid for peak power (the latest FDRE peak-power award is the yardstick:
+  above 1.5× its top tariff the bid cannot clear the auction), a minimum DSCR below the lender's.
+- *Carries cost*: own solar not at its best for these inputs (the review tries one step more and
+  one step less and says what the optimiser would save; run **Optimise own RE**), little own RE so
+  nearly all charging is bought, an extra battery for evening sale that costs more a year than it
+  earns, battery energy above what the tender needs, a battery that fades below the need before
+  the term ends (augment every year, add years to the schedule, or size for the last year), and
+  inputs more than 15% from the benchmark in the direction that raises the price (battery capex,
+  market charges, the interest rate, the equity target and the like), each named with its value
+  and the benchmark.
+- *To note*: a narrow state-of-charge window that inflates the nameplate (suppliers quote usable
+  energy, so check whether the 2 MWh per MW is already usable), green-market charging close to its
+  25% limit, inputs far from the benchmark in the direction that lowers the price (a lender will
+  ask for the evidence), a refinancing at the end of year 1, an equity target above 15%, days short
+  under the "pay the penalty" policy.
+
+An input far from the benchmark is not wrong: it needs evidence, which **Freeze** on the What-if
+step attaches. The review also travels with the workbook (sheet **Bid review**) and the bid agent
+answers "what is wrong with this bid" from the same list (`review_bid`).
+
+*The uploaded 150 MW bid of 10 November 2026, reviewed.* Its inputs were valid one by one and the
+tender's plant conditions were met, yet the review finds: a strike price of ₹26/kWh, 4.3× the
+highest peak-power award; the battery's capex as the first line of the price (buying the charging
+power is right here: group RE at ₹2.5 beats own solar at ₹4 cr/MWac, so more solar would raise the
+price); an extra 300 MWh battery that costs ₹53 cr a year and earns ₹0.2 cr; a 50%
+state-of-charge window that doubles the nameplate to 4.1 MWh per MW; augmentation in year 4 only,
+so the battery fades to 79% of the mandate in the last year and the green-market share then
+breaches 25%; battery capex and market charges well above the benchmarks; a refinancing a year
+after the COD; a 16% equity target. Each is a decision the bidder can revisit before the price
+means anything.
+
 ---
 
 ## Step 08 · Financial model *(Finance)*

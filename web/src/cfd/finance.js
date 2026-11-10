@@ -11,6 +11,7 @@
 import * as E from "../rtc/engine.js";
 import { genSource } from "../model/generation.js";
 import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
+import { reviewBid } from "./review.js";
 import { BENCHMARK_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
 import { TENDER } from "./terms.js";
 
@@ -190,7 +191,7 @@ export function cfdLiveRequest({ state, model, finance }) {
     otherCapexLabel: "SECI's charges and the bank guarantees' cost",
     fin: pick(eng.fin, [...LIVE_FIN_KEYS, "lcCostPct", "lcMinPrice", "lcDays", "cfdPenaltyMultiple"]),
     bess: pick(eng.bess, LIVE_BESS_KEYS),
-    ops: eng.ops.map((o) => ({ ...pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "chargingCostCr", "pxFeesCr", "lcMw", "solarGenMWh", "windGenMWh"]), penaltyWeeks: o.penaltyWeeks })),
+    ops: eng.ops.map((o) => ({ ...pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "recRevenueCr", "chargingCostCr", "pxFeesCr", "lcMw", "solarGenMWh", "windGenMWh"]), penaltyWeeks: o.penaltyWeeks })),
     gen,
     dispatch: null,
     sources: liveSources(state),
@@ -199,7 +200,7 @@ export function cfdLiveRequest({ state, model, finance }) {
 }
 
 /** The workbook request (POST /api/cfd/model → web/lib/modelWorkbook.js): cover, inputs, plant, capex, the model's years and the Live model block. */
-export function cfdModelExport({ state, model, finance }) {
+export function cfdModelExport({ state, model, finance, review = null }) {
   const eng = finance.engine || cfdEngineInputs(state, model);
   const i = model.inputs;
   const X = i.contractedMw;
@@ -286,6 +287,8 @@ export function cfdModelExport({ state, model, finance }) {
     tenderNumber: "SECI/C&P/IPP/13/0002/26-27",
     cover: { outputs, plant, inputs: keyInputs, tender, notes },
     conditions: [],
+    // the Bid review's findings (web/src/cfd/review.js), a sheet of their own
+    review: (review || reviewBid({ state, model, finance })).findings.map((f) => ({ severity: f.severity, title: f.title, detail: f.detail, step: f.step || "" })),
     inputs,
     plant,
     capex: capexRows,

@@ -27,6 +27,7 @@ Every number comes from the app's own model, the same code the SECI tab runs.
 | `get_results`, `get_financials` | The sized plant (floors met, EMD, PBG, net worth, dates) and the 25-year model (tariff for the target IRR, equity and project IRR, DSCR) |
 | `check_tariff` | The equity and project IRR at a quoted tariff, with a warning below the target |
 | `explain_generation` | Generation as a formula with the bid's numbers (MW × CUF × 8,760 h …); checks the user's own figure |
+| `review_bid` (CfD) | Why the bid is not optimal: findings from the tender checks, the price against the peak-power awards, the plant, the inputs against the benchmarks and the financing, each with the step to fix it |
 | `review_bid_forms` | The RfS formats the bid needs, blanks left, and every check against the tender |
 | `check_bid` | What-if: any plant, any tariff, instantly (rule-based dispatch, no optimisation): IRRs, DSCR, LCOE, the tariff the target needs, floors met, penalty, tender checks |
 | `winning_bid` | The auction result and the bridge from ₹6.50 to ₹5.25, step by step |

@@ -13,7 +13,7 @@ an administrator grants it like the other tabs.
 | 04 Bid inputs | Projects | Contracted MW (50–150, whole MW), the Effective Date with every date that follows it, the market to sell in, the sourcing choices, merchant sale, after the term; money at stake (EMD, PBG, CAC, fees, net worth, liquidity) | `BidInputsStep.jsx`, `inputs.jsx` |
 | 05 Design | Design | Battery MWh and MW per contracted MW, own solar and wind, RE commissioning, availability, CUFs, RTE, degradation, augmentation; **Fill up for me please**; **Optimise own RE** | `DesignStep.jsx` |
 | 06 Finance inputs | Finance | Costs and financing; debt repayment (six methods), moratorium, instalments, refinancing; construction months, drawdown, funding order; working capital and the debt service reserve; **Size the plant** | `FinanceInputsStep.jsx` |
-| 07 Size | Projects | The optimiser's own-RE sizes for the least strike price with every day met, each candidate priced by the full financial model (`runModel` and `optimiseOwnRe` take a `price` function; the screening price is kept beside it); the plant; seven tender checks; year-1 energy mix; every Contract Year; any day's operation by the hour or in 15-minute blocks; the 15-minute dispatch of the whole term (526,000 blocks: tiles, a table by Contract Year, a ZIP of one CSV per Contract Year, a workbook with a sheet per Contract Year) | `model.js optimiseOwnRe`, `finance.js runCfdFinance`, `dispatch15.js`, `SizeStep.jsx`, `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) |
+| 07 Size | Projects | The optimiser's own-RE sizes for the least strike price with every day met, each candidate priced by the full financial model (`runModel` and `optimiseOwnRe` take a `price` function; the screening price is kept beside it); the plant; seven tender checks; year-1 energy mix; every Contract Year; any day's operation by the hour or in 15-minute blocks; the 15-minute dispatch of the whole term (526,000 blocks: tiles, a table by Contract Year, a ZIP of one CSV per Contract Year, a workbook with a sheet per Contract Year); the Bid review (6.6): why the bid is not optimal, as findings in three groups (blocks the bid, carries cost, to note) with where to fix each | `model.js optimiseOwnRe`, `finance.js runCfdFinance`, `dispatch15.js`, `checks.js` (the tender checks as plain data), `review.js`, `BidReview.jsx`, `SizeStep.jsx`, `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) |
 | 08 Financial model | Finance | The bid strike price from the shared financial engine (the same price as on Size; the fast screening figure beside it), IRRs, DSCR, project cost, LC, Pool pay-in, penalty, charging power; Your quote; money at stake; revenue stack; the Pool; F.1 Assumptions to F.4 the 15-year model with the traceable explorer; **Download financial model (Excel)**: Cover, Live model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, Depreciation and tax, Working capital, Sensitivity | `finance.js`, `FinanceModelStep.jsx`, `web/src/rtc/engine.js`, `web/lib/liveModel.js`, `POST /api/cfd/model` |
 | 09 What-if | Finance | Returns at a tried strike price; the track to the quote (which levers, how far, in what order, the chance of each move and of the whole track; out of reach when no lever can get there) with a waterfall and a story; every input one step up and down with the price it gives and how far it must move, a reading guide and a plain-words note per lever; Apply; **Not for us** on a move turns the lever down (`state.rejected`, the track plotted again without it); a frozen value better than the suggestion is priced through the full model and the dialog gives the bands' chance of it; the bid size is not a lever | `levers.js`, `leverNotes.js` (notes, plausibility bands, `leverChance`), `track.js` (`planTrack`, frozen levers left alone), `TrackView.jsx`, `Freeze.jsx` (freeze with evidence into `state.frozen` and the evidence register, unfreeze), the What-if workbook (`cfdModelExport` + a `whatIf` block → the "What-if track" sheet of `lib/modelWorkbook.js`), `WhatIfStep.jsx` |
 | 10 Bid forms | Tender / Legal | The RfS's 17 formats with their 224 blanks beside the RfS page, the particulars asked once, the letters in the RfS wording, eleven checks, Word and PDF | `forms.js`, `formats.js`, `letters/`, `BidForms.jsx`, `POST /api/cfd/forms`, `/api/cfd/letters` |
@@ -265,3 +265,21 @@ the need. `tools/check_live_model.mjs` rebuilds the uploaded 150 MW bid of 10 No
 listed inputs: with the battery kept at nameplate (as that file's build did) the strike price
 reproduces within ₹0.15 of the file's ₹25.53; with the fade reaching the operation the last year
 delivers under 90% of the mandate and the price is about ₹0.9 higher.
+
+## The Bid review
+
+`web/src/cfd/review.js` `reviewBid({ state, model, finance, prices })` reads a bid as a reviewer
+would and returns findings `{ id, severity, title, detail, step, cite }` in three severities:
+`block` (a tender check failed, from `checks.js sizingChecks`; a strike price above 1.5× the top
+tariff of the latest FDRE peak-power award in `web/src/market/seed.js`; a minimum DSCR below the
+lender's), `warn` (own solar not at its best, tested one step up and down on the screening price;
+little own RE when more would help, else a note that buying the charging power is right; an extra evening-sale battery that earns less a year than its annualised capex and
+O&M; battery energy above the need; a battery faded below the need in the last year; inputs more
+than 25% from `BENCHMARKS` in the direction that raises the price) and `note` (a narrow SoC window,
+green-market charging near the cap, what carries the price (capex annualised, costs averaged, over
+the energy supplied), inputs far from the benchmark the other way, a year-1
+refinancing, an equity target above 15%, short days under the pay policy). The Size step shows it
+(6.6, `BidReview.jsx`), the workbook carries it (sheet "Bid review", `cfdModelExport` →
+`modelWorkbook.js`), the agent answers from it (`review_bid`), and `tools/check_cfd_review.mjs`
+asserts the uploaded 150 MW bid's findings and that the optimised benchmark bid has none of the
+plant findings.

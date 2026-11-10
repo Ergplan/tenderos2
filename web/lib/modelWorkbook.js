@@ -103,6 +103,21 @@ export async function buildModelWorkbook(body, { preparedBy, product }) {
     cond.views = [{ state: "frozen", ySplit: 1 }];
   }
 
+  // ---- the Bid review: why the bid is not optimal (CfD bid), one finding a row
+  if (Array.isArray(body.review) && body.review.length) {
+    const rv = wb.addWorksheet("Bid review");
+    header(rv.addRow(["Severity", "Finding", "Detail", "Where to fix"]));
+    const WORD = { block: "Blocks the bid", warn: "Carries cost", note: "To note" };
+    const COLOR = { block: "FFB3261E", warn: "FF9A6700", note: "FF666666" };
+    for (const f of body.review.slice(0, 60)) {
+      const row = rv.addRow([WORD[f.severity] || str(f.severity, 20), str(f.title, 200), str(f.detail, 1200), str(f.step, 40)]);
+      row.getCell(1).font = { bold: true, color: { argb: COLOR[f.severity] || "FF666666" } };
+      row.alignment = { vertical: "top", wrapText: true };
+    }
+    [16, 60, 110, 16].forEach((w, k) => { rv.getColumn(k + 1).width = w; });
+    rv.views = [{ state: "frozen", ySplit: 1 }];
+  }
+
   // ---- every input, with where it came from (the live model's own Inputs sheet holds the ones it reads)
   const inp = wb.addWorksheet("Inputs (list)");
   header(inp.addRow(["Group", "Input", "Value", "Unit", "Source"]));

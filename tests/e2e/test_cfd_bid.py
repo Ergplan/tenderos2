@@ -173,6 +173,13 @@ def test_cfd_bid_end_to_end(tmp_path):
             for name in ("About", "Summary", "Monthly", "CY01", "CY15"):
                 assert f'name="{name}"' in book, name
         page.click("[data-testid=cfd-day-hourly]")
+        # 6.6 the Bid review: findings with where to fix each; the optimised benchmark bid has no plant finding
+        page.click("[data-testid=cfd-review-run]")
+        page.wait_for_selector("[data-testid=cfd-review]", timeout=120_000)
+        review = page.locator("[data-testid=cfd-review]").inner_text().lower()
+        assert "peak-power award" in review or "nothing to fix" in review, review[:300]
+        assert page.locator("[data-testid=cfd-review-solar-not-optimised]").count() == 0, "the optimiser's solar is at its best"
+        assert page.locator("[data-testid=cfd-review-extra-battery]").count() == 0
 
         # 08 financial model: the tiles, the trace, the workbook with nine sheets
         _step(page, "finance")

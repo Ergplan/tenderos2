@@ -533,6 +533,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   const hydro = on.hydro ? plant("hydro") : null;
   const thermal = on.thermal ? plant("thermal") : null;
   const hourly = m.ops.some((o) => finite(o.surplusRevenueCr));
+  const recIncome = hourly && m.ops.some((o) => finite(o.recRevenueCr) && o.recRevenueCr > 0);
   // where each input came from: the request names some; sourceAll (Round the clock: the tab) names the rest
   const src = (key, fallback = "Your input") => m.sources?.[key] || m.sourceAll || fallback;
   const sim = m.engine === "simulation";
@@ -1260,7 +1261,10 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   if (blocky && dsp?.blocks) S.series("blockShort", "Short of the time-block floors", "MU", { f: (y) => (inPpa(y) ? fromDispatch("short", y).f : "0"), v: (y) => (inPpa(y) ? fromDispatch("short", y).v : 0), fmt: "mu", total: true, note: "Each hour's energy below its floor, summed from the hour-by-hour sheets" });
   else if (blocky) optRow("blockShort", "Short of the time-block floors", "MU", (o) => mu(o.blockShortfallMWh), { zeroBeyond: true, note: "Each hour's energy below its floor (peak and off-peak blocks), from the dispatch" });
   if (hourly) {
-    optRow("price", `Realised market price${m.market ? ` (IEX ${m.market}, hourly)` : " (hourly)"}`, "₹/kWh", (o) => (o.excessMWh > 0 && finite(o.surplusRevenueCr) ? (o.surplusRevenueCr * 1e4) / o.excessMWh : 0), { total: false, fmt: "tariff", note: "Market revenue of the year ÷ energy sold, at the hourly prices the optimiser dispatched against" });
+    optRow("price", `Realised market price${m.market ? ` (IEX ${m.market}, hourly)` : " (hourly)"}`, "₹/kWh", (o) => (o.excessMWh > 0 && finite(o.surplusRevenueCr) ? ((o.surplusRevenueCr - (finite(o.recRevenueCr) ? o.recRevenueCr : 0)) * 1e4) / o.excessMWh : 0), { total: false, fmt: "tariff", note: "Market revenue of the year ÷ energy sold, at the hourly prices the optimiser dispatched against (REC proceeds apart)" });
+    // income not tied to the energy sold (SECI CfD-I: the bidder's share of the RECs on own RE supplied
+    // in a brown market) is its own row, so a year that sells no surplus still carries it
+    if (recIncome) optRow("recRev", "REC proceeds and other market income not tied to energy sold", "₹ cr", (o) => (finite(o.recRevenueCr) ? o.recRevenueCr : 0), { total: true, zeroBeyond: true, note: "From the day-by-day operation; added to the market sale revenue" });
   } else {
     S.series("price", "Market sale price", "₹/kWh", { f: () => S.s("flatPrice"), v: () => S.v("flatPrice"), fmt: "tariff" });
   }
@@ -1343,8 +1347,9 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
     note: "Delivered MU × tariff ₹/kWh ÷ 10 = ₹ crore; beyond the PPA every unit sells at the extension price",
   });
   S.series("mktRev", m.market ? `Market sale revenue (IEX ${m.market})` : "Market sale revenue", "₹ cr", {
-    f: (y) => `IF(AND(${S.s("sell")}="Yes",${S.yr(y)}<=${S.s("ppaYears")}),${S.at(buyer ? "marketMu" : "excess", y)}*${S.at("price", y)}/10,0)`,
-    v: (y) => (S.v("sell") === "Yes" && inPpa(y) ? (S.v(buyer ? "marketMu" : "excess", y) * S.v("price", y)) / 10 : 0), total: true,
+    f: (y) => `IF(AND(${S.s("sell")}="Yes",${S.yr(y)}<=${S.s("ppaYears")}),${S.at(buyer ? "marketMu" : "excess", y)}*${S.at("price", y)}/10${recIncome ? `+${S.at("recRev", y)}` : ""},0)`,
+    v: (y) => (S.v("sell") === "Yes" && inPpa(y) ? (S.v(buyer ? "marketMu" : "excess", y) * S.v("price", y)) / 10 + (recIncome ? S.v("recRev", y) : 0) : 0), total: true,
+    note: recIncome ? "Energy sold × the realised price, plus the REC proceeds" : undefined,
   });
   if (buyer) {
     S.series("buyerRev", "Solar Hours excess sold to the buyer", "₹ cr", {
@@ -3208,6 +3213,7 @@ export function liveModelInput(raw) {
       penaltyWeeks: (Array.isArray(o?.penaltyWeeks) ? o.penaltyWeeks : []).slice(0, 54)
         .filter((w) => finite(w?.ref) && finite(w?.beyondMwh) && w.beyondMwh > 0).map((w) => ({ ref: Math.max(0, w.ref), beyondMwh: w.beyondMwh })),
       ...(finite(o?.surplusRevenueCr) ? { surplusRevenueCr: o.surplusRevenueCr } : {}),
+      ...(finite(o?.recRevenueCr) ? { recRevenueCr: o.recRevenueCr } : {}),
     })),
     dispatch: dispatchInput(raw.dispatch, raw.ops.length),
     gen: Object.fromEntries(["solar", "wind"].filter((k) => raw.on?.[k] && finite(raw.gen?.[k]?.cuf) && raw.gen[k].cuf > 0).map((k) => {
