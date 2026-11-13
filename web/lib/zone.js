@@ -6,7 +6,7 @@ export const ZONE = process.env.TENDEROS_ZONE === "intake" ? "intake" : process.
 
 // the engine paths that read tender documents with cloud models (LlamaParse, the LLM extraction):
 // intake-zone work; the core zone refuses them and takes signed packages instead
-const INTAKE_ENGINE = [/^bid\/tender\/read(-set)?$/, /^bid\/cerc-order$/, /^bess\/parse$/];
+const INTAKE_ENGINE = [/^bid\/tender\/read(-set)?$/, /^bid\/cerc-order$/, /^bess\/parse$/, /^market\/seci-scan$/];
 /** Whether the zone lets this engine path run (path: "bid/tender/read-set"). */
 export function zoneAllowsEngine(path) {
   if (ZONE !== "core") return true;

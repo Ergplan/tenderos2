@@ -36,7 +36,8 @@ export const INSTRUCTIONS = `TenderOS works a bid for SECI's FDRE-RTC-V tender (
 - Numbers about a bid come only from the tools: get_results, get_financials, check_tariff, check_bid, explain_generation. Do not estimate them.
 - The bid lives on the server for this conversation: set_input changes it (list_inputs gives the keys), use_benchmarks fills empty inputs, run_optimizer sizes the plant with HiGHS (one to two minutes; if it answers "running", call sizing_status), then get_results and get_financials.
 - check_bid tests a plant you specify instantly with a rule-based dispatch (no optimisation): use it for what-if questions.
-- winning_bid explains how the auction's winners reached Rs 5.25/kWh.`;
+- winning_bid explains how the auction's winners reached Rs 5.25/kWh.
+- seci_new_tenders lists SECI's other open tenders, scanned from its website, with a summary of each (no document read).`;
 
 // ---------------------------------------------------------------- data on the server
 
@@ -203,9 +204,36 @@ export const TOOLS = [
     description: "Test a plant you specify, instantly: an hourly rule-based dispatch of every PPA year against the tender's floors (no optimisation), then the 25-year model at the tariff. Returns equity, project and lender IRR, DSCR, LCOE, the tariff the target IRR needs, the floors met, the penalty and the tender checks. Unset inputs keep the What-if defaults (300 MW, 785 MWac solar, 440 MW wind, 635 MW x 4 h battery, Rs 7.00)." },
   { name: "winning_bid", title: "How the winners bid Rs 5.25", annotations: READ, inputSchema: schema(),
     description: "The auction result (Rs 5.25-5.26/kWh, 06.08.2026) and a bridge from TenderOS's benchmark Rs 6.50 to it, one change at a time (Amendment-03, green market, battery cost, selling surplus, finance, wind), with the plant per MW at each step, what a winner disclosed and what is not verified." },
+  { name: "seci_new_tenders", title: "SECI's open tenders", annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    inputSchema: schema({ scan: { type: "boolean", description: "Scan SECI's site first (about a minute). Without it the last scan is returned; a scan older than 12 hours is refreshed anyway." }, filter: str("all (default), new (new or changed at the last scan), soon (bids due within 14 days) or developers (power, storage and tariff bids)", { enum: ["all", "new", "soon", "developers"] }) }),
+    description: "SECI's open tenders as scanned from www.seci.co.in/tenders and each tender's details page (no document opened): ID, reference, title, category, capacity, scheme, the dates (pre-bid, bids due, opening) with the days left, a summary and what to watch, the documents' names and the announcements. Use it when asked what SECI has out to tender, what is new, or what closes soon." },
 ];
 
 const SIZING_TOOLS = new Set(["run_optimizer", "sizing_status"]);
+
+/** SECI's open tenders from the New tenders page's store (web/lib/seciScan.js), scanned first when asked or stale. */
+async function seciNewTenders(args = {}) {
+  const S = await import("./seciScan.js");
+  let data = await S.listSeciTenders({ includeDelisted: false });
+  if (args.scan || data.stale) data = await S.runSeciScan(null);
+  const today = Date.now();
+  const left = (t) => { const d = (t.record?.bidOnline || t.bidDeadline || "").slice(0, 10); return d ? Math.ceil((new Date(`${d}T23:59:59`) - today) / 86400000) : null; };
+  let list = data.tenders.filter((t) => t.listed);
+  if (args.filter === "new") list = list.filter((t) => t.isNew || t.isChanged);
+  if (args.filter === "soon") list = list.filter((t) => { const d = left(t); return d !== null && d >= 0 && d <= 14; });
+  if (args.filter === "developers") list = list.filter((t) => t.summary?.relevance === "high");
+  return {
+    source: "www.seci.co.in/tenders and each tender's details page; no tender document was opened",
+    scannedAt: data.scan?.at || null, summariesBy: data.scan?.mode || null, openTenders: data.tenders.filter((t) => t.listed).length,
+    tenders: list.map((t) => ({
+      tenderId: t.tenderId, ref: t.ref, title: t.title, category: t.record?.facts?.categoryLabel, bidder: t.record?.facts?.bidder, capacity: t.record?.facts?.capacity, scheme: t.record?.facts?.scheme,
+      published: t.published, preBid: t.record?.preBid || null, bidsDue: t.record?.bidOnline || t.bidDeadline, bidsOpen: t.record?.bidOpen || null, daysLeft: left(t),
+      summary: t.summary?.summary || null, watch: t.summary?.watch || [], relevance: t.summary?.relevance || null, isNew: t.isNew, isChanged: t.isChanged,
+      documents: (t.record?.documents || []).map((d) => d.name), announcements: (t.record?.announcements || []).map((a) => `${a.title} (${(a.uploadedAt || "").slice(0, 10)})`), url: t.record?.url,
+    })),
+    note: "Summaries come from the tender pages alone: state no term (tariff ceiling, eligibility, EMD amount) that only the documents hold.",
+  };
+}
 
 /** Waits up to WAIT_MS for the session's sizing; the results when done, else a "running" note. */
 async function awaitSizing(s) {
@@ -320,6 +348,7 @@ export async function callTool(s, name, args = {}) {
   if (name === "amendment_changes") return amendmentChanges(args);
   if (name === "check_bid") return checkBid(args);
   if (name === "winning_bid") return winningBid();
+  if (name === "seci_new_tenders") return seciNewTenders(args);
   if (name === "tender_lookup") {
     const hits = tenderLookup(String(args.query || ""), 6);
     return hits.length ? { matches: hits } : { matches: [], note: "Nothing in the tender documents matches: say so rather than guess." };

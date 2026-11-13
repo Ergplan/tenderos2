@@ -39,6 +39,7 @@ from engine.extraction.tenderset.docling import docling_available
 from engine.extraction.tenderset.llamaparse import llamaparse_available
 from engine.extraction.tenderset.read_set import MAX_FILES
 from engine.market.cerc_order import read_order
+from engine.market import seci_tenders as SECI_SCAN
 from engine.sizing import dispatch15 as D15
 from engine.sizing import rtc_lp as RLP
 
@@ -229,6 +230,23 @@ def cerc_order(req: BessParseRequest) -> dict[str, Any]:
         return _finite(read_order(req.file.name, payload))
     except (UnreadableDocument, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class SeciScanRequest(BaseModel):
+    known: dict[str, str] = {}  # tenderId -> fingerprint of the last scan: those unchanged are not summarised again
+    summarise: bool = True
+
+
+@app.post("/api/market/seci-scan")
+def seci_scan(req: SeciScanRequest) -> dict[str, Any]:
+    """Scan SECI's tender list and details pages and summarise the new and changed tenders
+    (engine/market/seci_tenders.py). No tender document is downloaded."""
+    try:
+        return _finite(SECI_SCAN.scan(known=dict(list(req.known.items())[:500]), summarise=req.summarise))
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:  # the site unreachable, a timeout
+        raise HTTPException(status_code=502, detail=f"SECI's site could not be read: {exc}") from exc
 
 
 @app.post("/api/bess/parse")

@@ -320,6 +320,19 @@ One row per `<Stat>` tag (`web/src/rtc/ui.jsx` Stat): a label, a value, a detail
 | --- | --- | --- | --- | --- | --- |
 | <l> *(label is an expression)* | `feedback/ChangeRequests.jsx:37` | `String(counts[k] \|\| 0)` | `String(counts[k] || 0)`: the requests with that status (open, approved, rejected, exported, done) | change_requests.status | computed from the `change_requests` rows |
 
+### `web/src/market/NewTendersTab.jsx`
+
+**Screen:** New tenders (sidebar): SECI's open tenders with a summary of each  
+**Computed by:** `engine/market/seci_tenders.py` `scan` (the list and details pages parsed, `facts` off the title, `fingerprint`, `claude_summaries` with prompt `seci_scan/v1` or `rules_summary`), called by `web/lib/seciScan.js` `runSeciScan`  
+**Rests on:** www.seci.co.in/tenders and each `/tender-details/<id>` page; no document  
+**Stored:** `seci_tenders` (one row per tender), `seci_scans` (the log)
+
+| Label as shown | Where | Value expression | Computed by | Inputs | Stored |
+| --- | --- | --- | --- | --- | --- |
+| Open tenders, New or changed, Closing in 14 days, Summaries by | `market/NewTendersTab.jsx` | the listed rows; the last scan's `new` + `changed`; deadlines within 14 days; the scan's `mode` | `listSeciTenders`, `lastScan` | `seci_tenders`, `seci_scans` | computed |
+| A tender card: category, bidder, capacity, scheme, New / Changed, days left, title, IDs, summary, what to watch, dates, documents and announcements | `market/NewTendersTab.jsx` TenderCard | `record.facts`, `summary`, `record.preBid`/`bidOnline`/`bidOpen`, `record.documents` (names), `record.announcements` | `seci_tenders.py` `facts`, `claude_summaries` / `rules_summary`; `isNew`/`isChanged` against the last scan | the SECI pages | `seci_tenders.record`, `seci_tenders.summary` |
+| Scan SECI now | `market/NewTendersTab.jsx` | `POST /api/market/seci/scan` | `runSeciScan` → engine `POST /api/market/seci-scan` with the known fingerprints; only new and changed tenders summarised | the SECI pages, the Anthropic key | `seci_tenders` upserted, `seci_scans` row; `activity_log` |
+
 ### `web/src/market/RecentTendersTab.jsx`
 
 **Screen:** Recent tenders › SECI results  

@@ -27,7 +27,7 @@ Conventions:
 | ID | Screen | Preconditions | Steps | Expected | Automated |
 | --- | --- | --- | --- | --- | --- |
 | SH-01 | Sidebar | Fresh browser at `/` | Open the app | The Tender to Bid start screen; no login page; the sidebar lists Workspace (7 tabs), Team (Team setup, Messages), Library (Saved scenarios), the day/night switch | `test_click_tour.py::test_sidebar_tabs_theme_and_zone`; `test_tender_to_bid.py` (`_session`) |
-| SH-02 | Sidebar | — | Click each Workspace tab in turn: Tender to Bid, Round the Clock, SECI RTC tender, BESS Tender, CfD Bid, What-if analysis, Recent tenders | Each opens its screen and its button is highlighted; the previous tab's edits are still there when you come back (tabs keep their state while the page is open) | `test_click_tour.py::test_sidebar_tabs_theme_and_zone` |
+| SH-02 | Sidebar | — | Click each Workspace tab in turn: Tender to Bid, Round the Clock, SECI RTC tender, BESS Tender, CfD Bid, What-if analysis, New tenders, Recent tenders | Each opens its screen and its button is highlighted; the previous tab's edits are still there when you come back (tabs keep their state while the page is open) | `test_click_tour.py::test_sidebar_tabs_theme_and_zone` |
 | SH-03 | Zone badge | — | Read the badge under the logo | "Single installation · vdev" (or the version); hover: "Tender reading and the bid workspace together". On a core-zone install it reads "Core zone … patched under AMC" | `test_click_tour.py` (data-zone = all); the core-zone 403s: instance check only (see FUNCTIONAL-TESTS.md) |
 | SH-04 | Day mode | — | Click "Day mode" at the foot of the sidebar | The page turns light at once, the logo changes to the dark-type one, the button reads "Night mode"; open charts redraw in the day palette | `test_theme.py::test_day_and_night`, `::test_switch_redraws_open_charts`; `test_click_tour.py` |
 | SH-05 | Day mode kept | SH-04 | Reload; open Saved scenarios; come back | Still day mode everywhere; the library page carries the same switch; switch back to night there and the workspace is night again | `test_theme.py::test_day_and_night` |
@@ -218,6 +218,14 @@ same as before.
 | CF-10b | Freeze a lever, download the What-if model | CF-10a | On a move: Freeze at this value › note › Freeze; Plot the track again; Download What-if model (Excel) | The lever appears in the Frozen levers table with the evidence and the secured-gap bar; the new track does not move it and says so; a waterfall bar click lights its move; the dialog opens in view wherever the page is scrolled; the workbook has the usual sheets plus "What-if track" (summary, moves with chances, frozen levers); Unfreeze removes the record | `test_cfd_bid.py` |
 | CF-13a | Market price path (F.9) | CF-08 | Financial model › F.9: click Storage flood; drag a midday dot; Smooth; Compare the scenarios | The tiles re-run on each change (strike price, IRR, charging bought in years 1–3, merchant share); dragging switches the scenario to Your own path; the table lists flat, storage flood, tight grid and the own path with the strike price and its gap to flat | `test_cfd_bid.py` |
 | CF-14 | Voice agent | — | Talk to the bid agent (needs the OpenAI key) | The agent reads the tender, sets inputs, runs the optimiser and explains the result through its sixteen tools | manual; `tools/check_cfd_agent.mjs` checks the tools |
+
+## 7b. New tenders
+
+| ID | Screen | Role | Clicks | Expected | Automated |
+| --- | --- | --- | --- | --- | --- |
+| NT-01 | New tenders | any with the tab | Open New tenders (it scans by itself when the last scan is over 12 hours old) or click **Scan SECI now** | About a minute; one card per open SECI tender with category, capacity, scheme, days left, a summary ("no document opened"), what to watch, the dates; the stats say Claude or Rules | `test_new_tenders.py` |
+| NT-02 | New tenders | any | Filters: New or changed, Closing in 14 days, For developers, No longer listed; expand a card's documents | Each filter narrows the cards; the documents are names only, "none was opened" | `test_new_tenders.py` |
+| NT-03 | New tenders | any | Scan again | "0 new"; the summaries kept; a tender with a new announcement or date shows "Changed" | `test_new_tenders.py` |
 
 ## 8. Recent tenders
 

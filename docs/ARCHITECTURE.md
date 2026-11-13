@@ -98,6 +98,7 @@ tabs, the bid forms and the agent.
 | Traceable model | `web/src/model/` | The Live model sheet (`web/lib/liveModel.js`) built into an in-memory grid; the explorer shows each number's formula, precedents, dependents and inputs |
 | Plant studios | `web/src/plant/` | Solar layout and ₹/Wp cost build-up with string or central inverters; wind turbines by make, CUF at the site's wind, farm cost; profiles on screen |
 | What-if | `web/src/whatif/` | Rule-based hourly dispatch of every year at the entered sizes, the 25-year model at the bid tariff, the SECI RTC-TM-V checks |
+| New tenders | `web/src/market/NewTendersTab.jsx`, `web/lib/seciScan.js`, `engine/market/seci_tenders.py` | SECI's open tenders scanned from its tender list and details pages (no document read), summarised by Claude or by rules (`docs/NEW_TENDERS.md`) |
 | Recent tenders | `web/src/market/`, `web/lib/market.js`, `engine/market/` | SECI results as reported; CERC orders uploaded, read by the engine (`/api/bid/cerc-order`) and stored in `market_orders` |
 
 ## Day and night mode

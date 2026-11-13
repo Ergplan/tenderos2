@@ -4,7 +4,7 @@
 // signs out. The legacy FDRE tabs (yield assessment, EYA report, custom dispatch and the
 // rest) are not part of this application.
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, KeyRound, Newspaper, Lock, LogOut, Scale, UserRound, UserCog, Users, ClipboardList, MessageSquarePlus } from "lucide-react";
+import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, KeyRound, Newspaper, Lock, LogOut, Radar, Scale, UserRound, UserCog, Users, ClipboardList, MessageSquarePlus } from "lucide-react";
 import { flushActivity, startActivityTracker, trackEvent } from "./activity";
 import "./styles.css";
 import "./chartTheme";
@@ -15,6 +15,7 @@ import SeciTab from "./seci/SeciTab";
 import CfdTab from "./cfd/CfdTab.jsx";
 import WhatIfTab from "./whatif/WhatIfTab";
 import RecentTendersTab from "./market/RecentTendersTab";
+import NewTendersTab from "./market/NewTendersTab.jsx";
 import Brand from "./Brand";
 import ThemeToggle from "./ThemeToggle";
 import { ALL_TAB_IDS } from "../lib/tabs";
@@ -35,6 +36,7 @@ const TABS = [
   ["bessTender", BatteryCharging, "BESS Tender"],
   ["cfd", Scale, "CfD Bid"],
   ["whatIf", FlaskConical, "What-if analysis"],
+  ["newTenders", Radar, "New tenders"],
   ["recentTenders", Newspaper, "Recent tenders"],
 ];
 
@@ -173,6 +175,7 @@ export default function App({ user = null, initialScenario = null }) {
         {canView && activeTab === "bessTender" && <BessTab initialScenario={opened("bess")} />}
         {canView && activeTab === "cfd" && <CfdTab initialScenario={opened("cfd")} />}
         {canView && activeTab === "whatIf" && <WhatIfTab />}
+        {canView && activeTab === "newTenders" && <NewTendersTab />}
         {canView && activeTab === "recentTenders" && <RecentTendersTab />}
         {activeTab === "teamSetup" && <TeamSetup team={team} />}
         {activeTab === "changeRequests" && <ChangeRequests team={team} requests={requests} onFeedback={() => setFeedbackOn(true)} />}

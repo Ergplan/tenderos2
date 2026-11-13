@@ -26,6 +26,7 @@ One web app with seven sidebar tabs (`web/lib/tabs.js` `TAB_CATALOG`, `web/src/m
 | BESS Tender (`bessTender`) | Standalone battery tenders: read the tender, size the battery, capacity charge for the target IRR | `bess` | `web/src/bess/`, `engine/bess/` |
 | CfD Bid (`cfd`) | SECI CfD-I: eleven steps by team (explainer, documents and Amendments 01–04, 249 conditions in force, bid inputs, design, finance inputs, own-RE sizing, the financial model through the shared engine with the nine-sheet workbook, What-if levers, the RfS's 17 formats as letters, reference bids), the voice agent | `POST /api/cfd/model`, `POST /api/cfd/dispatch15`, `/api/cfd/forms`, `/api/cfd/letters`, `/api/seci/live` (tab `cfd`) | `web/src/cfd/`, `docs/CFD.md` |
 | What-if analysis (`whatIf`) | Your sizes, costs, financing and tariff in; IRRs, DSCR, LCOE, the tariff the target IRR needs, tender checks, tariff levers; rule-based hourly dispatch, no optimisation | none | `web/src/whatif/` |
+| New tenders (`newTenders`) | SECI's open tenders scanned from its tender list and details pages, each summarised by Claude (or rules) without reading a document; new, changed, closing-soon filters | `GET /api/market/seci`, `POST /api/market/seci/scan` (engine `POST /api/market/seci-scan`) | `web/src/market/NewTendersTab.jsx`, `web/lib/seciScan.js`, `engine/market/seci_tenders.py`, `docs/NEW_TENDERS.md` |
 | Recent tenders (`recentTenders`) | SECI auction results as reported; CERC tariff-adoption orders uploaded and read by the engine | none (`/api/bid/cerc-order` goes through the `bid` family from this tab's upload) | `web/src/market/`, `engine/market/` |
 
 Across the tabs:
@@ -173,7 +174,7 @@ Local development needs Python 3.12, Node 22 and a Postgres (`Makefile` header, 
 | `model/` | The traceable model: `trace.js`, `ModelExplorer.jsx`, `generation.js`, `explainGeneration.js` |
 | `plant/` | Solar and wind studios (`solar.js`, `wind.js`), `ProfileView.jsx`, `cufFile.js`, `justification.js` |
 | `dsm/` | Deviation settlement (`dsm.js`, `DsmPanel.jsx`) |
-| `market/` | Recent tenders (`RecentTendersTab.jsx`, `seed.js`) |
+| `market/` | Recent tenders (`RecentTendersTab.jsx`, `seed.js`) and New tenders (`NewTendersTab.jsx`) |
 | `team/` | Team mode and assignments: `useTeamMode.js`, `FieldPings.jsx`, `fields.js`, `mentions.js`, `Inbox.jsx`, `TeamSetup.jsx`, `useTeam.js`, `AssignButton.jsx`, `TeamPanel.jsx`, `apply.js` |
 | `evidence/` | `EvidenceLayer.jsx`, `useEvidence.js`, `register.js` |
 | `scenarios/` | `client.js` (`scenarioApi`, `authApi`), `SaveDialog.jsx` |

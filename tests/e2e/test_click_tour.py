@@ -44,7 +44,7 @@ pytestmark = [
 SHOTS = os.environ.get("SCREENSHOTS")
 PACK = json.loads((Path(__file__).resolve().parents[2] / "web" / "src" / "seci" / "seci-rtc-tm-v.json").read_text())
 
-TABS = ["Tender to Bid", "Round the Clock", "SECI RTC tender", "BESS Tender", "CfD Bid", "What-if analysis", "Recent tenders"]
+TABS = ["Tender to Bid", "Round the Clock", "SECI RTC tender", "BESS Tender", "CfD Bid", "What-if analysis", "New tenders", "Recent tenders"]
 SECI_STEPS = ["documents", "conditions", "bid", "sources", "financeInputs", "size", "finance", "whatif", "forms", "winning"]
 BID_STEPS = ["tender", "dates", "capacity", "sources", "size", "finance"]
 RTC_CHAPTERS = ["Energy needed", "Supply type", "DFR", "Solar", "Wind", "Battery storage"]
@@ -142,6 +142,7 @@ def test_sidebar_tabs_theme_and_zone():
             "BESS Tender": ("nav.story-rail", "BESS"),
             "CfD Bid": ("[data-testid=cfd-step-explain]", "What is a CfD"),
             "What-if analysis": ("[data-testid=whatif-verdict]", "What-if"),
+            "New tenders": ("[data-testid=new-tenders]", "SECI"),
             "Recent tenders": ("[data-testid=seci-results]", "SECI"),
         }
         for label in TABS:
