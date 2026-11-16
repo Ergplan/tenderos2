@@ -31,3 +31,13 @@
 .iso-table, .iso-cont, .iso-turbine { animation: iso-in .45s ease backwards; }
 @keyframes iso-in { from { opacity: 0; transform: translateY(-8px); } }
 @media (prefers-reduced-motion: reduce) { .iso-rotor, .iso-flow, .iso-table, .iso-cont, .iso-turbine { animation: none; } }
+
+/* the deployment drawing */
+.iso-pad.zone-net { fill: color-mix(in srgb, var(--dim) 9%, transparent); stroke: var(--line-2); stroke-dasharray: 5 4; }
+.iso-pad.zone-dmz { fill: color-mix(in srgb, var(--evidence) 10%, transparent); stroke: color-mix(in srgb, var(--evidence) 70%, transparent); stroke-width: 1.2; }
+.iso-pad.zone-core { fill: color-mix(in srgb, var(--power) 9%, transparent); stroke: var(--power); stroke-width: 1.6; }
+.iso-fire { --tone: var(--heat); opacity: .78; } .iso-cloudb { --tone: var(--violet); } .iso-rackc { --tone: var(--power); } .iso-rackm { --tone: var(--evidence); } .iso-steelb { --tone: var(--dim); }
+.flow-block { stroke: var(--bad); stroke-dasharray: 3 6; animation: none; }
+.iso-num circle { fill: var(--ink); stroke: var(--bg); stroke-width: 1.5; } .iso-num text { fill: var(--bg); font: 700 10px var(--mono); }
+.iso-cross circle { fill: var(--bad); } .iso-cross path { stroke: #fff; stroke-width: 2.2; stroke-linecap: round; fill: none; }
+.iso-security .iso-label { font-size: 10.5px; letter-spacing: .06em; }

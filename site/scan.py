@@ -195,6 +195,11 @@ def main() -> None:
         else:
             results = prev.get("results", [])
     history = [e for e in (prev or {}).get("events", []) if (e["date"], e["id"], e["kind"], e["detail"]) not in {(x["date"], x["id"], x["kind"], x["detail"]) for x in events}]
+    current = {(t["source"], t["id"]): t for t in tenders}
+    for e in history:  # a tender's description can be read better on a later day: say the same thing everywhere
+        t = current.get((e["source"], e["id"]))
+        if t and e["kind"] == "new tender":
+            e["detail"], e["tender"] = t["summary"].split(" Bids are due")[0], name(t)
     events = sorted(events + history, key=lambda e: e["date"], reverse=True)[:80]
     tenders.sort(key=lambda t: (t.get("bidDeadline") or "9999", t["source"]))
     out = {

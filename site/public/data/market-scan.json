@@ -1,6 +1,6 @@
 {
  "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
- "scannedAt": "2026-11-16T12:02:29",
+ "scannedAt": "2026-11-16T17:28:20",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -74,38 +74,6 @@
    "status": "open",
    "lastAmendment": "2026-10-13",
    "daysToBid": 0
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000282",
-   "ref": "SECI/C&P/MI/00/06/2026-27",
-   "title": "RfS for Green Ammonia (Mode-2A-Tranche-II)",
-   "url": "https://www.seci.co.in/tender-details/Ymp1",
-   "published": "2026-09-24",
-   "bidDeadline": "2026-11-17",
-   "bidOpen": "2026-11-20",
-   "category": "hydrogen",
-   "categoryLabel": "Green hydrogen and ammonia",
-   "capacity": {},
-   "scheme": "Mode-2A-Tranche-II",
-   "ipp": true,
-   "summary": "Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 17 Nov 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 20 Nov 2026, 10:00.",
-   "documents": 7,
-   "amendments": [
-    {
-     "name": "Amendment-01",
-     "date": "2026-10-28"
-    },
-    {
-     "name": "Clarification-01",
-     "date": "2026-10-28"
-    }
-   ],
-   "fingerprint": "374d581884fb1345",
-   "firstSeen": "2026-09-24",
-   "status": "open",
-   "lastAmendment": "2026-10-28",
-   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -328,6 +296,38 @@
    "firstSeen": "2026-10-01",
    "status": "amended",
    "lastAmendment": "2026-11-03",
+   "daysToBid": 9
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000282",
+   "ref": "SECI/C&P/MI/00/06/2026-27",
+   "title": "RfS for Green Ammonia (Mode-2A-Tranche-II)",
+   "url": "https://www.seci.co.in/tender-details/Ymp1",
+   "published": "2026-09-24",
+   "bidDeadline": "2026-11-25",
+   "bidOpen": "2026-11-30",
+   "category": "hydrogen",
+   "categoryLabel": "Green hydrogen and ammonia",
+   "capacity": {},
+   "scheme": "Mode-2A-Tranche-II",
+   "ipp": true,
+   "summary": "Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 30 Nov 2026, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Amendment-01",
+     "date": "2026-10-28"
+    },
+    {
+     "name": "Clarification-01",
+     "date": "2026-10-28"
+    }
+   ],
+   "fingerprint": "6083100f21363264",
+   "firstSeen": "2026-09-24",
+   "status": "open",
+   "lastAmendment": "2026-10-28",
    "daysToBid": 9
   },
   {
@@ -1020,6 +1020,15 @@
  ],
  "events": [
   {
+   "date": "2026-11-16",
+   "source": "SECI",
+   "id": "SECI000282",
+   "tender": "Mode-2A-Tranche-II",
+   "kind": "deadline moved",
+   "detail": "2026-11-17 → 2026-11-25",
+   "url": "https://www.seci.co.in/tender-details/Ymp1"
+  },
+  {
    "date": "2026-11-05",
    "source": "SECI",
    "id": "SECI000249",
@@ -1034,7 +1043,7 @@
    "id": "9842",
    "tender": "RfS of Developer for Setting up BESS and Supply of Solar- Plus -BESS P…",
    "kind": "new tender",
-   "detail": "Battery storage (standalone BESS), 1,200 MW; for developers: a power-supply or tariff bid.",
+   "detail": "Solar with battery storage, 1,200 MW; for developers: a power-supply or tariff bid.",
    "url": "https://www.nhpcindia.com/welcome/tender_detail/9842"
   },
   {
@@ -1052,6 +1061,6 @@
   "ipp": 12,
   "seci": 15,
   "nhpc": 1,
-  "newToday": 0
+  "newToday": 1
  }
 }

@@ -3,10 +3,11 @@
 > TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities) that turns months of bid work into hours. It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with a HiGHS linear optimiser; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's premises: the tender is parsed in a DMZ, the bid stays in a core zone with no route to the internet.
 
 Key facts:
-- Maker: jouleWise (https://www.joulewise.tech). Contact: +91 87967 92724, sales@joulewise.com, https://www.joulewise.tech/contact
+- Maker: jouleWise (https://www.joulewise.tech). Book a demo: https://tenderos.joulewise.tech/#demo. Contact: +91 87967 92724, sales@joulewise.com
 - Tender types: Contract for Difference (SECI CfD-I), FDRE round-the-clock (SECI FDRE-RTC-V), assured peak supply, standalone BESS, solar or wind with storage.
 - Language models read documents and draft summaries only; a person confirms every value. Sizing (HiGHS linear programming), dispatch, the financial model and the bid review are deterministic code.
 - Speed, from the product's documentation: a tender read in 1 to 4 minutes; a 25-year optimisation in 1 to 2 minutes on 4 cores; what-if instant.
+- MCP connectors are available on subscription (18 tools for Claude or another MCP client); in the two-zone deployment they run in the intake zone only.
 - Collaboration: steps by team, pings and threads, evidence on every input, sign-off, activity log. Scenarios are saved with versions; up to 12 compared side by side.
 - Worked example on SECI CfD-I (RfS SECI/C&P/IPP/13/0002/26-27, 500 MW × 2 h): 262 conditions with pages, 40 amendment changes quoted. On illustrative inputs for a 100 MW bid the optimiser keeps 10 MWac of own solar and prices the strike at ₹8.32/kWh at a 13.0% equity IRR. This shows the method, not a price to bid: every bid is tender-specific.
 - Market watch: the tender lists of SECI and NHPC are scanned daily for new tenders, amendments, moved deadlines and result notices.
@@ -29,7 +30,7 @@ Key facts:
 - Build the financial model lenders will read: by hand, weeks (indicative); in TenderOS, minutes (the model is the product; the Excel twin is one click)
 - Prove compliance in 15-minute blocks: by hand, weeks (indicative); in TenderOS, minutes (96 blocks a day for the whole term, about 90 seconds for year 1)
 - Bid-day sensitivities and the route to a quote: by hand, days (indicative); in TenderOS, minutes (what-if is instant; the levers and the track take seconds)
-- Fill the tender's formats and letters: by hand, days (indicative); in TenderOS, minutes (generated from the bid in the RfS's wording, Word and PDF)
+- Fill the tender's formats and letters: by hand, days (indicative); in TenderOS, hours (filled in hours from the bid, in the RfS's wording, Word and PDF*)
 - Absorb a new amendment a week before the deadline: by hand, weeks (indicative); in TenderOS, hours (read the amendment, re-run, review: the same afternoon)
 
 ## Modules
@@ -47,7 +48,7 @@ Key facts:
 - **Team, evidence, sign-off**: Steps by team, a paperclip for evidence on every input, pings and threads, assignments with email, sign-off that turns amber when the value changes, an activity log.
 - **New tenders radar**: Scans SECI's tender list and details pages, never the documents, and summarises each tender: what it is, who may bid, the dates. New and changed tenders are marked.
 - **Recent results**: SECI's e-reverse auction results, every bidder awarded and not, with capacity and final tariff, linked to SECI's notices.
-- **Voice agent, Claude connector**: Ask the tender by voice or chat, or connect Claude through MCP (18 tools): look up a condition with its page, set an input, run the optimiser, read the financials.
+- **Voice agent, MCP connectors**: Ask the tender by voice or chat. MCP connectors are available on subscription: connect Claude or another MCP client (18 tools) to look up a condition with its page, set an input, run the optimiser and read the financials.
 - **On your premises**: Docker on any cloud or on-premises. A DMZ reads the tender; the bid, the costs and the model stay in a core zone with no route to the internet.
 
 ## Security and deployment
@@ -59,6 +60,7 @@ Key facts:
 - **Who sees what**: Administrator and user roles, access granted tab by tab, an activity log kept for 400 days.
 - **Backups and updates**: Database and files backed up, the newest 14 kept. Updates arrive as bundles signed with an EC P-256 key; the patch tool verifies, backs up, applies and health-checks.
 - **Modest hardware**: One 4-vCPU, 16 GB server on Ubuntu or Debian with Docker: AWS, Azure, GCP or your own rack. HTTPS only, firewall rules per zone.
+- **MCP connectors, on subscription**: Connect Claude or another MCP client to TenderOS: 18 tools to look up a condition with its page, set an input, run the optimiser and read the financials. In the two-zone deployment the connectors live in the intake zone, where they reach the tender's reading only, and are switched off in the core.
 - Roadmap, not in the current release: single sign-on; a cryptographically signed transfer package between the zones.
 
 ## The optimiser
@@ -221,15 +223,15 @@ Tracks: to ₹8.00: Battery capex (all-in) 0.85→0.78 (chance 100%); to ₹7.75
 | 2000 MW ISTS solar with 1000 MW / 4000 MWh ESS (SECI-ISTS-XX) | Solar + ESS | 2000 (4000 MWh) | 2000 | 2.86–2.87 | 2.862 | 2025-10-15 | Welspun Renewable Energy Private Limited 200 MW @ 2.86; MB Power (Madhya Pradesh) Limited 150 MW @ 2.86; Shivalaya Construction Limited 600 MW @ 2.86; Oswal Cables Limited 50 MW @ 2.86; Purvah Green Power Private Limited 300 MW @ 2.86; Banyan Insolation Private Limited 100 MW @ 2.86; LC Infra Projects Private Limited 50 MW @ 2.86; Stockwell Solar Services Private Limited 80 MW @ 2.86; SAEL Industries Limited 300 MW @ 2.87; GH2 Solar Limited 50 MW @ 2.87; Navayuga Green Energy Private Limited 120 MW @ 2.87 | https://www.seci.co.in/uploads/tenders/bidders/SECI_Solar_2000_MW_with_ESS_(ISTS-XX)_result_website_upload2.pdf |
 | 1200 MW RTC power from ISTS-connected RE projects (SECI-RTC-IV) | RTC (round-the-clock RE) | 1200 | 420 | 5.06–5.07 | 5.065 | 2025-05-26 | Hero Solar Energy Private Limited 120 MW @ 5.06; Hexa Climate Solutions Private Limited 100 MW @ 5.06; Sembcorp Green Infra Private Limited 50 MW @ 5.07; Jindal India Power Limited 150 MW @ 5.07 | https://www.seci.co.in/uploads/tenders/bidders/SECI_RTC-IV-_1200_MW_result_website_upload.pdf |
 
-## Open tenders at SECI and NHPC (scanned 2026-11-16T12:02:29, no documents opened)
+## Open tenders at SECI and NHPC (scanned 2026-11-16T17:28:20, no documents opened)
 - [SECI] 700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&I-1) (SECI/C&P/IPP/15/0009/26-27), bids due 2026-11-16: Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 16 Nov 2026, 18:00. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 19 Nov 2026, 10:00.
-- [SECI] RfS for Green Ammonia (Mode-2A-Tranche-II) (SECI/C&P/MI/00/06/2026-27), bids due 2026-11-17: Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 17 Nov 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 20 Nov 2026, 10:00.
 - [SECI] Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat (SECI/C&P/IPP/15/0013/26-27), bids due 2026-11-19: Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 19 Nov 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 24 Nov 2026, 10:00.
 - [SECI] RfS for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) under CfD Mechanism from ISTS-Connected RE Projects (SECI-CfD-I) (SECI/C&P/IPP/13/0002/26-27), bids due 2026-11-20, amended: Contract for Difference (peak supply), 500 MW / 1,000 MWh (SECI-CfD-I); for developers: a power-supply or tariff bid. Bids are due 20 Nov 2026, 18:00. Pre-bid meeting 4 May 2026, 11:30. Bids open 26 Nov 2026, 10:00.
 - [SECI] RfS for 1200 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XXI) (SECI/C&P/IPP/12/0011/26-27), bids due 2026-11-24: Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 27 Nov 2026, 10:00.
 - [SECI] RfS for setting up of 4083.75 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode at Constituent Colleges/Institutions of Central Agricultural University (CAU), Imphal - North Eastern Region (RTSPV T-XIII) (SECI/C&P/IPP/11/0008/26-27), bids due 2026-11-24: Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 30 Sep 2026, 14:30. Bids open 27 Nov 2026, 10:00.
 - [SECI] Request for Selection (RfS Document) of Solar Power Developers for Setting up of 11,159 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode through Tariff-Based Competitive Bidding (RTSPV-Tranche-XIV) (SECI/C&P/IPP/11/0009/26-27), bids due 2026-11-24: Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 7 Oct 2026, 14:30. Bids open 27 Nov 2026, 10:00.
 - [SECI] RfS for Supply of Energy from 800 MW/ 3200 MWh Standalone Battery Energy Storage Systems in India (SECI-ESS-IV) (SECI/C&P/IPP/15/0010/26-27), bids due 2026-11-25, amended: Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 9 Oct 2026, 16:00. Bids open 30 Nov 2026, 10:00.
+- [SECI] RfS for Green Ammonia (Mode-2A-Tranche-II) (SECI/C&P/MI/00/06/2026-27), bids due 2026-11-25: Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 30 Nov 2026, 10:00.
 - [SECI] RfS for Assured Peak Supply of 4800 MWh (1200 MW x 4 Hrs.) from ISTS-Connected RE Projects in India (SECI-FDRE-X) (SECI/C&P/IPP/13/0012/26-27), bids due 2026-12-01: Assured peak supply (FDRE), 1,200 MW / 4,800 MWh (SECI-FDRE-X); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 4 Dec 2026, 10:00.
 - [SECI] Request for Selection (RfS) of Solar Power Developer for setting up of 3680 kW Grid-Connected Rooftop Solar PV Projects on NDMC Buildings under RESCO Mode through Tariff-based Competitive Bidding (RTSPV T-XV) (SECI/C&P/IPP/11/0010/26-27), bids due 2026-12-01: Rooftop solar (RESCO), 3,680 kW (RTSPV T-XV); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 9 Nov 2026, 14:30. Bids open 4 Dec 2026, 10:00.
 - [SECI] RfS for setting up Solar PV Power Project for NHAI (Phase-I) under Tariff-Based Competitive Bidding (SECI/C&P/PMC/11/07/2025-26), bids due 2026-12-14: Solar power; for developers: a power-supply or tariff bid. Bids are due 14 Dec 2026, 18:00. Pre-bid meeting 12 Nov 2026, 14:30. Bids open 17 Dec 2026, 10:00.
@@ -239,8 +241,9 @@ Tracks: to ₹8.00: Battery capex (all-in) 0.85→0.78 (chance 100%); to ₹7.75
 - [SECI] Tender for Design, Engineering, Supply, Construction, Erection, Testing, Commissioning and O&M of ISTS-Connected 60 MW (AC) Solar PV Power Plant at Gaya, Bihar, India (SECI/C&P/OP/11/0007/26-27), bids due 2026-12-03: Solar power, 60 MW; for EPC contractors: build the plant for SECI. Bids are due 3 Dec 2026, 18:00. Pre-bid meeting 15 Oct 2026, 15:30. Bids open 8 Dec 2026, 10:00.
 
 ### What changed lately
+- 2026-11-16 SECI deadline moved: Mode-2A-Tranche-II — 2026-11-17 → 2026-11-25
 - 2026-11-05 SECI amendment: SECI-CfD-I — Amendment-04-SECI-CfD-I
-- 2026-11-04 NHPC new tender: RfS of Developer for Setting up BESS and Supply of Solar- Plus -BESS P… — Battery storage (standalone BESS), 1,200 MW; for developers: a power-supply or tariff bid.
+- 2026-11-04 NHPC new tender: RfS of Developer for Setting up BESS and Supply of Solar- Plus -BESS P… — Solar with battery storage, 1,200 MW; for developers: a power-supply or tariff bid.
 - 2026-11-03 SECI amendment: SECI-ESS-IV — Amendment-02-SECI-ESS-IV
 
 ## The tour's narration
@@ -277,6 +280,9 @@ No. In the enterprise deployment the bid, the costs, the profiles and the model 
 ### What makes the optimiser state of the art?
 It is a linear programme solved with HiGHS, the leading open-source solver, over every hour of the year for the years that bind (or all 25). It chooses solar, wind and battery power and energy together, honours every floor the tender sets by block, month and year, and minimises the tariff for your target equity IRR. A 25-year case takes one to two minutes on four cores, and each run starts from the last.
 
+### Are MCP connectors available?
+Yes, on subscription. An MCP connector lets Claude or another MCP client work with TenderOS through 18 tools: look up a tender condition with its page, list what an amendment changed, set an input, run the optimiser, read the results and the financials. In the two-zone deployment the connectors run in the intake zone and are switched off in the core zone, so the bid's costs and model stay out of reach of any cloud client.
+
 ### Can several people work on one bid?
 Yes. Inputs are split into steps by team (Projects, Design, Finance). Anyone can ping a colleague from any input, attach evidence, assign a question and fill in the answer; a super admin signs off each input and the sign-off turns amber if the value later changes. Saves are per user, with versions; an activity log records who did what.
 
@@ -299,4 +305,4 @@ Yes. Press Play with voice and each screen is narrated while the cursor drives i
 Every day the tender lists of SECI and NHPC and each open tender's page are read, without opening a document, and compared with the day before: a new tender, an amendment or corrigendum, a moved deadline or a result notice is reported, and the drawing at the top of this page is redrawn from the tenders open that day.
 
 ### How do we get access?
-Ask jouleWise for a walkthrough on your own tender: call +91 87967 92724, write to sales@joulewise.com, or use https://www.joulewise.tech/contact.
+Book a TenderOS demo on this page (https://tenderos.joulewise.tech/#demo): a working session on a tender of your choice. Or call +91 87967 92724, or write to sales@joulewise.com.

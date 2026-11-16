@@ -70,6 +70,14 @@
         grow(px + dx - 70, py + dy - 14); grow(px + dx + 70, py + dy + (sub ? 16 : 4));
         add(2, 0, `<text class="iso-label" x="${f(px + dx)}" y="${f(py + dy)}" text-anchor="${anchor}">${title}${sub ? `<tspan class="iso-sub" x="${f(px + dx)}" dy="13">${sub}</tspan>` : ""}</text>`);
       },
+      /** A server rack: a tall box with shelves and a status light. */
+      rack(x, y, w = 6, d = 5, h = 8, tone = "rackc") {
+        add(1, x + y + (w + d) / 2, `${boxSvg(x, y, 0, w, d, h, tone)}${[0.25, 0.5, 0.75].map((k) => seg([x + 0.8, y + d, h * k], [x + w - 0.8, y + d, h * k], "iso-door")).join("")}${seg([x + w, y + d * 0.3, h * 0.82], [x + w, y + d * 0.7, h * 0.82], "iso-led")}`);
+      },
+      /** A numbered marker above a point, for a key under the drawing. */
+      num(x, y, z, n) { const [px, py] = P(x, y, z); grow(px - 10, py - 10); grow(px + 10, py + 10); add(2, 0, `<g class="iso-num"><circle cx="${f(px)}" cy="${f(py)}" r="9"/><text x="${f(px)}" y="${f(py + 3.6)}" text-anchor="middle">${n}</text></g>`); },
+      /** A cross where a route is blocked. */
+      cross(x, y, z = 0.4) { const [px, py] = P(x, y, z); grow(px - 10, py - 10); add(2, 0, `<g class="iso-cross"><circle cx="${f(px)}" cy="${f(py)}" r="9"/><path d="M${f(px - 4)} ${f(py - 4)}l8 8M${f(px + 4)} ${f(py - 4)}l-8 8"/></g>`); },
       svg({ cls = "", title = "", pad = 14 } = {}) {
         const w = x1 - x0 + pad * 2, h = y1 - y0 + pad * 2;
         const body = items.slice().sort((a, b) => a.layer - b.layer || a.depth - b.depth).map((i) => i.svg).join("");
@@ -167,5 +175,48 @@
     return svg.replace(/<tspan class="iso-sub"([^>]*)>(\d+) MWac<\/tspan>/, mw && c !== "cfd" ? `<tspan class="iso-sub"$1>${c === "rooftop" ? `${Math.round(cap.kw || mw * 1000).toLocaleString("en-IN")} kW` : mwText}</tspan>` : "").replace(/<tspan class="iso-sub"([^>]*)>(\d+) MW<\/tspan>/, mw ? `<tspan class="iso-sub"$1>${mwText}</tspan>` : "");
   }
 
-  root.TOSIso = { Scene, plant, forTender };
+  /**
+   * The deployment: the internet, the DMZ that reads tenders, the core zone that holds the bid, the
+   * firewalls between them and what may cross. Parts are numbered for the key under the drawing.
+   */
+  function security() {
+    const S = Scene(4.4), at = (u, v) => [(v + u) / 2, (v - u) / 2];
+    const zone = (u0, v0, w, d, cls, title) => { const [x, y] = at(u0, v0); S.pad(x, y, w, d, cls); S.label(x + w, y + d, 0, title, "", "middle", 0, 18); return [x, y]; };
+    const [ix, iy] = zone(30, 20, 30, 30, "zone-net", "INTERNET");
+    const [dx, dy] = zone(104, 14, 36, 32, "zone-dmz", "DMZ · INTAKE ZONE");
+    const [cx, cy] = zone(194, 0, 54, 44, "zone-core", "CORE ZONE · YOUR NETWORK");
+    // the firewalls stand in the gaps, parallel to the zones' facing edges
+    const wall = (u, v, len) => { const [x, y] = at(u + len / 2, v - len / 2); S.box(x, y, 1, len, 6.5, "fire"); S.label(x, y, 8, "Firewall", "", "middle", 0, -4); };
+    wall(64, 49, 26); wall(145, 45, 30);
+    // internet: tender portals, cloud language models
+    S.building(ix + 3, iy + 15, 9, 9, 8, "office"); S.num(ix + 7.5, iy + 19.5, 11.5, 1);
+    S.building(ix + 17, iy + 4, 9, 9, 6, "cloudb"); S.num(ix + 21.5, iy + 8.5, 9.5, 2);
+    // DMZ: intake application, reader, MCP connectors, documents and their reading
+    S.rack(dx + 3, dy + 5, 7, 6, 10); S.num(dx + 6.5, dy + 8, 13.5, 3);
+    S.rack(dx + 13, dy + 5, 7, 6, 10); S.num(dx + 16.5, dy + 8, 13.5, 4);
+    S.rack(dx + 23, dy + 5, 7, 6, 10, "rackm"); S.num(dx + 26.5, dy + 8, 13.5, 5);
+    S.box(dx + 9, dy + 20, 15, 8, 4, "steel"); S.num(dx + 16.5, dy + 24, 7.5, 6);
+    // core: workspace, optimiser, financial model, team; database and backups
+    [7, 8, 9, 10].forEach((n, k) => { S.rack(cx + 4 + k * 12, cy + 5, 7, 6, 10); S.num(cx + 7.5 + k * 12, cy + 8, 13.5, n); });
+    S.box(cx + 8, cy + 25, 15, 9, 4, "steel"); S.num(cx + 15.5, cy + 29.5, 7.5, 11);
+    S.box(cx + 31, cy + 25, 10, 9, 4, "steel"); S.num(cx + 36, cy + 29.5, 7.5, 12);
+    // beside the core: the bid team, the organisation's own mail server and directory, the patch bundle
+    const [tx, ty] = at(232, 104), [mx, my] = at(262, 72), [px, py] = at(150, 84);
+    S.building(tx, ty, 8, 8, 6, "office"); S.num(tx + 4, ty + 4, 9.5, 13);
+    S.building(mx, my, 7, 7, 5, "steelb"); S.num(mx + 3.5, my + 3.5, 8.5, 14);
+    S.box(px, py, 6, 6, 3, "pool"); S.num(px + 3, py + 3, 6.5, 15);
+    // what crosses, and what does not
+    S.flow([[ix + 12, iy + 19.5], [dx + 3, dy + 9]], "charge"); // tender documents in
+    S.flow([[dx + 14, dy + 12], [ix + 26, iy + 9]], "bought"); // document text to the cloud models
+    S.flow([[dx + 24, dy + 24], [cx + 5, cy + 12]], "supply"); // the reviewed reading, one way
+    const [bx, by] = at(160, 6);
+    S.flow([[cx + 6, cy + 4], [bx, by]], "block"); S.cross(bx, by);
+    S.label(bx, by, 0, "No route to the internet", "", "end", -14, -6);
+    S.flow([[tx + 2, ty], [cx + 30, cy + 40]], "supply"); // the team, over HTTPS
+    S.flow([[cx + 52, cy + 22], [mx, my + 3]], "supply"); // mail and directory, the only outbound
+    S.flow([[px + 6, py + 2], [cx + 10, cy + 34]], "money"); // signed patch bundles, carried in
+    return S.svg({ cls: "iso-security", title: "The internet, a DMZ that reads tenders, and a core zone on your network that holds the bid and has no route to the internet" });
+  }
+
+  root.TOSIso = { Scene, plant, forTender, security };
 })(typeof globalThis !== "undefined" ? globalThis : window);

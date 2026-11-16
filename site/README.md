@@ -57,3 +57,11 @@ committed.
 
 The landing page shows no bid price outside the tour: the tour is a worked example on
 illustrative inputs and says so. The phone number is `PHONE` / `TEL` in `build.mjs`.
+
+## Requests for a demo
+
+The page has no server: the "Book a TenderOS demo" form (`#demo`) opens the visitor's own mail
+with the answers addressed to the sales address (`CONTACT_EMAIL` in `build.mjs`). Replace it with a
+form service or CRM endpoint when one is chosen. The tour has two routes (90-second overview of
+five screens, full tour of thirteen); it is held, voice included, while more than half of its window
+is out of view, and scrolling alone never stops it.

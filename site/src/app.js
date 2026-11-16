@@ -65,8 +65,17 @@
   const idOf = (k) => panels[k].id.replace("st-", "");
   const CANCEL = Symbol("cancel");
   let D = null, cur = 0, playing = false, tok = null, inView = false, started = false;
+  // the screens a run of the tour visits: all thirteen, or five for the 90-second overview
+  const SHORT = ["amend", "studio", "finance", "review", "pack"];
+  let route = null;
+  const onRoute = (k) => !route || route.includes(idOf(k));
+  const after = (k) => { for (let j = k + 1; j < panels.length; j += 1) if (onRoute(j)) return j; return -1; };
+  const first = () => { for (let j = 0; j < panels.length; j += 1) if (onRoute(j)) return j; return 0; };
   const speed = reduce ? 0.05 : 1;
-  const wait = (ms, t) => new Promise((res, rej) => setTimeout(() => (t.dead ? rej(CANCEL) : res()), ms * speed));
+  // `hold` freezes the tour where it is (the window has scrolled mostly out of view): every wait
+  // stays pending until it is released, so the cursor and the narration pick up where they stopped
+  let hold = false;
+  const wait = (ms, t) => new Promise((res, rej) => { const end = () => { if (t.dead) rej(CANCEL); else if (hold) setTimeout(end, 200); else res(); }; setTimeout(end, ms * speed); });
   const at = (target) => (typeof target === "string" ? $(target, screen) : target);
   const place = (x, y, dur) => { cursor.classList.add("on"); cursor.style.transitionDuration = `${dur * speed}ms, 300ms`; cursor.style.transform = `translate(${x}px, ${y}px)`; };
   const moveTo = async (t, target, { fx = 0.5, fy = 0.55, dur = 750 } = {}) => {
@@ -491,7 +500,8 @@
     $("#sd-vs").textContent = failed ? "this plant breaks the tender's conditions" : Math.abs(gap) < 0.05 ? `at the evening market (${rs(D.evening.chosen)}): the Pool is about neutral` : gap > 0 ? `${rs(gap)} above the evening market: the Pool pays` : `${rs(-gap)} below the evening market: the Pool collects`;
     $("#sd-capex").textContent = `₹${Math.round(capexAt(si, wi, sd.e)).toLocaleString("en-IN")} cr`;
     const sh = $("#sd-short"); sh.textContent = ph.shortDays.toLocaleString("en-IN"); sh.classList.toggle("bad", ph.shortDays > 0);
-    const parts = [["own", "Own solar", ph.own], ["wind", "Own wind, direct", ph.windDirect], ["market", "Green market", ph.market], ["group", "Group RE", ph.group]], tot = parts.reduce((a, x) => a + x[2], 0) || 1;
+    const ownLabel = sd.s && sd.w ? "Own solar and wind, into the battery" : sd.w ? "Own wind, into the battery" : "Own solar, into the battery";
+    const parts = [["own", ownLabel, sd.s || sd.w ? ph.own : 0], ["wind", "Own wind, supplied directly", sd.w ? ph.windDirect : 0], ["market", "Green market, into the battery", ph.market], ["group", "Group RE, into the battery", ph.group]], tot = parts.reduce((a, x) => a + x[2], 0) || 1;
     $("#sd-mix").innerHTML = parts.map(([c, , v]) => `<i class="${c}" style="width:${(v / tot) * 100}%"></i>`).join("");
     let key = $(".mix-key", $("#sd-mix").parentNode);
     if (!key) { key = document.createElement("div"); key.className = "mix-key"; $("#sd-mix").after(key); }
@@ -569,9 +579,10 @@
     const SHOWN = 6;
     track.innerHTML = plan.steps.slice(0, SHOWN).map((s, k) => {
       const can = wi.rej.length < D.tracks.depth && k < D.tracks.fan && D.tracks.plans[planKey(wi.t, [...wi.rej, s.key])];
-      return `<li style="animation-delay:${k * 80}ms"><span class="mv">${esc(s.label)} <small>${lv(s, s.from)} → ${lv(s, s.to)}${s.pct ? "" : ` ${esc(s.unit.replace(" per contracted MW", "/MW"))}`}</small></span><span class="pr">${rs(s.price, 3)}</span><span class="why">${esc(s.who)}</span><span class="ch">${Math.round(s.p * 100)}% likely</span>${can ? `<button type="button" class="rej" data-reject="${s.key}">Not for us</button>` : ""}</li>`;
+      return `<li style="animation-delay:${k * 80}ms"><span class="mv">${esc(s.label)} <small>${lv(s, s.from)} → ${lv(s, s.to)}${s.pct ? "" : ` ${esc(s.unit.replace(" per contracted MW", "/MW"))}`}</small></span><span class="pr">${rs(s.price, 3)}</span><span class="why">${esc(s.who)}</span><span class="ch ${s.p >= 0.999 ? "easy" : s.p >= 0.5 ? "neg" : "hard"}">${s.p >= 0.999 ? "within usual range" : s.p >= 0.5 ? "needs negotiation" : "a stretch"}</span>${can ? `<button type="button" class="rej" data-reject="${s.key}">Not for us</button>` : ""}</li>`;
     }).join("") + (plan.steps.length > SHOWN ? `<li class="more" style="animation-delay:${SHOWN * 80}ms"><span class="mv">${plan.steps.length - SHOWN} smaller moves follow <small>${plan.steps.slice(SHOWN, SHOWN + 4).map((x) => esc(x.label)).join(", ")}…</small></span><span class="pr">${rs(plan.final, 3)}</span></li>` : "");
-    out.innerHTML = plan.reached ? `From ${rs(D.win.tariff)} to ${rs(plan.final, 3)} in ${plan.steps.length} move${plan.steps.length === 1 ? "" : "s"}.<small>Chance that every move happens: ${Math.round(plan.chance * 100)}%. Each price is a real run of the model after the move.</small>` : `Out of reach: with every lever at its limit the price is ${rs(plan.floor ?? plan.final, 3)}.`;
+    const hard = plan.steps.filter((x) => x.p < 0.999).length;
+    out.innerHTML = plan.reached ? `From ${rs(D.win.tariff)} to ${rs(plan.final, 3)} in ${plan.steps.length} move${plan.steps.length === 1 ? "" : "s"}, each priced by a real run of the model.<small>${hard ? `${hard} of them ${hard === 1 ? "needs" : "need"} negotiation or ${hard === 1 ? "is" : "are"} a stretch against the model's benchmark ranges.` : "Every move sits inside the range a bidder can usually reach."} This is what the price would be if the moves are achieved: each one still needs its evidence (a binding offer, a term sheet, an approval) before it is frozen into the bid.</small>` : `Out of reach: with every lever at its limit the price is ${rs(plan.floor ?? plan.final, 3)}.`;
   }
   S.whatif = {
     init() {
@@ -653,12 +664,12 @@
         if (!voice && n && !reduce) await new Promise((res, rej) => setTimeout(() => (mine.dead ? rej(CANCEL) : res()), Math.max(0, n.seconds * 620 - (performance.now() - t0))));
         await wait(voice ? 500 : 1300, mine);
         cursor.classList.remove("on");
-        if (cur === panels.length - 1) { playing = false; setPlayLabel(); p.classList.remove("staged"); capBox.hidden = true; } else show(cur + 1, true);
+        if (after(cur) < 0) { playing = false; setPlayLabel(); p.classList.remove("staged"); capBox.hidden = true; } else show(after(cur), true);
       } catch (e) { if (e !== CANCEL) throw e; }
     })();
   }
-  const pause = (byUser) => { if (!playing && !tok) return; playing = false; kill(); panels[cur].classList.remove("staged"); S[idOf(cur)]?.rest?.(panels[cur]); setPlayLabel(); modeTag.hidden = !byUser; capBox.hidden = true; };
-  const play = (withVoice) => { if (withVoice && !voiceChosen) setVoice(true); started = true; playing = true; modeTag.hidden = true; setPlayLabel(); show(cur === panels.length - 1 ? 0 : cur, true); };
+  const pause = (byUser) => { if (!playing && !tok) return; playing = false; hold = false; sim.classList.remove("held"); kill(); panels[cur].classList.remove("staged"); S[idOf(cur)]?.rest?.(panels[cur]); setPlayLabel(); modeTag.hidden = !byUser; capBox.hidden = true; };
+  const play = (withVoice) => { if (withVoice && !voiceChosen) setVoice(true); started = true; playing = true; modeTag.hidden = true; setPlayLabel(); show(after(cur) < 0 || !onRoute(cur) ? first() : cur, true); };
 
   // the landing page's first drawing: the tenders on the market, one after another
   function heroRotator() {
@@ -685,25 +696,48 @@
     voiceBtn.hidden = !hasVoice();
     heroRotator();
     playBtn.addEventListener("click", () => (playing ? pause(false) : play(true)));
+    document.querySelectorAll("#tour-routes button").forEach((b) => b.addEventListener("click", () => {
+      route = b.dataset.route === "short" ? SHORT : null;
+      document.querySelectorAll("#tour-routes button").forEach((x) => x.classList.toggle("on", x === b));
+      railTabs.forEach((t, k) => t.classList.toggle("off-route", !onRoute(k)));
+      if (playing) pause(false);
+      cur = first(); play(true);
+    }));
+    // the demo request: no server behind this page, so it opens the visitor's own mail with the answers
+    const form = document.getElementById("demo-form");
+    if (form) form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const f = new FormData(form), line = (k, label) => (f.get(k) ? `${label}: ${f.get(k)}\n` : "");
+      const body = `${line("name", "Name")}${line("company", "Company")}${line("email", "Work email")}${line("phone", "Phone")}${line("role", "Role")}${line("tender", "Tender type or reference")}${line("when", "Preferred time")}\n${f.get("goal") || ""}`;
+      window.location.href = `mailto:${form.dataset.to}?subject=${encodeURIComponent(`TenderOS demo request${f.get("company") ? `: ${f.get("company")}` : ""}`)}&body=${encodeURIComponent(body)}`;
+      document.getElementById("demo-sent").hidden = false;
+    });
     voiceBtn.addEventListener("click", () => { voiceChosen = true; setVoice(!voice); if (playing) show(cur, true); });
     $("#sim-prev").addEventListener("click", () => { pause(true); show(cur - 1, false); });
     $("#sim-next").addEventListener("click", () => { pause(true); show(cur + 1, false); });
     railTabs.forEach((b, k) => b.addEventListener("click", () => { pause(true); show(k, false); }));
     rail.addEventListener("keydown", (e) => { if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return; e.preventDefault(); pause(true); show(cur + (e.key === "ArrowRight" ? 1 : -1), false); railTabs[cur].focus(); });
-    // the visitor takes the mouse: the tour stops where it is and the screen is theirs
-    for (const type of ["pointerdown", "wheel", "keydown"]) screen.addEventListener(type, (e) => { if (e.isTrusted && playing) pause(true); }, { capture: true, passive: true });
+    // the visitor takes the controls (a click, a slider, a key): the tour stops and the screen is
+    // theirs. Scrolling over the window is not taking the controls: the tour and its voice go on.
+    for (const type of ["click", "input", "keydown"]) screen.addEventListener(type, (e) => { if (e.isTrusted && playing) pause(true); }, { capture: true, passive: true });
     // a click on a link to the tour is a request to watch it: it may start with the voice
-    $$('a[href="#tour"]').forEach((a) => a.addEventListener("click", () => { wantVoice = true; }));
-    if ("IntersectionObserver" in window) {
-      let away = false;
-      new IntersectionObserver((es) => {
-        inView = es[es.length - 1].isIntersecting;
-        // coming into view starts the tour silently, with captions; the voice waits for a click
-        if (inView && !started && !reduce) { play(wantVoice); if (!voice) voiceBtn.classList.add("nudge"); }
-        else if (!inView && playing) { away = true; kill(); }
-        else if (inView && away && playing) { away = false; show(cur, true); }
-      }, { threshold: 0.3 }).observe(sim);
-    }
+    document.querySelectorAll('a[href="#tour"]').forEach((link) => link.addEventListener("click", () => { wantVoice = true; }));
+    // how much of the window is on screen, of what could be (a window taller than the screen counts
+    // as fully shown when it fills the screen). The tour starts when half is in view, is held (voice
+    // and cursor frozen in place) once more than half is out, and picks up again on return.
+    const shown = () => { const r = sim.getBoundingClientRect(), vh = window.innerHeight; return Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0)) / Math.max(1, Math.min(r.height, vh)); };
+    let heldAudio = false, queued = false;
+    const onView = () => {
+      queued = false;
+      inView = shown() >= 0.5;
+      if (inView && !started && !reduce) { play(wantVoice); if (!voice) voiceBtn.classList.add("nudge"); }
+      else if (!inView && playing && !hold) { hold = true; heldAudio = !audio.paused; audio.pause(); sim.classList.add("held"); }
+      else if (inView && hold) { hold = false; sim.classList.remove("held"); if (playing && voice && heldAudio) audio.play().catch(() => {}); heldAudio = false; }
+    };
+    const queue = () => { if (!queued) { queued = true; requestAnimationFrame(onView); } };
+    window.addEventListener("scroll", queue, { passive: true });
+    window.addEventListener("resize", queue, { passive: true });
+    onView();
     sim.dataset.ready = "1";
   }).catch((e) => { console.error("TenderOS demo data did not load", e); });
 })();

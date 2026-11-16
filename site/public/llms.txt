@@ -3,10 +3,11 @@
 > TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities) that turns months of bid work into hours. It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with a HiGHS linear optimiser; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's premises: the tender is parsed in a DMZ, the bid stays in a core zone with no route to the internet.
 
 Key facts:
-- Maker: jouleWise (https://www.joulewise.tech). Contact: +91 87967 92724, sales@joulewise.com, https://www.joulewise.tech/contact
+- Maker: jouleWise (https://www.joulewise.tech). Book a demo: https://tenderos.joulewise.tech/#demo. Contact: +91 87967 92724, sales@joulewise.com
 - Tender types: Contract for Difference (SECI CfD-I), FDRE round-the-clock (SECI FDRE-RTC-V), assured peak supply, standalone BESS, solar or wind with storage.
 - Language models read documents and draft summaries only; a person confirms every value. Sizing (HiGHS linear programming), dispatch, the financial model and the bid review are deterministic code.
 - Speed, from the product's documentation: a tender read in 1 to 4 minutes; a 25-year optimisation in 1 to 2 minutes on 4 cores; what-if instant.
+- MCP connectors are available on subscription (18 tools for Claude or another MCP client); in the two-zone deployment they run in the intake zone only.
 - Collaboration: steps by team, pings and threads, evidence on every input, sign-off, activity log. Scenarios are saved with versions; up to 12 compared side by side.
 - Worked example on SECI CfD-I (RfS SECI/C&P/IPP/13/0002/26-27, 500 MW × 2 h): 262 conditions with pages, 40 amendment changes quoted. On illustrative inputs for a 100 MW bid the optimiser keeps 10 MWac of own solar and prices the strike at ₹8.32/kWh at a 13.0% equity IRR. This shows the method, not a price to bid: every bid is tender-specific.
 - Market watch: the tender lists of SECI and NHPC are scanned daily for new tenders, amendments, moved deadlines and result notices.

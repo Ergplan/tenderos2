@@ -92,6 +92,9 @@ try {
       check(await page.locator("#sd-checks li.failed").count() > 0, "studio: 4 MWac fails no condition");
       check(await page.locator("#sd-iso .iso-table").count() === 2, "studio: the array did not follow the slider");
       await page.locator("#sd-wind").fill("10"); check(await page.locator("#sd-iso .iso-turbine").count() === 2, "studio: no wind array");
+      await page.locator("#sd-solar").fill("0"); await page.locator("#sd-wind").fill("20");
+      const mixKey = await page.locator("#st-studio .mix-key").textContent();
+      check(!mixKey.includes("solar") && mixKey.includes("Own wind, into the battery"), `studio: with no solar the charging mix reads "${mixKey}"`);
       await page.locator("#sd-wind").fill("0"); await page.locator("#sd-opt").click(); await page.waitForTimeout(400);
       check(await read() === p0 && await page.locator("#sd-solar").inputValue() === String(data.best), `studio: optimise ended at ${await page.locator("#sd-solar").inputValue()} MWac`);
       await page.locator("#sd-ess").fill("0.72"); check(parseFloat((await read()).slice(1)) < data.win.tariff, "studio: cheaper battery did not lower the price");
@@ -104,6 +107,7 @@ try {
       const n0 = await page.locator("#wi-track li").count(), first = await page.locator("#wi-track li .mv").first().textContent();
       await page.locator("#wi-track .rej").first().click();
       const first2 = await page.locator("#wi-track li .mv").first().textContent();
+      check(!(await page.locator("#st-whatif").textContent()).includes("% likely"), "what-if: a bare likelihood is still shown");
       check(n0 > 0 && first !== first2 && await page.locator("#wi-rej button").count() === 1, "what-if: turning a lever down did not replan");
     }
     if (id === "st-review") { await page.locator('#rv-toggle button[data-bid="overbuilt"]').click(); check(await page.locator("#rv-list li.block").count() >= 3, "review: the over-built bid has no blocking findings"); if (SHOTS) await sim.screenshot({ path: join(SHOTS, "stage-12b-review-over.png") }); await page.locator('#rv-toggle button[data-bid="winning"]').click(); }
@@ -113,12 +117,17 @@ try {
   // the landing page: no price in the hero, the phone number, the tenders on the market
   check(!(await page.locator(".hero").textContent()).includes("₹"), "hero: a price is shown on the landing page");
   check(await page.locator('a[href="tel:+918796792724"]').count() >= 4, "phone: the number is missing somewhere");
+  check(await page.locator(".sticker").isVisible() && (await page.locator(".sticker").evaluate((n) => getComputedStyle(n).position)) === "fixed", "sticker: not floating");
+  check((await page.locator(".hero .kicker").textContent()).includes("every IPP") && await page.locator("#security svg.iso-security .iso-num").count() === 15, "hero kicker or security drawing missing");
   const dots = await page.locator("#hero-dots button").count();
   check(dots >= 3 && await page.locator("#hero-draw svg.iso").count() === 1, `hero: ${dots} tenders drawn`);
   const cap0 = await page.locator("#hero-cap b").textContent();
   await page.locator("#hero-dots button").nth(1).click(); await page.waitForTimeout(150);
   check((await page.locator("#hero-cap b").textContent()) !== cap0, "hero: the drawing did not change with the tender");
   check(await page.locator(".events li").count() >= 1 && await page.locator(".open-tenders .src-nhpc").count() >= 1, "market: no change feed, or no NHPC tender");
+  // the demo request stays on this page and is about TenderOS
+  check(await page.locator('a[href="#demo"]').count() >= 3 && await page.locator("#demo-form input[name=company]").count() === 1 && await page.locator('a[href*="joulewise.tech/contact"]').count() === 0, "demo: the booking journey is not on this page");
+  check(await page.locator("#buy .steps4 > div").count() === 4 && await page.locator("table.modes tbody tr").count() === 2, "buying steps or deployment modes missing");
   // tender types, sections
   for (const tt of ["fdre", "bess", "cfd"]) { await page.locator(`#tt-tabs button[data-tt="${tt}"]`).click(); check(await page.locator(`#tt-${tt} svg.iso`).isVisible(), `tender type ${tt}: no drawing`); if (SHOTS) await page.locator("#tenders").screenshot({ path: join(SHOTS, `tenders-${tt}.png`) }); }
   if (SHOTS) { await page.screenshot({ path: join(SHOTS, "hero.png") }); for (const s of ["time", "optimiser", "team", "security", "what"]) await page.locator(`#${s}`).screenshot({ path: join(SHOTS, `section-${s}.png`) }); }
@@ -132,12 +141,26 @@ try {
   await tour.waitForFunction(() => document.querySelector("#cursor").classList.contains("on"), null, { timeout: 8000 });
   await tour.waitForFunction(() => !document.querySelector("#st-read").hidden, null, { timeout: 30000 });
   if (SHOTS) { await tour.waitForTimeout(3500); await tour.locator("#sim").screenshot({ path: join(SHOTS, "tour-cursor.png") }); }
+  // a little scrolling leaves the tour running; more than half out of view holds it; back, it goes on
+  const state = () => tour.evaluate(() => [document.querySelector("#sim-play").textContent.includes("Pause"), document.querySelector("#sim").classList.contains("held")]);
+  await tour.mouse.move(700, 500); await tour.mouse.wheel(0, 140); await tour.waitForTimeout(400);
+  let st = await state(); check(st[0] && !st[1], `scroll: a small scroll stopped the tour (${st})`);
+  await tour.evaluate(() => window.scrollTo(0, 0)); await tour.waitForTimeout(400);
+  st = await state(); check(st[0] && st[1], `scroll: out of view did not hold the tour (${st})`);
+  const stageHeld = await tour.evaluate(() => document.querySelector(".stage:not([hidden])").id);
+  await tour.waitForTimeout(1500);
+  check(await tour.evaluate(() => document.querySelector(".stage:not([hidden])").id) === stageHeld, "scroll: the tour moved on while held");
+  await tour.locator("#sim").scrollIntoViewIfNeeded(); await tour.waitForTimeout(500);
+  st = await state(); check(st[0] && !st[1], `scroll: back in view did not resume (${st})`);
   await tour.locator(".sim-rail button[data-stage='5']").click();
   await tour.locator("#sim-play").click();
   await tour.waitForFunction(() => +document.querySelector("#sd-solar").value >= 28, null, { timeout: 15000 });
   if (SHOTS) await tour.locator("#sim").screenshot({ path: join(SHOTS, "tour-studio-drag.png") });
   await tour.locator("#sd-view, .sd-view").first().click({ position: { x: 30, y: 30 } });
   check(await tour.locator("#sim-mode").isVisible() && !(await tour.locator("#cursor").evaluate((c) => c.classList.contains("on"))), "tour: taking the mouse did not stop it");
+  // the 90-second overview visits five screens
+  await tour.locator('#tour-routes button[data-route="short"]').click(); await tour.waitForTimeout(700);
+  check(await tour.evaluate(() => document.querySelector(".stage:not([hidden])").id) === "st-amend" && await tour.locator(".sim-rail button.off-route").count() === 8, "tour: the short route did not start on the amendments");
   await tour.close();
 
   // ---- the voice-over: Play turns it on, the caption carries the same words, the button turns it off
