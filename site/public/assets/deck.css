@@ -1,5 +1,6 @@
 /* TenderOS deck: 16:9 slides, printed one per page to TenderOS-deck.pdf by site/render.mjs */
 @page { size: 1280px 720px; margin: 0; }
+:root { --bg: #f7f5f0; --bg-soft: #efece5; --panel: #fffdf9; --ink: #1d1e20; --body: #3b3c3f; --dim: #636466; --line: #e4e0d7; --line-2: #cdc7bb; --power: #0a7448; --heat: #95500a; --data: #2a5abd; --accent: #0f6f69; --gold: #7d600f; --evidence: #7d5f0d; --violet: #5b46b8; --sans: "Inter Tight", Arial, sans-serif; --mono: "IBM Plex Mono", monospace; }
 * { box-sizing: border-box; }
 body { margin: 0; background: #d9d4c8; font: 18px/1.5 "Inter Tight", "Helvetica Neue", Arial, sans-serif; color: #1d1e20; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .slide { width: 1280px; height: 720px; position: relative; overflow: hidden; background: #f7f5f0; padding: 56px 70px 80px; margin: 0 auto 24px; break-after: page; page-break-after: always; }
@@ -50,3 +51,29 @@ body { margin: 0; background: #d9d4c8; font: 18px/1.5 "Inter Tight", "Helvetica 
 .mods > div { padding: 10px 12px; min-height: 0; }
 .mods b { font-size: 15px; } .mods p { margin: 2px 0 0; font-size: 12.5px; line-height: 1.35; color: #3b3c3f; }
 ul { padding-left: 22px; } li { margin-bottom: 6px; }
+
+.iso-rotor, .iso-flow, .iso-table, .iso-cont, .iso-turbine { animation: none !important; }
+.dk-t td.hand { color: #95500a; font-weight: 600; white-space: nowrap; }
+.dk-t.wide td { padding: 7px 10px; }
+.dk-iso { background: #fffdf9; border: 1px solid #e4e0d7; border-radius: 6px; padding: 10px; }
+.dk-iso svg { max-height: 330px; }
+.isos .dk-iso svg { max-height: 200px; } .isos > div { padding: 14px; } .isos b { font-size: 19px; margin-top: 10px; } .isos p { font-size: 15px; margin: 4px 0 0; }
+.dk-page { position: relative; height: 430px; overflow: hidden; border: 1px solid #cdc7bb; border-radius: 6px; background: #fff; }
+.dk-page img { width: 100%; display: block; margin-top: -40px; }
+.dk-page i { position: absolute; mix-blend-mode: multiply; margin-top: -40px; }
+.dk-page i.was { background: rgba(255,110,90,.42); } .dk-page i.now { background: rgba(60,200,130,.42); }
+.dk-zones { display: grid; grid-template-columns: 1fr 1.2fr 1.4fr; gap: 26px; margin: 22px 0 18px; }
+.dk-zones > div { border: 1px solid #cdc7bb; border-radius: 6px; padding: 18px; background: #fff; position: relative; }
+.dk-zones > div + div::before { content: "→"; position: absolute; left: -22px; top: 40%; color: #7d5f0d; font-size: 22px; }
+.dk-zones .dmz { border-color: #7d5f0d; } .dk-zones .core { border-color: #0a7448; box-shadow: 0 0 0 4px rgba(10,116,72,.12); }
+.dk-zones b { font-family: "IBM Plex Mono", monospace; font-size: 14px; text-transform: uppercase; letter-spacing: .12em; } .dk-zones p { margin: 8px 0 0; font-size: 16px; }
+.cols3.tight { margin-top: 0; gap: 26px; } .cols3.tight > div { padding: 14px 18px; } .cols3.tight b { font-size: 18px; } .cols3.tight p { margin: 4px 0 0; font-size: 15px; }
+.flow { grid-template-columns: repeat(5, 1fr); gap: 10px; } .flow li { padding: 10px 12px; } .flow b { font-size: 16px; } .flow span { font-size: 13px; }
+.mods { grid-template-columns: repeat(4, 1fr); } .mods > div { padding: 8px 12px; } .mods p { font-size: 12px; }
+.stats2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; } .stats2 .stat { margin-bottom: 14px; } .stats2 .stat b { font-size: 34px; }
+.dk-t .num { white-space: nowrap; }
+.dk-iso svg { max-height: 300px; width: 100%; }
+.dk-iso.wide svg { max-height: 215px; } .dk-iso.wide { padding: 6px 30px; margin-bottom: 14px; }
+.cols2.low { align-items: center; } .cols2.low .dk-chart { max-height: 215px; } .cols2.low p { font-size: 17px; color: #3b3c3f; }
+.isorows { display: grid; gap: 12px; margin-top: 16px; } .isorows > div { display: grid; grid-template-columns: 1.25fr 1fr; gap: 30px; align-items: center; }
+.isorows .dk-iso { padding: 4px 20px; } .isorows .dk-iso svg { max-height: 150px; } .isorows b { font-size: 22px; } .isorows p { margin: 6px 0 0; font-size: 16px; color: #3b3c3f; }

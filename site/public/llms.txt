@@ -1,15 +1,17 @@
 # TenderOS by jouleWise
 
-> TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities). It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with HiGHS optimisation; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's own infrastructure.
+> TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities) that turns months of bid work into hours. It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with a HiGHS linear optimiser; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's premises: the tender is parsed in a DMZ, the bid stays in a core zone with no route to the internet.
 
 Key facts:
 - Maker: jouleWise (https://www.joulewise.tech). Contact: sales@joulewise.com, https://www.joulewise.tech/contact
-- Tender types: FDRE round-the-clock, assured peak supply, Contract for Difference (SECI CfD-I), standalone BESS, solar or wind with storage.
-- Language models read documents and draft summaries only; a person confirms every value. Sizing, dispatch, the financial model and the bid review are deterministic code.
+- Tender types: Contract for Difference (SECI CfD-I), FDRE round-the-clock (SECI FDRE-RTC-V), assured peak supply, standalone BESS, solar or wind with storage.
+- Language models read documents and draft summaries only; a person confirms every value. Sizing (HiGHS linear programming), dispatch, the financial model and the bid review are deterministic code.
+- Speed, from the product's documentation: a tender read in 1 to 4 minutes; a 25-year optimisation in 1 to 2 minutes on 4 cores; what-if instant.
+- Collaboration: steps by team, pings and threads, evidence on every input, sign-off, activity log. Scenarios are saved with versions; up to 12 compared side by side.
 - Demo result on SECI CfD-I (RfS SECI/C&P/IPP/13/0002/26-27, 500 MW × 2 h, bids due 20 Nov 2026): 262 conditions with pages, 40 amendment changes quoted; for a 100 MW bid with competitive inputs the optimiser keeps 10 MWac of own solar and prices the strike at ₹8.32/kWh at a 13.0% equity IRR (minimum DSCR 1.20).
 
 ## Pages
-- [Demo and product overview](https://tenderos.joulewise.tech/): the eleven-step simulation, the modules, SECI results, open SECI tenders, FAQ
+- [Product tour and overview](https://tenderos.joulewise.tech/): the thirteen-screen tour, tender types, the optimiser, security, SECI results, open SECI tenders, FAQ
 - [Deck (PDF)](https://tenderos.joulewise.tech/TenderOS-deck.pdf)
 - [Full text for language models](https://tenderos.joulewise.tech/llms-full.txt)
 
@@ -17,4 +19,4 @@ Key facts:
 - [SECI auction results, CSV](https://tenderos.joulewise.tech/data/seci-results.csv): one row per bidder in eight SECI e-reverse auctions (May 2025 – Aug 2026), awarded or not, with bid MW, awarded MW and final tariff, and the SECI notice
 - [SECI auction results, JSON](https://tenderos.joulewise.tech/data/seci-results.json)
 - [Open SECI tenders, JSON](https://tenderos.joulewise.tech/data/seci-open-tenders.json): scanned 16 Nov 2026 from www.seci.co.in/tenders
-- [CfD-I demo numbers, JSON](https://tenderos.joulewise.tech/data/cfd-demo.json): the optimiser scan, a day's dispatch, the Pool table, bid-review findings
+- [CfD-I demo numbers, JSON](https://tenderos.joulewise.tech/data/cfd-demo.json): the amendments with diffs, the design surface, a day's dispatch, the levers and tracks, the Pool, the bid review

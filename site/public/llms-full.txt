@@ -1,15 +1,17 @@
 # TenderOS by jouleWise
 
-> TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities). It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with HiGHS optimisation; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's own infrastructure.
+> TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities) that turns months of bid work into hours. It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with a HiGHS linear optimiser; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's premises: the tender is parsed in a DMZ, the bid stays in a core zone with no route to the internet.
 
 Key facts:
 - Maker: jouleWise (https://www.joulewise.tech). Contact: sales@joulewise.com, https://www.joulewise.tech/contact
-- Tender types: FDRE round-the-clock, assured peak supply, Contract for Difference (SECI CfD-I), standalone BESS, solar or wind with storage.
-- Language models read documents and draft summaries only; a person confirms every value. Sizing, dispatch, the financial model and the bid review are deterministic code.
+- Tender types: Contract for Difference (SECI CfD-I), FDRE round-the-clock (SECI FDRE-RTC-V), assured peak supply, standalone BESS, solar or wind with storage.
+- Language models read documents and draft summaries only; a person confirms every value. Sizing (HiGHS linear programming), dispatch, the financial model and the bid review are deterministic code.
+- Speed, from the product's documentation: a tender read in 1 to 4 minutes; a 25-year optimisation in 1 to 2 minutes on 4 cores; what-if instant.
+- Collaboration: steps by team, pings and threads, evidence on every input, sign-off, activity log. Scenarios are saved with versions; up to 12 compared side by side.
 - Demo result on SECI CfD-I (RfS SECI/C&P/IPP/13/0002/26-27, 500 MW × 2 h, bids due 20 Nov 2026): 262 conditions with pages, 40 amendment changes quoted; for a 100 MW bid with competitive inputs the optimiser keeps 10 MWac of own solar and prices the strike at ₹8.32/kWh at a 13.0% equity IRR (minimum DSCR 1.20).
 
 ## Pages
-- [Demo and product overview](https://tenderos.joulewise.tech/): the eleven-step simulation, the modules, SECI results, open SECI tenders, FAQ
+- [Product tour and overview](https://tenderos.joulewise.tech/): the thirteen-screen tour, tender types, the optimiser, security, SECI results, open SECI tenders, FAQ
 - [Deck (PDF)](https://tenderos.joulewise.tech/TenderOS-deck.pdf)
 - [Full text for language models](https://tenderos.joulewise.tech/llms-full.txt)
 
@@ -17,36 +19,69 @@ Key facts:
 - [SECI auction results, CSV](https://tenderos.joulewise.tech/data/seci-results.csv): one row per bidder in eight SECI e-reverse auctions (May 2025 – Aug 2026), awarded or not, with bid MW, awarded MW and final tariff, and the SECI notice
 - [SECI auction results, JSON](https://tenderos.joulewise.tech/data/seci-results.json)
 - [Open SECI tenders, JSON](https://tenderos.joulewise.tech/data/seci-open-tenders.json): scanned 16 Nov 2026 from www.seci.co.in/tenders
-- [CfD-I demo numbers, JSON](https://tenderos.joulewise.tech/data/cfd-demo.json): the optimiser scan, a day's dispatch, the Pool table, bid-review findings
+- [CfD-I demo numbers, JSON](https://tenderos.joulewise.tech/data/cfd-demo.json): the amendments with diffs, the design surface, a day's dispatch, the levers and tracks, the Pool, the bid review
 
-## What a bid team gets
-- **Tender to Bid**: Upload an RfS with its amendments, clarifications and PPA/PSA (up to 20 files). TenderOS reads them, applies every amendment, quotes each change was/now, and gives every value its document and page. A reviewer confirms the reading before it reaches the bid.
-- **SECI FDRE-RTC tender**: The 1,000 MW firm and dispatchable round-the-clock tender worked end to end: block-wise supply floors, storage, penalties at multiples of the tariff, the bid forms in SECI's own wording, and how the winners reached ₹5.25/kWh.
-- **CfD bid (SECI CfD-I)**: A Contract for Difference explained in plain words; the RfS and four amendments with 40 changes quoted; 262 conditions with their pages; own solar sized for the least strike price; the Pool and Amendment-04's corpus test; the 17 formats as letters.
-- **BESS tenders**: Standalone battery tenders: capacity and energy, round-trip efficiency, cycles and augmentation, availability and the payment by the buying utility.
-- **Plant sizing optimiser**: HiGHS optimisation sizes solar, wind and storage against every block floor, storage mandate and sale rule, hour by hour over every year of the contract, minimising the tariff for the target equity IRR.
-- **15-minute dispatch**: Every day of the term in 96 time blocks (the Grid Code's scheduling block): charging, discharge, state of charge, supply due and delivered, surplus sold. Downloadable per Contract Year as CSV or a streaming Excel file.
-- **Financial model and Excel twin**: A 25-year model from construction: IDC, six repayment methods, refinancing, working capital, DSRA, tax with losses carried, DSCR/LLCR. One click gives the live Excel workbook, every number a formula, recalculated in tests against the application.
-- **What-if and tariff levers**: Set the price you want to quote and the levers table shows, input by input, what moves the tariff and how far. Freeze a lever with evidence, reject one so the model searches others. Contract size is never offered as a lever.
-- **Bid review**: Why a bid is not optimal: tender conditions failed, prices far above recent awards, a plant not at its best size, a battery that fades below the need, inputs far from benchmarks, a DSCR the lender will not accept. Each finding says where to fix it.
-- **New tenders radar**: Scans SECI's tender list and details pages, never the documents, and writes a summary per tender: what it is, who may bid, the dates. New, changed and closed tenders are marked at every scan.
-- **Recent results**: SECI's e-reverse auction results: every bidder awarded and not, capacity and final tariff, linked to SECI's notices. The reference for what wins.
-- **Voice agent and Claude connector**: Ask the tender by voice or chat, or connect Claude through MCP (18 tools): look up a condition with its page, set an input, run the optimiser, read the financials, explain what wins.
-- **Team, evidence and sign-off**: Steps by team (Projects, Design, Finance), a paperclip for evidence on every input, sign-off that turns amber when a value changes, pings and threads, saved bids with versions, an activity log.
-- **Runs on your infrastructure**: Docker on any cloud or on-premises. The enterprise edition splits an intake zone (documents and cloud models) from a core zone where the bid, the costs and the model live with no cloud client. Signed patches under the AMC.
+## Months of work in hours
+- Read the tender set and reconcile every amendment: by hand, weeks (indicative); in TenderOS, minutes (1 to 4 minutes a tender, up to 10 for a set; then a reviewer confirms)
+- List every condition with its page and clause: by hand, days (indicative); in TenderOS, minutes (262 conditions on CfD-I, part of the reading)
+- Size solar, wind and storage against every block floor: by hand, weeks (indicative); in TenderOS, minutes (1 to 2 minutes an optimisation, a 25-year case on 4 cores)
+- Build the financial model lenders will read: by hand, weeks (indicative); in TenderOS, minutes (the model is the product; the Excel twin is one click)
+- Prove compliance in 15-minute blocks: by hand, weeks (indicative); in TenderOS, minutes (96 blocks a day for the whole term, about 90 seconds for year 1)
+- Bid-day sensitivities and the route to a quote: by hand, days (indicative); in TenderOS, minutes (what-if is instant; the levers and the track take seconds)
+- Fill the tender's formats and letters: by hand, days (indicative); in TenderOS, minutes (generated from the bid in the RfS's wording, Word and PDF)
+- Absorb a new amendment a week before the deadline: by hand, weeks (indicative); in TenderOS, hours (read the amendment, re-run, review: the same afternoon)
 
-## The demo, step by step (SECI CfD-I)
-1. Tender in: Six documents of SECI CfD-I
-2. Read with evidence: Every value with its page and quote
-3. Amendments applied: Was / now, quoted
-4. Conditions: 262 conditions in 11 groups
-5. Inputs by team: Fill with competitive values
-6. Size the plant: Least strike price, every day met
-7. Dispatch: Hour by hour, 15-minute blocks
-8. Financial model: Tariff for the target IRR
-9. What wins: The CfD Pool and the corpus
-10. Bid review: Why a bid is not optimal
-11. Bid pack: Excel, letters, dispatch files
+## Modules
+- **Tender to Bid**: Upload an RfS with its amendments, clarifications and PPA/PSA (up to 20 files). Every value read carries its document, page and quote; a reviewer confirms the reading before it reaches the bid.
+- **SECI FDRE-RTC tender**: The 1,000 MW round-the-clock tender worked end to end: block-wise floors, storage, penalties, the bid forms in SECI's wording, and the bridge to the ₹5.25 the winners bid.
+- **CfD bid (SECI CfD-I)**: A Contract for Difference in plain words; four amendments with 40 changes quoted; 262 conditions with their pages; own RE sized for the least strike price; the Pool and the corpus test.
+- **BESS tenders**: Standalone battery tenders read from the document: oversizing against augmentation, cycles, round-trip efficiency and availability, priced as a capacity charge per MW per month.
+- **Solar and wind studios**: Solar: module class, fixed tilt or tracker, string or central inverters, DC:AC ratio, cost built up in ₹/Wp. Wind: ten turbines by make, hub height, wind regime, losses, spacing.
+- **Plant sizing optimiser**: Linear optimisation with HiGHS over every hour of the year, against every block floor, storage rule and sale rule, minimising the tariff for the target equity IRR.
+- **15-minute dispatch**: Every day of the term in 96 time blocks: charging, discharge, state of charge, supply due and delivered. One file per Contract Year, CSV or Excel.
+- **Financial model, Excel twin**: A 25-year model from construction: IDC, six repayment methods, refinancing, working capital, DSRA, tax. One click gives a live Excel workbook, every number a formula.
+- **What-if and the track to a quote**: Every lever's effect on the tariff, the surest route to the price you want to quote with the chance of each move, levers frozen with evidence or turned down.
+- **Bid review**: Why a bid is not optimal: conditions failed, a price far above recent awards, a plant not at its best size, a battery that fades, a DSCR the lender will not accept.
+- **Saved bids and scenarios**: Every save is a named scenario with versions kept; restore any version; compare up to 12 scenarios side by side.
+- **Team, evidence, sign-off**: Steps by team, a paperclip for evidence on every input, pings and threads, assignments with email, sign-off that turns amber when the value changes, an activity log.
+- **New tenders radar**: Scans SECI's tender list and details pages, never the documents, and summarises each tender: what it is, who may bid, the dates. New and changed tenders are marked.
+- **Recent results**: SECI's e-reverse auction results, every bidder awarded and not, with capacity and final tariff, linked to SECI's notices.
+- **Voice agent, Claude connector**: Ask the tender by voice or chat, or connect Claude through MCP (18 tools): look up a condition with its page, set an input, run the optimiser, read the financials.
+- **On your premises**: Docker on any cloud or on-premises. A DMZ reads the tender; the bid, the costs and the model stay in a core zone with no route to the internet.
+
+## Security and deployment
+- **Two zones, by design**: A DMZ (the intake zone) holds only the tender documents and their reading. The core zone holds the bid: inputs, evidence, profiles, sizing, the financial model, the forms and the team.
+- **The core has no route to the internet**: No cloud keys, no cloud client. It reaches only your own mail server and directory; everything else outbound is blocked, DNS included. The optimiser runs on internal-only container networks.
+- **The core refuses to read tenders**: The tender-reading routes answer 403 in the core zone. Parsing happens in the DMZ; the reviewed reading moves inward, one way.
+- **Or read with no cloud at all**: A rule-based reader extracts the headline fields with page and quote without any language model, for sites that allow none.
+- **Secrets and sign-in**: Passwords hashed with scrypt, sessions in httpOnly cookies, sign-in throttled after ten failures. Provider keys encrypted with AES-256-GCM and shown masked.
+- **Who sees what**: Administrator and user roles, access granted tab by tab, an activity log kept for 400 days.
+- **Backups and updates**: Database and files backed up, the newest 14 kept. Updates arrive as bundles signed with an EC P-256 key; the patch tool verifies, backs up, applies and health-checks.
+- **Modest hardware**: One 4-vCPU, 16 GB server on Ubuntu or Debian with Docker: AWS, Azure, GCP or your own rack. HTTPS only, firewall rules per zone.
+- Roadmap, not in the current release: single sign-on; a cryptographically signed transfer package between the zones.
+
+## The optimiser
+A linear programme solved with HiGHS over every hour of the year (8,760) for the years that bind or all 25. It chooses solar, wind and battery power and energy together; honours floors by block, month and year over peak, off-peak and solar hours, ramp limits, the state-of-charge window, penalties or hard floors, separate sites and pooling stations; and minimises the tariff for the target equity IRR. One to two minutes for a 25-year case on four cores; re-runs start from the last solution (93 s to 53 s after a 5% change in wind cost). A 15-minute dispatch (35,040 blocks a year) proves compliance.
+
+## Tender types
+- Contract for Difference, SECI CfD-I: strike price ₹8.32/kWh on 100 MW with 10 MWac own solar and a 100 MW / 200 MWh battery.
+- FDRE round the clock, SECI FDRE-RTC-V (₹5.25–5.26 (seven bidders, 1,000 MW); NTPC at ₹5.39): the application's bridge, Benchmark inputs, the terms before Amendment-03 ₹6.50 → Amendment-03's supply profile ₹7.46 → + 5% bought on the green market ₹6.90 → + battery at ₹0.85 cr/MWh, 89% round trip ₹6.06 (estimate) → + sell the Solar Hours surplus ₹5.80 → + debt at 8.5% for 18 years, equity IRR 12% ₹5.24 (estimate) → + new-generation wind, CUF 37% ₹5.14 (estimate). Plant at the last step per contracted MW: 2.26 MWac solar, 0.98 MW wind, 2.09 MW / 8.36 MWh battery.
+- Standalone battery (the application's example, 250 MW / 500 MWh, 12 years, 2 cycles a day): capacity charge ₹4.57 lakh per MW per month at a 14% equity IRR; 620 MWh installed on day one, augmented every year.
+
+## The tour, screen by screen (SECI CfD-I)
+1. Tender in: Six documents, classified
+2. Evidence: Every value on its page
+3. Amendments: 40 changes, word by word
+4. Conditions: 262, tested on the bid
+5. Team inputs: Pings, evidence, sign-off
+6. Design studio: Move the plant, watch the price
+7. Optimise: Least price, every day met
+8. Dispatch: 15-minute blocks, 15 years
+9. Finance: The model behind the price
+10. What-if: Levers and the track to a quote
+11. What wins: The Pool and the corpus
+12. Bid review: Against rules and the market
+13. Bid pack: Excel, letters, files
 
 ### The tender set
 - RfS (129 pages, 2026-07-15): The tender as revised on 15.07.2026 (it replaces the RfS of the same number dated 17.04.2026): 500 MW of assured peak supply, 2 MWh per MW every evening through the power exchanges, settled against the strike price by SECI's CfD Pool; the bid, the e-Reverse Auction, eligibility, guarantees, milestones and the formats (Section 7). Read with the amendments, which override it.
@@ -55,6 +90,60 @@ Key facts:
 - Amendment-02 (5 pages, 2026-08-03): A battery of X MW / 2X MWh owned by the bidder becomes mandatory; the SCD applies to the battery (15 months) with the RE generation due by 36 months; the green-market share (25%, plus 75% for charging until month 36, then 50% from group companies); the penalties re-cut for the two deadlines.
 - Amendment-03 (5 pages, 2026-10-08): The term becomes 15 years; the ₹5.80/kWh ceiling goes; the CfD settlement becomes a full pass-through (the bidder nets the strike price on every kWh, the Pool keeps every gain and bears every loss); TAM and G-TAM join the markets; SECI may designate the hours and bid on the RPD's behalf; the EMD validity rule; a new contact.
 - Amendment-04 (6 pages, 2026-11-05): How SECI's designation of the Peak Hours works: the RPD declares the day's availability (MWh) by 06:00 on D-1, or 100% of the contracted capacity is deemed available; SECI instructs the time blocks, price and quantum by 08:00 on D-1, or bids on the RPD's behalf; up to 80% of the availability may go through TAM/G-TAM and the balance through the day-ahead markets, never above the contracted capacity in a block; deviations, DSM and every exchange charge are the RPD's; sale elsewhere when MCPs stay below the strike price needs SECI/MNRE approval. And SECI may restrict the capacity awarded to what the CfD corpus can bear at the discovered tariff.
+
+### The tender today against the tender as issued
+- Term of the agreement: 12 years → 15 years (Amendment-03)
+- Ceiling tariff: ₹5.80/kWh → None (Amendment-03)
+- Battery: Optional, may be a third party's → Mandatory X MW / 2X MWh, owned (Amendment-02)
+- Commissioning: Whole project by month 15 → Battery by month 15, RE by month 36 (Amendment-02)
+- Charging power: 25% from the green market → +75% until month 36, then +50% group RE (Amendment-02)
+- Settlement: Gains and losses shared in slabs → Full pass-through at the strike price (Amendment-03)
+- CfD Pool: A fund of ₹76 crore → SECI replenishes it for the whole term (Amendment-01)
+- Markets: DAM, RTM, GDAM, HP-DAM → + TAM and G-TAM (Amendment-03)
+- Peak hours: The bidder's choice → SECI may designate them, day-ahead (Amendment-04)
+- Award: 500 MW → What the CfD corpus can carry (Amendment-04)
+
+### All 40 amendment changes
+- Amendment-01, RfS 1.9 (addendum), page 1 — The CfD Pool stays funded: If the ₹76 crore Pool runs dry, SECI tops it up from its own funds for the whole term: the payment security behind every settlement is SECI's balance sheet, not just the fund.
+- Amendment-01, RfS 9.3.a.iv (addendum), page 1 — Gains above ₹10/kWh: Under the slab sharing, the part of a market price above ₹10/kWh was to be split half and half; Amendment-03 later rewrote the whole clause as a full pass-through, so this split no longer applies.
+- Amendment-01, CfDA 1.1 “CfD Pool” (addendum), page 1 — The CfD Pool stays funded: The same undertaking written into the agreement's definition of the Pool.
+- Amendment-01, CfDA 9.2.iv (addendum), page 2 — Gains above ₹10/kWh: The same split in the agreement; replaced by Amendment-03's rewrite of Article 9.2.iv.
+- Amendment-02, RfS 4.3, page 1 — The battery becomes mandatory and yours: Storage is no longer optional or leasable: for every contracted MW you build and own at least 1 MW / 2 MWh of battery.
+- Amendment-02, RfS 9.1.d, page 1 — Where the energy may come from: 25% of each year's energy may be bought in the green market for the whole term; a further 75% may be bought to charge the battery until 36 months from the Effective Date; after that a further 50% may come from your group companies' RE projects, charging only. Shares are measured on the energy discharged, and energy above the limits is not settled.
+- Amendment-02, RfS 10.2.a, page 2 — Two commissioning deadlines: The SCD (15 months) now applies to the battery; your own solar or wind gets until 36 months from the Effective Date, so supply can start from the battery alone.
+- Amendment-02, RfS 10.2.b, page 2 — Grace period with penalty: The 3-month window with penalty is for the battery and the start of supply, not the RE generation.
+- Amendment-02, RfS 10.2.c, page 2 — Penalty for a late start: In the 3 months after the SCD the PBG is encashed in proportion to whichever is larger: the capacity not yet supplying or the battery not yet commissioned; RE generation late beyond 36 months is penalised pro rata from the next monthly bill.
+- Amendment-02, RfS 10.2.d, page 3 — Capacity cut after the grace period: Beyond 3 months after the SCD the contract shrinks to the smaller of the battery commissioned and the capacity supplying; RE generation still missing at 36 months cuts the contract to what was commissioned.
+- Amendment-02, CfDA 3.2.3, page 3 — Default at the SCD: The agreement's SCD obligation is the battery and the start of full supply.
+- Amendment-02, CfDA 4.1.1.(f), page 3 — The RPD's obligations: Commissioning the RE generation by month 36 becomes an obligation of its own.
+- Amendment-02, CfDA 4.4.1.iv, page 4 — Where the energy may come from: The same sourcing rules as RfS 9.1.d, written into the agreement: 25% green market for the term, 75% more for charging until month 36, then 50% from group companies.
+- Amendment-02, CfDA 4.6.1, page 4 — Penalty for a late start: The agreement's penalty for the 3 months after the SCD, and the pro-rata PBG encashment for RE generation late beyond 36 months.
+- Amendment-02, CfDA 4.6.2, page 5 — Capacity cut after the grace period: The agreement's capacity cut after 3 months, and for RE generation missing at its deadline.
+- Amendment-03, RfS Bid Information Sheet (P), page 1 — Who to contact: Queries now go to Sh. Sandeep Kumar, DGM (C&P).
+- Amendment-03, RfS 1.53, page 1 — Power exchange markets: The Term Ahead Market and the Green Term Ahead Market are added to the markets a power exchange runs.
+- Amendment-03, RfS 1.76 (new), page 1 — Term Ahead Contract: A new definition: a contract traded today for delivery two or more days ahead.
+- Amendment-03, RfS 1.77 (new), page 1 — Term Ahead Market: A new definition.
+- Amendment-03, RfS 1.78 (new), page 1 — Green Term Ahead Market: A new definition.
+- Amendment-03, RfS 2.3, page 1 — Term of the CfDA: The agreement runs 15 years instead of 12.
+- Amendment-03, RfS 9.2.b, page 1 — Markets you may sell in: TAM and G-TAM are now markets the peak supply may be sold in; the words “based on Collective Transaction” are dropped.
+- Amendment-03, RfS 9.2.c, page 2 — SECI may set the hours and bid for you: When SECI designates the hours you must keep the power available for them, and SECI may schedule or bid it on your behalf.
+- Amendment-03, RfS 9.3.a.iv, page 2 — Settlement: full pass-through: The slab sharing (70:30, 50:50, 30:70) goes: the Pool takes the whole gain when the market clears above the strike price and pays the whole shortfall when it clears below, so you net the strike price on every kWh settled. Amendment-01's split above ₹10/kWh is replaced with it.
+- Amendment-03, RfS 9.3.a.vi.a, page 3 — RECs in brown markets: Sales in the TAM also earn RECs, half of whose proceeds go to the Pool.
+- Amendment-03, RfS 17, page 3 — EMD validity: An EMD valid 12 months from the original deadline need not be extended during evaluation if it still runs at least 6 months past the final deadline; a winner extends it at least 30 days before it expires.
+- Amendment-03, RfS 21.2, page 3 — Term of the CfDA: 15 years from the SCD; any extension by mutual agreement.
+- Amendment-03, RfS 21.7, page 3 — After the term: The same freedom to keep operating, after 15 years.
+- Amendment-03, RfS 40.3, page 4 — No ceiling tariff: The ₹5.80/kWh ceiling and the summary rejection above it are removed; one first-round tariff, two decimals.
+- Amendment-03, CfDA 1.1 “Expiry Date”, page 4 — Term of the CfDA: The agreement expires 15 years from the SCD.
+- Amendment-03, CfDA 1.1 (new), page 4 — Term Ahead Contract: The new definition in the agreement.
+- Amendment-03, CfDA 1.1 (new), page 4 — Term Ahead Market: The new definition in the agreement.
+- Amendment-03, CfDA 1.1 (new), page 4 — Green Term Ahead Market: The new definition in the agreement.
+- Amendment-03, CfDA 4.4.2.ii, page 4 — Markets you may sell in: TAM and G-TAM added in the agreement.
+- Amendment-03, CfDA 4.4.2.iv, page 4 — SECI may set the hours and bid for you: The same right in the agreement.
+- Amendment-03, CfDA 9.2.iv, page 5 — Settlement: full pass-through: The agreement's settlement article rewritten: you neither retain any gain nor bear any loss between the market price and the strike price.
+- Amendment-03, CfDA 9.2.vi.a, page 5 — RECs in brown markets: TAM sales earn RECs too.
+- Amendment-04, RfS 9.2.c, page 1 — Availability, SECI's instructions, TAM/G-TAM, deviations and charges: Amendment-03's one paragraph becomes an operating procedure: you declare the day's availability in MWh by 06:00 on D-1 (silence means 100% of the contracted capacity), SECI tells you the blocks, price and quantum by 08:00 on D-1 or bids for you, up to 80% of the availability may be sold term-ahead (TAM/G-TAM) with the rest day-ahead, never above the contracted capacity in any block, and every deviation, DSM charge and exchange fee is yours, recoverable from your next bill if SECI pays it. The model's plant availability and exchange fee inputs carry these; the DSM exposure sits in your availability figure.
+- Amendment-04, RfS 42.2.b, page 3 — SECI may award less than 500 MW: The award is no longer 500 MW by right: SECI will award only what the CfD corpus can carry at the discovered strike price. A high price wins less capacity, or none; the Bid review sizes the Pool's pay-out at your price against the corpus.
+- Amendment-04, CfDA 4.4.2.iv, page 4 — The same procedure in the CfDA: The CfDA carries the same clauses (i) to (p) as the RfS's (a) to (h), so the procedure binds under the agreement you sign, not only the RfS.
 
 ### Conditions by group (262)
 - Scheme and bid: 39
@@ -70,27 +159,46 @@ Key facts:
 - Bid documents: 20
 
 ### Sample conditions with evidence
-- What is procured: Assured peak supply of 1000 MWh a day (500 MW × 2 hours) from ISTS-connected RE projects, sold through the power exchanges, settled by SECI under a CfD [Standard CfD Agreement (CfDA), Recital D, page 3] Quote: "SECI had initiated a Tariff Based Competitive Bid Process for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) from ISTS-Connected RE Projects under CfD mechanism"
+- Capacity you may bid: One bid for you and your group: 50 to 150 MW cumulative, in whole MW [RfS, 6.1, page 16] Quote: "submit a single bid offering a minimum quantum of cumulative Contracted Capacity of 50 MW and a maximum quantum of 150 MW, in the prescribed formats. The cumulative Contracted Capacity shall be quoted in integral values only."
 - What you bid: One strike price in ₹/kWh for all projects applied for; digits after two decimals are ignored [Amendment-03, RfS 40.3 (amended), page 4] Quote: "quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. If it is quoted with more than two digits after decimal, digits after first two decimal places shall be ignored."
 - Ceiling tariff: None: the ₹5.80/kWh ceiling of the RfS was removed by Amendment-03 [Amendment-03, RfS 40.3 (original, removed), page 4] Quote: "The tariff has to be less than or equal to INR 5.80/kWh"
-- Strike price over the term: Fixed for the whole term (no escalation) [Standard CfD Agreement (CfDA), 9.1, page 40] Quote: "the Strike Price shall be fixed for the entire term of this Agreement"
+- Earnest Money Deposit (EMD): ₹9.68 lakh/MW solar + ₹13.68 lakh/MW wind or other RE + ₹2.40 lakh/MWh battery, as a bank guarantee or surety bond with the bid [RfS, 17, page 31] Quote: "Earnest Money Deposit = [INR 9,68,000 x Rated cumulative Installed Capacity of Solar PV component (MW) + INR 13,68,000 x Rated cumulative Installed Capacity of Wind component and other RE generating sources (MW) + INR 2,40,000 x Rated cumulative Installed Capacity of the ESS component (MWh)]."
+- Performance Bank Guarantee (PBG): ₹24.20 lakh/MW solar + ₹34.20 lakh/MW wind or other RE + ₹6.00 lakh/MWh battery, on the installed (AC) capacities [RfS, 18.1, page 33] Quote: "Performance Bank Guarantee = [INR 24,20,000 x Rated Installed Capacity of Solar component (MW) + INR 34,20,000 x Rated cumulative Installed Capacity of Wind component and other RE generating sources (MW) + INR 6,00,000 x Rated cumulative Installed Capacity of the ESS component (MWh)]."
 - SECI may set the hours: SECI may designate the Peak Hours and time blocks; you must make the power available in them and sell it on the exchanges as it instructs [Amendment-04, RfS 9.2.c (amended), page 1] Quote: "SECI shall have the right, as deemed necessary, to designate the Peak Hours (including specific Time-Blocks) during which the RPD shall make available and sell power from the Project through the Power Exchanges. The RPD shall ensure availability of power during the Peak Hours/Time-Blocks so designated by SECI"
 - Declare the day's availability by 06:00 on D-1: In MWh, day-ahead; the declaration drives what SECI schedules [Amendment-04, RfS 9.2.c (b), page 1] Quote: "The RPD shall declare the availability of energy from the Project, in MWh, on a day-ahead basis, latest by 06:00 hours on the day immediately preceding the day of delivery (‘D-1’ Day for delivery on Day ‘D’)."
 - Up to 80% term-ahead, the rest day-ahead: TAM/G-TAM may take up to 80% of the declared availability; the balance goes to DAM/GDAM/HP-DAM; never above the contracted capacity in any block, never sold twice [Amendment-04, RfS 9.2.c (e), page 2] Quote: "For the purpose of sale of power through the TAM and G-TAM, up to 80% of the availability shall be considered for offering/scheduling, as applicable, in the aforesaid markets"
-- Deviations and DSM are yours: Schedule revisions, deviations, DSM and any scheduling non-compliance are borne by you, with an indemnity to SECI [Amendment-04, RfS 9.2.c (f), page 2] Quote: "Any penalties, charges or financial liabilities arising on account of revisions to the schedule, deviations from the schedule, deviation settlement mechanism (DSM) or any other scheduling-related non-compliance attributable to the RPD, including failure to maintain the declared availability or to comply with SECI's instructions, shall be borne entirely by the RPD."
 - SECI may award less than 500 MW: The capacity awarded is what the CfD corpus can carry at the discovered tariff; SECI may restrict the total award [Amendment-04, RfS 42.2.b (amended), page 3] Quote: "the final capacity to be awarded under the RfS shall be determined by SECI based on an assessment of the financial viability of the discovered Tariff and the corresponding requirement of the CfD Pool, within the available CfD corpus. Accordingly, SECI reserves the right to restrict the total capacity to be awarded under the RfS, as considered necessary, to ensure that the financial implications of the award remain within the available CfD corpus."
 
-### Amendment changes (sample)
-- The battery becomes mandatory and yours (Amendment-02, RfS 4.3, page 1): Storage is no longer optional or leasable: for every contracted MW you build and own at least 1 MW / 2 MWh of battery.
-- No ceiling tariff (Amendment-03, RfS 40.3, page 4): The ₹5.80/kWh ceiling and the summary rejection above it are removed; one first-round tariff, two decimals.
-- Settlement: full pass-through (Amendment-03, RfS 9.3.a.iv, page 2): The slab sharing (70:30, 50:50, 30:70) goes: the Pool takes the whole gain when the market clears above the strike price and pays the whole shortfall when it clears below, so you net the strike price on every kWh settled. Amendment-01's split above ₹10/kWh is replaced with it.
-- SECI may award less than 500 MW (Amendment-04, RfS 42.2.b, page 3): The award is no longer 500 MW by right: SECI will award only what the CfD corpus can carry at the discovered strike price. A high price wins less capacity, or none; the Bid review sizes the Pool's pay-out at your price against the corpus.
+### Conditions tested on the competitive bid
+- Contracted capacity: met (100 MW; 50 to 150 MW in whole MW)
+- Battery X MW / 2X MWh usable at the meter: met (100 MW / 200 MWh nameplate for 100 MW; augmentation keeps the usable energy every year)
+- RE online by month 36: met (21 months after the SCD (01 Feb 2030); at most 21)
+- Green market within 25% (+75% until month 36): met (highest after month 36: 25.0%)
+- Group RE within 50% after month 36: met (highest: 49.9%)
+- 2 MWh/MW every day: met (every day; 97.0% of the mandate supplied)
+- Weekly shortfall within 10%: met (no week below 90% of 14 MWh/MW)
 
-### Sizing scan (100 MW, competitive inputs): own solar MWac → strike price ₹/kWh (days short)
-0 → 9.501 (short 2,34,595 MWh over the term); 2 → 9.241 (short 1,85,898 MWh over the term); 4 → 8.984 (short 1,37,201 MWh over the term); 6 → 8.773 (short 88,505 MWh over the term); 8 → 8.517 (short 39,808 MWh over the term); 10 → 8.322; 12 → 8.366; 14 → 8.407; 16 → 8.455; 18 → 8.498; 20 → 8.531; 22 → 8.575; 24 → 8.626; 26 → 8.686; 28 → 8.753; 30 → 8.817; 32 → 8.864; 34 → 8.901; 36 → 8.927; 38 → 8.944; 40 → 8.952; 42 → 8.961; 44 → 8.977; 46 → 8.999; 48 → 9.025; 50 → 9.061; 52 → 9.098; 54 → 9.136; 56 → 9.175; 58 → 9.214; 60 → 9.255
+### Design surface (100 MW; battery ₹0.85 cr/MWh, 13% equity IRR): own solar MWac → strike price ₹/kWh at 0 MW wind [days short in 15 years]
+0 → 9.501 [1219]; 2 → 9.241 [1026]; 4 → 8.984 [812]; 6 → 8.773 [567]; 8 → 8.517 [282]; 10 → 8.322 [0]; 12 → 8.366 [0]; 14 → 8.407 [0]; 16 → 8.455 [0]; 18 → 8.498 [0]; 20 → 8.531 [0]; 22 → 8.575 [0]; 24 → 8.626 [0]; 26 → 8.686 [0]; 28 → 8.753 [0]; 30 → 8.817 [0]; 32 → 8.864 [0]; 34 → 8.901 [0]; 36 → 8.927 [0]; 38 → 8.944 [0]; 40 → 8.952 [0]
+With 10 MW of own wind at 10 MWac solar: ₹8.700 (wind raises the price on this tender).
 
 ### Financial result
-Strike price ₹8.322/kWh; equity IRR 13.0%; project IRR 8.8%; minimum DSCR 1.20. Evening market in the two chosen hours ₹8.30/kWh, all evening hours ₹6.73/kWh.
+Strike price ₹8.322/kWh; equity IRR 13.0%; project IRR 8.8%; minimum DSCR 1.20; project cost ₹250 crore (debt ₹187 crore, equity ₹62 crore). What carries the price: battery's capex ₹3.15; charging power and exchange fees ₹1.99; O&M, insurance, fixed costs and the LC ₹1.08; transmission, SECI's charges and pre-operative cost ₹0.81; own RE capex ₹0.67; augmentation ₹0.31; surplus sales and RECs ₹-0.02; tax and the equity return above the discount rate ₹0.33.
+
+### What-if levers (one step down / up, ₹/kWh)
+- Own solar (now 10 MWac, step 10): ₹9.501 / ₹8.531
+- Battery energy (now 2 MWh per contracted MW, step 0.05): ₹8.322 / ₹8.432
+- Extra battery for evening sale (now 0 MWh per contracted MW, step 0.05): ₹8.322 / ₹8.432
+- Principal moratorium (now 0 years, step 1): ₹8.322 / ₹8.234
+- Battery capex (all-in) (now 0.85 ₹ cr/MWh, step 0.01): ₹8.276 / ₹8.369
+- Target equity IRR (now 13%, step 0.25%): ₹8.281 / ₹8.364
+- Debt share (now 75%, step 1%): ₹8.358 / ₹8.284
+- Receivable days (now 45 days, step 15): ₹8.288 / ₹8.357
+- Plant availability (now 97%, step 0.5%): ₹8.352 / ₹8.294
+- Pre-operative & IDC (now 5%, step 0.5%): ₹8.299 / ₹8.346
+- Transmission to the ISTS substation (now 0.3 ₹ cr per contracted MW, step 0.01): ₹8.301 / ₹8.344
+- Battery O&M (now 1.2 ₹ lakh/MWh/yr, step 0.05): ₹8.304 / ₹8.341
+Tracks: to ₹8.00: Battery capex (all-in) 0.85→0.78 (chance 100%); to ₹7.75: Battery capex (all-in) 0.85→0.72 (chance 100%); to ₹7.50: Battery capex (all-in) 0.85→0.7, Transmission to the ISTS substation 0.3→0.27, Pre-operative & IDC 5%→4%, Receivable days 45→30 (chance 100%).
 
 ### What wins: CfD Pool net flow a year for 500 MW (positive = the Pool pays)
 ₹5.50 → ₹-98.7 cr; ₹6.00 → ₹-81.1 cr; ₹6.50 → ₹-63.5 cr; ₹7.00 → ₹-45.9 cr; ₹7.50 → ₹-28.3 cr; ₹8.00 → ₹-10.7 cr; ₹8.32 → ₹0.7 cr; ₹8.50 → ₹7.0 cr; ₹9.00 → ₹24.6 cr; ₹9.50 → ₹42.2 cr; ₹10.00 → ₹59.8 cr. At ₹8.33 the quote sits at the evening market (₹8.30 in the two chosen hours): the Pool is about neutral on your 100 MW (₹0.2 cr a year paid), so the corpus carries the full 500 MW at the price year's prices; on a lower evening view SECI would weigh the gap.
@@ -98,6 +206,7 @@ Strike price ₹8.322/kWh; equity IRR 13.0%; project IRR 8.8%; minimum DSCR 1.20
 ### Bid review
 - Competitive bid ₹8.32: nothing blocking, 1 that carries cost, 4 to note. [warn] ₹8.32/kWh is above the highest FDRE peak-power award (₹6.00); [note] Buying the charging power is the right call here: more own solar would raise the price; [note] What carries the ₹8.32: the battery's capex ₹3.15/kWh, then charging power and exchange fees ₹1.99; [note] Green-market charging reaches 25.0% of the supply after month 36 (limit 25%); [note] 4 inputs far from the benchmark in the direction that lowers the price
 - Over-built bid ₹19.92: 4 blocking findings, 5 that carry cost, 4 to note. [block] Tender condition not met: Green market within 25% (+75% until month 36); [block] Tender condition not met: 2 MWh/MW every day; [note] Tender condition to watch: Weekly shortfall within 10%; [block] A strike price of ₹19.92/kWh is 3.3× the highest FDRE peak-power award; [note] At ₹19.92 the Pool pays about ₹62 cr a year for your 150 MW; the full 500 MW would need ₹206 cr a year against a ₹76 cr corpus; [warn] Own solar is not at its best: 29 MWac instead of 14 lowers the screening price by ₹3.970/kWh; [warn] Little own RE (14 MWac for 150 MW): nearly all charging power is bought; [note] What carries the ₹19.92: the battery's capex ₹12.11/kWh, then O&M, insurance, fixed costs and the LC ₹2.53; [warn] The extra battery for evening sale (1.00 MWh/MW, 150 MWh) costs ₹25.5 cr a year and earns ₹0.0 cr; [warn] The battery fades below the need: the last year supplies 43.7% of the mandate; [warn] 1 input far from the benchmark in the direction that raises the price; [block] Minimum DSCR 1.02× is below the lender's 1.10×; [note] A 16.0% equity IRR target is high for a contracted supply
+- Market comparables: SECI-FDRE-IX (4 h of assured peak supply a day) ₹5.99–6.00; SECI-FDRE-RTC-V (firm supply round the clock) ₹5.25–5.26; SECI-Tranche-XX (wind energy as generated) ₹3.78–3.85; SECI-FDRE-VII (4 h of assured peak supply a day) ₹6.27–6.28; SECI-Tranche-XIX (wind energy as generated) ₹3.67–3.69; SECI-ISTS-XXI (solar with storage) ₹3.12–3.13; SECI-ISTS-XX (solar with storage) ₹2.86–2.87; SECI-RTC-IV (round-the-clock RE) ₹5.06–5.07; evening market ₹8.30 in the two dearest hours, ₹6.73 over all evening hours.
 
 ## SECI auction results (₹/kWh as discovered; Discovered tariffs, as SECI's result notices give them. SECI sells on to the buying utilities at the tariff plus its trading margin.)
 | Auction | Product | Tendered MW | Awarded MW | Tariff range | Weighted | Auction date | Winners | Source |
@@ -129,25 +238,37 @@ Strike price ₹8.322/kWh; equity IRR 13.0%; project IRR 8.8%; minimum DSCR 1.20
 
 ## FAQ
 ### What is TenderOS?
-TenderOS is a bid workspace for renewable power tenders in India, made by jouleWise. It reads a tender and its amendments with every value tied to its page, sizes the plant against the tender's conditions, prices the bid for the equity return you target, and produces the bid pack: the financial model as a live Excel workbook, the tender's formats and letters, and the sensitivities for bid day.
+TenderOS is a bid workspace for renewable power tenders in India, made by jouleWise. It reads a tender and its amendments with every value tied to its page, sizes the plant against the tender's conditions, prices the bid for the equity return you target, reviews the bid against the tender and recent awards, and produces the bid pack: the financial model as a live Excel workbook, the tender's formats and letters, and the 15-minute compliance files.
+
+### How can months of work become hours?
+Reading and reconciling a tender set, sizing a plant against block-wise floors, building a lender-grade model and proving compliance in 15-minute blocks each take a bid team days or weeks in spreadsheets, and an amendment restarts them. TenderOS reads a tender in minutes, optimises a 25-year case in one to two minutes and regenerates the model, the dispatch and the forms from the same bid, so the team's time goes to judgement: checking the reading, choosing inputs, deciding the price.
 
 ### Which tenders does it handle?
-Firm and dispatchable renewable energy (FDRE) and round-the-clock tenders, assured peak supply, Contracts for Difference (SECI CfD-I), standalone battery storage, and solar or wind with storage, from SECI, NHPC, NTPC and state utilities. A new tender type is added as a tender pack.
+Firm and dispatchable renewable energy (FDRE) and round-the-clock tenders, assured peak supply, Contracts for Difference (SECI CfD-I), standalone battery storage, and solar or wind with storage, from SECI, NHPC, NTPC and state utilities. A new tender arrives as a tender pack.
 
 ### Does the AI decide the bid?
-No. Language models read documents and draft summaries; every value they read carries its document, page and quote, and a person confirms it before it reaches the bid. Sizing, dispatch and the financial model are deterministic code (HiGHS optimisation and a formula model), and the Excel twin shows every formula.
+No. Language models read documents and draft summaries; every value they read carries its document, page and quote, and a person confirms it before it reaches the bid. Sizing is linear optimisation (HiGHS), the financial model is formulas, and the bid review is rules. The Excel twin shows every formula.
+
+### Does our bid data leave our premises?
+No. In the enterprise deployment the bid, the costs, the profiles and the model live in a core zone on your network that has no route to the internet. Only the tender documents, which are public, are read in a separate DMZ, with cloud models or with the rule-based reader that uses none.
+
+### What makes the optimiser state of the art?
+It is a linear programme solved with HiGHS, the leading open-source solver, over every hour of the year for the years that bind (or all 25). It chooses solar, wind and battery power and energy together, honours every floor the tender sets by block, month and year, and minimises the tariff for your target equity IRR. A 25-year case takes one to two minutes on four cores, and each run starts from the last.
+
+### Can several people work on one bid?
+Yes. Inputs are split into steps by team (Projects, Design, Finance). Anyone can ping a colleague from any input, attach evidence, assign a question and fill in the answer; a super admin signs off each input and the sign-off turns amber if the value later changes. Saves are per user, with versions; an activity log records who did what.
+
+### Are scenarios saved?
+Yes. Every save is a named scenario; each further save is a new version, earlier versions are kept and can be restored, and up to 12 scenarios can be compared side by side.
 
 ### How accurate is the financial model?
-The model is exported as a live Excel workbook in which every number is a formula on the blue input cells. The product's own tests recalculate that workbook in LibreOffice and compare it with the application's numbers, so the workbook a lender reads and the application agree.
+The model is exported as a live Excel workbook in which every number is a formula on the blue input cells. The product's own tests recalculate that workbook in LibreOffice and compare it with the application's numbers.
 
 ### Where does the SECI auction data come from?
 From SECI's own result notices (https://www.seci.co.in/tenders/results), linked per auction. The dataset is free to download as CSV or JSON from this page. Tariffs are as discovered in the e-reverse auction; SECI sells on to the buying utilities at the tariff plus its trading margin.
 
 ### What did the model find for SECI CfD-I?
-With competitive inputs for a 100 MW bid, the optimiser keeps 10 MWac of own solar and buys the rest of the charging power, for a strike price of ₹8.32/kWh at a 13% equity IRR. The two dearest evening hours averaged ₹8.30/kWh in the price year, so a quote near that leaves SECI's CfD Pool about neutral, which matters because Amendment-04 lets SECI cut the award to what its ₹76 crore corpus can carry.
-
-### Can it run on our own servers?
-Yes. TenderOS installs with Docker on any cloud or on-premises. The enterprise edition separates an intake zone (tender documents and cloud models) from a core zone on your network where bids, costs and the model live with no cloud client.
+With competitive inputs for a 100 MW bid, the optimiser keeps 10 MWac of own solar and buys the rest of the charging power, for a strike price of ₹8.32/kWh at a 13.0% equity IRR. The two dearest evening hours averaged ₹8.30/kWh in the price year, so a quote near that leaves SECI's CfD Pool about neutral, which matters because Amendment-04 lets SECI cut the award to what its ₹76 crore corpus can carry.
 
 ### How do we get access?
 Ask jouleWise for a walkthrough on your own tender: https://www.joulewise.tech/contact or sales@joulewise.com.

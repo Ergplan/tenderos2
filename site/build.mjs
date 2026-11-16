@@ -1,27 +1,33 @@
 // Builds the public demo site for TenderOS (tenderos.joulewise.tech) into site/public/.
 //
-//   node site/build.mjs          then   node site/render.mjs   (the deck PDF and the share image)
+//   node site/build.mjs [--model] [--pages]     then     node site/render.mjs
 //
 // Every number on the page comes from the application's own code and data, run here:
-//   SECI auction results      web/src/market/seed.js (SECI's result notices)
-//   the CfD-I tender set      web/src/cfd/pack.js (documents, amendment changes with quotes)
-//   the tender's conditions   web/src/cfd/terms.js
-//   the model                 web/src/cfd/model.js, finance.js, winning.js, review.js
-//   open SECI tenders         site/data-src/seci-open.json, a scan by engine/market/seci_tenders.py
-// so the page cannot drift from the product. The page is static HTML (readable without
-// JavaScript, for search engines and language models); site/src/app.js animates the simulation.
+//   the CfD model            site/lib/model.mjs runs web/src/cfd/* (cached in data-src/model-cache.json;
+//                            --model recomputes: about 140 full 15-year simulations, 1,700 pricings)
+//   the tender set           web/src/cfd/pack.js and terms.js (documents, amendment quotes, conditions)
+//   the tender's pages       site/pages.py renders the PDF pages and places every quote on its page
+//                            (cached in public/pages and data-src/pages.json; --pages re-renders)
+//   SECI auction results     web/src/market/seed.js (SECI's result notices)
+//   FDRE-RTC and BESS        web/src/seci/winningBid.js and web/src/bess/engine.js
+//   open SECI tenders        data-src/seci-open.json, a scan by engine/market/seci_tenders.py
+// The page is static HTML (readable without JavaScript); site/src/app.js runs the guided tour and
+// the interactive studio from public/data/demo.json.
 
-import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { SECI_RESULTS, SECI_SITE, TRADING_MARGIN_NOTE, tariffRange, weightedTariff } from "../web/src/market/seed.js";
 import { PACK } from "../web/src/cfd/pack.js";
-import { TERMS, termById } from "../web/src/cfd/terms.js";
-import { defaultCfdState, fillBenchmarks, fillWinning, modelInputs, priceBook, profiles, simulate, capShortfall, runModel } from "../web/src/cfd/model.js";
-import { runCfdFinance } from "../web/src/cfd/finance.js";
-import { eveningAverage, eveningMcp, poolTable, whatWins } from "../web/src/cfd/winning.js";
-import { reviewBid } from "../web/src/cfd/review.js";
+import { TERMS, TENDER, termById } from "../web/src/cfd/terms.js";
+import { RESULT as RTC_RESULT, BRIDGE as RTC_BRIDGE } from "../web/src/seci/winningBid.js";
+import * as BESS from "../web/src/bess/engine.js";
+import { computeModel } from "./lib/model.mjs";
+import { wordDiff } from "./lib/diff.mjs";
+import "./src/iso.js";
 
+const ISO = globalThis.TOSIso;
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..");
 const OUT = join(HERE, "public");
@@ -29,85 +35,77 @@ const SITE = "https://tenderos.joulewise.tech";
 const CONTACT_URL = "https://www.joulewise.tech/contact";
 const CONTACT_EMAIL = "sales@joulewise.com"; // jouleWise's published sales address (www.joulewise.tech)
 const BUILT = new Date().toISOString().slice(0, 10);
+const ARGS = new Set(process.argv.slice(2));
 
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const fmt = (n, d = 2) => (n == null || !Number.isFinite(n) ? "–" : n.toLocaleString("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d }));
 const int = (n) => (n == null ? "–" : Math.round(n).toLocaleString("en-IN"));
+const pct = (x, d = 1) => `${(x * 100).toFixed(d)}%`;
 const dateWords = (iso) => (iso ? new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "–");
 const write = (rel, text) => { const p = join(OUT, rel); mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
 const log = (...a) => console.log("site:", ...a);
+const cut = (s, n) => (s.length > n ? `${s.slice(0, s.lastIndexOf(" ", n - 1))}…` : s);
 
-// ------------------------------------------------------------------ the model, run as the app runs it
-const prices = JSON.parse(readFileSync(join(ROOT, "web/public/market/iex_hourly_prices.json"), "utf8"));
-const pricerFor = (st) => (inputs, sim) => runCfdFinance({ ...st, tariffLocked: false }, { inputs, sim, opYears: sim.opYears, sp: null });
-
-const win = fillWinning(defaultCfdState());
-win.inputs.contractedMw = 100;
-const base = modelInputs(win);
-const book = priceBook(prices, base.sellMarket);
-const scan = [];
-for (let mw = 0; mw <= 60; mw += 2) {
-  const inputs = { ...base, solarMw: mw };
-  const sim = simulate(inputs, book, profiles(inputs));
-  scan.push({ mw, sp: +pricerFor(win)(inputs, sim).tariff.toFixed(3), shortMwh: Math.round(capShortfall(sim)) });
+// ------------------------------------------------------------------ the model (cached)
+const CACHE = join(HERE, "data-src/model-cache.json");
+let M;
+if (ARGS.has("--model") || !existsSync(CACHE)) {
+  M = await computeModel(ROOT, (s) => log(s));
+  writeFileSync(CACHE, JSON.stringify(M));
+} else {
+  M = JSON.parse(readFileSync(CACHE, "utf8"));
 }
-const best = scan.reduce((a, b) => (b.shortMwh === 0 && (a.shortMwh > 0 || b.sp < a.sp) ? b : a));
-win.inputs.solarMw = best.mw;
-const model = runModel(win, prices, { price: pricerFor(win) });
-const fin = runCfdFinance(win, model);
-const evening = { chosen: eveningMcp(model), all: eveningAverage(model) };
-const pool = poolTable(model, fin.tariff).map((r) => ({ sp: +r.sp.toFixed(2), cr: +r.allCr.toFixed(1), yours: Boolean(r.yours) }));
-const verdict = whatWins({ model, finance: fin });
-const reviewWin = reviewBid({ state: win, model, finance: fin, prices });
-log(`winning case: ${best.mw} MWac solar on 100 MW, ₹${fin.tariff.toFixed(2)}/kWh`);
+const W = M.win;
+log(`model: ₹${W.tariff}/kWh at ${W.solarMw} MWac; ${M.sims} simulations and ${M.pricings} pricings in ${M.seconds} s (${M.computedAt.slice(0, 10)})`);
 
-// an over-built bid: the shape of a real upload (SoC window 0.05–50 %, extra battery, dear capex, 16 % equity)
-const high = fillBenchmarks(defaultCfdState());
-Object.assign(high.inputs, { contractedMw: 150, solarMw: 14, essSocMin: 0.05, essSocMax: 50, extraEssMwhPerMw: 1, essCrPerMwh: 1.2, targetEquityIrr: 0.16 });
-const highModel = runModel(high, prices, { price: pricerFor(high) });
-const highFin = runCfdFinance(high, highModel);
-const reviewHigh = reviewBid({ state: high, model: highModel, finance: highFin, prices });
-log(`over-built case: ₹${highFin.tariff.toFixed(2)}/kWh, ${reviewHigh.findings.length} findings`);
-
-// a day of operation after the RE is built (operating year 4 onward) with the full supply met
-let day = null;
-simulate(model.inputs, model.book, model.prof, {
-  onDay: (k, rec) => {
-    if (day || k < 3 * 365 + 150) return;
-    if (rec.delivered >= rec.required * model.inputs.availability - 0.01 && Math.max(...rec.solar) > 0.6 * best.mw) day = rec;
-  },
-});
-const dayOut = day && {
-  date: new Date(day.date).toISOString().slice(0, 10),
-  chosen: day.chosen,
-  solar: day.solar.map((v) => +v.toFixed(2)),
-  charge: Array.from({ length: 24 }, (_, h) => +((day.own[h] || 0) + (day.market[h] || 0) + (day.group[h] || 0)).toFixed(2)),
-  own: day.own.slice(0, 24).map((v) => +v.toFixed(2)),
-  bought: Array.from({ length: 24 }, (_, h) => +((day.market[h] || 0) + (day.group[h] || 0)).toFixed(2)),
-  discharge: Array.from({ length: 24 }, (_, h) => (day.chosen.includes(h) ? +(day.essOut / day.chosen.length + (Array.isArray(day.windDirect) ? day.windDirect[h] || 0 : 0)).toFixed(2) : 0)),
-  price: day.price.map((v) => +v.toFixed(2)),
-  delivered: +day.delivered.toFixed(1),
-  required: day.required,
-  availability: model.inputs.availability,
-};
-
-// ------------------------------------------------------------------ the tender set and its conditions
+// ------------------------------------------------------------------ the tender set
 const docs = PACK.documents.map((d) => ({ id: d.id, title: d.title, kind: d.kind, date: d.date, pages: d.pages, summary: d.summary }));
 const totalPages = docs.reduce((a, d) => a + d.pages, 0);
-const quoteOf = (q) => (Array.isArray(q) ? q.map((x) => x.quote).join(" ") : q?.quote) || null;
-const pageOf = (q) => (Array.isArray(q) ? q[0]?.page : q?.page) ?? null;
-const SHOW_CHANGES = ["a2-rfs-4.3", "a3-rfs-40.3", "a3-rfs-9.3.a.iv", "a4-rfs-42.2.b"];
-const changes = SHOW_CHANGES.map((id) => PACK.changes.find((c) => c.id === id)).filter(Boolean).map((c) => ({
-  id: c.id, doc: PACK.documents.find((d) => d.id === c.doc)?.title, document: c.document, clause: c.clause, topic: c.topic,
-  before: quoteOf(c.before), after: quoteOf(c.after), page: pageOf(c.after), effect: c.effect,
-}));
+const docTitle = (id) => PACK.documents.find((d) => d.id === id)?.title || id;
+const docFile = (id) => { const d = PACK.documents.find((x) => x.id === id); return d?.file ? join(ROOT, "web/public", PACK.folder, d.file) : null; };
+const many = (q) => (q ? (Array.isArray(q) ? q : [q]) : []);
 const groups = {};
 for (const t of TERMS) groups[t.group] = (groups[t.group] || 0) + 1;
-const docTitle = (id) => PACK.documents.find((d) => d.id === id)?.title || id;
-const SHOW_TERMS = ["scheme", "bid", "ceiling", "spFixed", "seciHours4", "declareAvail", "tamShare", "dsmOnRpd", "corpusCap"];
-const terms = SHOW_TERMS.map((id) => termById[id]).filter(Boolean).map((t) => ({ id: t.id, group: t.group, label: t.label, display: t.display, doc: docTitle(t.doc), clause: t.clause, page: t.page, quote: t.quote }));
 
-// ------------------------------------------------------------------ SECI results and open tenders
+const EV_IDS = ["capacityBid", "bid", "ceiling", "emd", "pbg", "seciHours4", "declareAvail", "tamShare", "corpusCap"];
+const ev = EV_IDS.map((id) => termById[id]).filter((t) => t && docFile(t.doc)).map((t) => ({ id: t.id, group: t.group, label: t.label, display: t.display, doc: docTitle(t.doc), clause: t.clause, page: t.page, quote: t.quote }));
+
+const AMD = { amd1: 1, amd2: 2, amd3: 3, amd4: 4 };
+const changes = PACK.changes.map((c) => {
+  const before = many(c.before).map((q) => q.quote).join(" ") || null;
+  const after = many(c.after).map((q) => q.quote).join(" ");
+  const d = wordDiff(before, after);
+  return { id: c.id, amd: AMD[c.doc], amdTitle: docTitle(c.doc), document: c.document, clause: c.clause, topic: c.topic, effect: c.effect, page: many(c.after)[0].page, diff: d.html, added: d.added, removed: d.removed, isNew: d.isNew };
+});
+// what the tender is today against the tender as issued: the changes that move the bid
+const NET = [
+  ["Term of the agreement", "12 years", "15 years", "a3-rfs-2.3"],
+  ["Ceiling tariff", "₹5.80/kWh", "None", "a3-rfs-40.3"],
+  ["Battery", "Optional, may be a third party's", "Mandatory X MW / 2X MWh, owned", "a2-rfs-4.3"],
+  ["Commissioning", "Whole project by month 15", "Battery by month 15, RE by month 36", "a2-rfs-10.2.a"],
+  ["Charging power", "25% from the green market", "+75% until month 36, then +50% group RE", "a2-rfs-9.1.d"],
+  ["Settlement", "Gains and losses shared in slabs", "Full pass-through at the strike price", "a3-rfs-9.3.a.iv"],
+  ["CfD Pool", "A fund of ₹76 crore", "SECI replenishes it for the whole term", "a1-rfs-1.9"],
+  ["Markets", "DAM, RTM, GDAM, HP-DAM", "+ TAM and G-TAM", "a3-rfs-9.2.b"],
+  ["Peak hours", "The bidder's choice", "SECI may designate them, day-ahead", "a4-rfs-9.2.c"],
+  ["Award", "500 MW", "What the CfD corpus can carry", "a4-rfs-42.2.b"],
+].map(([label, was, now, change]) => { const c = changes.find((x) => x.id === change); if (!c) throw new Error(`no change ${change}`); return { label, was, now, change, amd: c.amd }; });
+
+// ------------------------------------------------------------------ the tender's pages, with every quote placed
+const PAGES_JSON = join(HERE, "data-src/pages.json");
+if (ARGS.has("--pages") || !existsSync(PAGES_JSON) || !existsSync(join(OUT, "pages"))) {
+  const reqs = [];
+  for (const c of PACK.changes) for (const [kind, q] of [["was", c.before], ["now", c.after]]) for (const x of many(q)) { const f = docFile(x.doc); if (f) reqs.push({ id: c.id, file: f, page: x.page, quote: x.quote, kind }); }
+  // a condition cites the printed page; the RfS PDF has a cover first (pdfOffset)
+  for (const t of EV_IDS.map((id) => termById[id])) { const f = docFile(t.doc); if (f) reqs.push({ id: `ev-${t.id}`, file: f, page: t.page + (PACK.documents.find((d) => d.id === t.doc)?.pdfOffset || 0), quote: t.quote, kind: "value" }); }
+  const reqFile = join(HERE, "data-src/.page-requests.json");
+  writeFileSync(reqFile, JSON.stringify(reqs));
+  log(execFileSync("python3", ["-W", "ignore", join(HERE, "pages.py"), reqFile, join(OUT, "pages"), PAGES_JSON], { encoding: "utf8" }).trim());
+  rmSync(reqFile);
+}
+const pageData = JSON.parse(readFileSync(PAGES_JSON, "utf8"));
+
+// ------------------------------------------------------------------ SECI results, comparables, open tenders
 const results = SECI_RESULTS.map((r) => {
   const [lo, hi] = tariffRange(r);
   return {
@@ -119,11 +117,26 @@ const results = SECI_RESULTS.map((r) => {
     note: r.note || null, sources: r.sources || [],
   };
 }).sort((a, b) => String(b.auctionDate).localeCompare(String(a.auctionDate)));
+const codeOf = (r) => (r.tender.match(/\((SECI-[^)]+)\)/) || [])[1] || r.id;
+const BUYS = { "FDRE peak power": "4 h of assured peak supply a day", "FDRE-RTC": "firm supply round the clock", "Wind": "wind energy as generated", "Solar + ESS": "solar with storage", "RTC (round-the-clock RE)": "round-the-clock RE" };
+const comps = results.map((r) => ({ code: codeOf(r), product: r.product, lo: r.tariffLow, hi: r.tariffHigh, date: r.auctionDate, buys: BUYS[r.product] || r.product }));
 const open = JSON.parse(readFileSync(join(HERE, "data-src/seci-open.json"), "utf8"));
 const scannedDay = open.scannedAt.slice(0, 10);
 const openRows = open.tenders.filter((t) => t.facts.category !== "admin").sort((a, b) => String(a.bidDeadline).localeCompare(String(b.bidDeadline)));
 
-// ------------------------------------------------------------------ the data files (open to anyone)
+// ------------------------------------------------------------------ the other tender types, from the app's own modules
+const bridgeLabel = { base: "Benchmark inputs, the terms before Amendment-03", amd3: "Amendment-03's supply profile", green: "+ 5% bought on the green market", bess: "+ battery at ₹0.85 cr/MWh, 89% round trip", sell: "+ sell the Solar Hours surplus", finance: "+ debt at 8.5% for 18 years, equity IRR 12%", wind: "+ new-generation wind, CUF 37%" };
+const rtc = { result: RTC_RESULT, bridge: RTC_BRIDGE.map((b) => ({ id: b.id, label: bridgeLabel[b.id] || b.step, tariff: b.tariff, kind: b.kind, plant: b.plant })) };
+const rtcPlant = rtc.bridge[rtc.bridge.length - 1].plant; // per contracted MW
+const bo = BESS.optimize(BESS.DEFAULT_REQ, BESS.DEFAULT_TECH, BESS.DEFAULT_COSTS, BESS.DEFAULT_FIN);
+const bess = {
+  req: BESS.DEFAULT_REQ, charge: +bo.best.chargeLakh.toFixed(2), equityIrr: +bo.best.equityIrr.toFixed(3), strategy: bo.best.strategy, evals: bo.evals,
+  cohorts: bo.best.plan.cohorts.map((c) => ({ year: c.year, mwh: +c.mwh.toFixed(1), kind: c.kind })),
+  compliance: BESS.compliance(BESS.DEFAULT_REQ, BESS.DEFAULT_TECH, bo.best).map((c) => ({ label: c.label, required: c.required, design: c.design, ok: c.ok })),
+};
+log(`other tenders: FDRE-RTC bridge ₹${rtc.bridge[0].tariff} → ₹${rtc.bridge[rtc.bridge.length - 1].tariff}; BESS ₹${bess.charge} lakh/MW/month (${bess.evals} plans tried)`);
+
+// ------------------------------------------------------------------ data files (open to anyone)
 const csvCell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 const resultsCsv = [["auction_id", "product", "tender", "rfs_no", "auction_date", "tendered_mw", "storage_mwh", "awarded_mw", "bidder", "bid_mw", "awarded_mw_bidder", "tariff_inr_per_kwh", "awarded", "source"]]
   .concat(results.flatMap((r) => [
@@ -139,21 +152,21 @@ const dataset = {
 write("data/seci-results.json", JSON.stringify(dataset, null, 1));
 write("data/seci-results.csv", resultsCsv);
 write("data/seci-open-tenders.json", JSON.stringify({ ...open, note: "SECI's tender list and each tender's details page, read without opening any document; summaries by rules." }, null, 1));
+const LEVERS_SHOWN = 12;
 const demo = {
-  tender: { short: PACK.short, title: PACK.title, rfsNo: PACK.rfsNo, tenderedMw: PACK.tenderedMw, documents: docs, totalPages, conditions: TERMS.length, groups, changesQuoted: PACK.changes.length },
-  changes, terms,
-  winning: { contractedMw: 100, solarMwac: best.mw, tariff: +fin.tariff.toFixed(3), equityIrr: +fin.equityIrr.toFixed(4), projectIrr: +fin.projectIrr.toFixed(4), minDscr: +fin.minDscr.toFixed(2), inputs: win.inputs },
-  scan, day: dayOut, evening: { chosen: +evening.chosen.toFixed(2), all: +evening.all.toFixed(2) }, pool, verdict: { tone: verdict.tone, text: verdict.verdict },
-  review: {
-    winning: { tariff: +fin.tariff.toFixed(2), summary: reviewWin.summary, findings: reviewWin.findings.map((f) => ({ severity: f.severity, title: f.title })) },
-    overbuilt: { tariff: +highFin.tariff.toFixed(2), summary: reviewHigh.summary, findings: reviewHigh.findings.map((f) => ({ severity: f.severity, title: f.title })) },
-  },
+  built: BUILT,
+  tender: { short: PACK.short, title: PACK.title, rfsNo: PACK.rfsNo, tenderedMw: PACK.tenderedMw, totalPages, conditions: TERMS.length, groups, changes: changes.length, formats: 17, bidSteps: PACK.bidProcess.length, queries: PACK.queries.length, corpusCr: TENDER.poolCr },
+  docs, ev, changes, net: NET, pages: pageData.pages, marks: pageData.marks,
+  stats: { sims: M.sims, pricings: M.pricings, seconds: M.seconds, daysPerSim: M.daysPerSim },
+  win: W, scan: M.scan, best: M.best, grid: M.grid, day: M.day, heat: M.heat, rows: M.rows, drivers: M.drivers,
+  levers: M.levers.slice(0, LEVERS_SHOWN), tracks: M.tracks, evening: M.evening, pool: M.pool, verdict: M.verdict, risks: M.risks,
+  checks: { win: M.checks, over: M.review.overbuilt.checks }, review: { winning: M.review.winning, overbuilt: M.review.overbuilt }, comps,
+  rtc, bess,
 };
-write("data/cfd-demo.json", JSON.stringify(demo, null, 1));
+write("data/demo.json", JSON.stringify(demo));
+write("data/cfd-demo.json", JSON.stringify({ note: "SECI CfD-I through the TenderOS model: the optimiser's scan, the design surface, a day's dispatch, the levers, the Pool, the bid review.", ...demo, pages: undefined, marks: undefined, heat: undefined }, null, 1));
 
 // ------------------------------------------------------------------ page pieces
-const W = demo.winning;
-const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const productOrder = [...new Set(results.map((r) => r.product))];
 const resultsTable = `
 <div class="table-wrap"><table class="results" id="results-table">
@@ -178,71 +191,96 @@ ${r.notAwarded.length ? `<p class="muted small">Not awarded: ${r.notAwarded.map(
 </tr>`).join("\n")}
 </tbody></table></div>`;
 
-// tariff range strip chart (server-rendered SVG)
 const rangeChart = (() => {
   const w = 720, rowH = 30, top = 26, left = 250, right = 30, n = results.length, h = top + n * rowH + 28;
   const lo = 2.5, hi = 6.75, x = (v) => left + ((v - lo) / (hi - lo)) * (w - left - right);
-  const ticks = [3, 4, 5, 6];
   return `<svg class="range-chart" viewBox="0 0 ${w} ${h}" role="img" aria-labelledby="rc-t rc-d"><title id="rc-t">Discovered tariffs by auction</title><desc id="rc-d">${results.map((r) => `${r.tender}: ₹${fmt(r.tariffLow)} to ₹${fmt(r.tariffHigh)} per kWh`).join("; ")}</desc>
-${ticks.map((t) => `<line x1="${x(t)}" x2="${x(t)}" y1="${top - 8}" y2="${h - 24}" class="grid"/><text x="${x(t)}" y="${h - 8}" class="tick" text-anchor="middle">₹${t}</text>`).join("")}
-${results.map((r, i) => { const y = top + i * rowH + rowH / 2; const short = r.tender.replace(/\s*\(SECI-[^)]+\)/, "").replace(/ISTS-connected /i, ""); const code = (r.tender.match(/\((SECI-[^)]+)\)/) || [])[1] || r.id; return `<g class="rc-row" data-product="${esc(r.product)}"><text x="${left - 10}" y="${y - 2}" text-anchor="end" class="rc-label">${esc(code)}</text><text x="${left - 10}" y="${y + 11}" text-anchor="end" class="rc-sub">${esc(r.product)} · ${dateWords(r.auctionDate)}</text><line x1="${x(r.tariffLow) - 3}" x2="${x(r.tariffHigh) + 3}" y1="${y}" y2="${y}" class="rc-bar"/><text x="${x(r.tariffHigh) + 12}" y="${y + 4}" class="rc-val">₹${fmt(r.tariffLow)}${r.tariffHigh !== r.tariffLow ? `–${fmt(r.tariffHigh)}` : ""}</text></g>`; }).join("\n")}
+${[3, 4, 5, 6].map((t) => `<line x1="${x(t)}" x2="${x(t)}" y1="${top - 8}" y2="${h - 24}" class="grid"/><text x="${x(t)}" y="${h - 8}" class="tick" text-anchor="middle">₹${t}</text>`).join("")}
+${results.map((r, i) => { const y = top + i * rowH + rowH / 2; return `<g class="rc-row" data-product="${esc(r.product)}"><text x="${left - 10}" y="${y - 2}" text-anchor="end" class="rc-label">${esc(codeOf(r))}</text><text x="${left - 10}" y="${y + 11}" text-anchor="end" class="rc-sub">${esc(r.product)} · ${dateWords(r.auctionDate)}</text><line x1="${x(r.tariffLow) - 3}" x2="${x(r.tariffHigh) + 3}" y1="${y}" y2="${y}" class="rc-bar"/><text x="${x(r.tariffHigh) + 12}" y="${y + 4}" class="rc-val">₹${fmt(r.tariffLow)}${r.tariffHigh !== r.tariffLow ? `–${fmt(r.tariffHigh)}` : ""}</text></g>`; }).join("\n")}
 </svg>`;
 })();
 
 const openTable = `<div class="table-wrap"><table class="open-tenders"><thead><tr><th scope="col">Tender</th><th scope="col">What it is</th><th scope="col">Bids due</th></tr></thead><tbody>
-${openRows.map((t) => `<tr><th scope="row"><a href="${esc(t.url)}" rel="noopener" target="_blank">${esc(t.title.length > 110 ? `${t.title.slice(0, 108)}…` : t.title)}</a><br><span class="muted small">${esc(t.ref)}</span></th><td>${esc(t.summary.split(" Bids are due")[0])}</td><td><time datetime="${esc(t.bidDeadline)}">${dateWords(t.bidDeadline)}</time></td></tr>`).join("\n")}
+${openRows.map((t) => `<tr><th scope="row"><a href="${esc(t.url)}" rel="noopener" target="_blank">${esc(cut(t.title, 110))}</a><br><span class="muted small">${esc(t.ref)}</span></th><td>${esc(t.summary.split(" Bids are due")[0])}</td><td><time datetime="${esc(t.bidDeadline)}">${dateWords(t.bidDeadline)}</time></td></tr>`).join("\n")}
 </tbody></table></div>`;
 
-const MODULES = [
-  ["tender", "Tender to Bid", "Upload an RfS with its amendments, clarifications and PPA/PSA (up to 20 files). TenderOS reads them, applies every amendment, quotes each change was/now, and gives every value its document and page. A reviewer confirms the reading before it reaches the bid."],
-  ["rtc", "SECI FDRE-RTC tender", "The 1,000 MW firm and dispatchable round-the-clock tender worked end to end: block-wise supply floors, storage, penalties at multiples of the tariff, the bid forms in SECI's own wording, and how the winners reached ₹5.25/kWh."],
-  ["cfd", "CfD bid (SECI CfD-I)", `A Contract for Difference explained in plain words; the RfS and four amendments with ${PACK.changes.length} changes quoted; ${TERMS.length} conditions with their pages; own solar sized for the least strike price; the Pool and Amendment-04's corpus test; the 17 formats as letters.`],
-  ["bess", "BESS tenders", "Standalone battery tenders: capacity and energy, round-trip efficiency, cycles and augmentation, availability and the payment by the buying utility."],
-  ["optimiser", "Plant sizing optimiser", "HiGHS optimisation sizes solar, wind and storage against every block floor, storage mandate and sale rule, hour by hour over every year of the contract, minimising the tariff for the target equity IRR."],
-  ["dispatch", "15-minute dispatch", "Every day of the term in 96 time blocks (the Grid Code's scheduling block): charging, discharge, state of charge, supply due and delivered, surplus sold. Downloadable per Contract Year as CSV or a streaming Excel file."],
-  ["finance", "Financial model and Excel twin", "A 25-year model from construction: IDC, six repayment methods, refinancing, working capital, DSRA, tax with losses carried, DSCR/LLCR. One click gives the live Excel workbook, every number a formula, recalculated in tests against the application."],
-  ["whatif", "What-if and tariff levers", "Set the price you want to quote and the levers table shows, input by input, what moves the tariff and how far. Freeze a lever with evidence, reject one so the model searches others. Contract size is never offered as a lever."],
-  ["review", "Bid review", "Why a bid is not optimal: tender conditions failed, prices far above recent awards, a plant not at its best size, a battery that fades below the need, inputs far from benchmarks, a DSCR the lender will not accept. Each finding says where to fix it."],
-  ["new", "New tenders radar", "Scans SECI's tender list and details pages, never the documents, and writes a summary per tender: what it is, who may bid, the dates. New, changed and closed tenders are marked at every scan."],
-  ["recent", "Recent results", "SECI's e-reverse auction results: every bidder awarded and not, capacity and final tariff, linked to SECI's notices. The reference for what wins."],
-  ["agent", "Voice agent and Claude connector", "Ask the tender by voice or chat, or connect Claude through MCP (18 tools): look up a condition with its page, set an input, run the optimiser, read the financials, explain what wins."],
-  ["team", "Team, evidence and sign-off", "Steps by team (Projects, Design, Finance), a paperclip for evidence on every input, sign-off that turns amber when a value changes, pings and threads, saved bids with versions, an activity log."],
-  ["enterprise", "Runs on your infrastructure", "Docker on any cloud or on-premises. The enterprise edition splits an intake zone (documents and cloud models) from a core zone where the bid, the costs and the model live with no cloud client. Signed patches under the AMC."],
-];
 const ICONS = {
-  tender: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
-  rtc: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
-  cfd: '<path d="M4 17l5-5 4 3 7-8"/><path d="M4 7h4M16 17h4"/>',
-  bess: '<rect x="4" y="7" width="15" height="10" rx="1.5"/><path d="M19 10h2v4h-2M8 12h4"/>',
-  optimiser: '<path d="M4 18c3-9 5-12 8-12s5 3 8 12"/><circle cx="12" cy="6" r="1.6"/>',
-  dispatch: '<path d="M4 20V10M8 20V6M12 20v-8M16 20V8M20 20v-5"/>',
-  finance: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 9v11M14 9v11"/>',
-  whatif: '<path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/>',
-  review: '<path d="M11 4a7 7 0 105 12l4 4"/><path d="M8 11l2 2 4-4"/>',
-  new: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="5"/>',
-  recent: '<path d="M4 20h16M7 16V9M12 16V5M17 16v-4"/>',
-  agent: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0012 0M12 17v4"/>',
-  team: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6M15 14c3 0 6 1.5 6 5"/>',
-  enterprise: '<path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/>',
+  tender: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>', rtc: '<circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/>',
+  cfd: '<path d="M4 17l5-5 4 3 7-8"/><path d="M4 7h4M16 17h4"/>', bess: '<rect x="4" y="7" width="15" height="10" rx="1.5"/><path d="M19 10h2v4h-2M8 12h4"/>',
+  optimiser: '<path d="M4 18c3-9 5-12 8-12s5 3 8 12"/><circle cx="12" cy="6" r="1.6"/>', dispatch: '<path d="M4 20V10M8 20V6M12 20v-8M16 20V8M20 20v-5"/>',
+  finance: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 9v11M14 9v11"/>', whatif: '<path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/>',
+  review: '<path d="M11 4a7 7 0 105 12l4 4"/><path d="M8 11l2 2 4-4"/>', radar: '<path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="5"/>',
+  recent: '<path d="M4 20h16M7 16V9M12 16V5M17 16v-4"/>', agent: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0012 0M12 17v4"/>',
+  team: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6M15 14c3 0 6 1.5 6 5"/>', shield: '<path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/>',
+  studio: '<path d="M3 17l6-3 6 3 6-3M3 12l6-3 6 3 6-3"/><path d="M9 4l3-1.5L15 4l-3 1.5z"/>', save: '<path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V8a4 4 0 018 0v3"/>', clip: '<path d="M8 12l6-6a3 3 0 014 4l-8 8a5 5 0 01-7-7l7-7"/>',
+  check: '<path d="M5 12l4 4 10-10"/>', key: '<circle cx="8" cy="14" r="4"/><path d="M11 11l9-8M16 6l3 3"/>', server: '<rect x="4" y="4" width="16" height="6" rx="1"/><rect x="4" y="14" width="16" height="6" rx="1"/><path d="M8 7h.01M8 17h.01"/>',
 };
-const icon = (k) => `<svg viewBox="0 0 24 24" aria-hidden="true" class="ic">${ICONS[k] || ""}</svg>`;
+const icon = (k, cls = "ic") => `<svg viewBox="0 0 24 24" aria-hidden="true" class="${cls}">${ICONS[k] || ""}</svg>`;
+
+const MODULES = [
+  ["tender", "Tender to Bid", "Upload an RfS with its amendments, clarifications and PPA/PSA (up to 20 files). Every value read carries its document, page and quote; a reviewer confirms the reading before it reaches the bid."],
+  ["rtc", "SECI FDRE-RTC tender", "The 1,000 MW round-the-clock tender worked end to end: block-wise floors, storage, penalties, the bid forms in SECI's wording, and the bridge to the ₹5.25 the winners bid."],
+  ["cfd", "CfD bid (SECI CfD-I)", `A Contract for Difference in plain words; four amendments with ${changes.length} changes quoted; ${TERMS.length} conditions with their pages; own RE sized for the least strike price; the Pool and the corpus test.`],
+  ["bess", "BESS tenders", "Standalone battery tenders read from the document: oversizing against augmentation, cycles, round-trip efficiency and availability, priced as a capacity charge per MW per month."],
+  ["studio", "Solar and wind studios", "Solar: module class, fixed tilt or tracker, string or central inverters, DC:AC ratio, cost built up in ₹/Wp. Wind: ten turbines by make, hub height, wind regime, losses, spacing."],
+  ["optimiser", "Plant sizing optimiser", "Linear optimisation with HiGHS over every hour of the year, against every block floor, storage rule and sale rule, minimising the tariff for the target equity IRR."],
+  ["dispatch", "15-minute dispatch", "Every day of the term in 96 time blocks: charging, discharge, state of charge, supply due and delivered. One file per Contract Year, CSV or Excel."],
+  ["finance", "Financial model, Excel twin", "A 25-year model from construction: IDC, six repayment methods, refinancing, working capital, DSRA, tax. One click gives a live Excel workbook, every number a formula."],
+  ["whatif", "What-if and the track to a quote", "Every lever's effect on the tariff, the surest route to the price you want to quote with the chance of each move, levers frozen with evidence or turned down."],
+  ["review", "Bid review", "Why a bid is not optimal: conditions failed, a price far above recent awards, a plant not at its best size, a battery that fades, a DSCR the lender will not accept."],
+  ["save", "Saved bids and scenarios", "Every save is a named scenario with versions kept; restore any version; compare up to 12 scenarios side by side."],
+  ["team", "Team, evidence, sign-off", "Steps by team, a paperclip for evidence on every input, pings and threads, assignments with email, sign-off that turns amber when the value changes, an activity log."],
+  ["radar", "New tenders radar", "Scans SECI's tender list and details pages, never the documents, and summarises each tender: what it is, who may bid, the dates. New and changed tenders are marked."],
+  ["recent", "Recent results", "SECI's e-reverse auction results, every bidder awarded and not, with capacity and final tariff, linked to SECI's notices."],
+  ["agent", "Voice agent, Claude connector", "Ask the tender by voice or chat, or connect Claude through MCP (18 tools): look up a condition with its page, set an input, run the optimiser, read the financials."],
+  ["shield", "On your premises", "Docker on any cloud or on-premises. A DMZ reads the tender; the bid, the costs and the model stay in a core zone with no route to the internet."],
+];
+
+// the time it takes: by hand (indicative) and in TenderOS (from the product's own documentation)
+const SCALE = ["minutes", "hours", "days", "weeks"];
+const TIME = [
+  ["Read the tender set and reconcile every amendment", "weeks", "minutes", "1 to 4 minutes a tender, up to 10 for a set; then a reviewer confirms"],
+  ["List every condition with its page and clause", "days", "minutes", `${TERMS.length} conditions on CfD-I, part of the reading`],
+  ["Size solar, wind and storage against every block floor", "weeks", "minutes", "1 to 2 minutes an optimisation, a 25-year case on 4 cores"],
+  ["Build the financial model lenders will read", "weeks", "minutes", "the model is the product; the Excel twin is one click"],
+  ["Prove compliance in 15-minute blocks", "weeks", "minutes", "96 blocks a day for the whole term, about 90 seconds for year 1"],
+  ["Bid-day sensitivities and the route to a quote", "days", "minutes", "what-if is instant; the levers and the track take seconds"],
+  ["Fill the tender's formats and letters", "days", "minutes", "generated from the bid in the RfS's wording, Word and PDF"],
+  ["Absorb a new amendment a week before the deadline", "weeks", "hours", "read the amendment, re-run, review: the same afternoon"],
+];
+
+const SECURITY = [
+  ["server", "Two zones, by design", "A DMZ (the intake zone) holds only the tender documents and their reading. The core zone holds the bid: inputs, evidence, profiles, sizing, the financial model, the forms and the team."],
+  ["lock", "The core has no route to the internet", "No cloud keys, no cloud client. It reaches only your own mail server and directory; everything else outbound is blocked, DNS included. The optimiser runs on internal-only container networks."],
+  ["shield", "The core refuses to read tenders", "The tender-reading routes answer 403 in the core zone. Parsing happens in the DMZ; the reviewed reading moves inward, one way."],
+  ["tender", "Or read with no cloud at all", "A rule-based reader extracts the headline fields with page and quote without any language model, for sites that allow none."],
+  ["key", "Secrets and sign-in", "Passwords hashed with scrypt, sessions in httpOnly cookies, sign-in throttled after ten failures. Provider keys encrypted with AES-256-GCM and shown masked."],
+  ["team", "Who sees what", "Administrator and user roles, access granted tab by tab, an activity log kept for 400 days."],
+  ["save", "Backups and updates", "Database and files backed up, the newest 14 kept. Updates arrive as bundles signed with an EC P-256 key; the patch tool verifies, backs up, applies and health-checks."],
+  ["optimiser", "Modest hardware", "One 4-vCPU, 16 GB server on Ubuntu or Debian with Docker: AWS, Azure, GCP or your own rack. HTTPS only, firewall rules per zone."],
+];
 
 const FAQ = [
-  ["What is TenderOS?", `TenderOS is a bid workspace for renewable power tenders in India, made by jouleWise. It reads a tender and its amendments with every value tied to its page, sizes the plant against the tender's conditions, prices the bid for the equity return you target, and produces the bid pack: the financial model as a live Excel workbook, the tender's formats and letters, and the sensitivities for bid day.`],
-  ["Which tenders does it handle?", "Firm and dispatchable renewable energy (FDRE) and round-the-clock tenders, assured peak supply, Contracts for Difference (SECI CfD-I), standalone battery storage, and solar or wind with storage, from SECI, NHPC, NTPC and state utilities. A new tender type is added as a tender pack."],
-  ["Does the AI decide the bid?", "No. Language models read documents and draft summaries; every value they read carries its document, page and quote, and a person confirms it before it reaches the bid. Sizing, dispatch and the financial model are deterministic code (HiGHS optimisation and a formula model), and the Excel twin shows every formula."],
-  ["How accurate is the financial model?", "The model is exported as a live Excel workbook in which every number is a formula on the blue input cells. The product's own tests recalculate that workbook in LibreOffice and compare it with the application's numbers, so the workbook a lender reads and the application agree."],
+  ["What is TenderOS?", `TenderOS is a bid workspace for renewable power tenders in India, made by jouleWise. It reads a tender and its amendments with every value tied to its page, sizes the plant against the tender's conditions, prices the bid for the equity return you target, reviews the bid against the tender and recent awards, and produces the bid pack: the financial model as a live Excel workbook, the tender's formats and letters, and the 15-minute compliance files.`],
+  ["How can months of work become hours?", "Reading and reconciling a tender set, sizing a plant against block-wise floors, building a lender-grade model and proving compliance in 15-minute blocks each take a bid team days or weeks in spreadsheets, and an amendment restarts them. TenderOS reads a tender in minutes, optimises a 25-year case in one to two minutes and regenerates the model, the dispatch and the forms from the same bid, so the team's time goes to judgement: checking the reading, choosing inputs, deciding the price."],
+  ["Which tenders does it handle?", "Firm and dispatchable renewable energy (FDRE) and round-the-clock tenders, assured peak supply, Contracts for Difference (SECI CfD-I), standalone battery storage, and solar or wind with storage, from SECI, NHPC, NTPC and state utilities. A new tender arrives as a tender pack."],
+  ["Does the AI decide the bid?", "No. Language models read documents and draft summaries; every value they read carries its document, page and quote, and a person confirms it before it reaches the bid. Sizing is linear optimisation (HiGHS), the financial model is formulas, and the bid review is rules. The Excel twin shows every formula."],
+  ["Does our bid data leave our premises?", "No. In the enterprise deployment the bid, the costs, the profiles and the model live in a core zone on your network that has no route to the internet. Only the tender documents, which are public, are read in a separate DMZ, with cloud models or with the rule-based reader that uses none."],
+  ["What makes the optimiser state of the art?", "It is a linear programme solved with HiGHS, the leading open-source solver, over every hour of the year for the years that bind (or all 25). It chooses solar, wind and battery power and energy together, honours every floor the tender sets by block, month and year, and minimises the tariff for your target equity IRR. A 25-year case takes one to two minutes on four cores, and each run starts from the last."],
+  ["Can several people work on one bid?", "Yes. Inputs are split into steps by team (Projects, Design, Finance). Anyone can ping a colleague from any input, attach evidence, assign a question and fill in the answer; a super admin signs off each input and the sign-off turns amber if the value later changes. Saves are per user, with versions; an activity log records who did what."],
+  ["Are scenarios saved?", "Yes. Every save is a named scenario; each further save is a new version, earlier versions are kept and can be restored, and up to 12 scenarios can be compared side by side."],
+  ["How accurate is the financial model?", "The model is exported as a live Excel workbook in which every number is a formula on the blue input cells. The product's own tests recalculate that workbook in LibreOffice and compare it with the application's numbers."],
   ["Where does the SECI auction data come from?", `From SECI's own result notices (${SECI_SITE}), linked per auction. The dataset is free to download as CSV or JSON from this page. Tariffs are as discovered in the e-reverse auction; SECI sells on to the buying utilities at the tariff plus its trading margin.`],
-  ["What did the model find for SECI CfD-I?", `With competitive inputs for a 100 MW bid, the optimiser keeps ${W.solarMwac} MWac of own solar and buys the rest of the charging power, for a strike price of ₹${fmt(W.tariff)}/kWh at a 13% equity IRR. The two dearest evening hours averaged ₹${fmt(demo.evening.chosen)}/kWh in the price year, so a quote near that leaves SECI's CfD Pool about neutral, which matters because Amendment-04 lets SECI cut the award to what its ₹76 crore corpus can carry.`],
-  ["Can it run on our own servers?", "Yes. TenderOS installs with Docker on any cloud or on-premises. The enterprise edition separates an intake zone (tender documents and cloud models) from a core zone on your network where bids, costs and the model live with no cloud client."],
+  ["What did the model find for SECI CfD-I?", `With competitive inputs for a 100 MW bid, the optimiser keeps ${W.solarMw} MWac of own solar and buys the rest of the charging power, for a strike price of ₹${fmt(W.tariff)}/kWh at a ${pct(W.equityIrr)} equity IRR. The two dearest evening hours averaged ₹${fmt(M.evening.chosen)}/kWh in the price year, so a quote near that leaves SECI's CfD Pool about neutral, which matters because Amendment-04 lets SECI cut the award to what its ₹${TENDER.poolCr} crore corpus can carry.`],
   ["How do we get access?", `Ask jouleWise for a walkthrough on your own tender: ${CONTACT_URL} or ${CONTACT_EMAIL}.`],
 ];
 
+const desc = `TenderOS by jouleWise turns months of bid work into hours: it reads an Indian renewable energy tender and its amendments with page-level evidence, sizes solar, wind and battery with a HiGHS optimiser, prices the bid and builds the Excel model and bid pack, on your premises.`;
 const jsonLd = [
-  { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "TenderOS", applicationCategory: "BusinessApplication", operatingSystem: "Web, Docker (any cloud or on-premises)", url: SITE, image: `${SITE}/og.jpg`,
-    description: "Bid workspace for Indian renewable energy tenders: reads the RfS and amendments with page-level evidence, sizes solar, wind and battery plants against the tender's conditions, prices the bid for a target equity IRR, and produces the financial model as a live Excel workbook and the bid pack.",
-    publisher: { "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech" },
-    featureList: MODULES.map((m) => m[1]), offers: { "@type": "Offer", availability: "https://schema.org/InStock", url: CONTACT_URL, description: "Licence with installation and annual maintenance (AMC); priced per engagement" } },
+  { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "TenderOS", applicationCategory: "BusinessApplication", operatingSystem: "Web, Docker (any cloud or on-premises)", url: SITE, image: `${SITE}/og.jpg`, description: desc,
+    publisher: { "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech" }, featureList: MODULES.map((m) => m[1]),
+    offers: { "@type": "Offer", availability: "https://schema.org/InStock", url: CONTACT_URL, description: "Licence with installation and annual maintenance (AMC); priced per engagement" } },
   { "@context": "https://schema.org", "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech", email: CONTACT_EMAIL, sameAs: ["https://www.linkedin.com/company/joulewiseadvisoryservices/"] },
   { "@context": "https://schema.org", "@type": "Dataset", name: dataset.name, description: dataset.description, url: `${SITE}/#results`, creator: { "@type": "Organization", name: "jouleWise" }, isBasedOn: SECI_SITE, dateModified: BUILT, temporalCoverage: "2025-05/2026-08", spatialCoverage: "India",
     distribution: [{ "@type": "DataDownload", encodingFormat: "text/csv", contentUrl: `${SITE}/data/seci-results.csv` }, { "@type": "DataDownload", encodingFormat: "application/json", contentUrl: `${SITE}/data/seci-results.json` }],
@@ -251,27 +289,224 @@ const jsonLd = [
 ];
 
 const STAGES = [
-  ["upload", "Tender in", "Six documents of SECI CfD-I"],
-  ["read", "Read with evidence", "Every value with its page and quote"],
-  ["amend", "Amendments applied", "Was / now, quoted"],
-  ["conditions", "Conditions", `${TERMS.length} conditions in ${Object.keys(groups).length} groups`],
-  ["inputs", "Inputs by team", "Fill with competitive values"],
-  ["size", "Size the plant", "Least strike price, every day met"],
-  ["dispatch", "Dispatch", "Hour by hour, 15-minute blocks"],
-  ["finance", "Financial model", "Tariff for the target IRR"],
-  ["wins", "What wins", "The CfD Pool and the corpus"],
-  ["review", "Bid review", "Why a bid is not optimal"],
-  ["pack", "Bid pack", "Excel, letters, dispatch files"],
+  ["upload", "Tender in", "Six documents, classified"],
+  ["read", "Evidence", "Every value on its page"],
+  ["amend", "Amendments", `${changes.length} changes, word by word`],
+  ["conditions", "Conditions", `${TERMS.length}, tested on the bid`],
+  ["team", "Team inputs", "Pings, evidence, sign-off"],
+  ["studio", "Design studio", "Move the plant, watch the price"],
+  ["size", "Optimise", "Least price, every day met"],
+  ["dispatch", "Dispatch", "15-minute blocks, 15 years"],
+  ["finance", "Finance", "The model behind the price"],
+  ["whatif", "What-if", "Levers and the track to a quote"],
+  ["wins", "What wins", "The Pool and the corpus"],
+  ["review", "Bid review", "Against rules and the market"],
+  ["pack", "Bid pack", "Excel, letters, files"],
 ];
 
-const desc = `TenderOS by jouleWise turns an Indian renewable energy tender into a bid: it reads the RfS and amendments with page-level evidence, sizes solar, wind and battery against every condition, prices the bid for your target IRR and builds the Excel model and bid pack. Live demo with SECI auction results.`;
+// ---- isometric plants, drawn at build time so they are in the HTML
+const isoHero = ISO.plant({ kind: "cfd", solarMw: 24, windMw: 15, bessMwh: 200, text: { title: "A hybrid plant: solar, wind, battery, substation, grid, power exchange and SECI's CfD Pool", solar: "Solar", wind: "Wind", pool: "CfD Pool", poolSub: "" } });
+const isoCfd = ISO.plant({ kind: "cfd", solarMw: W.solarMw, windMw: 0, bessMwh: 200, text: { title: "SECI CfD-I plant for a 100 MW bid", bessSub: "100 MW / 200 MWh" } });
+const rtcMw = 200;
+const isoFdre = ISO.plant({ kind: "fdre", solarMw: Math.round(rtcPlant.solar * rtcMw), windMw: Math.round(rtcPlant.wind * rtcMw), bessMwh: Math.round(rtcPlant.bessMwh * rtcMw), mwPerTable: 25, mwPerTurbine: 33, mwhPerContainer: 140, text: { title: "FDRE round-the-clock plant for a 200 MW bid", buyer: "SECI", buyerSub: "to the discoms, 24 h", bessSub: `${Math.round(rtcPlant.bess * rtcMw)} MW / ${int(rtcPlant.bessMwh * rtcMw)} MWh` } });
+const isoBess = ISO.plant({ kind: "bess", bessMwh: bess.req.energyMwh, mwhPerContainer: 28, text: { title: "Standalone battery of 250 MW / 500 MWh", buyer: "Buying utility", buyerSub: "charges and dispatches", bessSub: `${bess.req.powerMw} MW / ${bess.req.energyMwh} MWh` } });
+
+const bridgeChart = (() => {
+  const b = rtc.bridge, w = 560, h = 250, L = 16, R = 16, T = 26, B = 22, bw = (w - L - R) / (b.length + 1);
+  const y = (v) => T + (1 - (v - 4.6) / (7.8 - 4.6)) * (h - T - B);
+  let s = "";
+  b.forEach((st, k) => {
+    const prev = k ? b[k - 1].tariff : 4.6, top = Math.min(y(prev), y(st.tariff)), hh = Math.max(2, Math.abs(y(prev) - y(st.tariff)));
+    const cls = k === 0 ? "wf-base" : st.tariff > prev ? "wf-up" : "wf-down";
+    s += `<rect class="${cls}${st.kind === "estimate" ? " est" : ""}" x="${L + k * bw + 5}" y="${k === 0 ? y(st.tariff) : top}" width="${bw - 10}" height="${k === 0 ? y(4.6) - y(st.tariff) : hh}"/><text class="wf-v" x="${L + k * bw + bw / 2}" y="${Math.min(y(prev), y(st.tariff)) - 5}" text-anchor="middle">₹${fmt(st.tariff)}</text><text class="wf-n" x="${L + k * bw + bw / 2}" y="${h - 6}" text-anchor="middle">${k + 1}</text>`;
+  });
+  const k = b.length;
+  s += `<rect class="wf-win" x="${L + k * bw + 5}" y="${y(5.26)}" width="${bw - 10}" height="${y(4.6) - y(5.26)}"/><text class="wf-v" x="${L + k * bw + bw / 2}" y="${y(5.26) - 5}" text-anchor="middle">₹5.25</text><text class="wf-n" x="${L + k * bw + bw / 2}" y="${h - 6}" text-anchor="middle">won</text>`;
+  return `<svg class="mini-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="From ₹${fmt(b[0].tariff)} on benchmark inputs to ₹${fmt(b[b.length - 1].tariff)}, against the ₹5.25 to 5.26 the winners bid">${s}</svg>`;
+})();
+const augChart = (() => {
+  const c = bess.cohorts, w = 560, h = 190, L = 16, R = 16, T = 22, B = 22, bw = (w - L - R) / c.length, max = c[0].mwh;
+  return `<svg class="mini-chart" viewBox="0 0 ${w} ${h}" role="img" aria-label="Battery installed on day one and added each year">${c.map((x, k) => { const hh = Math.max(2, (x.mwh / max) * (h - T - B)); return `<rect class="${k ? "wf-down" : "wf-base"}" x="${L + k * bw + 4}" y="${h - B - hh}" width="${bw - 8}" height="${hh}"/><text class="wf-v" x="${L + k * bw + bw / 2}" y="${h - B - hh - 5}" text-anchor="middle">${int(x.mwh)}</text><text class="wf-n" x="${L + k * bw + bw / 2}" y="${h - 6}" text-anchor="middle">${x.year}</text>`; }).join("")}</svg>`;
+})();
+
+const stepper = STAGES.map(([id, t, s], i) => `<li><button role="tab" id="tab-${id}" aria-controls="st-${id}" aria-selected="${i === 0}" data-stage="${i}"><span class="n">${i + 1}</span><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></button></li>`).join("\n");
+const stage = (id, k, title, lede, body, hidden = true) => `
+        <div class="stage" id="st-${id}" role="tabpanel" aria-labelledby="tab-${id}"${hidden ? " hidden" : ""}>
+          <header class="stage-head"><h3><span class="sn">${k}</span>${title}</h3><p>${lede}</p></header>
+${body}
+        </div>`;
+const pageview = (id, caption) => `<figure class="pageview" id="${id}"><figcaption>${caption}</figcaption><div class="pv-scroll"><div class="pv-sheet"><img alt="" loading="lazy" decoding="async"><div class="pv-marks"></div></div></div></figure>`;
+const TEAM_INPUTS = [
+  ["Projects", [["contractedMw", "Contracted capacity", "100 MW", "you"], ["groupPrice", "Group RE price for charging", `₹${fmt(W.inputs.groupPrice)}/kWh`, "win"], ["availability", "Plant availability declared", pct(W.inputs.availability, 0), "win"]]],
+  ["Design", [["essCrPerMwh", "Battery capex, all-in", `₹${fmt(W.inputs.essCrPerMwh)} cr/MWh`, "win"], ["solarCrPerMw", "Solar capex, all-in", `₹${fmt(W.inputs.solarCrPerMw)} cr/MWac`, "win"], ["rte", "Battery round trip", pct(W.inputs.rte, 0), "win"]]],
+  ["Finance", [["targetEquityIrr", "Target equity IRR", pct(W.inputs.targetEquityIrr), "win"], ["interestRate", "Interest · tenor", `${pct(W.inputs.interestRate, 2)} · ${W.inputs.tenorYears} years`, "win"], ["repayment", "Repayment", "Sculpted, DSCR 1.20", "win"]]],
+];
+const findingLi = (f) => `<li class="${f.severity}"><span>${f.severity === "block" ? "Blocks" : f.severity === "warn" ? "Cost" : "Note"}</span>${esc(f.title)}</li>`;
+
+const stagesHtml = [
+  stage("upload", 1, "Tender in: the whole set at once", "Drop the RfS, the agreement and every amendment. Each file is identified, dated and ordered: later amendments override earlier text, and the agreement prevails over the RfS where they differ.", `
+          <div class="up-grid">
+            <div class="dropzone" id="dropzone"><p class="dz-hint">${icon("tender", "ic sm")} SECI-CfD-I tender set · 6 files</p>
+              <ul class="files">
+${docs.map((d) => `                <li class="file" data-kind="${d.kind}"><span class="fi">PDF</span><span class="fn"><b>${esc(d.title)}</b><span class="muted small">${d.pages} pages${d.date ? ` · ${dateWords(d.date)}` : ""}</span></span><span class="tag">${esc(d.kind)}</span></li>`).join("\n")}
+              </ul></div>
+            <div class="up-side">
+              <div class="meter"><span>Pages read</span><b id="read-count" data-total="${totalPages}">${totalPages}</b><span>/ ${totalPages}</span></div>
+              <ul class="extract">
+                <li><b data-n="${TERMS.length}">${TERMS.length}</b><span>conditions, each with its page and quote</span></li>
+                <li><b data-n="${changes.length}">${changes.length}</b><span>amendment changes, was and now</span></li>
+                <li><b data-n="17">17</b><span>formats to submit, as letters</span></li>
+                <li><b data-n="${PACK.bidProcess.length}">${PACK.bidProcess.length}</b><span>steps of the bid process, in order</span></li>
+                <li><b data-n="${PACK.queries.length}">${PACK.queries.length}</b><span>pre-bid queries drafted from gaps in the text</span></li>
+              </ul>
+              <p class="foot">RfS ${esc(PACK.rfsNo)} · ${PACK.tenderedMw} MW × 2 h of assured peak supply</p>
+            </div>
+          </div>`, false),
+  stage("read", 2, "Evidence: every value sits on its page", "Click a value and the tender opens at the page, with the sentence it was read from highlighted. This is the real page of SECI's document, not a summary.", `
+          <div class="ev-grid">
+            <ul class="ev-list" id="ev-list">
+${ev.map((t, k) => `              <li><button type="button" data-ev="${t.id}" class="${k === 0 ? "on" : ""}"><span class="ev-l">${esc(t.label)}</span><span class="ev-v">${esc(cut(t.display, 120))}</span><span class="cite">${esc(t.doc)} · ${esc(t.clause)} · p.${t.page}</span></button></li>`).join("\n")}
+            </ul>
+            ${pageview("ev-page", "The tender's page")}
+          </div>`),
+  stage("amend", 3, "Amendments: what changed, word by word", `Four amendments in four months changed ${changes.length} clauses. Each is shown as it stood and as amended, with the words removed and added, the page of SECI's amendment, and what it does to the bid.`, `
+          <div class="am-net" id="am-net" aria-label="The tender today against the tender as issued">
+${NET.map((n) => `            <button type="button" data-change="${n.change}"><span class="l">${esc(n.label)}</span><span class="was">${esc(n.was)}</span><span class="now">${esc(n.now)}</span><span class="by">A${n.amd}</span></button>`).join("\n")}
+          </div>
+          <div class="am-grid">
+            <div class="am-nav">
+              <ol class="am-line" id="am-line">
+                <li><span class="node rfs"></span><b>RfS</b><span>${dateWords(PACK.rfsDate)}</span></li>
+${[1, 2, 3, 4].map((a) => { const d = PACK.documents.find((x) => x.id === `amd${a}`); return `                <li><button type="button" data-amd="${a}"><span class="node"></span><b>Amendment-0${a}</b><span>${dateWords(d.date)} · ${changes.filter((c) => c.amd === a).length} changes</span></button></li>`; }).join("\n")}
+              </ol>
+              <ul class="am-list" id="am-list"></ul>
+            </div>
+            <div class="am-body" id="am-body"><p class="muted">Pick a change.</p></div>
+            ${pageview("am-page", "SECI's amendment")}
+          </div>`),
+  stage("conditions", 4, `${TERMS.length} conditions, and the ones a plant can fail`, "Every condition is kept with its clause. The ones that depend on the plant are tested on every sizing, so a bid that breaks the tender says so before the bid committee sees it.", `
+          <div class="cond-grid">
+            <div class="groups">
+${Object.entries(groups).sort((a, b) => b[1] - a[1]).map(([g, n]) => `              <div class="grp"><span class="gl">${esc(g)}</span><span class="gb"><i style="--w:${((n / 44) * 100).toFixed(1)}%"></i></span><span class="gn">${n}</span></div>`).join("\n")}
+            </div>
+            <div class="cond-test">
+              <div class="seg" id="cond-toggle" role="group" aria-label="Which bid"><button type="button" data-bid="win" class="on">Competitive bid · ₹${fmt(M.review.winning.tariff)}</button><button type="button" data-bid="over">Over-built bid · ₹${fmt(M.review.overbuilt.tariff)}</button></div>
+              <ul class="checks" id="cond-list">
+${M.checks.map((c) => `                <li class="${c.status}"><span class="st">${c.status === "met" ? "Met" : c.status === "failed" ? "Failed" : "Watch"}</span><b>${esc(c.label)}</b><span class="d">${esc(c.detail)}</span></li>`).join("\n")}
+              </ul>
+            </div>
+          </div>`),
+  stage("team", 5, "Team inputs: one bid, three teams", "Projects, Design and Finance each own a step. Empty boxes fill with the values winning bidders show lenders, marked until someone replaces them. Any box can carry a question, the evidence and a sign-off.", `
+          <div class="team-grid">
+            <div class="team-cols">
+              <div class="team-bar"><button type="button" class="btn small" id="team-fill">Fill for me</button><span class="muted small">Names and messages below are illustrative; the values are the model's.</span></div>
+${TEAM_INPUTS.map(([team, rows]) => `              <div class="tcol"><h4>${team}</h4>${rows.map(([k, l, v, src]) => `<div class="tin" data-k="${k}"><span class="tl">${esc(l)}</span><span class="tv" data-v="${esc(v)}">${esc(v)}</span><span class="tag ${src}">${src === "you" ? "Your input" : "Competitive"}</span><span class="tmarks"><i class="clip" title="Evidence">${icon("clip", "ic xs")}</i><i class="so" title="Sign-off">${icon("check", "ic xs")}</i></span></div>`).join("")}</div>`).join("\n")}
+            </div>
+            <aside class="thread" id="team-thread" aria-label="A thread on Battery capex">
+              <h4>Battery capex, all-in <span class="cite">Design · 1 thread</span></h4>
+              <div class="msg" data-m="1"><span class="who fin">Finance lead</span><p><b>@design</b> is ₹0.85 cr/MWh backed by an offer for 2028 delivery? The lender will ask.</p></div>
+              <div class="msg" data-m="2"><span class="who des">Design engineer</span><p>Yes: supplier offer attached, valid to March. DC block, PCS, EMS and installation.</p><span class="chip">${icon("clip", "ic xs")} Supplier offer (PDF)</span> <button type="button" class="chip act" id="team-fillin">Fill in 0.85</button></div>
+              <div class="msg sys" data-m="3"><span class="who adm">Bid head</span><p>${icon("check", "ic xs")} Signed off at ₹0.85 cr/MWh.</p></div>
+              <div class="msg sys amber" data-m="4"><span class="who des">Design engineer</span><p>Changed to ₹0.82 cr/MWh. The sign-off turns amber: signed off at an older value.</p></div>
+            </aside>
+          </div>`),
+  stage("studio", 6, "Design studio: move the plant, watch the price", `Drag the sliders. Each plant size is a full run of the model, ${int(M.daysPerSim)} days of operation priced through the financial model; the tender's conditions are tested as you move.`, `
+          <div class="sd-grid">
+            <form class="sd-controls" id="sd-form" onsubmit="return false">
+              <label><span>Own solar <b id="sd-solar-v">${W.solarMw} MWac</b></span><input type="range" id="sd-solar" min="0" max="40" step="2" value="${W.solarMw}"></label>
+              <label><span>Own wind <b id="sd-wind-v">0 MW</b></span><input type="range" id="sd-wind" min="0" max="20" step="5" value="0"></label>
+              <label><span>Battery capex <b id="sd-ess-v">₹${fmt(W.inputs.essCrPerMwh)} cr/MWh</b></span><input type="range" id="sd-ess" min="0.65" max="1.25" step="0.01" value="${W.inputs.essCrPerMwh}"></label>
+              <label><span>Target equity IRR <b id="sd-irr-v">${pct(W.inputs.targetEquityIrr)}</b></span><input type="range" id="sd-irr" min="11" max="17" step="0.25" value="${W.inputs.targetEquityIrr * 100}"></label>
+              <div class="sd-actions"><button type="button" class="btn small" id="sd-opt">${icon("optimiser", "ic xs")} Optimise own solar</button><button type="button" class="btn small ghost" id="sd-save">${icon("save", "ic xs")} Save scenario</button></div>
+              <div class="saved" id="sd-saved" hidden><h4>Saved scenarios</h4><table><thead><tr><th>Name</th><th class="num">Solar</th><th class="num">Wind</th><th class="num">₹/kWh</th><th class="num">vs base</th></tr></thead><tbody></tbody></table></div>
+            </form>
+            <div class="sd-view">
+              <div class="sd-iso" id="sd-iso">${isoCfd}</div>
+              <div class="sd-read">
+                <div class="sd-price"><span class="l">Strike price</span><b id="sd-sp">₹${fmt(W.tariff)}</b><span class="s" id="sd-vs">at the evening market</span></div>
+                <div class="sd-kv"><span class="l">Project cost</span><b id="sd-capex">₹${int(W.capex.total)} cr</b></div>
+                <div class="sd-kv"><span class="l">Days short in 15 years</span><b id="sd-short">0</b></div>
+                <div class="sd-kv wide"><span class="l">Where the charging power comes from</span><div class="mix" id="sd-mix"></div></div>
+              </div>
+              <ul class="sd-checks" id="sd-checks">${M.grid.checks.map((c) => `<li class="met" title="${esc(c.label)}">${esc(c.label.replace(/ \(.*\)/, ""))}</li>`).join("")}</ul>
+            </div>
+          </div>
+          <p class="foot">Behind the sliders: ${M.grid.solar.length * M.grid.wind.length} plants simulated day by day for 15 years and ${int(M.grid.sp.length)} financial models, computed in ${Math.round(M.seconds)} seconds. Plant sizes snap to simulated points; cost and return are interpolated between them.</p>`),
+  stage("size", 7, "Optimise: the model tries every size", `For each candidate the model runs the whole term and prices it. Below ${M.best} MWac some days fall short of 2 MWh per MW; above it, solar costs more than the charging power it replaces.`, `
+          <div class="chart" id="chart-scan" role="img" aria-label="Strike price against own solar size: lowest at ${M.best} MWac, ₹${fmt(W.tariff)} per kWh"></div>
+          <p class="foot" id="scan-readout">Own solar ${M.best} MWac · strike price ₹${fmt(W.tariff)}/kWh · every day met</p>`),
+  stage("dispatch", 8, "Dispatch: 96 blocks a day, every day of 15 years", `The battery charges from own solar and bought renewable power, then supplies the two dearest evening hours. Below, ${dateWords(M.day.date)} in 15-minute blocks, and a whole year hour by hour.`, `
+          <div class="dp-grid">
+            <div><div class="chart" id="chart-day" role="img" aria-label="One day in 15-minute blocks: charging, supply, state of charge and price"></div>
+              <p class="legend"><span class="sw s-solar"></span>Own solar charging <span class="sw s-bought"></span>Bought RE charging <span class="sw s-dis"></span>Battery supply <span class="sw s-soc"></span>State of charge <span class="sw s-price"></span>Exchange price</p></div>
+            <div class="heat"><canvas id="heat" width="730" height="240" role="img" aria-label="A year of battery operation: each column a day, each row an hour"></canvas>
+              <p class="legend"><span class="sw s-solar"></span>Charging <span class="sw s-dis"></span>Supplying · 365 days across, 24 hours down</p>
+              <div class="dp-stats"><div><b>${int(M.daysPerSim)}</b><span>days simulated</span></div><div><b>${int(M.daysPerSim * 96)}</b><span>15-minute blocks</span></div><div><b>${fmt(M.day.delivered, 0)} MWh</b><span>supplied on this day, of ${fmt(M.day.required * M.day.availability, 0)} due</span></div></div>
+            </div>
+          </div>`),
+  stage("finance", 9, "Finance: the model behind the price", "The strike price is the one at which equity earns its target over the whole term: construction, debt sculpted to the lender's cover ratio, tax, working capital. Every figure opens its formula.", `
+          <div class="tiles">
+            <div class="tile" id="fin-sp"><span class="l">Strike price</span><b data-count="${W.tariff}" data-dec="2" data-pre="₹">₹${fmt(W.tariff)}</b><span class="s">per kWh, fixed 15 years</span></div>
+            <div class="tile"><span class="l">Equity IRR</span><b data-count="${(W.equityIrr * 100).toFixed(1)}" data-dec="1" data-suf="%">${pct(W.equityIrr)}</b><span class="s">the target, met</span></div>
+            <div class="tile"><span class="l">Project IRR</span><b data-count="${(W.projectIrr * 100).toFixed(1)}" data-dec="1" data-suf="%">${pct(W.projectIrr)}</b><span class="s">before financing</span></div>
+            <div class="tile"><span class="l">Minimum DSCR</span><b data-count="${W.minDscr}" data-dec="2" data-suf="×">${fmt(W.minDscr)}×</b><span class="s">sculpted</span></div>
+            <div class="tile"><span class="l">Project cost</span><b data-count="${Math.round(W.capex.total)}" data-dec="0" data-pre="₹" data-suf=" cr">₹${int(W.capex.total)} cr</b><span class="s">debt ₹${int(W.debt)} cr · equity ₹${int(W.equity)} cr</span></div>
+          </div>
+          <div class="fin-grid">
+            <div><h4>Where each year's revenue goes, ₹ crore</h4><div class="chart" id="chart-cash" role="img" aria-label="Revenue each year split into running costs, debt service, tax and cash to equity"></div>
+              <p class="legend"><span class="sw s-opex"></span>Running costs <span class="sw s-debt"></span>Debt service <span class="sw s-tax"></span>Tax <span class="sw s-eq"></span>Cash to equity</p></div>
+            <div><h4>What carries the ₹${fmt(W.tariff)}</h4><div class="chart" id="chart-drivers" role="img" aria-label="${esc(M.drivers.map((d) => `${d.label} ₹${fmt(d.value)}`).join(", "))}"></div></div>
+          </div>
+          <div class="trace" id="fin-trace" hidden><b>Strike price ₹${fmt(W.tariff, 3)}/kWh</b> = the price at which the equity IRR is ${pct(W.equityIrr)} · rests on: battery capex ₹${fmt(W.inputs.essCrPerMwh)} cr/MWh, solar ₹${fmt(W.inputs.solarCrPerMw)} cr/MWac, debt ${pct(W.inputs.debtFraction, 0)} at ${pct(W.inputs.interestRate, 2)} for ${W.inputs.tenorYears} years, tax ${pct(W.inputs.taxRate, 2)}, ${int(M.daysPerSim)} days of dispatch</div>
+          <p class="foot">The same model downloads as a live Excel workbook: Live model, Construction, Profit and loss, Cash flow, Balance sheet, Debt, Tax, Working capital, Sensitivity, Bid review and the dispatch sheets. The product's tests recalculate it in LibreOffice against the application.</p>`),
+  stage("whatif", 10, "What-if: the levers, and the track to a quote", "Choose the price you want to quote. The model shows what each input is worth, then plans the surest route there, with the chance of each move. Turn a lever down and it finds another way.", `
+          <div class="wi-grid">
+            <div><h4>What one step of each lever does to the price</h4><div class="chart" id="chart-tornado" role="img" aria-label="${esc(M.levers.slice(0, 8).map((l) => `${l.label}: ₹${fmt(l.down, 3)} to ₹${fmt(l.up, 3)}`).join("; "))}"></div></div>
+            <div class="wi-plan">
+              <div class="seg" id="wi-targets" role="group" aria-label="The price to quote"><span class="seg-l">Quote</span>${M.tracks.targets.map((t, k) => `<button type="button" data-t="${t.toFixed(2)}" class="${k === 0 ? "on" : ""}">₹${fmt(t)}</button>`).join("")}</div>
+              <ol class="track" id="wi-track"></ol>
+              <p class="wi-out" id="wi-out"></p>
+              <div class="wi-rej" id="wi-rej" hidden></div>
+              <button type="button" class="btn small ghost" id="wi-save">${icon("save", "ic xs")} Save as scenario</button>
+            </div>
+          </div>`),
+  stage("wins", 11, "What wins: will SECI's CfD Pool carry this price?", `The bidder sells in the evening market and SECI's Pool pays, or collects, the difference to the strike price. Amendment-04 lets SECI award only what its ₹${TENDER.poolCr} crore corpus can carry.`, `
+          <div class="wins-grid">
+            <div><h4>The Pool's net pay-out a year for the full ${PACK.tenderedMw} MW, ₹ crore</h4><div class="chart" id="chart-pool" role="img" aria-label="CfD Pool net flow per year against strike price"></div>
+              <p class="verdict">${esc(M.verdict.text)}</p></div>
+            <div><h4>The risks the bidder keeps</h4><ul class="risks">${M.risks.map((r) => `<li>${esc(r.title)}</li>`).join("")}</ul></div>
+          </div>`),
+  stage("review", 12, "Bid review: against the rules and the market", "Before the bid goes to the committee it is reviewed against the tender's conditions, the benchmarks, the lender's ratios and what the market has paid. Two bids for the same tender:", `
+          <div class="rv-grid">
+            <div class="rv-col">
+              <div class="seg" id="rv-toggle" role="group" aria-label="Which bid"><button type="button" data-bid="winning" class="on">Competitive · ₹${fmt(M.review.winning.tariff)}</button><button type="button" data-bid="overbuilt">Over-built · ₹${fmt(M.review.overbuilt.tariff)}</button></div>
+              <p class="rv-sum" id="rv-sum">${esc(M.review.winning.summary)}</p>
+              <ul class="rv-list" id="rv-list">${M.review.winning.findings.map(findingLi).join("")}</ul>
+            </div>
+            <div class="rv-col"><h4>Market comparables: what SECI's auctions and the exchange have paid, ₹/kWh</h4><div class="chart" id="chart-comps" role="img" aria-label="${esc(comps.map((c) => `${c.code} ₹${fmt(c.lo)} to ${fmt(c.hi)}`).join("; "))}; evening market ₹${fmt(M.evening.all)} to ₹${fmt(M.evening.chosen)}"></div>
+              <p class="foot">SECI awards from its result notices. The CfD asks 2 hours for 15 years and is paid through the market, so the evening price, not an FDRE award, is its nearest comparable.</p></div>
+          </div>`),
+  stage("pack", 13, "The bid pack, ready for the committee", "Everything the tender asks to be submitted, and everything the bid committee asks to see, generated from the same bid.", `
+          <ul class="pack">
+            <li>${icon("finance")}<b>Financial model, Excel</b><span>A live workbook, every number a formula on the blue inputs; Goal Seek the tariff</span></li>
+            <li>${icon("tender")}<b>17 RfS formats as letters</b><span>Filled from the bid in SECI's own wording; Word and PDF; signed copies accepted back</span></li>
+            <li>${icon("dispatch")}<b>15-minute dispatch</b><span>96 blocks a day for 15 years, one file per Contract Year</span></li>
+            <li>${icon("check")}<b>Conditions checklist</b><span>${TERMS.length} conditions, met, failed or pending, each with its page</span></li>
+            <li>${icon("agent")}<b>Pre-bid queries</b><span>${PACK.queries.length} points to raise with SECI, drafted from gaps in the text</span></li>
+            <li>${icon("clip")}<b>Evidence register</b><span>Every input, who set it, the evidence attached and the sign-off</span></li>
+          </ul>
+          <div class="cta-row"><a class="btn" href="${CONTACT_URL}">Book a walkthrough on your tender</a><a class="btn ghost" href="/TenderOS-deck.pdf" download>Download the deck</a></div>`),
+].join("\n");
+
+const FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap">';
+const scaleX = (s) => (SCALE.indexOf(s) / (SCALE.length - 1)) * 100;
 
 const page = `<!doctype html>
 <html lang="en-IN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TenderOS: from tender PDF to winning bid for Indian renewable energy tenders | jouleWise</title>
+<title>TenderOS: months of bid work in hours, for Indian renewable energy tenders | jouleWise</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${SITE}/">
 <meta name="robots" content="index, follow, max-image-preview:large">
@@ -279,23 +514,24 @@ const page = `<!doctype html>
 <meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
 <meta name="color-scheme" content="dark light">
 <script>try{var t=localStorage.getItem("tos-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap">
+${FONTS}
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TenderOS by jouleWise">
-<meta property="og:title" content="TenderOS: from tender PDF to winning bid">
-<meta property="og:description" content="Watch a SECI tender become a bid: read with page evidence, amendments applied, plant sized, model priced, bid reviewed. With SECI's recent auction results.">
+<meta property="og:title" content="TenderOS: months of bid work, done in hours">
+<meta property="og:description" content="Watch a SECI tender become a bid: read with page evidence, amendments word by word, plant sized by a HiGHS optimiser, model priced, bid reviewed. On your premises.">
 <meta property="og:url" content="${SITE}/">
 <meta property="og:image" content="${SITE}/og.jpg">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:locale" content="en_IN">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="TenderOS: from tender PDF to winning bid">
-<meta name="twitter:description" content="Bid workspace for Indian RE tenders: evidence-linked reading, plant sizing, financial model, bid review. Demo and SECI auction data.">
+<meta name="twitter:title" content="TenderOS: months of bid work, done in hours">
+<meta name="twitter:description" content="Bid workspace for Indian RE tenders: evidence-linked reading, plant optimiser, financial model, bid review. Live demo and SECI auction data.">
 <meta name="twitter:image" content="${SITE}/og.jpg">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM summary">
 <link rel="alternate" type="text/csv" href="/data/seci-results.csv" title="SECI auction results (CSV)">
 <link rel="stylesheet" href="/assets/styles.css">
+<link rel="stylesheet" href="/assets/iso.css">
 ${jsonLd.map((j) => `<script type="application/ld+json">${JSON.stringify(j)}</script>`).join("\n")}
 </head>
 <body>
@@ -303,7 +539,7 @@ ${jsonLd.map((j) => `<script type="application/ld+json">${JSON.stringify(j)}</sc
 <header class="top">
   <div class="wrap nav">
     <a href="/" class="brand" aria-label="TenderOS home"><span class="w1">Tender</span><span class="w2">OS</span><span class="by">by jouleWise</span></a>
-    <nav aria-label="Sections"><a href="#simulation">Demo</a><a href="#what">Modules</a><a href="#results">SECI results</a><a href="#faq">FAQ</a></nav>
+    <nav aria-label="Sections"><a href="#tour">Tour</a><a href="#tenders">Tenders</a><a href="#optimiser">Optimiser</a><a href="#security">Security</a><a href="#results">SECI data</a></nav>
     <a class="btn small" href="/TenderOS-deck.pdf" download>Deck (PDF)</a>
     <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to day mode" title="Day mode"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></svg></button>
   </div>
@@ -313,155 +549,160 @@ ${jsonLd.map((j) => `<script type="application/ld+json">${JSON.stringify(j)}</sc
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <p class="eyebrow">For bid teams at renewable energy developers in India</p>
-      <h1>From the tender PDF to a winning bid, <em>with every number traceable</em>.</h1>
-      <p class="lede">TenderOS reads a SECI, NHPC or NTPC tender and its amendments, ties every value to its page, sizes the solar, wind and battery plant against each condition, prices the bid for your target equity return and builds the bid pack, including the financial model as a live Excel workbook.</p>
-      <div class="cta-row"><a class="btn" href="#simulation">Watch a tender become a bid</a><a class="btn ghost" href="/TenderOS-deck.pdf" download>Download the deck (PDF)</a></div>
-      <p class="muted small">The demo below runs on SECI's CfD-I tender (bids due 20 Nov 2026) and the product's own model. Nothing on this page is a mock-up number.</p>
+      <p class="eyebrow">Bid workspace for renewable energy tenders · India</p>
+      <h1>Months of bid work. <em>Done in hours.</em></h1>
+      <p class="lede">TenderOS reads the tender and every amendment, sizes the solar, wind and battery plant against each condition, prices the bid for your target return and builds the bid pack. Every number traces to its page or its formula, and all of it runs on your premises.</p>
+      <div class="cta-row"><a class="btn" href="#tour">Watch a tender become a bid</a><a class="btn ghost" href="/TenderOS-deck.pdf" download>Download the deck (PDF)</a></div>
+      <p class="muted small">The tour below runs on SECI's CfD-I tender (bids due 20 Nov 2026) and the product's own model. Every model figure on this page is the product's own output.</p>
     </div>
-    <div class="hero-card" aria-label="Key results of the demo">
-      <div class="kpi"><span class="k">${TERMS.length}</span><span class="l">tender conditions read, each with its page and quote</span></div>
-      <div class="kpi"><span class="k">${PACK.changes.length}</span><span class="l">amendment changes applied across 4 amendments</span></div>
-      <div class="kpi"><span class="k">₹${fmt(W.tariff)}</span><span class="l">strike price found for a 100 MW bid at a 13% equity IRR</span></div>
-      <div class="kpi"><span class="k">96</span><span class="l">15-minute blocks a day, dispatched for every day of the 15-year term</span></div>
+    <div class="hero-stats">
+      <div><b>${totalPages}</b><span>pages of tender, read with page and quote</span></div>
+      <div><b>${TERMS.length}</b><span>conditions and ${changes.length} amendment changes kept current</span></div>
+      <div><b>${int(M.sims)}</b><span>full 15-year simulations behind this page, run in ${Math.round(M.seconds)} seconds</span></div>
+      <div><b>₹${fmt(W.tariff)}</b><span>strike price found for a 100 MW bid at a ${pct(W.equityIrr, 0)} equity IRR</span></div>
     </div>
   </div>
+  <div class="wrap"><div class="hero-iso" aria-hidden="true">${isoHero}<p class="iso-key"><span class="k-charge"></span>charging from own solar <span class="k-wind"></span>and wind <span class="k-bought"></span>bought renewable power <span class="k-supply"></span>evening supply <span class="k-money"></span>settlement to the strike price</p></div></div>
 </section>
 
-<section class="band" id="sell">
-  <div class="wrap three">
-    <div><h2 class="h3">The problem</h2><p>A tender set runs to hundreds of pages and keeps changing: CfD-I had four amendments in four months, and one removed the ceiling tariff. Bid teams rebuild spreadsheets each time, and nobody can say which page a number came from.</p></div>
-    <div><h2 class="h3">What TenderOS does</h2><p>It reads the tender once with evidence, keeps the amendments applied, sizes the plant and prices the bid under the tender's own rules, then reviews the bid against those rules and recent awards before you submit.</p></div>
-    <div><h2 class="h3">What you get</h2><p>The application on your infrastructure, the Excel workbook of every bid, the bid forms and letters, a 15-minute compliance file, and patches and new tender packs under an annual maintenance contract.</p></div>
-  </div>
-</section>
-
-<section id="simulation" class="sim-section">
+<section id="time" class="band">
   <div class="wrap">
-    <p class="eyebrow">Live simulation</p>
-    <h2>Watch SECI CfD-I become a bid, in eleven steps</h2>
-    <p class="lede narrow">Press play, or click any step. Each screen shows what the application does and the numbers it produced on this tender. Amendment quotes are SECI's own words, with the page they come from.</p>
+    <p class="eyebrow">Why bid teams use it</p>
+    <h2>Where the months go, and what is left of them</h2>
+    <p class="lede narrow">A tender set runs to hundreds of pages and keeps changing: CfD-I had four amendments in four months, and one removed the ceiling tariff. Each step below is weeks of spreadsheet work that an amendment sends back to the start.</p>
+    <div class="time" role="table" aria-label="Time by hand and in TenderOS">
+      <div class="time-head" role="row"><span role="columnheader">The work</span><span class="time-axis" role="columnheader">${SCALE.map((s) => `<i style="left:${scaleX(s)}%">${s}</i>`).join("")}</span><span role="columnheader">In TenderOS</span></div>
+${TIME.map(([task, hand, tos, note]) => `      <div class="time-row" role="row"><span class="tt" role="cell">${esc(task)}</span><span class="time-bar" role="cell" aria-label="By hand: ${hand}. In TenderOS: ${tos}."><i class="span" style="left:${scaleX(tos)}%;width:${scaleX(hand) - scaleX(tos)}%"></i><i class="dot tos" style="left:${scaleX(tos)}%"></i><i class="dot hand" style="left:${scaleX(hand)}%"></i></span><span class="tn" role="cell">${esc(note)}</span></div>`).join("\n")}
+    </div>
+    <p class="muted small">Grey: indicative effort for a bid team working from PDFs and spreadsheets. Green: TenderOS, from the product's documentation and tests. What remains is judgement: confirming the reading, choosing the inputs, deciding the price.</p>
+  </div>
+</section>
+
+<section id="tour" class="sim-section">
+  <div class="wrap">
+    <p class="eyebrow">Guided product tour</p>
+    <h2>Watch SECI CfD-I become a bid</h2>
+    <p class="lede narrow">Thirteen screens of the application, driven for you. Take the mouse at any time: every slider, tab and button below works, on real results of the model.</p>
     <div class="sim" id="sim">
-      <ol class="sim-rail" role="tablist" aria-label="Simulation steps">
-${STAGES.map(([id, t, s], i) => `        <li><button role="tab" id="tab-${id}" aria-controls="st-${id}" aria-selected="${i === 0}" data-stage="${i}"><span class="n">${i + 1}</span><span class="t">${esc(t)}</span><span class="s">${esc(s)}</span></button></li>`).join("\n")}
+      <div class="sim-bar"><span class="dots"><i></i><i></i><i></i></span><span class="sim-title" id="sim-title">TenderOS · SECI CfD-I · 100 MW bid</span><span class="sim-mode" id="sim-mode" hidden>You have the controls</span><span class="sim-ctl"><button id="sim-prev" aria-label="Previous screen">‹</button><button id="sim-play" aria-label="Play the tour">▶ Play tour</button><button id="sim-next" aria-label="Next screen">›</button></span></div>
+      <div class="sim-progress"><i id="sim-progress"></i></div>
+      <ol class="sim-rail" role="tablist" aria-label="Screens of the tour">
+${stepper}
       </ol>
-      <div class="sim-screen">
-        <div class="sim-bar"><span class="dots"><i></i><i></i><i></i></span><span class="sim-title" id="sim-title">TenderOS · SECI CfD-I</span><span class="sim-ctl"><button id="sim-prev" aria-label="Previous step">‹</button><button id="sim-play" aria-label="Play">▶ Play</button><button id="sim-next" aria-label="Next step">›</button></span></div>
-        <div class="sim-progress"><i id="sim-progress"></i></div>
-
-        <div class="stage" id="st-upload" role="tabpanel" aria-labelledby="tab-upload">
-          <h3>1 · Tender in: the RfS, the agreement and four amendments</h3>
-          <p class="muted">The set is dropped in at once; each file is identified and counted. Later amendments override earlier text, and the agreement prevails over the RfS where they differ.</p>
-          <ul class="files">
-${docs.map((d) => `            <li class="file" data-kind="${d.kind}"><span class="fi">PDF</span><span class="fn"><b>${esc(d.title)}</b><span class="muted small">${d.pages} pages${d.date ? ` · ${dateWords(d.date)}` : ""}</span></span><span class="tag">${esc(d.kind)}</span></li>`).join("\n")}
-          </ul>
-          <p class="foot">${totalPages} pages in the set · RfS ${esc(PACK.rfsNo)}</p>
-        </div>
-
-        <div class="stage" id="st-read" role="tabpanel" aria-labelledby="tab-read" hidden>
-          <h3>2 · Read with evidence: every value carries its page</h3>
-          <div class="meter"><span>Reading pages</span><b id="read-count">0</b><span>/ ${totalPages}</span></div>
-          <ul class="terms">
-${terms.map((t) => `            <li><div class="tl"><b>${esc(t.label)}</b><span class="cite">${esc(t.doc)} · ${esc(t.clause)} · p.${t.page}</span></div><p>${esc(t.display)}</p><blockquote>“${esc(t.quote.length > 220 ? `${t.quote.slice(0, 218)}…` : t.quote)}”</blockquote></li>`).join("\n")}
-          </ul>
-        </div>
-
-        <div class="stage" id="st-amend" role="tabpanel" aria-labelledby="tab-amend" hidden>
-          <h3>3 · Amendments applied: what changed, in SECI's words</h3>
-          <div class="changes">
-${changes.map((c) => `            <article class="change"><header><b>${esc(c.topic)}</b><span class="cite">${esc(c.doc)} · ${esc(c.document)} ${esc(c.clause)} · p.${c.page}</span></header>
-              ${c.before ? `<p class="was"><span>Was</span>${esc(c.before.length > 260 ? `${c.before.slice(0, 258)}…` : c.before)}</p>` : `<p class="was none"><span>Was</span>(new clause)</p>`}
-              <p class="now"><span>Now</span>${esc(c.after.length > 300 ? `${c.after.slice(0, 298)}…` : c.after)}</p>
-              <p class="effect">${esc(c.effect)}</p></article>`).join("\n")}
-          </div>
-        </div>
-
-        <div class="stage" id="st-conditions" role="tabpanel" aria-labelledby="tab-conditions" hidden>
-          <h3>4 · ${TERMS.length} conditions, grouped, as a checklist against the bid</h3>
-          <div class="groups">
-${Object.entries(groups).sort((a, b) => b[1] - a[1]).map(([g, n]) => `            <div class="grp"><span class="gl">${esc(g)}</span><span class="gb"><i style="--w:${((n / 44) * 100).toFixed(1)}%"></i></span><span class="gn">${n}</span></div>`).join("\n")}
-          </div>
-          <p class="foot">Each condition is tested against the sized plant: met, failed or pending. Supply floors, storage, sourcing limits, penalties, guarantees and dates.</p>
-        </div>
-
-        <div class="stage" id="st-inputs" role="tabpanel" aria-labelledby="tab-inputs" hidden>
-          <h3>5 · Inputs by team, filled with what winning bidders show lenders</h3>
-          <p class="muted">Projects, Design and Finance each own a step. “Fill for me” puts competitive values in the empty boxes, marked until someone replaces them with their own and attaches the evidence.</p>
-          <table class="inputs"><thead><tr><th>Input</th><th>Team</th><th class="num">Value</th><th>Source</th></tr></thead><tbody>
-            <tr><td>Contracted capacity</td><td>Projects</td><td class="num">100 MW</td><td><span class="tag you">Your input</span></td></tr>
-            <tr><td>Battery, all-in capex</td><td>Design</td><td class="num">₹${fmt(win.inputs.essCrPerMwh)} cr/MWh</td><td><span class="tag win">Competitive</span></td></tr>
-            <tr><td>Solar, all-in capex</td><td>Design</td><td class="num">₹${fmt(win.inputs.solarCrPerMw)} cr/MWac</td><td><span class="tag win">Competitive</span></td></tr>
-            <tr><td>Group RE price for charging</td><td>Projects</td><td class="num">₹${fmt(win.inputs.groupPrice)}/kWh</td><td><span class="tag win">Competitive</span></td></tr>
-            <tr><td>Target equity IRR</td><td>Finance</td><td class="num">${pct(win.inputs.targetEquityIrr)}</td><td><span class="tag win">Competitive</span></td></tr>
-            <tr><td>Interest rate · tenor</td><td>Finance</td><td class="num">${pct(win.inputs.interestRate)} · ${win.inputs.tenorYears} yrs</td><td><span class="tag win">Competitive</span></td></tr>
-            <tr><td>Repayment</td><td>Finance</td><td class="num">Sculpted, DSCR 1.20</td><td><span class="tag win">Competitive</span></td></tr>
-          </tbody></table>
-        </div>
-
-        <div class="stage" id="st-size" role="tabpanel" aria-labelledby="tab-size" hidden>
-          <h3>6 · Size the plant: the optimiser tries every solar size</h3>
-          <p class="muted">For each size the model runs all 15 years, day by day, and prices the bid through the full financial model. Below ${best.mw} MWac some days fall short of 2 MWh per MW; above it, solar costs more than the charging power it replaces.</p>
-          <div class="chart" id="chart-scan" role="img" aria-label="Strike price against own solar size: lowest at ${best.mw} MWac, ₹${fmt(W.tariff)} per kWh"></div>
-          <p class="foot" id="scan-readout">Own solar ${best.mw} MWac · strike price ₹${fmt(W.tariff)}/kWh · every day met</p>
-        </div>
-
-        <div class="stage" id="st-dispatch" role="tabpanel" aria-labelledby="tab-dispatch" hidden>
-          <h3>7 · Dispatch: one day of the plant, ${dayOut ? dateWords(dayOut.date) : ""}</h3>
-          <p class="muted">The battery charges from own solar and from group renewable power bought at the planned price, then supplies in the two dearest evening hours. The model does this for every day; the 15-minute file splits each hour into four Grid Code blocks.</p>
-          <div class="chart" id="chart-day" role="img" aria-label="Hourly charging, discharge and market price for one day"></div>
-          <p class="legend"><span class="sw s-solar"></span>Own solar charging <span class="sw s-bought"></span>Bought RE charging <span class="sw s-dis"></span>Battery supply <span class="sw s-price"></span>Exchange price ₹/kWh</p>
-          <p class="foot">${dayOut ? `Supplied ${fmt(dayOut.delivered, 0)} MWh in the hours from ${dayOut.chosen.map((h) => `${h}:00`).join(" and ")}: the ${fmt(dayOut.required, 0)} MWh due a day at the ${Math.round(dayOut.availability * 100)}% availability the bidder declares (Amendment-04), so the day is met` : ""}</p>
-        </div>
-
-        <div class="stage" id="st-finance" role="tabpanel" aria-labelledby="tab-finance" hidden>
-          <h3>8 · The financial model: the strike price for the target return</h3>
-          <div class="tiles">
-            <div class="tile"><span class="l">Strike price</span><b data-count="${W.tariff}" data-dec="2" data-pre="₹">₹${fmt(W.tariff)}</b><span class="s">per kWh, fixed for 15 years</span></div>
-            <div class="tile"><span class="l">Equity IRR</span><b data-count="${(W.equityIrr * 100).toFixed(1)}" data-dec="1" data-suf="%">${pct(W.equityIrr)}</b><span class="s">the target, met</span></div>
-            <div class="tile"><span class="l">Project IRR</span><b data-count="${(W.projectIrr * 100).toFixed(1)}" data-dec="1" data-suf="%">${pct(W.projectIrr)}</b><span class="s">pre-financing</span></div>
-            <div class="tile"><span class="l">Minimum DSCR</span><b data-count="${W.minDscr}" data-dec="2" data-suf="×">${fmt(W.minDscr)}×</b><span class="s">sculpted to the lender</span></div>
-          </div>
-          <p class="foot">Click any number in the application to open its formula and the inputs it rests on. The same model downloads as a live Excel workbook: Live model, Construction, P&amp;L, Cash flow, Balance sheet, Debt, Tax, Working capital, Sensitivity and dispatch sheets.</p>
-        </div>
-
-        <div class="stage" id="st-wins" role="tabpanel" aria-labelledby="tab-wins" hidden>
-          <h3>9 · What wins: will SECI's CfD Pool carry this price?</h3>
-          <p class="muted">Under the CfD the bidder sells in the evening market and SECI's Pool pays (or collects) the difference to the strike price. Amendment-04 lets SECI award only what its ₹76 crore corpus can carry. Net Pool pay-out a year for the full 500 MW:</p>
-          <div class="chart" id="chart-pool" role="img" aria-label="CfD Pool net flow per year against strike price"></div>
-          <p class="verdict">${esc(verdict.verdict)}</p>
-        </div>
-
-        <div class="stage" id="st-review" role="tabpanel" aria-labelledby="tab-review" hidden>
-          <h3>10 · Bid review: the same tender, two bids</h3>
-          <div class="review-cols">
-            <div class="rv good"><header><b>Competitive bid · ₹${fmt(demo.review.winning.tariff)}</b><span>${esc(demo.review.winning.summary)}</span></header><ul>${demo.review.winning.findings.map((f) => `<li class="${f.severity}"><span>${f.severity === "block" ? "Blocks" : f.severity === "warn" ? "Cost" : "Note"}</span>${esc(f.title)}</li>`).join("")}</ul></div>
-            <div class="rv bad"><header><b>Over-built bid · ₹${fmt(demo.review.overbuilt.tariff)}</b><span>${esc(demo.review.overbuilt.summary)}</span></header><ul>${demo.review.overbuilt.findings.slice(0, 8).map((f) => `<li class="${f.severity}"><span>${f.severity === "block" ? "Blocks" : f.severity === "warn" ? "Cost" : "Note"}</span>${esc(f.title)}</li>`).join("")}</ul></div>
-          </div>
-          <p class="foot">The over-built case is a pattern bid teams fall into: a battery used only between 0.05% and 50% charge, an extra battery for evening sale, dear battery capex and a 16% equity target. The review names each cost and where to fix it${demo.review.overbuilt.findings.length > 8 ? ` (8 of ${demo.review.overbuilt.findings.length} findings shown)` : ""}.</p>
-        </div>
-
-        <div class="stage" id="st-pack" role="tabpanel" aria-labelledby="tab-pack" hidden>
-          <h3>11 · The bid pack, ready for the bid committee</h3>
-          <ul class="pack">
-            <li><b>Financial model, Excel</b><span>Live workbook, every number a formula on the blue inputs; Goal Seek the tariff</span></li>
-            <li><b>17 RfS formats as letters</b><span>Filled from the bid in SECI's own wording; Word and PDF</span></li>
-            <li><b>15-minute dispatch</b><span>96 blocks a day for 15 years, one file per Contract Year</span></li>
-            <li><b>Conditions checklist</b><span>${TERMS.length} conditions, met / failed / pending, each with its page</span></li>
-            <li><b>Pre-bid queries</b><span>The points to raise with SECI, drafted from the tender's gaps</span></li>
-            <li><b>Evidence register</b><span>Every input, who set it, the evidence attached and the sign-off</span></li>
-          </ul>
-          <div class="cta-row"><a class="btn" href="${CONTACT_URL}">Book a walkthrough on your tender</a></div>
-        </div>
+      <div class="sim-screen" id="sim-screen">
+${stagesHtml}
+        <div class="cursor" id="cursor" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 1.5L10 19z"/></svg><i></i></div>
       </div>
     </div>
-    <noscript><p class="muted">The simulation animates with JavaScript; all its content is shown above as text.</p></noscript>
+    <noscript><p class="muted">The tour animates with JavaScript; its content is shown above as text.</p></noscript>
+  </div>
+</section>
+
+<section id="tenders" class="band">
+  <div class="wrap">
+    <p class="eyebrow">One workspace, every kind of tender</p>
+    <h2>Each tender has its own plant, rules and price</h2>
+    <p class="lede narrow">The same reading, sizing, model and review, with the rules of the tender in front of you. Three kinds the application works today:</p>
+    <div class="seg big" id="tt-tabs" role="tablist" aria-label="Tender type"><button type="button" role="tab" data-tt="cfd" class="on" aria-selected="true">Contract for Difference</button><button type="button" role="tab" data-tt="fdre" aria-selected="false">FDRE round the clock</button><button type="button" role="tab" data-tt="bess" aria-selected="false">Standalone battery</button></div>
+    <div class="tt" id="tt-cfd" role="tabpanel">
+      <div class="tt-iso">${isoCfd}</div>
+      <div class="tt-text">
+        <div><h3>SECI CfD-I: 500 MW × 2 h of evening supply, sold on the exchange</h3>
+        <dl><dt>The tender asks</dt><dd>2 MWh per MW every evening for 15 years, from a battery you own, charged from own RE, the green market (25%) and group RE (50% after month 36). SECI's Pool settles each block to the strike price.</dd>
+        <dt>TenderOS does</dt><dd>Sizes own solar and wind for the least strike price with every day met, tests the sourcing limits year by year, and sizes the Pool's pay-out against the ₹${TENDER.poolCr} crore corpus.</dd></dl></div>
+        <div><p class="tt-note">On this tender wind raises the price and a little own solar lowers it: the studio in the tour above lets you try both. A bid at the evening market's price leaves the Pool neutral, which is what Amendment-04 makes decisive.</p><div class="tt-kpi"><div><b>₹${fmt(W.tariff)}</b><span>strike price, 100 MW</span></div><div><b>${W.solarMw} MWac</b><span>own solar, the optimum</span></div><div><b>100 MW / 200 MWh</b><span>battery, mandated</span></div></div></div>
+      </div>
+    </div>
+    <div class="tt" id="tt-fdre" role="tabpanel" hidden>
+      <div class="tt-iso">${isoFdre}</div>
+      <div class="tt-text">
+        <div><h3>SECI FDRE-RTC-V: 1,000 MW firm, round the clock</h3>
+        <dl><dt>The tender asks</dt><dd>Supply in every block of the day against floors by hour band (Solar Hours 50 to 60%, the remaining hours 70%, Peak Hours 90%), with penalties at a multiple of the tariff for what is short.</dd>
+        <dt>TenderOS does</dt><dd>Optimises solar, wind and battery together over every hour of the year, then bridges its benchmark tariff to the auction's result, lever by lever. Hatched steps are estimates, as the application marks them.</dd></dl>
+        <div class="tt-kpi"><div><b>₹${fmt(rtc.bridge[rtc.bridge.length - 1].tariff)}</b><span>the bridge ends here</span></div><div><b>₹5.25–5.26</b><span>the seven winners bid</span></div><div><b>${fmt(rtcPlant.solar)} · ${fmt(rtcPlant.wind)} · ${fmt(rtcPlant.bessMwh)}</b><span>MWac solar · MW wind · MWh battery per contracted MW</span></div></div></div>
+        <div>${bridgeChart}
+        <ol class="bridge-key">${rtc.bridge.map((b) => `<li${b.kind === "estimate" ? ' class="est"' : ""}>${esc(b.label)}</li>`).join("")}</ol></div>
+      </div>
+    </div>
+    <div class="tt" id="tt-bess" role="tabpanel" hidden>
+      <div class="tt-iso">${isoBess}</div>
+      <div class="tt-text">
+        <div><h3>Standalone battery: ${bess.req.powerMw} MW / ${bess.req.energyMwh} MWh for ${bess.req.contractYears} years</h3>
+        <dl><dt>The tender asks</dt><dd>${bess.req.cyclesPerDay} cycles a day, ${pct(bess.req.availability, 0)} availability, a round trip of at least ${pct(bess.req.minRte, 0)}, and the full energy at the delivery point every year of the contract. (The application's example tender; yours is read from its document.)</dd>
+        <dt>TenderOS does</dt><dd>Tries ${bess.evals} plans of oversizing against augmentation and keeps the one with the least capacity charge for the target return. Here: ${int(bess.cohorts[0].mwh)} MWh installed on day one, then a top-up every year.</dd></dl>
+        <div class="tt-kpi"><div><b>₹${fmt(bess.charge)} lakh</b><span>per MW per month</span></div><div><b>${pct(bess.equityIrr, 0)}</b><span>equity IRR, the target</span></div><div><b>${bess.compliance.filter((c) => c.ok).length} of ${bess.compliance.length}</b><span>tender conditions met</span></div></div></div>
+        <div>${augChart}<p class="muted small">MWh of battery installed in each contract year: oversized on day one, topped up every year so the full energy is there at the delivery point.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="optimiser">
+  <div class="wrap opt-grid">
+    <div>
+      <p class="eyebrow">The engine</p>
+      <h2>A state-of-the-art optimiser, not a goal-seek</h2>
+      <p class="lede">A spreadsheet tries a handful of plants. TenderOS states the tender as a linear programme and solves it with HiGHS, the leading open-source solver: solar, wind and battery power and energy chosen together, for the lowest tariff that still earns your return.</p>
+      <ul class="ticks">
+        <li><b>Every hour of the year.</b> 8,760 hours for the years that bind, or all 25: generation, charging, discharge, state of charge, sale and shortfall in each.</li>
+        <li><b>The tender's own floors.</b> By block, month and year; peak, off-peak and solar hours; ramp limits; the state-of-charge window; penalties at a multiple of the tariff or hard floors.</li>
+        <li><b>Real plants.</b> Degradation, battery fade and augmentation, separate sites each with its battery, one or two pooling stations, losses to the billing meter.</li>
+        <li><b>Minutes, not days.</b> One to two minutes for a 25-year case on four cores, and each run starts from the last, so a changed input re-solves faster.</li>
+        <li><b>Then proved in 15-minute blocks.</b> 35,040 blocks a year, the compliance workbook the tender's scheduling rules ask for.</li>
+      </ul>
+    </div>
+    <div class="opt-card">
+      <div class="opt-stat"><b>8,760</b><span>hours a year, each with its own balance</span></div>
+      <div class="opt-stat"><b>1–2 min</b><span>a 25-year case, 4 CPU cores</span></div>
+      <div class="opt-stat"><b>93 → 53 s</b><span>re-solve after a 5% change in wind cost, starting from the last solution</span></div>
+      <div class="opt-stat"><b>${bess.evals}</b><span>battery plans compared for one BESS bid</span></div>
+      <div class="opt-stat"><b>${int(M.sims)}</b><span>full-term CfD simulations behind this page</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="team" class="band">
+  <div class="wrap">
+    <p class="eyebrow">Built for the whole bid team</p>
+    <h2>Many people, one bid, nothing lost</h2>
+    <div class="three">
+      <div class="card">${icon("team")}<h3>Work together</h3><p>Steps by team. Ping a colleague from any input with an @mention, keep the thread on the box, assign a question and fill in the answer from the reply. Email for mentions and assignments.</p></div>
+      <div class="card">${icon("clip")}<h3>Evidence and sign-off</h3><p>A paperclip on every input for the quote, report or data sheet behind it. A super admin signs off; change the value later and the tick turns amber. An evidence register and an activity log for the audit.</p></div>
+      <div class="card">${icon("save")}<h3>Scenarios are saved</h3><p>Every save is a named scenario. Each further save is a new version; earlier versions are kept and can be restored. Compare up to 12 scenarios side by side on bid day.</p></div>
+    </div>
+    <div class="table-wrap"><table class="teams"><thead><tr><th>Team</th><th>What TenderOS gives them</th></tr></thead><tbody>
+      <tr><th>Tender and legal</th><td>The tender and amendments reconciled, every condition with its page and quote, the formats and letters in the RfS's wording, a pre-bid query list</td></tr>
+      <tr><th>Projects</th><td>Capacity, dates, supply profile, sourcing and market sale in one place; the sized plant and its compliance block by block</td></tr>
+      <tr><th>Design</th><td>Solar and wind studios, hourly profiles, losses to the billing meter, pooling stations, deviation settlement per CERC norms</td></tr>
+      <tr><th>Finance</th><td>Financing terms, construction and IDC, repayment methods, refinancing, working capital, DSRA, the 25-year model and its Excel twin</td></tr>
+      <tr><th>Management</th><td>The tariff for the target IRR, the levers for bid day, what wins, sign-off per input, the audit trail</td></tr>
+    </tbody></table></div>
+  </div>
+</section>
+
+<section id="security">
+  <div class="wrap">
+    <p class="eyebrow">Cybersecurity</p>
+    <h2>Your bid never leaves your premises</h2>
+    <p class="lede narrow">TenderOS is installed on your infrastructure. The tender, which is a public document, is parsed in a DMZ. Everything that is yours, the costs, the profiles, the model and the price, is worked in a core zone that has no route to the internet.</p>
+    <div class="zones" role="img" aria-label="Three zones: the internet, a DMZ that reads tenders, and a core zone on your network that holds the bid and has no route to the internet">
+      <div class="zone net"><h3>Internet</h3><div class="zbox">SECI and other tender portals<small>tender PDFs, public</small></div><div class="zbox">Cloud language models<small>read the tender text, optional</small></div></div>
+      <div class="zlink a"><i></i><span>tender documents in</span><i class="back"></i></div>
+      <div class="zone dmz"><h3>DMZ · intake zone</h3><div class="zbox">Tender documents and amendments</div><div class="zbox">Reading, with page and quote</div><div class="zbox">A reviewer confirms<small>or the rule-based reader, no cloud</small></div></div>
+      <div class="zlink b"><i></i><span>reviewed reading, one way</span></div>
+      <div class="zone core"><h3>Core zone · your network</h3><div class="zbox">Bid inputs, costs, evidence</div><div class="zbox">Optimiser and dispatch</div><div class="zbox">Financial model and Excel</div><div class="zbox">Team, scenarios, bid pack</div><p class="zno">${icon("lock", "ic xs")} No route to the internet</p></div>
+    </div>
+    <div class="sec-grid">
+${SECURITY.map(([k, t, d]) => `      <article class="mod">${icon(k)}<h3>${esc(t)}</h3><p>${esc(d)}</p></article>`).join("\n")}
+    </div>
+    <p class="muted small">On the roadmap, not in the current release: single sign-on, and a cryptographically signed transfer package between the zones.</p>
   </div>
 </section>
 
 <section id="what" class="band">
   <div class="wrap">
     <p class="eyebrow">Everything in the application</p>
-    <h2>Fourteen modules, one bid</h2>
+    <h2>Sixteen modules, one bid</h2>
     <div class="modules">
 ${MODULES.map(([k, t, d]) => `      <article class="mod">${icon(k)}<h3>${esc(t)}</h3><p>${esc(d)}</p></article>`).join("\n")}
     </div>
@@ -472,18 +713,7 @@ ${MODULES.map(([k, t, d]) => `      <article class="mod">${icon(k)}<h3>${esc(t)}
   </div>
 </section>
 
-<section class="wrap teams" aria-labelledby="teams-h">
-  <h2 id="teams-h">Built for the whole bid team</h2>
-  <div class="table-wrap"><table><thead><tr><th>Team</th><th>What TenderOS gives them</th></tr></thead><tbody>
-    <tr><th>Tender and legal</th><td>The tender and amendments reconciled, every condition with its page and quote, the formats and letters in the RfS's wording, a pre-bid query list</td></tr>
-    <tr><th>Projects</th><td>Capacity, dates, supply profile, sourcing and market sale in one place; the sized plant and its compliance block by block</td></tr>
-    <tr><th>Design</th><td>Solar, wind and battery studios, hourly profiles, losses to the billing meter, pooling stations, deviation settlement per CERC norms</td></tr>
-    <tr><th>Finance</th><td>Financing terms, construction and IDC, repayment methods, refinancing, working capital, DSRA, the 25-year model and its Excel twin</td></tr>
-    <tr><th>Management</th><td>The tariff for the target IRR, the levers for bid day, what wins, sign-off per input, the audit trail</td></tr>
-  </tbody></table></div>
-</section>
-
-<section id="results" class="band">
+<section id="results">
   <div class="wrap">
     <p class="eyebrow">Open data</p>
     <h2>SECI's recent auction results</h2>
@@ -499,18 +729,12 @@ ${MODULES.map(([k, t, d]) => `      <article class="mod">${icon(k)}<h3>${esc(t)}
   </div>
 </section>
 
-<section id="open" class="wrap">
-  <p class="eyebrow">New tenders radar</p>
-  <h2>Open at SECI, scanned ${dateWords(scannedDay)}</h2>
-  <p class="lede narrow">TenderOS reads SECI's tender list and each tender's details page (${open.found} listed, ${open.documentsOpened} documents opened) and writes what each tender is, who may bid and when bids are due. In the application the scan runs on demand and marks what is new or changed.</p>
-  ${openTable}
-</section>
-
-<section class="band" id="trust">
-  <div class="wrap three">
-    <div><h2 class="h3">Traceable, not a black box</h2><p>Every figure opens its formula and inputs in the application and in the Excel workbook, which the product's tests recalculate against the application.</p></div>
-    <div><h2 class="h3">The tender's rules, as written</h2><p>Time-block floors, sourcing limits, penalties at multiples of the tariff, storage mandates and SECI's designated hours are modelled as the tender and its amendments write them.</p></div>
-    <div><h2 class="h3">Your secrets stay inside</h2><p>Costs, bids and the model can live in a core zone on your network with no cloud client. Only the tender documents meet cloud models, in a separate intake zone.</p></div>
+<section id="open" class="band">
+  <div class="wrap">
+    <p class="eyebrow">New tenders radar</p>
+    <h2>Open at SECI, scanned ${dateWords(scannedDay)}</h2>
+    <p class="lede narrow">TenderOS reads SECI's tender list and each tender's details page (${open.found} listed, ${open.documentsOpened} documents opened) and writes what each tender is, who may bid and when bids are due. In the application the scan runs on demand and marks what is new or changed.</p>
+    ${openTable}
   </div>
 </section>
 
@@ -522,16 +746,16 @@ ${FAQ.map(([q, a]) => `  <details><summary>${esc(q)}</summary><p>${esc(a)}</p></
 <section class="cta-band">
   <div class="wrap cta-inner">
     <div><h2>See it on your next tender</h2><p>A walkthrough on a live SECI, NHPC or NTPC tender with your team's own inputs. Installed on your infrastructure, with patches and new tender packs under an annual contract.</p></div>
-    <div class="cta-row"><a class="btn" href="${CONTACT_URL}">Contact jouleWise</a><a class="btn ghost light" href="mailto:${CONTACT_EMAIL}?subject=TenderOS%20walkthrough">${CONTACT_EMAIL}</a><a class="btn ghost light" href="/TenderOS-deck.pdf" download>Deck (PDF)</a></div>
+    <div class="cta-row"><a class="btn" href="${CONTACT_URL}">Contact jouleWise</a><a class="btn ghost" href="mailto:${CONTACT_EMAIL}?subject=TenderOS%20walkthrough">${CONTACT_EMAIL}</a><a class="btn ghost" href="/TenderOS-deck.pdf" download>Deck (PDF)</a></div>
   </div>
 </section>
 </main>
 
 <footer class="wrap foot-site">
-  <p><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span> is a product of <a href="https://www.joulewise.tech">jouleWise</a>. Auction data from <a href="${SECI_SITE}" rel="noopener">SECI's result notices</a>; tender quotes from the SECI CfD-I RfS and its amendments. Model figures from the application's own code, built ${dateWords(BUILT)}.</p>
+  <p><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span> is a product of <a href="https://www.joulewise.tech">jouleWise</a>. Auction data from <a href="${SECI_SITE}" rel="noopener">SECI's result notices</a>; tender pages and quotes from the SECI CfD-I RfS and its amendments, SECI's documents, shown to illustrate the reading. Model figures from the application's own code, built ${dateWords(BUILT)}.</p>
   <p class="small"><a href="/llms.txt">llms.txt</a> · <a href="/llms-full.txt">llms-full.txt</a> · <a href="/data/seci-results.csv">SECI results (CSV)</a> · <a href="/data/cfd-demo.json">demo data (JSON)</a> · <a href="/sitemap.xml">sitemap</a></p>
 </footer>
-<script id="demo-data" type="application/json">${JSON.stringify({ scan, day: dayOut, pool, best: best.mw, tariff: W.tariff, evening: demo.evening }).replace(/</g, "\\u003c")}</script>
+<script src="/assets/iso.js" defer></script>
 <script src="/assets/app.js" defer></script>
 </body>
 </html>
@@ -540,35 +764,49 @@ write("index.html", page);
 
 // ------------------------------------------------------------------ the deck (rendered to PDF by render.mjs)
 const slide = (cls, inner) => `<section class="slide ${cls}">${inner}<footer><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span><span>tenderos.joulewise.tech</span></footer></section>`;
-const topResults = results.slice(0, 8);
-const deck = `<!doctype html><html lang="en-IN"><head><meta charset="utf-8"><title>TenderOS deck</title><meta name="robots" content="noindex"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap"><link rel="stylesheet" href="/assets/deck.css"></head><body>
-${slide("cover", `<div class="cv"><p class="eyebrow">jouleWise</p><h1><span class="w1">Tender</span><span class="w2">OS</span></h1><p class="big">From the tender PDF to a winning bid,<br>with every number traceable.</p><p class="muted">Bid workspace for renewable energy tenders in India · ${dateWords(BUILT)}</p></div>`)}
-${slide("", `<h2>The problem</h2><div class="cols3"><div><b>Hundreds of pages, always changing</b><p>SECI CfD-I: an RfS of 129 pages, a 69-page agreement and four amendments in four months. One removed the ceiling tariff; one let SECI cut the award to its corpus.</p></div><div><b>Spreadsheets rebuilt every time</b><p>Each amendment sends the bid team back to its model. Nobody can say which page a number came from or which input moved the tariff.</p></div><div><b>Bids lost on the price</b><p>Awarded tariffs cluster within paise. An over-built battery or a high return target puts a bid out of the auction before it starts.</p></div></div>`)}
-${slide("", `<h2>What TenderOS does</h2><ol class="flow">${STAGES.map(([, t, s]) => `<li><b>${esc(t)}</b><span>${esc(s)}</span></li>`).join("")}</ol>`)}
-${slide("", `<h2>Read with evidence</h2><p class="sub">Every value carries its document, page and quote. A person confirms it before it reaches the bid.</p><div class="cols2"><div><div class="stat"><b>${TERMS.length}</b><span>conditions in ${Object.keys(groups).length} groups</span></div><div class="stat"><b>${PACK.changes.length}</b><span>amendment changes, was / now, quoted</span></div><div class="stat"><b>${totalPages}</b><span>pages in the CfD-I set</span></div></div><div>${changes.slice(0, 3).map((c) => `<div class="qc"><b>${esc(c.topic)}</b><span class="cite">${esc(c.doc)} · ${esc(c.clause)} · p.${c.page}</span><p>${esc(c.effect)}</p></div>`).join("")}</div></div>`)}
-${slide("", `<h2>Size the plant, price the bid</h2><p class="sub">SECI CfD-I, 100 MW, competitive inputs. Every candidate size is run for 15 years, day by day, through the full financial model.</p><div class="cols2"><div><svg viewBox="0 0 460 250" class="dk-chart">${(() => { const xs = (mw) => 40 + (mw / 60) * 400; const ys = (sp) => 220 - ((sp - 8) / 1.6) * 190; return `<line x1="40" y1="220" x2="440" y2="220" class="ax"/><line x1="40" y1="20" x2="40" y2="220" class="ax"/>${[8, 8.5, 9, 9.5].map((v) => `<text x="34" y="${ys(v) + 4}" text-anchor="end">₹${v}</text>`).join("")}${[0, 20, 40, 60].map((v) => `<text x="${xs(v)}" y="238" text-anchor="middle">${v} MWac</text>`).join("")}<polyline class="ln" points="${scan.map((p) => `${xs(p.mw)},${ys(p.sp)}`).join(" ")}"/>${scan.filter((p) => p.shortMwh > 0).map((p) => `<circle cx="${xs(p.mw)}" cy="${ys(p.sp)}" r="3.5" class="short"/>`).join("")}<circle cx="${xs(best.mw)}" cy="${ys(W.tariff)}" r="6" class="best"/>`; })()}</svg><p class="small muted">Red: some days short of 2 MWh/MW. Gold: the optimum.</p></div><div><div class="stat"><b>${best.mw} MWac</b><span>own solar; the rest of the charging power bought</span></div><div class="stat"><b>₹${fmt(W.tariff)}/kWh</b><span>strike price at ${pct(W.equityIrr)} equity IRR</span></div><div class="stat"><b>${fmt(W.minDscr)}×</b><span>minimum DSCR, sculpted</span></div></div></div>`)}
-${slide("", `<h2>What wins, and why a bid is not optimal</h2><div class="cols2"><div><b>The CfD Pool at each strike price (500 MW, ₹ cr a year)</b><table class="dk-t">${pool.map((p) => `<tr class="${p.yours ? "yours" : ""}"><td>₹${fmt(p.sp)}</td><td class="num">${p.cr > 0 ? "pays" : "collects"} ${fmt(Math.abs(p.cr), 1)}</td></tr>`).join("")}</table><p class="small muted">Evening market in the two chosen hours: ₹${fmt(demo.evening.chosen)}/kWh. Corpus ₹76 cr.</p></div><div><b>Bid review</b><div class="rvd good"><b>₹${fmt(demo.review.winning.tariff)}</b> ${esc(demo.review.winning.summary)}</div><div class="rvd bad"><b>₹${fmt(demo.review.overbuilt.tariff)}</b> ${esc(demo.review.overbuilt.summary)}</div><ul class="small">${demo.review.overbuilt.findings.filter((f) => f.severity !== "note").slice(0, 5).map((f) => `<li>${esc(f.title)}</li>`).join("")}</ul></div></div>`)}
-${slide("", `<h2>SECI's recent auctions</h2><table class="dk-t wide"><thead><tr><th>Auction</th><th>Product</th><th class="num">MW</th><th class="num">₹/kWh</th><th>Date</th></tr></thead><tbody>${topResults.map((r) => `<tr><td>${esc(r.tender.replace(/^.*\((SECI-[^)]+)\).*$/, "$1"))}</td><td>${esc(r.product)}</td><td class="num">${int(r.awardedMw)}</td><td class="num">${fmt(r.tariffLow)}–${fmt(r.tariffHigh)}</td><td>${dateWords(r.auctionDate)}</td></tr>`).join("")}</tbody></table><p class="small muted">From SECI's result notices. Full dataset with every bidder: tenderos.joulewise.tech/data/seci-results.csv</p>`)}
-${slide("", `<h2>Everything in the application</h2><div class="mods">${MODULES.map(([, t, d]) => { const f = d.split(". ")[0].split(": ")[0]; return `<div><b>${esc(t)}</b><p>${esc(f.length > 120 ? `${f.slice(0, f.lastIndexOf(" ", 117))}…` : `${f}.`)}</p></div>`; }).join("")}</div>`)}
-${slide("", `<h2>Why teams trust it</h2><div class="cols3"><div><b>Traceable</b><p>Every number opens its formula and inputs. The Excel twin is recalculated in the product's tests against the application.</p></div><div><b>Deterministic where it counts</b><p>Language models read and summarise; they never set a value. Sizing is HiGHS optimisation, the model is formulas, the review is rules.</p></div><div><b>Your secrets stay inside</b><p>Bids, costs and the model can live in a core zone on your network with no cloud client; documents meet cloud models in a separate intake zone.</p></div></div>`)}
+const deckPage = (() => {
+  const c = changes.find((x) => x.id === "a3-rfs-40.3"), marks = pageData.marks[c.id] || [], key = marks[0]?.page, pg = pageData.pages[key];
+  if (!pg) return "";
+  return `<div class="dk-page"><img src="${pg.src}" alt="">${marks.filter((m) => m.page === key).flatMap((m) => m.rects.map(([x, y, w, h]) => `<i class="${m.kind}" style="left:${x * 100}%;top:${y * 100}%;width:${w * 100}%;height:${h * 100}%"></i>`)).join("")}</div>`;
+})();
+const scanSvg = (() => { const xs = (mw) => 40 + (mw / 60) * 400, ys = (sp) => 220 - ((sp - 8) / 1.6) * 190; return `<svg viewBox="0 0 460 250" class="dk-chart"><line x1="40" y1="220" x2="440" y2="220" class="ax"/><line x1="40" y1="20" x2="40" y2="220" class="ax"/>${[8, 8.5, 9, 9.5].map((v) => `<text x="34" y="${ys(v) + 4}" text-anchor="end">₹${v}</text>`).join("")}${[0, 20, 40, 60].map((v) => `<text x="${xs(v)}" y="238" text-anchor="middle">${v} MWac</text>`).join("")}<polyline class="ln" points="${M.scan.map((p) => `${xs(p.mw)},${ys(p.sp)}`).join(" ")}"/>${M.scan.filter((p) => p.shortMwh > 0).map((p) => `<circle cx="${xs(p.mw)}" cy="${ys(p.sp)}" r="3.5" class="short"/>`).join("")}<circle cx="${xs(M.best)}" cy="${ys(W.tariff)}" r="6" class="best"/></svg>`; })();
+const compRows = [...comps.slice(0, 4).map((c) => [c.code, c.buys, `₹${fmt(c.lo)}–${fmt(c.hi)}`]), ["Evening market, the two dearest hours", "IEX price year", `₹${fmt(M.evening.chosen)}`], ["Evening market, all hours 18:00–24:00", "IEX price year", `₹${fmt(M.evening.all)}`]];
+const plan750 = M.tracks.plans["7.50|"];
+const lv = (s, v) => (s.pct ? `${(v * 100).toFixed(2).replace(/\.?0+$/, "")}%` : `${+v.toFixed(3)}`);
+const deck = `<!doctype html><html lang="en-IN"><head><meta charset="utf-8"><title>TenderOS deck</title><meta name="robots" content="noindex">${FONTS}<link rel="stylesheet" href="/assets/deck.css"><link rel="stylesheet" href="/assets/iso.css"></head><body>
+${slide("cover", `<div class="cv"><p class="eyebrow">jouleWise</p><h1><span class="w1">Tender</span><span class="w2">OS</span></h1><p class="big">Months of bid work. Done in hours.</p><p class="muted">Bid workspace for renewable energy tenders in India · ${dateWords(BUILT)}</p></div>`)}
+${slide("", `<h2>Where the months go</h2><p class="sub">Each step is weeks of spreadsheet work that an amendment sends back to the start.</p><table class="dk-t wide"><thead><tr><th>The work</th><th>By hand</th><th>In TenderOS</th></tr></thead><tbody>${TIME.map(([t, hand, , note]) => `<tr><td>${esc(t)}</td><td class="hand">${hand}</td><td>${esc(note)}</td></tr>`).join("")}</tbody></table><p class="small muted">By hand: indicative, for a team working from PDFs and spreadsheets. TenderOS: from the product's documentation and tests.</p>`)}
+${slide("", `<h2>From tender PDF to bid pack</h2><ol class="flow">${STAGES.map(([, t, s]) => `<li><b>${esc(t)}</b><span>${esc(s)}</span></li>`).join("")}</ol>`)}
+${slide("", `<h2>Read with evidence, amendments word by word</h2><div class="cols2"><div><div class="stats2"><div class="stat"><b>${TERMS.length}</b><span>conditions, each with page and quote</span></div><div class="stat"><b>${changes.length}</b><span>amendment changes, was and now</span></div></div><table class="dk-t">${NET.slice(0, 5).map((n) => `<tr><td>${esc(n.label)}</td><td class="hand">${esc(n.was)}</td><td>${esc(n.now)}</td></tr>`).join("")}</table></div><div>${deckPage}<p class="small muted">SECI's Amendment-03, page 4: the ₹5.80 ceiling removed. Red: as it stood. Green: as amended.</p></div></div>`)}
+${slide("", `<h2>Design the plant, see the price</h2><p class="sub">SECI CfD-I, 100 MW. ${M.grid.solar.length * M.grid.wind.length} plants simulated for 15 years, ${int(M.grid.sp.length)} financial models, ${Math.round(M.seconds)} seconds.</p><div class="dk-iso wide">${isoCfd}</div><div class="cols2 low"><div>${scanSvg}</div><div><div class="stat"><b>${M.best} MWac · ₹${fmt(W.tariff)}/kWh</b><span>the optimum: every day met, ${pct(W.equityIrr)} equity IRR, DSCR ${fmt(W.minDscr)}×</span></div><p>Move own solar, wind, battery cost and the equity return: the strike price, the project cost, the days short and the tender's conditions follow. Below ${M.best} MWac days fall short; above it solar costs more than the power it replaces.</p></div></div>`)}
+${slide("", `<h2>Every kind of tender</h2><div class="isorows"><div><div class="dk-iso">${isoCfd}</div><div><b>Contract for Difference</b><p>SECI CfD-I: 2 h of evening supply through the exchange, settled by SECI's Pool. Strike price ₹${fmt(W.tariff)} on 100 MW with ${W.solarMw} MWac of own solar.</p></div></div><div><div class="dk-iso">${isoFdre}</div><div><b>FDRE round the clock</b><p>SECI FDRE-RTC-V: floors in every block of the day. The bridge runs from ₹${fmt(rtc.bridge[0].tariff)} to ₹${fmt(rtc.bridge[rtc.bridge.length - 1].tariff)}; the winners bid ₹5.25.</p></div></div><div><div class="dk-iso">${isoBess}</div><div><b>Standalone battery</b><p>${bess.req.powerMw} MW / ${bess.req.energyMwh} MWh, ${bess.req.cyclesPerDay} cycles a day: ₹${fmt(bess.charge)} lakh per MW per month at a ${pct(bess.equityIrr, 0)} IRR, ${bess.evals} plans compared.</p></div></div></div>`)}
+${slide("", `<h2>A state-of-the-art optimiser</h2><p class="sub">The tender stated as a linear programme, solved with HiGHS: the lowest tariff that still earns your return.</p><div class="cols2"><ul><li><b>Every hour of the year</b>: 8,760 hours for the years that bind, or all 25</li><li><b>The tender's own floors</b>: by block, month and year; peak, off-peak, solar hours; penalties</li><li><b>Real plants</b>: degradation, fade, augmentation, separate sites, losses to the meter</li><li><b>Proved in 15-minute blocks</b>: 35,040 a year</li></ul><div><div class="stat"><b>1–2 min</b><span>a 25-year case on four cores</span></div><div class="stat"><b>93 → 53 s</b><span>re-solve from the last solution</span></div><div class="stat"><b>${int(M.daysPerSim * 96)}</b><span>15-minute blocks in a CfD term</span></div></div></div>`)}
+${slide("", `<h2>What-if: the track to a quote</h2><p class="sub">From ₹${fmt(W.tariff)} to a quote of ₹7.50: the surest route, each move with its chance. Turn a lever down and the model finds another.</p><div class="cols2"><table class="dk-t"><thead><tr><th>Lever, one step</th><th class="num">down</th><th class="num">up</th></tr></thead>${M.levers.slice(0, 8).map((l) => `<tr><td>${esc(l.label)}</td><td class="num">₹${fmt(l.down, 3)}</td><td class="num">₹${fmt(l.up, 3)}</td></tr>`).join("")}</table><div>${plan750 ? `<table class="dk-t"><thead><tr><th>Move</th><th class="num">chance</th><th class="num">price after</th></tr></thead>${plan750.steps.map((s) => `<tr><td>${esc(s.label)}: ${lv(s, s.from)} → ${lv(s, s.to)}</td><td class="num">${Math.round(s.p * 100)}%</td><td class="num">₹${fmt(s.price, 3)}</td></tr>`).join("")}</table>` : ""}<p class="small muted">Scenarios are saved with versions; up to 12 compared side by side.</p></div></div>`)}
+${slide("", `<h2>Bid review, with market comparables</h2><div class="cols2"><div><div class="rvd good"><b>₹${fmt(M.review.winning.tariff)}</b> ${esc(M.review.winning.summary)}</div><div class="rvd bad"><b>₹${fmt(M.review.overbuilt.tariff)}</b> ${esc(M.review.overbuilt.summary)}</div><ul class="small">${M.review.overbuilt.findings.filter((f) => f.severity !== "note").slice(0, 5).map((f) => `<li>${esc(f.title)}</li>`).join("")}</ul></div><div><table class="dk-t"><thead><tr><th>Comparable</th><th>What it buys</th><th class="num">₹/kWh</th></tr></thead>${compRows.map((r) => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td class="num">${r[2]}</td></tr>`).join("")}</table><p class="small muted">The Pool is about neutral at the evening price; SECI may cut the award to its ₹${TENDER.poolCr} crore corpus.</p></div></div>`)}
+${slide("", `<h2>Your bid never leaves your premises</h2><div class="dk-zones"><div><b>Internet</b><p>Tender portals. Cloud language models, optional.</p></div><div class="dmz"><b>DMZ · intake zone</b><p>Tender documents, their reading with page and quote, a reviewer's confirmation. Or the rule-based reader, with no cloud at all.</p></div><div class="core"><b>Core zone · your network</b><p>Inputs, costs, evidence, optimiser, financial model, team, scenarios, bid pack. No route to the internet.</p></div></div><div class="cols3 tight"><div><b>Secrets</b><p>scrypt passwords, httpOnly sessions, throttled sign-in, keys in AES-256-GCM.</p></div><div><b>Control</b><p>Roles, access tab by tab, an activity log for 400 days, backups.</p></div><div><b>Updates</b><p>Bundles signed with an EC P-256 key, verified before they are applied.</p></div></div>`)}
+${slide("", `<h2>Many people, one bid</h2><div class="cols3"><div><b>Work together</b><p>Steps by team. Pings with @mentions and threads on any input, assignments, email, answers filled in from the reply.</p></div><div><b>Evidence and sign-off</b><p>A paperclip on every input. Sign-off turns amber if the value changes. Evidence register and activity log.</p></div><div><b>Scenarios are saved</b><p>Named scenarios with versions, restored at will, up to 12 compared side by side.</p></div></div>`)}
+${slide("", `<h2>SECI's recent auctions</h2><table class="dk-t wide"><thead><tr><th>Auction</th><th>Product</th><th class="num">MW</th><th class="num">₹/kWh</th><th>Date</th></tr></thead><tbody>${results.map((r) => `<tr><td>${esc(codeOf(r))}</td><td>${esc(r.product)}</td><td class="num">${int(r.awardedMw)}</td><td class="num">${fmt(r.tariffLow)}–${fmt(r.tariffHigh)}</td><td>${dateWords(r.auctionDate)}</td></tr>`).join("")}</tbody></table><p class="small muted">From SECI's result notices. Every bidder: tenderos.joulewise.tech/data/seci-results.csv</p>`)}
+${slide("", `<h2>Everything in the application</h2><div class="mods">${MODULES.map(([, t, d]) => { const f1 = d.split(". ")[0].split(": ")[0]; return `<div><b>${esc(t)}</b><p>${esc(f1.length > 110 ? cut(f1, 108) : `${f1}.`)}</p></div>`; }).join("")}</div>`)}
 ${slide("", `<h2>How we work with you</h2><div class="cols2"><div><b>You receive</b><ul><li>The application installed on your cloud or on-premises (Docker)</li><li>Tender packs for the tenders you bid</li><li>The Excel workbook and bid pack of every bid</li><li>Documentation, test matrix and installation guide</li></ul></div><div><b>Under the annual contract</b><ul><li>Signed patches and new tender packs</li><li>Change requests raised in the application, implemented and shipped</li><li>Support on installation and upgrades</li></ul></div></div>`)}
-${slide("cover", `<div class="cv"><h2>See it on your next tender</h2><p class="big">${CONTACT_EMAIL}</p><p>${CONTACT_URL.replace("https://", "")}</p><p class="muted">Live demo and SECI auction data: tenderos.joulewise.tech</p></div>`)}
+${slide("cover", `<div class="cv"><h2>See it on your next tender</h2><p class="big">${CONTACT_EMAIL}</p><p>${CONTACT_URL.replace("https://", "")}</p><p class="muted">Live tour and SECI auction data: tenderos.joulewise.tech</p></div>`)}
 </body></html>`;
 write("deck/index.html", deck);
 
 // ------------------------------------------------------------------ LLM and crawler files
 const llms = `# TenderOS by jouleWise
 
-> TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities). It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with HiGHS optimisation; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's own infrastructure.
+> TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities) that turns months of bid work into hours. It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with a HiGHS linear optimiser; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's premises: the tender is parsed in a DMZ, the bid stays in a core zone with no route to the internet.
 
 Key facts:
 - Maker: jouleWise (https://www.joulewise.tech). Contact: ${CONTACT_EMAIL}, ${CONTACT_URL}
-- Tender types: FDRE round-the-clock, assured peak supply, Contract for Difference (SECI CfD-I), standalone BESS, solar or wind with storage.
-- Language models read documents and draft summaries only; a person confirms every value. Sizing, dispatch, the financial model and the bid review are deterministic code.
-- Demo result on SECI CfD-I (RfS ${PACK.rfsNo}, 500 MW × 2 h, bids due 20 Nov 2026): ${TERMS.length} conditions with pages, ${PACK.changes.length} amendment changes quoted; for a 100 MW bid with competitive inputs the optimiser keeps ${best.mw} MWac of own solar and prices the strike at ₹${fmt(W.tariff)}/kWh at a ${pct(W.equityIrr)} equity IRR (minimum DSCR ${fmt(W.minDscr)}).
+- Tender types: Contract for Difference (SECI CfD-I), FDRE round-the-clock (SECI FDRE-RTC-V), assured peak supply, standalone BESS, solar or wind with storage.
+- Language models read documents and draft summaries only; a person confirms every value. Sizing (HiGHS linear programming), dispatch, the financial model and the bid review are deterministic code.
+- Speed, from the product's documentation: a tender read in 1 to 4 minutes; a 25-year optimisation in 1 to 2 minutes on 4 cores; what-if instant.
+- Collaboration: steps by team, pings and threads, evidence on every input, sign-off, activity log. Scenarios are saved with versions; up to 12 compared side by side.
+- Demo result on SECI CfD-I (RfS ${PACK.rfsNo}, 500 MW × 2 h, bids due 20 Nov 2026): ${TERMS.length} conditions with pages, ${changes.length} amendment changes quoted; for a 100 MW bid with competitive inputs the optimiser keeps ${W.solarMw} MWac of own solar and prices the strike at ₹${fmt(W.tariff)}/kWh at a ${pct(W.equityIrr)} equity IRR (minimum DSCR ${fmt(W.minDscr)}).
 
 ## Pages
-- [Demo and product overview](${SITE}/): the eleven-step simulation, the modules, SECI results, open SECI tenders, FAQ
+- [Product tour and overview](${SITE}/): the thirteen-screen tour, tender types, the optimiser, security, SECI results, open SECI tenders, FAQ
 - [Deck (PDF)](${SITE}/TenderOS-deck.pdf)
 - [Full text for language models](${SITE}/llms-full.txt)
 
@@ -576,40 +814,69 @@ Key facts:
 - [SECI auction results, CSV](${SITE}/data/seci-results.csv): one row per bidder in eight SECI e-reverse auctions (May 2025 – Aug 2026), awarded or not, with bid MW, awarded MW and final tariff, and the SECI notice
 - [SECI auction results, JSON](${SITE}/data/seci-results.json)
 - [Open SECI tenders, JSON](${SITE}/data/seci-open-tenders.json): scanned ${dateWords(scannedDay)} from www.seci.co.in/tenders
-- [CfD-I demo numbers, JSON](${SITE}/data/cfd-demo.json): the optimiser scan, a day's dispatch, the Pool table, bid-review findings
+- [CfD-I demo numbers, JSON](${SITE}/data/cfd-demo.json): the amendments with diffs, the design surface, a day's dispatch, the levers and tracks, the Pool, the bid review
 `;
 write("llms.txt", llms);
+const g = M.grid;
+const spAt = (s, w, e, q) => g.sp[((s * g.wind.length + w) * g.ess.length + e) * g.irr.length + q];
 const llmsFull = `${llms}
-## What a bid team gets
+## Months of work in hours
+${TIME.map(([t, hand, tos, note]) => `- ${t}: by hand, ${hand} (indicative); in TenderOS, ${tos} (${note})`).join("\n")}
+
+## Modules
 ${MODULES.map(([, t, d]) => `- **${t}**: ${d}`).join("\n")}
 
-## The demo, step by step (SECI CfD-I)
+## Security and deployment
+${SECURITY.map(([, t, d]) => `- **${t}**: ${d}`).join("\n")}
+- Roadmap, not in the current release: single sign-on; a cryptographically signed transfer package between the zones.
+
+## The optimiser
+A linear programme solved with HiGHS over every hour of the year (8,760) for the years that bind or all 25. It chooses solar, wind and battery power and energy together; honours floors by block, month and year over peak, off-peak and solar hours, ramp limits, the state-of-charge window, penalties or hard floors, separate sites and pooling stations; and minimises the tariff for the target equity IRR. One to two minutes for a 25-year case on four cores; re-runs start from the last solution (93 s to 53 s after a 5% change in wind cost). A 15-minute dispatch (35,040 blocks a year) proves compliance.
+
+## Tender types
+- Contract for Difference, SECI CfD-I: strike price ₹${fmt(W.tariff)}/kWh on 100 MW with ${W.solarMw} MWac own solar and a 100 MW / 200 MWh battery.
+- FDRE round the clock, SECI FDRE-RTC-V (${rtc.result.winners}): the application's bridge, ${rtc.bridge.map((b) => `${b.label} ₹${fmt(b.tariff)}${b.kind === "estimate" ? " (estimate)" : ""}`).join(" → ")}. Plant at the last step per contracted MW: ${fmt(rtcPlant.solar)} MWac solar, ${fmt(rtcPlant.wind)} MW wind, ${fmt(rtcPlant.bess)} MW / ${fmt(rtcPlant.bessMwh)} MWh battery.
+- Standalone battery (the application's example, ${bess.req.powerMw} MW / ${bess.req.energyMwh} MWh, ${bess.req.contractYears} years, ${bess.req.cyclesPerDay} cycles a day): capacity charge ₹${fmt(bess.charge)} lakh per MW per month at a ${pct(bess.equityIrr, 0)} equity IRR; ${int(bess.cohorts[0].mwh)} MWh installed on day one, augmented every year.
+
+## The tour, screen by screen (SECI CfD-I)
 ${STAGES.map(([, t, s], i) => `${i + 1}. ${t}: ${s}`).join("\n")}
 
 ### The tender set
 ${docs.map((d) => `- ${d.title} (${d.pages} pages${d.date ? `, ${d.date}` : ""}): ${d.summary}`).join("\n")}
 
+### The tender today against the tender as issued
+${NET.map((n) => `- ${n.label}: ${n.was} → ${n.now} (Amendment-0${n.amd})`).join("\n")}
+
+### All ${changes.length} amendment changes
+${changes.map((c) => `- ${c.amdTitle}, ${c.document} ${c.clause}, page ${c.page} — ${c.topic}: ${c.effect}`).join("\n")}
+
 ### Conditions by group (${TERMS.length})
-${Object.entries(groups).map(([g, n]) => `- ${g}: ${n}`).join("\n")}
+${Object.entries(groups).map(([k, n]) => `- ${k}: ${n}`).join("\n")}
 
 ### Sample conditions with evidence
-${terms.map((t) => `- ${t.label}: ${t.display} [${t.doc}, ${t.clause}, page ${t.page}] Quote: "${t.quote}"`).join("\n")}
+${ev.map((t) => `- ${t.label}: ${t.display} [${t.doc}, ${t.clause}, page ${t.page}] Quote: "${t.quote}"`).join("\n")}
 
-### Amendment changes (sample)
-${changes.map((c) => `- ${c.topic} (${c.doc}, ${c.document} ${c.clause}, page ${c.page}): ${c.effect}`).join("\n")}
+### Conditions tested on the competitive bid
+${M.checks.map((c) => `- ${c.label}: ${c.status} (${c.detail})`).join("\n")}
 
-### Sizing scan (100 MW, competitive inputs): own solar MWac → strike price ₹/kWh (days short)
-${scan.map((p) => `${p.mw} → ${fmt(p.sp, 3)}${p.shortMwh ? ` (short ${int(p.shortMwh)} MWh over the term)` : ""}`).join("; ")}
+### Design surface (100 MW; battery ₹0.85 cr/MWh, 13% equity IRR): own solar MWac → strike price ₹/kWh at 0 MW wind [days short in 15 years]
+${g.solar.map((s, k) => `${s} → ${fmt(spAt(k, 0, 1, 1), 3)} [${g.phys[k * g.wind.length].shortDays}]`).join("; ")}
+With 10 MW of own wind at 10 MWac solar: ₹${fmt(spAt(5, 2, 1, 1), 3)} (wind raises the price on this tender).
 
 ### Financial result
-Strike price ₹${fmt(W.tariff, 3)}/kWh; equity IRR ${pct(W.equityIrr)}; project IRR ${pct(W.projectIrr)}; minimum DSCR ${fmt(W.minDscr)}. Evening market in the two chosen hours ₹${fmt(demo.evening.chosen)}/kWh, all evening hours ₹${fmt(demo.evening.all)}/kWh.
+Strike price ₹${fmt(W.tariff, 3)}/kWh; equity IRR ${pct(W.equityIrr)}; project IRR ${pct(W.projectIrr)}; minimum DSCR ${fmt(W.minDscr)}; project cost ₹${int(W.capex.total)} crore (debt ₹${int(W.debt)} crore, equity ₹${int(W.equity)} crore). What carries the price: ${M.drivers.map((d) => `${d.label} ₹${fmt(d.value)}`).join("; ")}.
+
+### What-if levers (one step down / up, ₹/kWh)
+${M.levers.slice(0, LEVERS_SHOWN).map((l) => `- ${l.label} (now ${lv(l, l.value)}${l.pct ? "" : ` ${l.unit}`}, step ${lv(l, l.step)}): ₹${fmt(l.down, 3)} / ₹${fmt(l.up, 3)}`).join("\n")}
+Tracks: ${M.tracks.targets.map((t) => { const p = M.tracks.plans[`${t.toFixed(2)}|`]; return `to ₹${fmt(t)}: ${p.steps.map((s) => `${s.label} ${lv(s, s.from)}→${lv(s, s.to)}`).join(", ")} (chance ${Math.round(p.chance * 100)}%)`; }).join("; ")}.
 
 ### What wins: CfD Pool net flow a year for 500 MW (positive = the Pool pays)
-${pool.map((p) => `₹${fmt(p.sp)} → ₹${fmt(p.cr, 1)} cr`).join("; ")}. ${verdict.verdict}
+${M.pool.map((p) => `₹${fmt(p.sp)} → ₹${fmt(p.cr, 1)} cr`).join("; ")}. ${M.verdict.text}
 
 ### Bid review
-- Competitive bid ₹${fmt(demo.review.winning.tariff)}: ${demo.review.winning.summary} ${demo.review.winning.findings.map((f) => `[${f.severity}] ${f.title}`).join("; ")}
-- Over-built bid ₹${fmt(demo.review.overbuilt.tariff)}: ${demo.review.overbuilt.summary} ${demo.review.overbuilt.findings.map((f) => `[${f.severity}] ${f.title}`).join("; ")}
+- Competitive bid ₹${fmt(M.review.winning.tariff)}: ${M.review.winning.summary} ${M.review.winning.findings.map((f) => `[${f.severity}] ${f.title}`).join("; ")}
+- Over-built bid ₹${fmt(M.review.overbuilt.tariff)}: ${M.review.overbuilt.summary} ${M.review.overbuilt.findings.map((f) => `[${f.severity}] ${f.title}`).join("; ")}
+- Market comparables: ${comps.map((c) => `${c.code} (${c.buys}) ₹${fmt(c.lo)}–${fmt(c.hi)}`).join("; ")}; evening market ₹${fmt(M.evening.chosen)} in the two dearest hours, ₹${fmt(M.evening.all)} over all evening hours.
 
 ## SECI auction results (₹/kWh as discovered; ${TRADING_MARGIN_NOTE})
 | Auction | Product | Tendered MW | Awarded MW | Tariff range | Weighted | Auction date | Winners | Source |
@@ -651,19 +918,20 @@ Sitemap: ${SITE}/sitemap.xml
 `);
 write("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${["/", "/TenderOS-deck.pdf", "/llms.txt", "/llms-full.txt", "/data/seci-results.csv", "/data/seci-results.json", "/data/seci-open-tenders.json"].map((p) => `  <url><loc>${SITE}${p}</loc><lastmod>${BUILT}</lastmod></url>`).join("\n")}
+${["/", "/TenderOS-deck.pdf", "/llms.txt", "/llms-full.txt", "/data/seci-results.csv", "/data/seci-results.json", "/data/seci-open-tenders.json", "/data/cfd-demo.json"].map((p) => `  <url><loc>${SITE}${p}</loc><lastmod>${BUILT}</lastmod></url>`).join("\n")}
 </urlset>
 `);
 write("vercel.json", JSON.stringify({
   cleanUrls: true,
   headers: [
-    { source: "/assets/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=3600" }] },
+    { source: "/assets/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=600" }] },
+    { source: "/pages/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=86400" }, { key: "X-Robots-Tag", value: "noindex" }] },
     { source: "/(.*)", headers: [{ key: "X-Content-Type-Options", value: "nosniff" }, { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }] },
     { source: "/data/(.*)", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
     { source: "/TenderOS-deck.pdf", headers: [{ key: "Content-Disposition", value: "attachment; filename=\"TenderOS-deck.pdf\"" }] },
   ],
 }, null, 2));
 mkdirSync(join(OUT, "assets"), { recursive: true });
-for (const f of ["styles.css", "app.js", "deck.css"]) copyFileSync(join(HERE, "src", f), join(OUT, "assets", f));
+for (const f of ["styles.css", "iso.css", "app.js", "iso.js", "deck.css"]) copyFileSync(join(HERE, "src", f), join(OUT, "assets", f));
 copyFileSync(join(HERE, "src/favicon.svg"), join(OUT, "favicon.svg"));
-log(`wrote ${OUT}`);
+log(`wrote ${OUT} (index.html ${Math.round(page.length / 1024)} KB, demo.json ${Math.round(JSON.stringify(demo).length / 1024)} KB)`);

@@ -1,8 +1,10 @@
-// Renders the deck to site/public/TenderOS-deck.pdf and the share image to site/public/og.png
-// with Playwright's Chromium, serving site/public on a local port. Run after build.mjs:
-//   node site/render.mjs [--shots DIR]     (--shots also saves desktop and phone screenshots)
+// Renders the deck to site/public/TenderOS-deck.pdf and the share image to site/public/og.jpg
+// with Playwright's Chromium, serving site/public on a local port, and tests the page: every
+// screen of the tour, the studio's sliders, the what-if planner, the guided tour's cursor, day
+// mode, a phone. Run after build.mjs:
+//   node site/render.mjs [--shots DIR]     (--shots also saves screenshots of every screen)
 import { createServer } from "node:http";
-import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, existsSync, statSync, mkdirSync } from "node:fs";
 import { join, extname, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -11,12 +13,13 @@ const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUB = join(HERE, "public");
-const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".pdf": "application/pdf", ".txt": "text/plain; charset=utf-8", ".csv": "text/csv", ".xml": "application/xml" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".pdf": "application/pdf", ".txt": "text/plain; charset=utf-8", ".csv": "text/csv", ".xml": "application/xml" };
 const shotsAt = process.argv.indexOf("--shots");
 const SHOTS = shotsAt > 0 ? process.argv[shotsAt + 1] : null;
+if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 const server = createServer((req, res) => {
-  let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  const p = decodeURIComponent(new URL(req.url, "http://x").pathname);
   let f = join(PUB, p);
   if (existsSync(f) && statSync(f).isDirectory()) f = join(f, "index.html");
   if (!existsSync(f)) { res.writeHead(404); res.end("not found"); return; }
@@ -27,80 +30,125 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}`;
 const browser = await chromium.launch();
 const errors = [];
+const check = (ok, what) => { if (!ok) errors.push(what); };
+const watch = (page, name) => { page.on("console", (m) => { if (m.type() === "error") errors.push(`${name}: ${m.text()}`); }); page.on("pageerror", (e) => errors.push(`${name}: ${e}`)); };
+const ready = async (page) => { await page.goto(`${base}/`, { waitUntil: "networkidle" }); await page.waitForSelector("#sim[data-ready]"); };
 try {
-  // the deck, one 1280×720 slide per page
+  // ---- the deck, one 1280×720 slide per page
   const deck = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  watch(deck, "deck");
   await deck.goto(`${base}/deck/`, { waitUntil: "networkidle" });
+  await deck.evaluate(() => document.fonts.ready);
   await deck.pdf({ path: join(PUB, "TenderOS-deck.pdf"), width: "1280px", height: "720px", printBackground: true, preferCSSPageSize: true });
   const slides = await deck.locator(".slide").count();
+  const over = await deck.evaluate(() => [...document.querySelectorAll(".slide")].map((s, k) => { const f = s.querySelector("footer").getBoundingClientRect().top; const low = Math.max(...[...s.children].filter((c) => c.tagName !== "FOOTER").map((c) => c.getBoundingClientRect().bottom)); return low > f + 1 ? k + 1 : 0; }).filter(Boolean));
+  check(!over.length, `deck: content runs into the footer on slide ${over.join(", ")}`);
   console.log(`render: deck ${slides} slides → TenderOS-deck.pdf (${Math.round(statSync(join(PUB, "TenderOS-deck.pdf")).size / 1024)} KB)`);
+  if (SHOTS) for (let k = 0; k < slides; k += 1) await deck.locator(".slide").nth(k).screenshot({ path: join(SHOTS, `slide-${String(k + 1).padStart(2, "0")}.png`) });
 
-  // the share image: the cover with the demo's headline numbers
-  const data = JSON.parse(readFileSync(join(PUB, "data/cfd-demo.json"), "utf8"));
+  // ---- the share image
+  const data = JSON.parse(readFileSync(join(PUB, "data/demo.json"), "utf8"));
   const og = await browser.newPage({ viewport: { width: 1200, height: 630 } });
   await og.setContent(`<!doctype html><html><head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter+Tight:wght@400;500;700&display=swap"><style>
     body{margin:0;width:1200px;height:630px;font-family:"Inter Tight","Helvetica Neue",Arial,sans-serif;background:#141517;background-image:linear-gradient(90deg,#1e2023 1px,transparent 1px);background-size:150px 100%;color:#efeeeb;display:flex;flex-direction:column;justify-content:center;padding:0 80px;box-sizing:border-box}
-    .b{font-size:84px;font-weight:500;letter-spacing:-.035em}.b i{font-style:normal;color:#b8962e}
-    p{font-size:38px;line-height:1.25;margin:10px 0 34px;max-width:960px}
-    .k{display:flex;gap:44px}.k div{font-size:20px;color:#cbcac6}.k b{display:block;font-size:44px;font-weight:700;color:#3dd68c}
+    .b{font-size:44px;font-weight:500;letter-spacing:-.035em}.b i{font-style:normal;color:#b8962e}
+    h1{font-size:92px;line-height:.96;letter-spacing:-.035em;text-transform:uppercase;margin:18px 0 34px}h1 em{font-style:normal;color:#3dd68c;display:block}
+    .k{display:flex;gap:44px}.k div{font-size:19px;color:#cbcac6}.k b{display:block;font-size:40px;font-weight:700;color:#3dd68c}
     .f{position:absolute;bottom:34px;left:80px;font-size:18px;color:#939190;font-family:"IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase}</style></head><body>
-    <div class="b"><i>Tender</i>OS</div><p>From the tender PDF to a winning bid, with every number traceable.</p>
-    <div class="k"><div><b>${data.tender.conditions}</b>conditions with pages</div><div><b>${data.tender.changesQuoted}</b>amendment changes quoted</div><div><b>₹${data.winning.tariff.toFixed(2)}</b>strike price, SECI CfD-I</div><div><b>8</b>SECI auctions, open data</div></div>
-    <div class="f">tenderos.joulewise.tech · by jouleWise</div></body></html>`);
+    <div class="b"><i>Tender</i>OS</div><h1>Months of bid work.<em>Done in hours.</em></h1>
+    <div class="k"><div><b>${data.tender.conditions}</b>conditions with pages</div><div><b>${data.tender.changes}</b>amendment changes</div><div><b>₹${data.win.tariff.toFixed(2)}</b>strike price, SECI CfD-I</div><div><b>${data.stats.sims}</b>15-year simulations</div></div>
+    <div class="f">tenderos.joulewise.tech · by jouleWise · on your premises</div></body></html>`);
   await og.waitForLoadState("networkidle"); await og.evaluate(() => document.fonts.ready);
   await og.screenshot({ path: join(PUB, "og.jpg"), type: "jpeg", quality: 86 });
   console.log("render: og.jpg 1200×630");
 
-  // the page itself: no console errors, the charts drawn
-  const page = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-  page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto(`${base}/`, { waitUntil: "networkidle" });
-  for (const id of ["chart-scan", "chart-day", "chart-pool"]) {
-    const n = await page.locator(`#${id} svg`).count();
-    if (n !== 1) errors.push(`${id}: no chart`);
-  }
-  if (SHOTS) {
-    mkdirSync(SHOTS, { recursive: true });
-    await page.screenshot({ path: join(SHOTS, "desktop-top.png") });
-    for (const [i, name] of [[5, "size"], [6, "dispatch"], [8, "wins"], [9, "review"]]) {
-      await page.locator(`.sim-rail button[data-stage="${i}"]`).click();
-      await page.waitForTimeout(4200);
-      await page.locator("#sim").screenshot({ path: join(SHOTS, `sim-${name}.png`) });
+  // ---- the page: every screen of the tour, by hand
+  const page = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "dark", reducedMotion: "reduce" });
+  watch(page, "page");
+  await ready(page);
+  const stages = await page.locator(".sim-rail button").count();
+  check(stages === 13, `tour: ${stages} screens`);
+  const sim = page.locator("#sim");
+  for (let k = 0; k < stages; k += 1) {
+    await page.locator(`.sim-rail button[data-stage="${k}"]`).click();
+    await page.waitForTimeout(350);
+    const id = await page.evaluate(() => document.querySelector(".stage:not([hidden])").id);
+    if (id === "st-read" || id === "st-amend") {
+      await page.waitForFunction((sel) => { const i = document.querySelector(`${sel} img`); return i && i.complete && i.naturalWidth > 0; }, id === "st-read" ? "#ev-page" : "#am-page");
+      check(await page.locator(`#${id} .pv-marks i`).count() > 0, `${id}: no passage marked on the page`);
     }
-    await page.locator("#results").screenshot({ path: join(SHOTS, "results.png") });
-    const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, colorScheme: "dark" });
-    phone.on("pageerror", (e) => errors.push(`phone: ${e}`));
-    await phone.goto(`${base}/`, { waitUntil: "networkidle" });
-    await phone.screenshot({ path: join(SHOTS, "phone-top.png") });
-    const overflow = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    if (overflow > 1) errors.push(`phone: page scrolls sideways by ${overflow}px`);
-    await phone.locator("#simulation").scrollIntoViewIfNeeded();
-    await phone.waitForTimeout(2500);
-    await phone.screenshot({ path: join(SHOTS, "phone-sim.png") });
-    const ds = await browser.newPage({ viewport: { width: 1280, height: 720 } });
-    await ds.goto(`${base}/deck/`, { waitUntil: "networkidle" });
-    const n = await ds.locator(".slide").count();
-    for (let k = 0; k < n; k += 1) await ds.locator(".slide").nth(k).screenshot({ path: join(SHOTS, `slide-${String(k + 1).padStart(2, "0")}.png`) });
-    // day mode: a visitor whose system is light, then the toggle back to night and its memory
-    const day = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "light" });
-    day.on("pageerror", (e) => errors.push(`day: ${e}`));
-    await day.goto(`${base}/`, { waitUntil: "networkidle" });
-    await day.screenshot({ path: join(SHOTS, "day-top.png") });
-    await day.locator('.sim-rail button[data-stage="8"]').click();
-    await day.waitForTimeout(2500);
-    await day.locator("#sim").screenshot({ path: join(SHOTS, "day-wins.png") });
-    await day.locator("#theme-toggle").click();
-    const after = await day.evaluate(() => [document.documentElement.dataset.theme, localStorage.getItem("tos-theme"), getComputedStyle(document.body).backgroundColor]);
-    if (after[0] !== "dark" || after[1] !== "dark" || after[2] !== "rgb(20, 21, 23)") errors.push(`toggle: ${after.join(" ")}`);
-    await day.reload({ waitUntil: "networkidle" });
-    const kept = await day.evaluate(() => document.documentElement.dataset.theme);
-    if (kept !== "dark") errors.push(`toggle not remembered: ${kept}`);
-    console.log(`render: day mode and toggle ok; screenshots in ${SHOTS}`);
+    if (id === "st-amend") {
+      check(await page.locator("#am-body .diff del").count() > 0 && await page.locator("#am-body .diff ins").count() >= 0, "amendments: no word diff");
+      await page.locator('#am-net button[data-change="a2-rfs-4.3"]').click();
+      check((await page.locator("#am-body h5").textContent()).includes("battery"), "amendments: the chip did not open its change");
+      await page.locator('#am-net button[data-change="a3-rfs-40.3"]').click();
+    }
+    if (id === "st-conditions") { await page.locator('#cond-toggle button[data-bid="over"]').click(); check(await page.locator("#cond-list li.failed").count() >= 1, "conditions: the over-built bid fails none"); await page.locator('#cond-toggle button[data-bid="win"]').click(); check(await page.locator("#cond-list li.failed").count() === 0, "conditions: the competitive bid fails one"); }
+    if (id === "st-studio") {
+      const read = () => page.locator("#sd-sp").textContent();
+      const p0 = await read();
+      await page.locator("#sd-solar").fill("4"); const p1 = await read();
+      check(p0 === `₹${data.win.tariff.toFixed(2)}` && p1 !== p0, `studio: price ${p0} → ${p1}`);
+      check(await page.locator("#sd-checks li.failed").count() > 0, "studio: 4 MWac fails no condition");
+      check(await page.locator("#sd-iso .iso-table").count() === 2, "studio: the array did not follow the slider");
+      await page.locator("#sd-wind").fill("10"); check(await page.locator("#sd-iso .iso-turbine").count() === 2, "studio: no wind array");
+      await page.locator("#sd-wind").fill("0"); await page.locator("#sd-opt").click(); await page.waitForTimeout(400);
+      check(await read() === p0 && await page.locator("#sd-solar").inputValue() === String(data.best), `studio: optimise ended at ${await page.locator("#sd-solar").inputValue()} MWac`);
+      await page.locator("#sd-ess").fill("0.72"); check(parseFloat((await read()).slice(1)) < data.win.tariff, "studio: cheaper battery did not lower the price");
+      await page.locator("#sd-save").click(); check(await page.locator("#sd-saved tbody tr").count() === 1, "studio: scenario not saved");
+      if (SHOTS) { await page.locator("#sd-solar").fill("30"); await page.locator("#sd-wind").fill("15"); await page.waitForTimeout(200); await sim.screenshot({ path: join(SHOTS, "stage-06b-studio-big.png") }); }
+      await page.locator(`.sim-rail button[data-stage="${k}"]`).click(); await page.waitForTimeout(200);
+    }
+    if (id === "st-whatif") {
+      await page.locator('#wi-targets button[data-t="7.50"]').click();
+      const n0 = await page.locator("#wi-track li").count(), first = await page.locator("#wi-track li .mv").first().textContent();
+      await page.locator("#wi-track .rej").first().click();
+      const first2 = await page.locator("#wi-track li .mv").first().textContent();
+      check(n0 > 0 && first !== first2 && await page.locator("#wi-rej button").count() === 1, "what-if: turning a lever down did not replan");
+    }
+    if (id === "st-review") { await page.locator('#rv-toggle button[data-bid="overbuilt"]').click(); check(await page.locator("#rv-list li.block").count() >= 3, "review: the over-built bid has no blocking findings"); if (SHOTS) await sim.screenshot({ path: join(SHOTS, "stage-12b-review-over.png") }); await page.locator('#rv-toggle button[data-bid="winning"]').click(); }
+    for (const c of await page.locator(`#${id} .chart`).all()) check(await c.locator("svg").count() === 1, `${id}: a chart is empty`);
+    if (SHOTS) await sim.screenshot({ path: join(SHOTS, `stage-${String(k + 1).padStart(2, "0")}-${id.replace("st-", "")}.png`) });
   }
+  // tender types, sections
+  for (const tt of ["fdre", "bess", "cfd"]) { await page.locator(`#tt-tabs button[data-tt="${tt}"]`).click(); check(await page.locator(`#tt-${tt} svg.iso`).isVisible(), `tender type ${tt}: no drawing`); if (SHOTS) await page.locator("#tenders").screenshot({ path: join(SHOTS, `tenders-${tt}.png`) }); }
+  if (SHOTS) { await page.screenshot({ path: join(SHOTS, "hero.png") }); for (const s of ["time", "optimiser", "team", "security", "what"]) await page.locator(`#${s}`).screenshot({ path: join(SHOTS, `section-${s}.png`) }); }
+  await page.close();
+
+  // ---- the guided tour: the cursor drives, then the visitor takes over
+  const tour = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
+  watch(tour, "tour");
+  await ready(tour);
+  await tour.locator("#sim").scrollIntoViewIfNeeded(); // the tour starts by itself when it comes into view
+  await tour.waitForFunction(() => document.querySelector("#cursor").classList.contains("on"), null, { timeout: 8000 });
+  await tour.waitForFunction(() => !document.querySelector("#st-read").hidden, null, { timeout: 30000 });
+  if (SHOTS) { await tour.waitForTimeout(3500); await tour.locator("#sim").screenshot({ path: join(SHOTS, "tour-cursor.png") }); }
+  await tour.locator(".sim-rail button[data-stage='5']").click();
+  await tour.locator("#sim-play").click();
+  await tour.waitForFunction(() => +document.querySelector("#sd-solar").value >= 28, null, { timeout: 15000 });
+  if (SHOTS) await tour.locator("#sim").screenshot({ path: join(SHOTS, "tour-studio-drag.png") });
+  await tour.locator("#sd-view, .sd-view").first().click({ position: { x: 30, y: 30 } });
+  check(await tour.locator("#sim-mode").isVisible() && !(await tour.locator("#cursor").evaluate((c) => c.classList.contains("on"))), "tour: taking the mouse did not stop it");
+  await tour.close();
+
+  // ---- day mode and the toggle; a phone
+  const day = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "light", reducedMotion: "reduce" });
+  watch(day, "day");
+  await ready(day);
+  if (SHOTS) { await day.screenshot({ path: join(SHOTS, "day-hero.png") }); await day.locator(".sim-rail button[data-stage='2']").click(); await day.waitForTimeout(600); await day.locator("#sim").screenshot({ path: join(SHOTS, "day-amend.png") }); await day.locator("#security").screenshot({ path: join(SHOTS, "day-security.png") }); }
+  await day.locator("#theme-toggle").click();
+  const after = await day.evaluate(() => [document.documentElement.dataset.theme, localStorage.getItem("tos-theme"), getComputedStyle(document.body).backgroundColor]);
+  check(after[0] === "dark" && after[1] === "dark" && after[2] === "rgb(20, 21, 23)", `toggle: ${after.join(" ")}`);
+  await day.close();
+  const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, colorScheme: "dark", reducedMotion: "reduce" });
+  watch(phone, "phone");
+  await ready(phone);
+  for (const k of [0, 2, 5, 9]) { await phone.locator(`.sim-rail button[data-stage="${k}"]`).click(); await phone.waitForTimeout(250); const o = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); check(o <= 1, `phone: screen ${k + 1} scrolls sideways by ${o}px`); if (SHOTS) await phone.locator("#sim").screenshot({ path: join(SHOTS, `phone-stage-${k + 1}.png`) }); }
+  if (SHOTS) await phone.screenshot({ path: join(SHOTS, "phone-hero.png") });
+  await phone.close();
 } finally {
   await browser.close();
   server.close();
 }
-if (errors.length) { console.error("render: page errors:\n" + errors.join("\n")); process.exit(1); }
-console.log("render: page loads with no errors, three charts drawn");
+if (errors.length) { console.error("render: FAILED\n  " + errors.join("\n  ")); process.exit(1); }
+console.log(`render: 13 screens, studio, what-if, guided tour, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);
