@@ -1,0 +1,20 @@
+{
+  "voice": "sage",
+  "model": "gpt-4o-mini-tts",
+  "instructions": "A calm, confident product narrator speaking clear Indian English to energy professionals. Measured pace, warm but precise, no hype. Say rupee amounts and numbers naturally. Read 'CfD' as 'C F D', 'SECI' as 'seki', 'TenderOS' as 'Tender O S', 'jouleWise' as 'joule wise'.",
+  "clips": {
+    "upload": "This is SECI's first Contract for Difference tender. Six documents, two hundred and sixteen pages: the request for selection, the agreement, and four amendments. Drop them in together. TenderOS identifies each one, puts them in order, and starts reading.",
+    "read": "Every value it reads is tied to its page. Click a condition, and the tender opens at the exact sentence it came from. Nothing reaches the bid until a reviewer has confirmed the reading.",
+    "amend": "Amendments are where bids go wrong. Here are all forty changes, word by word: what was struck out, what was added, and SECI's own page beside it. The ceiling tariff removed. The battery made mandatory. The award tied to SECI's corpus.",
+    "conditions": "Two hundred and sixty-two conditions, each with its clause. The ones that depend on the plant are tested on every design, so a bid that breaks the tender is flagged before the bid committee ever sees it.",
+    "team": "Projects, design and finance each own their inputs. Ask a colleague from any box, attach the supplier's offer as evidence, and have the bid head sign off. If the value changes later, the sign-off turns amber.",
+    "studio": "Now design the plant. Move own solar, wind, battery cost, or the return you want, and the strike price, the project cost and the tender's conditions follow at once. Every point is a full fifteen-year simulation. Take the mouse and try it yourself.",
+    "size": "The optimiser searches every plant. Too little solar, and some evenings fall short. Too much, and the solar costs more than the power it replaces. Add wind, and on this tender the price rises. It keeps the lowest price that still meets the tender every single day.",
+    "dispatch": "Then it proves the result. Every day of fifteen years, in fifteen-minute blocks: when the battery charges, from which source, and when it supplies the evening peak. More than half a million blocks, ready as a compliance file.",
+    "finance": "Behind the price is a complete financial model: construction, debt sculpted to the lender's cover ratio, tax and working capital. Click any figure to see what it rests on. The same model downloads as a live Excel workbook.",
+    "whatif": "On bid day, choose the price you want to quote. TenderOS shows what each lever is worth, and plans the surest route there, with the chance of each move. Turn a lever down, and it finds another way.",
+    "wins": "Will this price win? SECI's pool pays, or collects, the difference between the strike price and the market. After the fourth amendment, SECI may award only what its corpus can carry. So the bid is tested against the pool as well.",
+    "review": "Before submission, the bid is reviewed against the tender's rules, the lender's ratios, and what the market has actually paid. A sound bid passes. An over-built one is told exactly what is wrong, and where to fix it.",
+    "pack": "And the bid pack is ready: the Excel model, the tender's formats as letters, the fifteen-minute dispatch, the conditions checklist and the evidence register. Months of bid work, done in hours. Talk to jouleWise to see it on your own tender."
+  }
+}

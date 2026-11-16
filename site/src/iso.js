@@ -96,37 +96,43 @@
     // `reserve` keeps the drawing's frame fixed while the sizes move (the studio's sliders): the
     // field is laid out for the largest solar and room is kept for the wind rows
     const rows = 4, colsT = Math.max(2, Math.ceil((reserve ? Math.round(reserve.solarMw / mwPerTable) : nT) / rows));
-    const hasGen = kind !== "bess";
-    const fieldW = hasGen ? colsT * 8.5 + 1.5 : 0, fieldD = hasGen ? rows * 5.4 + 1.5 : 0;
+    const hasField = kind !== "bess" && (nT > 0 || nW > 0 || Boolean(reserve)), windOnly = hasField && !nT && !reserve, hasBess = nC > 0;
+    const fieldW = hasField ? (windOnly ? 40 : colsT * 8.5 + 1.5) : 0, fieldD = hasField ? rows * 5.4 + 1.5 : 0;
     const perCol = 5, colsC = Math.max(1, Math.ceil(nC / perCol)), yardW = colsC * 11 + 1, yardD = Math.min(perCol, Math.max(nC, 1)) * 4.4 + 1.5;
-    const vc = hasGen ? (fieldW + fieldD) / 2 : (yardW + yardD) / 2; // the depth everything is centred on
-    const uY = (hasGen ? fieldW + 5 : 0) + yardD, [bx, by] = at(uY, vc - (yardW + yardD) / 2);
-    const uS = uY + yardW + 5 + 12, [sx, sy] = at(uS, vc - 15);
+    const vc = hasField ? (fieldW + fieldD) / 2 : (yardW + yardD) / 2; // the depth everything is centred on
+    const uGen = hasField ? fieldW + 5 : 0;
+    const uY = uGen + yardD, [bx, by] = at(uY, vc - (yardW + yardD) / 2);
+    const uS = (hasBess ? uY + yardW + 5 : uGen) + 12, [sx, sy] = at(uS, vc - 15);
     const uP = [uS + 18 + 8, uS + 18 + 21], pyl = uP.map((u) => at(u, vc));
     const uE = uP[1] + 9 + 12, [ex, ey] = at(uE, vc - 12);
     const line = (u0, u1, dv) => [at(u0, vc + dv), at(u1, vc + dv)];
-    if (hasGen) {
+    const uStore = hasBess ? uY - yardD / 2 : uS - 8; // where generation is taken to
+    if (hasField) {
       S.pad(-2, -2, fieldW + 2, fieldD + 2, "park");
       for (let k = 0; k < nT; k += 1) { const c = Math.floor(k / rows), rI = k % rows; S.table(c * 8.5, rI * 5.4, 7, 3, k * 18); }
-      if (labels) S.label(fieldW / 2 - 6, fieldD + 1, 0, text.solar || "Own solar", `${solarMw} MWac`, "middle", 0, 18);
-      const gap = Math.min(10, (fieldW - 6) / 3.4), wx = (k) => 2 + (k % 4) * gap + (k >= 4 ? gap / 2 : 0), wy = (k) => -9 - (k >= 4 ? 10 : 0);
+      if (labels && (nT || reserve)) S.label(fieldW / 2 - 6, fieldD + 1, 0, text.solar || "Solar", `${solarMw} MWac`, "middle", 0, 18);
+      // wind stands behind the solar field, or on the ground itself when there is no solar
+      const gap = windOnly ? 9 : Math.min(10, (fieldW - 6) / 3.4), wx = (k) => (windOnly ? 5 : 2) + (k % 4) * gap + (k >= 4 ? gap / 2 : 0), wy = (k) => (windOnly ? (k >= 4 ? 15 : 5) : -9 - (k >= 4 ? 10 : 0));
       if (reserve && reserve.windMw) { S.P(wx(0), -19, 23); S.P(wx(7), -19, 23); }
       for (let k = 0; k < nW; k += 1) S.turbine(wx(k), wy(k), 15, 6, (k * 1.3) % 5, k * 40);
-      if (nW && labels) S.label(wx(Math.min(nW, 4) - 1) / 2 + 1, nW > 4 ? -19 : -9, 23, text.wind || "Own wind", `${windMw} MW`, "middle", 0, -4);
-      if (nT) S.flow(line(fieldW * 0.62, uY - yardD / 2, 3), "charge");
-      if (nW) S.flow([[wx(Math.min(nW, 4) - 1) + 2, -8], at(uY - yardD - 2, vc - 9), at(uY - yardD / 2, vc - 3)], "wind");
+      if (nW && labels) { if (windOnly) S.label(fieldW / 2 - 6, fieldD + 1, 0, text.wind || "Wind", `${windMw} MW`, "middle", 0, 18); else S.label(wx(Math.min(nW, 4) - 1) / 2 + 1, nW > 4 ? -19 : -9, 23, text.wind || "Wind", `${windMw} MW`, "middle", 0, -4); }
+      if (nT || windOnly) S.flow(line(fieldW * 0.62, uStore, 3), hasBess ? "charge" : "supply");
+      if (nW && !windOnly) S.flow([[wx(Math.min(nW, 4) - 1) + 2, -8], at(uGen - 2, vc - 9), at(uStore, vc - 3)], "wind");
     }
-    S.pad(bx - 1.5, by - 1, yardW + 1.5, yardD + 1, "yard");
-    for (let k = 0; k < nC; k += 1) { const c = Math.floor(k / perCol), rI = k % perCol; S.container(bx + c * 11, by + rI * 4.4, 9, 3.2, 3.4, k * 22); }
-    if (labels) S.label(bx + yardW / 2 - 4, by + yardD + 1, 0, text.bess || "Battery", text.bessSub || `${bessMwh} MWh`, "middle", 0, 18);
+    if (hasBess) {
+      S.pad(bx - 1.5, by - 1, yardW + 1.5, yardD + 1, "yard");
+      for (let k = 0; k < nC; k += 1) { const c = Math.floor(k / perCol), rI = k % perCol; S.container(bx + c * 11, by + rI * 4.4, 9, 3.2, 3.4, k * 22); }
+      if (labels) S.label(bx + yardW / 2 - 4, by + yardD + 1, 0, text.bess || "Battery", text.bessSub || `${bessMwh} MWh`, "middle", 0, 18);
+    }
     S.substation(sx, sy);
     if (labels) S.label(sx + 9, sy + 13, 0, text.sub || "Pooling substation", "", "middle", 14, 20);
     S.pylon(pyl[0][0], pyl[0][1], 15, pyl[1]); S.pylon(pyl[1][0], pyl[1][1], 15, null);
     if (labels) S.label(...at((uP[0] + uP[1]) / 2, vc), 17, text.grid || "ISTS grid", "", "middle", 0, -8);
     S.building(ex, ey, 12, 12, 11, "office");
     if (labels) S.label(ex + 6, ey + 6, 12.5, text.buyer || "Power exchange", text.buyerSub || "", "middle", 0, text.buyerSub ? -32 : -18);
-    S.flow(line(uY + (yardW - yardD) / 2, uE - 2, -2), "supply");
-    if (kind !== "fdre") S.flow(line(uE - 2, uY + (yardW - yardD) / 2, 2.5), "bought");
+    const uFrom = hasBess ? uY + (yardW - yardD) / 2 : uS - 8;
+    S.flow(line(uFrom, uE - 2, -2), "supply");
+    if (hasBess && (kind === "cfd" || kind === "bess")) S.flow(line(uE - 2, uFrom, 2.5), "bought");
     if (kind === "cfd") {
       const [px, py] = at(uE - 1.5, vc + 29);
       S.building(px, py, 9, 9, 7, "pool");
@@ -136,5 +142,30 @@
     return S.svg({ cls: `iso-plant iso-${kind}`, title: text.title || "Plant schematic" });
   }
 
-  root.TOSIso = { Scene, plant };
+  /**
+   * The plant a tender asks for, from what its title says: the drawing for a tender on the market
+   * (the landing page's first picture). Sizes are symbolic above a few hundred MW: the drawing
+   * shows the mix, the labels carry the tender's own figures.
+   */
+  function forTender(t) {
+    const cap = t.capacity || {}, mw = cap.mw || (cap.kw ? cap.kw / 1000 : 0), mwh = cap.mwh || 0, c = t.category || "";
+    const tables = (n) => ({ solarMw: n * 2, mwPerTable: 2 }), turbines = (n) => ({ windMw: n * 5, mwPerTurbine: 5 }), boxes = (n) => ({ bessMwh: n * 20, mwhPerContainer: 20 });
+    const size = (v, lo, hi, ref) => Math.max(lo, Math.min(hi, Math.round(lo + (hi - lo) * Math.min(1, (v || ref / 2) / ref))));
+    const mwText = mw ? `${Math.round(mw).toLocaleString("en-IN")} MW` : "", storeText = mwh ? `${Math.round(mwh).toLocaleString("en-IN")} MWh` : "storage";
+    const text = { title: t.title, buyer: t.source, buyerSub: "to the buying utilities" };
+    let o;
+    if (c === "cfd") o = { kind: "cfd", ...tables(6), ...turbines(0), ...boxes(size(mwh, 6, 14, 2000)), text: { ...text, buyer: "Power exchange", buyerSub: "", solar: "Own RE", bessSub: `${mwText} / ${storeText}` } };
+    else if (c === "bess") o = { kind: "bess", solarMw: 0, windMw: 0, ...boxes(size(mwh, 8, 20, 8000)), text: { ...text, bess: "Battery", bessSub: mwh ? `${mwText} / ${storeText}` : mwText } };
+    else if (c === "wind") o = { kind: "fdre", solarMw: 0, ...turbines(size(mw, 4, 8, 1500)), bessMwh: 0, text: { ...text, wind: "Wind" } };
+    else if (c === "solar" || c === "rooftop") o = { kind: "fdre", ...tables(size(mw, 6, 20, 1500)), windMw: 0, bessMwh: 0, text: { ...text, solar: c === "rooftop" ? "Rooftop solar" : "Solar" } };
+    else if (c === "solar+ess") o = { kind: "fdre", ...tables(size(mw, 10, 20, 1500)), windMw: 0, ...boxes(8), text: { ...text, bessSub: storeText } };
+    else o = { kind: "fdre", ...tables(size(mw, 10, 20, 1500)), ...turbines(size(mw, 3, 6, 1500)), ...boxes(size(mwh, 6, 14, 6000)), text: { ...text, bessSub: storeText } };
+    const svg = plant(o);
+    // a firm-supply tender states what is contracted, not how much solar or wind stands behind it
+    if (!["cfd", "bess", "wind", "solar", "rooftop", "solar+ess"].includes(c)) return svg.replace(/<tspan class="iso-sub"[^>]*>\d+ MW(ac)?<\/tspan>/g, "");
+    // the labels carry the tender's figures, not the drawing's symbolic ones
+    return svg.replace(/<tspan class="iso-sub"([^>]*)>(\d+) MWac<\/tspan>/, mw && c !== "cfd" ? `<tspan class="iso-sub"$1>${c === "rooftop" ? `${Math.round(cap.kw || mw * 1000).toLocaleString("en-IN")} kW` : mwText}</tspan>` : "").replace(/<tspan class="iso-sub"([^>]*)>(\d+) MW<\/tspan>/, mw ? `<tspan class="iso-sub"$1>${mwText}</tspan>` : "");
+  }
+
+  root.TOSIso = { Scene, plant, forTender };
 })(typeof globalThis !== "undefined" ? globalThis : window);

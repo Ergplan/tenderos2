@@ -1,0 +1,72 @@
+{
+ "voice": "sage",
+ "model": "gpt-4o-mini-tts",
+ "recordedAt": "2026-11-16",
+ "clips": {
+  "upload": {
+   "file": "upload-fdb75ef1.mp3",
+   "bytes": 121773,
+   "seconds": 20.3
+  },
+  "read": {
+   "file": "read-58d8886b.mp3",
+   "bytes": 75549,
+   "seconds": 12.6
+  },
+  "amend": {
+   "file": "amend-52e20bd3.mp3",
+   "bytes": 122925,
+   "seconds": 20.4
+  },
+  "conditions": {
+   "file": "conditions-4b96838c.mp3",
+   "bytes": 77421,
+   "seconds": 12.9
+  },
+  "team": {
+   "file": "team-453eb35b.mp3",
+   "bytes": 100749,
+   "seconds": 16.8
+  },
+  "studio": {
+   "file": "studio-5ef8482d.mp3",
+   "bytes": 107373,
+   "seconds": 17.9
+  },
+  "size": {
+   "file": "size-b059ff97.mp3",
+   "bytes": 133725,
+   "seconds": 22.2
+  },
+  "dispatch": {
+   "file": "dispatch-f05623cc.mp3",
+   "bytes": 107085,
+   "seconds": 17.8
+  },
+  "finance": {
+   "file": "finance-cb32bc72.mp3",
+   "bytes": 106221,
+   "seconds": 17.7
+  },
+  "whatif": {
+   "file": "whatif-4a0491dc.mp3",
+   "bytes": 86925,
+   "seconds": 14.4
+  },
+  "wins": {
+   "file": "wins-b2d9b44e.mp3",
+   "bytes": 119325,
+   "seconds": 19.8
+  },
+  "review": {
+   "file": "review-762ba09b.mp3",
+   "bytes": 91821,
+   "seconds": 15.3
+  },
+  "pack": {
+   "file": "pack-cd092fe3.mp3",
+   "bytes": 110397,
+   "seconds": 18.4
+  }
+ }
+}

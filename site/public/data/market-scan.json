@@ -1,0 +1,1057 @@
+{
+ "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
+ "scannedAt": "2026-11-16T11:49:46",
+ "sources": [
+  "https://www.seci.co.in/tenders",
+  "https://www.seci.co.in/tenders/results",
+  "https://www.nhpcindia.com/welcome/tender"
+ ],
+ "documentsOpened": 0,
+ "errors": [],
+ "tenders": [
+  {
+   "source": "SECI",
+   "id": "SECI000277",
+   "ref": "RfP No. SECI/C&P/MI/00/0002/26-27",
+   "title": "Selection of Tenant(s) for Renting out the Office space(s) of SECI, along with built-up facilities (Licensed Assets), at the NBCC Complex, East Kidwai Nagar, New Delhi",
+   "url": "https://www.seci.co.in/tender-details/YmVw",
+   "published": "2026-09-02",
+   "bidDeadline": "2026-11-06",
+   "bidOpen": "2026-11-06",
+   "category": "admin",
+   "categoryLabel": "Office, administration and other",
+   "capacity": {},
+   "scheme": null,
+   "ipp": false,
+   "summary": "Office, administration and other; for consultants and service providers. Bids are due 6 Nov 2026, 16:00, already closed. Pre-bid meeting 14 Sep 2026, 14:06. Bids open 6 Nov 2026, 16:30.",
+   "documents": 6,
+   "amendments": [
+    {
+     "name": "amendment-02",
+     "date": "2026-10-19"
+    },
+    {
+     "name": "Amendment-1 29092026R",
+     "date": "2026-09-29"
+    }
+   ],
+   "fingerprint": "6b4dca4b7e26bf85",
+   "firstSeen": "2026-09-02",
+   "status": "open",
+   "lastAmendment": "2026-10-19",
+   "daysToBid": -10
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000278",
+   "ref": "SECI/C&P/IPP/15/0009/26-27",
+   "title": "700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&I-1)",
+   "url": "https://www.seci.co.in/tender-details/YmV_",
+   "published": "2026-09-03",
+   "bidDeadline": "2026-11-16",
+   "bidOpen": "2026-11-19",
+   "category": "solar",
+   "categoryLabel": "Solar power",
+   "capacity": {
+    "mw": 700
+   },
+   "scheme": "C&I-1",
+   "ipp": true,
+   "summary": "Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 16 Nov 2026, 18:00. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 19 Nov 2026, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Pre Bid Clarifications1",
+     "date": "2026-10-13"
+    },
+    {
+     "name": "Amendment 011",
+     "date": "2026-10-13"
+    }
+   ],
+   "fingerprint": "f798274e21136d31",
+   "firstSeen": "2026-09-03",
+   "status": "open",
+   "lastAmendment": "2026-10-13",
+   "daysToBid": 0
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000282",
+   "ref": "SECI/C&P/MI/00/06/2026-27",
+   "title": "RfS for Green Ammonia (Mode-2A-Tranche-II)",
+   "url": "https://www.seci.co.in/tender-details/Ymp1",
+   "published": "2026-09-24",
+   "bidDeadline": "2026-11-17",
+   "bidOpen": "2026-11-20",
+   "category": "hydrogen",
+   "categoryLabel": "Green hydrogen and ammonia",
+   "capacity": {},
+   "scheme": "Mode-2A-Tranche-II",
+   "ipp": true,
+   "summary": "Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 17 Nov 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 20 Nov 2026, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Amendment-01",
+     "date": "2026-10-28"
+    },
+    {
+     "name": "Clarification-01",
+     "date": "2026-10-28"
+    }
+   ],
+   "fingerprint": "374d581884fb1345",
+   "firstSeen": "2026-09-24",
+   "status": "open",
+   "lastAmendment": "2026-10-28",
+   "daysToBid": 1
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000296",
+   "ref": "SECI/C&P/IPP/15/0013/26-27",
+   "title": "Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat",
+   "url": "https://www.seci.co.in/tender-details/Ymtx",
+   "published": "2026-10-28",
+   "bidDeadline": "2026-11-19",
+   "bidOpen": "2026-11-24",
+   "category": "bess",
+   "categoryLabel": "Battery storage (standalone BESS)",
+   "capacity": {
+    "mw": 4000,
+    "mwh": 16000
+   },
+   "scheme": null,
+   "ipp": true,
+   "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 19 Nov 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 24 Nov 2026, 10:00.",
+   "documents": 3,
+   "amendments": [],
+   "fingerprint": "fff0e4550b474506",
+   "firstSeen": "2026-10-28",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 3
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000249",
+   "ref": "SECI/C&P/IPP/13/0002/26-27",
+   "title": "RfS for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) under CfD Mechanism from ISTS-Connected RE Projects (SECI-CfD-I)",
+   "url": "https://www.seci.co.in/tender-details/YmZ-",
+   "published": "2026-04-19",
+   "bidDeadline": "2026-11-20",
+   "bidOpen": "2026-11-26",
+   "category": "cfd",
+   "categoryLabel": "Contract for Difference (peak supply)",
+   "capacity": {
+    "mw": 500,
+    "mwh": 1000,
+    "hours": 2
+   },
+   "scheme": "SECI-CfD-I",
+   "ipp": true,
+   "summary": "Contract for Difference (peak supply), 500 MW / 1,000 MWh (SECI-CfD-I); for developers: a power-supply or tariff bid. Bids are due 20 Nov 2026, 18:00. Pre-bid meeting 4 May 2026, 11:30. Bids open 26 Nov 2026, 10:00.",
+   "documents": 9,
+   "amendments": [
+    {
+     "name": "Amendment-04-SECI-CfD-I",
+     "date": "2026-11-05"
+    },
+    {
+     "name": "Amendment-03-SECI-CfD-I",
+     "date": "2026-10-09"
+    },
+    {
+     "name": "Amendment-02-SECI-CfD-I",
+     "date": "2026-08-03"
+    },
+    {
+     "name": "Amendment-01-SECI-CfD-I",
+     "date": "2026-07-17"
+    },
+    {
+     "name": "Revised RfS for 1000 MWh assured Peak Supply under CfD Mechanism (CfD-I)",
+     "date": "2026-07-15"
+    }
+   ],
+   "fingerprint": "bd0ed35dbfda3732",
+   "firstSeen": "2026-04-19",
+   "status": "amended",
+   "lastAmendment": "2026-11-05",
+   "daysToBid": 4
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000263",
+   "ref": "SECI/C&P/OP/11/0003/26-27",
+   "title": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wind)",
+   "url": "https://www.seci.co.in/tender-details/YmR0",
+   "published": "2026-07-16",
+   "bidDeadline": "2026-11-20",
+   "bidOpen": "2026-11-25",
+   "category": "wind",
+   "categoryLabel": "Wind power",
+   "capacity": {
+    "mw": 45.6
+   },
+   "scheme": null,
+   "ipp": false,
+   "summary": "Wind power, 45.6 MW; for EPC contractors: build the plant for SECI. Bids are due 20 Nov 2026, 18:00. Pre-bid meeting 3 Aug 2026, 15:30. Bids open 25 Nov 2026, 10:30.",
+   "documents": 9,
+   "amendments": [
+    {
+     "name": "amendment-2 28092026",
+     "date": "2026-09-28"
+    },
+    {
+     "name": "Amendment-1 Clarification-1 dwgFile KML File SA-A SA-B SA-C",
+     "date": "2026-09-10"
+    }
+   ],
+   "fingerprint": "08ecc1910eff9b71",
+   "firstSeen": "2026-07-16",
+   "status": "open",
+   "lastAmendment": "2026-09-28",
+   "daysToBid": 4
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000288",
+   "ref": "SECI/C&P/IPP/12/0011/26-27",
+   "title": "RfS for 1200 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XXI)",
+   "url": "https://www.seci.co.in/tender-details/Ymp_",
+   "published": "2026-10-07",
+   "bidDeadline": "2026-11-24",
+   "bidOpen": "2026-11-27",
+   "category": "wind",
+   "categoryLabel": "Wind power",
+   "capacity": {
+    "mw": 1200
+   },
+   "scheme": "SECI-Tranche-XXI",
+   "ipp": true,
+   "summary": "Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 27 Nov 2026, 10:00.",
+   "documents": 6,
+   "amendments": [
+    {
+     "name": "Amendment-01 Wind-Tranche-XXI",
+     "date": "2026-10-28"
+    }
+   ],
+   "fingerprint": "f956cf86dceb06ce",
+   "firstSeen": "2026-10-07",
+   "status": "open",
+   "lastAmendment": "2026-10-28",
+   "daysToBid": 8
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000281",
+   "ref": "SECI/C&P/IPP/11/0008/26-27",
+   "title": "RfS for setting up of 4083.75 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode at Constituent Colleges/Institutions of Central Agricultural University (CAU), Imphal - North Eastern Region (RTSPV T-XIII)",
+   "url": "https://www.seci.co.in/tender-details/Ymp2",
+   "published": "2026-09-18",
+   "bidDeadline": "2026-11-24",
+   "bidOpen": "2026-11-27",
+   "category": "rooftop",
+   "categoryLabel": "Rooftop solar (RESCO)",
+   "capacity": {
+    "kw": 4083.75
+   },
+   "scheme": "RTSPV T-XIII",
+   "ipp": true,
+   "summary": "Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 30 Sep 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
+   "documents": 5,
+   "amendments": [],
+   "fingerprint": "875841506f88d4fe",
+   "firstSeen": "2026-09-18",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 8
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000285",
+   "ref": "SECI/C&P/IPP/11/0009/26-27",
+   "title": "Request for Selection (RfS Document) of Solar Power Developers for Setting up of 11,159 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode through Tariff-Based Competitive Bidding (RTSPV-Tranche-XIV)",
+   "url": "https://www.seci.co.in/tender-details/Ympy",
+   "published": "2026-10-01",
+   "bidDeadline": "2026-11-24",
+   "bidOpen": "2026-11-27",
+   "category": "rooftop",
+   "categoryLabel": "Rooftop solar (RESCO)",
+   "capacity": {
+    "kw": 11159
+   },
+   "scheme": "RTSPV-Tranche-XIV",
+   "ipp": true,
+   "summary": "Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 7 Oct 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
+   "documents": 4,
+   "amendments": [],
+   "fingerprint": "a86db47d6e2b3699",
+   "firstSeen": "2026-10-01",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 8
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000286",
+   "ref": "SECI/C&P/IPP/15/0010/26-27",
+   "title": "RfS for Supply of Energy from 800 MW/ 3200 MWh Standalone Battery Energy Storage Systems in India (SECI-ESS-IV)",
+   "url": "https://www.seci.co.in/tender-details/Ympx",
+   "published": "2026-10-01",
+   "bidDeadline": "2026-11-25",
+   "bidOpen": "2026-11-30",
+   "category": "bess",
+   "categoryLabel": "Battery storage (standalone BESS)",
+   "capacity": {
+    "mw": 800,
+    "mwh": 3200
+   },
+   "scheme": "SECI-ESS-IV",
+   "ipp": true,
+   "summary": "Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 9 Oct 2026, 16:00. Bids open 30 Nov 2026, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Amendment-02-SECI-ESS-IV",
+     "date": "2026-11-03"
+    },
+    {
+     "name": "Amendment-01-SECI-ESS-IV",
+     "date": "2026-10-31"
+    }
+   ],
+   "fingerprint": "77c97b8a89f45da5",
+   "firstSeen": "2026-10-01",
+   "status": "amended",
+   "lastAmendment": "2026-11-03",
+   "daysToBid": 9
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000283",
+   "ref": "SECI/C&P/EOI/17/0005/26-27",
+   "title": "Call for Proposals (CfP) for Selection of Executing Agency(ies) for preparation of Detailed Project Reports (DPRs) for Green Hydrogen Hubs in India under Component-B1 of the National Green Hydrogen Mission",
+   "url": "https://www.seci.co.in/tender-details/Ymp0",
+   "published": "2026-09-28",
+   "bidDeadline": "2026-11-30",
+   "bidOpen": "2026-12-01",
+   "category": "hydrogen",
+   "categoryLabel": "Green hydrogen and ammonia",
+   "capacity": {},
+   "scheme": null,
+   "ipp": false,
+   "summary": "Green hydrogen and ammonia; for consultants and service providers. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 6 Oct 2026, 14:30. Bids open 1 Dec 2026, 10:00.",
+   "documents": 2,
+   "amendments": [],
+   "fingerprint": "9854d3b0f3e44d15",
+   "firstSeen": "2026-09-28",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 14
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000289",
+   "ref": "SECI/C&P/IPP/13/0012/26-27",
+   "title": "RfS for Assured Peak Supply of 4800 MWh (1200 MW x 4 Hrs.) from ISTS-Connected RE Projects in India (SECI-FDRE-X)",
+   "url": "https://www.seci.co.in/tender-details/Ymp-",
+   "published": "2026-10-07",
+   "bidDeadline": "2026-12-01",
+   "bidOpen": "2026-12-04",
+   "category": "peak",
+   "categoryLabel": "Assured peak supply (FDRE)",
+   "capacity": {
+    "mw": 1200,
+    "mwh": 4800,
+    "hours": 4
+   },
+   "scheme": "SECI-FDRE-X",
+   "ipp": true,
+   "summary": "Assured peak supply (FDRE), 1,200 MW / 4,800 MWh (SECI-FDRE-X); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 4 Dec 2026, 10:00.",
+   "documents": 6,
+   "amendments": [
+    {
+     "name": "Amendment-01-SECI-FDRE-X",
+     "date": "2026-10-29"
+    }
+   ],
+   "fingerprint": "b2418eda0cf06db6",
+   "firstSeen": "2026-10-07",
+   "status": "open",
+   "lastAmendment": "2026-10-29",
+   "daysToBid": 15
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000287",
+   "ref": "SECI/C&P/IPP/11/0010/26-27",
+   "title": "Request for Selection (RfS) of Solar Power Developer for setting up of 3680 kW Grid-Connected Rooftop Solar PV Projects on NDMC Buildings under RESCO Mode through Tariff-based Competitive Bidding (RTSPV T-XV)",
+   "url": "https://www.seci.co.in/tender-details/Ympw",
+   "published": "2026-10-07",
+   "bidDeadline": "2026-12-01",
+   "bidOpen": "2026-12-04",
+   "category": "rooftop",
+   "categoryLabel": "Rooftop solar (RESCO)",
+   "capacity": {
+    "kw": 3680
+   },
+   "scheme": "RTSPV T-XV",
+   "ipp": true,
+   "summary": "Rooftop solar (RESCO), 3,680 kW (RTSPV T-XV); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 9 Nov 2026, 14:30. Bids open 4 Dec 2026, 10:00.",
+   "documents": 3,
+   "amendments": [],
+   "fingerprint": "dd24ed0d984d91e2",
+   "firstSeen": "2026-10-07",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 15
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000284",
+   "ref": "SECI/C&P/OP/11/0007/26-27",
+   "title": "Tender for Design, Engineering, Supply, Construction, Erection, Testing, Commissioning and O&M of ISTS-Connected 60 MW (AC) Solar PV Power Plant at Gaya, Bihar, India",
+   "url": "https://www.seci.co.in/tender-details/Ympz",
+   "published": "2026-09-30",
+   "bidDeadline": "2026-12-03",
+   "bidOpen": "2026-12-08",
+   "category": "solar",
+   "categoryLabel": "Solar power",
+   "capacity": {
+    "mw": 60
+   },
+   "scheme": null,
+   "ipp": false,
+   "summary": "Solar power, 60 MW; for EPC contractors: build the plant for SECI. Bids are due 3 Dec 2026, 18:00. Pre-bid meeting 15 Oct 2026, 15:30. Bids open 8 Dec 2026, 10:00.",
+   "documents": 5,
+   "amendments": [],
+   "fingerprint": "2f60a15e16abc986",
+   "firstSeen": "2026-09-30",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 17
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000295",
+   "ref": "SECI/C&P/PMC/11/07/2025-26",
+   "title": "RfS for setting up Solar PV Power Project for NHAI (Phase-I) under Tariff-Based Competitive Bidding",
+   "url": "https://www.seci.co.in/tender-details/Ymty",
+   "published": "2026-10-28",
+   "bidDeadline": "2026-12-14",
+   "bidOpen": "2026-12-17",
+   "category": "solar",
+   "categoryLabel": "Solar power",
+   "capacity": {},
+   "scheme": null,
+   "ipp": true,
+   "summary": "Solar power; for developers: a power-supply or tariff bid. Bids are due 14 Dec 2026, 18:00. Pre-bid meeting 12 Nov 2026, 14:30. Bids open 17 Dec 2026, 10:00.",
+   "documents": 6,
+   "amendments": [],
+   "fingerprint": "d94bcfbc0c29ccbf",
+   "firstSeen": "2026-10-28",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 28
+  },
+  {
+   "source": "NHPC",
+   "id": "9842",
+   "ref": "2026_NHPC_930977_1",
+   "title": "RfS of Developer for Setting up BESS and Supply of Solar- Plus -BESS Power utilizing the 1200 MW Solar Project at Jalaun Solar Park of BSUL",
+   "url": "https://www.nhpcindia.com/welcome/tender_detail/9842",
+   "published": "2026-11-04",
+   "bidDeadline": "2026-12-15",
+   "bidOpen": "2026-12-16",
+   "category": "solar+ess",
+   "categoryLabel": "Solar with battery storage",
+   "capacity": {
+    "mw": 1200
+   },
+   "scheme": null,
+   "ipp": true,
+   "summary": "Solar with battery storage, 1,200 MW; for developers: a power-supply or tariff bid.",
+   "documents": 1,
+   "amendments": [],
+   "fingerprint": "2026-12-15|0|RfS of Developer for Setting up BESS and Supply of Solar- Plus -BESS Power utilizing the 1200 MW Solar Project at Jalaun Solar Park of BSUL",
+   "firstSeen": "2026-11-04",
+   "status": "new",
+   "lastAmendment": null,
+   "daysToBid": 29
+  }
+ ],
+ "results": [
+  {
+   "source": "SECI",
+   "id": "SECI000258",
+   "ref": "SECI/C&P/IPP/13/0006/26-27",
+   "title": "RfS for assured Peak Supply of 6000 MWh (1500 MW x 4 Hrs.) from ISTS-Connected RE Projects (SECI-FDRE-IX)",
+   "url": "https://www.seci.co.in/tender-details/Ymd_"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000250",
+   "ref": "SECI/C&P/IPP/12/0003/26-27",
+   "title": "RfS for 2000 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XX)",
+   "url": "https://www.seci.co.in/tender-details/Ymd3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000243",
+   "ref": "SECI/C&P/IPP/11/0021/25-26",
+   "title": "RfS for setting up of 4455 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode (RTSPV-Tranche-IX)",
+   "url": "https://www.seci.co.in/tender-details/YmZ0"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000240",
+   "ref": "SECI/C&P/IPP/13/0020/25-26",
+   "title": "RfS for Supply of 1000 MW Firm and Dispatchable Renewable Energy Round-the-Clock (FDRE-RTC) Power from ISTS-Connected RE Power Projects in India (SECI-FDRE-RTC-V)",
+   "url": "https://www.seci.co.in/tender-details/YmZ3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000238",
+   "ref": "SECI/C&P/IPP/11/0019/25-26",
+   "title": "RfS for setting up of 10 MW Grid Connected Solar PV Power Project in Odisha under VGF-based Competitive Bidding",
+   "url": "https://www.seci.co.in/tender-details/YmF_"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000234",
+   "ref": "SECI/C&P/IPP/11/0018/25-26",
+   "title": "RfS for setting up of 5665 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode (RTSPV-Tranche-VIII)",
+   "url": "https://www.seci.co.in/tender-details/YmFz"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000230",
+   "ref": "SECI/C&P/IPP/15/0017/25-26",
+   "title": "RfS for Setting up of 1500 MW/12000 MWh Pumped Storage Plants in India (PSP-I)",
+   "url": "https://www.seci.co.in/tender-details/YmF3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000228",
+   "ref": "SECI/C&P/IPP/15/0015/25-26",
+   "title": "RfS for setting up of Projects of 125 MW/ 500 MWh Standalone BESS in Odisha with Viability Gap Funding supported through PSDF",
+   "url": "https://www.seci.co.in/tender-details/YmB_"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000227",
+   "ref": "SECI/C&P/IPP/11/0011/25-26",
+   "title": "RfS for Setting up of 8900 kW Grid-Connected RTSPV Projects on JNV Buildings under (RTSPV-Tranche-VI)",
+   "url": "https://www.seci.co.in/tender-details/YmBw"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000222",
+   "ref": "SECI/C&P/IPP/12/0013/25-26",
+   "title": "RfS for Setting up of 1200 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XIX)",
+   "url": "https://www.seci.co.in/tender-details/YmB1"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000221",
+   "ref": "SECI/C&P/IPP/13/0012/25-26",
+   "title": "RfS for assured Peak supply of 4800 MWh (1200 MW x 4 Hrs.) from ISTS-Connected RE Power Projects in India (SECI-FDRE-VII)",
+   "url": "https://www.seci.co.in/tender-details/YmB2"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000220",
+   "ref": "SECI/C&P/IPP/11/0009/25-26",
+   "title": "RfS for setting up of 3410 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode (RTSPV-Tranche-IV)",
+   "url": "https://www.seci.co.in/tender-details/YmB3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000218",
+   "ref": "SECI/C&P/IPP/11/0010/25-26",
+   "title": "RfS for Setting up of 17768 kW Grid-Connected RTSPV project in Puducherry (RTSPV-Tranche-V)",
+   "url": "https://www.seci.co.in/tender-details/YmN_"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000216",
+   "ref": "SECI/C&P/IPP/11/0008/25-26",
+   "title": "RfS for Setting up of 1000 kW Grid-Connected RTSPV project on buildings of Rashtrapati Bhavan (RTSPV-Tranche-III)",
+   "url": "https://www.seci.co.in/tender-details/YmNx"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000215",
+   "ref": "SECI/C&P/IPP/11/0007/25-26",
+   "title": "RfS for setting up of 3540 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode (RTSPV-Tranche-II)",
+   "url": "https://www.seci.co.in/tender-details/YmNy"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000213",
+   "ref": "SECI/C&P/OP/15/0002/25-26",
+   "title": "RfP for Selection of Contractor for Balance of System of 600 MW/1200 MWh BESS Project at Nandiyal, Andhra Pradesh (AC Package)",
+   "url": "https://www.seci.co.in/tender-details/YmN0"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000210",
+   "ref": "SECI/C&P/OP/15/0001/25-26",
+   "title": "RfP for Supply of 600 MW/1200 MWh Battery Energy Storage System (DC Package)",
+   "url": "https://www.seci.co.in/tender-details/YmN3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000206",
+   "ref": "SECI/C&P/IPP/11/0002/25-26",
+   "title": "RfS for setting up of 3850 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode (RTSPV-Tranche-I)",
+   "url": "https://www.seci.co.in/tender-details/YmJx"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000204",
+   "ref": "SECI/C&P/IPP/11/0006/25-26",
+   "title": "RfS for Setting up of 1200 MW ISTS-connected Solar PV Power Projects with 600 MW/3600 MWh ESS in India (SECI-ISTS-XXI)",
+   "url": "https://www.seci.co.in/tender-details/YmJz"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000202",
+   "ref": "SECI/C&P/IPP/11/0004/25-26",
+   "title": "RfS for 2000 MW ISTS-Connected Solar PV Power Projects with 1000 MW/ 4000 MWh ESS in India (SECI-ISTS-XX)",
+   "url": "https://www.seci.co.in/tender-details/YmJ1"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000194",
+   "ref": "SECI/C&P/IPP/11/0001/25-26",
+   "title": "RfS for Setting up of 6.25 MW Grid-Connected Rooftop Solar PV Projects under RESCO Mode",
+   "url": "https://www.seci.co.in/tender-details/YWtz"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000192",
+   "ref": "SECI/C&P/IPP/14/0026/24-25",
+   "title": "Setting up of 4.55 MW Grid-Connected Rooftop Solar PV Projects under RESCO Mode",
+   "url": "https://www.seci.co.in/tender-details/YWt1"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000186",
+   "ref": "SECI/C&P/IPP/14/0021/24-25",
+   "title": "Setting up of 1750 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode",
+   "url": "https://www.seci.co.in/tender-details/YWpx"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000184",
+   "ref": "GEM/2025/B/5799258",
+   "title": "Placement of office Assets Insurance Policy covering office Building, Office Equipment’s, Furniture & Fixtures etc. for SECI Assets.",
+   "url": "https://www.seci.co.in/tender-details/YWpz"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000183",
+   "ref": "GEM/2025/B/5799842",
+   "title": "Empanelment of Insurance Broking Firm",
+   "url": "https://www.seci.co.in/tender-details/YWp0"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000181",
+   "ref": "SECI/C&P/IPP/15/00018/24-25",
+   "title": "REQUEST FOR SELECTION (RFS) DOCUMENT FOR SETTING UP OF 125 MW/ 500 MWH STANDALONE BATTERY ENERGY STORAGE SYSTEM IN KERALA WITH VGF UNDER TARIFF-BASED GLOBAL COMPETITIVE BIDDING (ESS-3)",
+   "url": "https://www.seci.co.in/tender-details/YWp2"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000180",
+   "ref": "SECI/C&P/IPP/14/0012/24-25",
+   "title": "Setting up of 2112 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode",
+   "url": "https://www.seci.co.in/tender-details/YWp3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000179",
+   "ref": "SECI/C&P/IPP/11/0023/24-25",
+   "title": "Setting up 4.125 MW Grid-Connected Solar PV Projects in IIT Kharagpur Campus under RESCO Mode",
+   "url": "https://www.seci.co.in/tender-details/YWV-"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000176",
+   "ref": "SECI/C&P/IPP/13/0019/24-25",
+   "title": "RfS for 1200 MW RTC Power from ISTS-Connected RE Power Projects in India (SECI-RTC-IV)",
+   "url": "https://www.seci.co.in/tender-details/YWVx"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000175",
+   "ref": "SECI/C&P/MI/00/09/2024-25",
+   "title": "Tender for Engagement of Agency for Public Relations (PR) and Media Management of SECI",
+   "url": "https://www.seci.co.in/tender-details/YWVy"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000171",
+   "ref": "SECI/C&P/IPP/11/0014/24-25",
+   "title": "RfS for 1000 MW ISTS-Connected Solar PV Power Projects in India (SECI-ISTS-XVIII)",
+   "url": "https://www.seci.co.in/tender-details/YWV2"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000170",
+   "ref": "SECI/C&P/IPP/13/0013/24-25",
+   "title": "RfS for assured Peak supply of 8000 MWh (2000 MW x 4 Hrs.) from ISTS-Connected RE Projects (SECI-FDRE-VI)",
+   "url": "https://www.seci.co.in/tender-details/YWV3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000162",
+   "ref": "SECI/C&P/IPP/11/0011/24-25",
+   "title": "RfS for Setting up of 2000 MW ISTS-connected Solar PV Power Projects with 1000 MW/4000 MWh Energy Storage Systems (ESS) in India under Tariff-based Competitive Bidding (SECI-ISTS-XVII)",
+   "url": "https://www.seci.co.in/tender-details/YWR1"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000157",
+   "ref": "SECI/C&P/MI/00/0006/2024-25",
+   "title": "RfS for Setting up Production Facilities for Green Hydrogen in India under SIGHT Scheme (Mode-1-Tranche-II)",
+   "url": "https://www.seci.co.in/tender-details/YWdw"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000148",
+   "ref": "SECI/C&P/IPP/14/0011/23-24",
+   "title": "Limited tender for Setting up of 1800 kW Grid-Connected Rooftop Solar PV Projects on government buildings in Uttar Pradesh at IIM-L (Lucknow & Noida campus) and BBAU- Lucknow under RESCO mode",
+   "url": "https://www.seci.co.in/tender-details/YWZ_"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000147",
+   "ref": "SECI/C&P/IPP/14/0010/23-24",
+   "title": "Limited tender for Setting up of 1000 kW Grid-Connected Rooftop Solar PV Project at Sardar Vallabh Bhai National Police Academy-Hyderabad under RESCO Mode",
+   "url": "https://www.seci.co.in/tender-details/YWZw"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000146",
+   "ref": "SECI/C&P/IPP/13/0006/24-25",
+   "title": "RfS for Selection of Hybrid Power Developers for Setting up of 400 MW ISTS-connected Wind-Solar Hybrid Power Projects in India (SECI-Tranche-IX)",
+   "url": "https://www.seci.co.in/tender-details/YWZx"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000142",
+   "ref": "SECI/C&P/MI/00/0002/2024-25",
+   "title": "RfS for Production and Supply of Green Ammonia in India under SIGHT Scheme (Mode-2A-Tranche-I)",
+   "url": "https://www.seci.co.in/tender-details/YWZ1"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000140",
+   "ref": "SECI/C&P/IPP/12/0002/24-25",
+   "title": "RfS for 500 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XVII)",
+   "url": "https://www.seci.co.in/tender-details/YWZ3"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000139",
+   "ref": "SECI/C&P/IPP/11/0004/24-25",
+   "title": "RfS for Setting up of 1200 MW ISTS-connected Solar PV Power Projects in India under Tariff-based Competitive Bidding (SECI-ISTS-XVI)",
+   "url": "https://www.seci.co.in/tender-details/YWF-"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000132",
+   "ref": "SECI/C&P/IPP/11/0023/23-24",
+   "title": "RfS for Setting up of 1200 MW ISTS-connected Solar PV Power Projects with 600 MW/1200 MWh Energy Storage Systems (ESS) in India under Tariff-based Competitive Bidding (SECI-ISTS-XV)",
+   "url": "https://www.seci.co.in/tender-details/YWF1"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000131",
+   "ref": "SECI/C&P/MI/00/0022/2023-24",
+   "title": "RfS for setting up Manufacturing Capacities for Electrolysers in India under SIGHT scheme (Tranche-II)",
+   "url": "https://www.seci.co.in/tender-details/YWF2"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000123",
+   "ref": "SECI/C&P/IPP/13/0020/23-24",
+   "title": "RfS for Selection of Hybrid Power Developers for Setting up of 1200 MW ISTS-connected Wind-Solar Hybrid Power Projects in India under Tariff-Based Competitive Bidding (SECI-Tranche-VIII)",
+   "url": "https://www.seci.co.in/tender-details/YWB0"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000121",
+   "ref": "SECI/C&P/IPP/11/0017/23-24",
+   "title": "RfS for Setting up of 1500 MW ISTS-Connected Solar PV Power Projects in India (SECI-ISTS-XIV)",
+   "url": "https://www.seci.co.in/tender-details/YWB2"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000119",
+   "ref": "SECI/C&P/IPP/11/0016/23-24",
+   "title": "RfS for Selection of Solar Power Developers for Setting up of 1500 MW ISTS-connected Solar PV Power Projects in India under Tariff-Based Competitive Bidding (SECI-ISTS-XIII)",
+   "url": "https://www.seci.co.in/tender-details/YWN-"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000117",
+   "ref": "SECI/C&P/MI/00/0017/2023-24",
+   "title": "Empanelment of Vendors for setting up of Rooftop and ground mounted projects (up to 5 MW) under category B (Round 2)",
+   "url": "https://www.seci.co.in/tender-details/YWNw"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000112",
+   "ref": "SECI/C&P/IPP/12/0009/22-23",
+   "title": "RfS for Selection of Wind Power Developers for Setting up of 1350 MW ISTS-connected Wind Power Projects (SECI-Tranche-XVI)",
+   "url": "https://www.seci.co.in/tender-details/YWN1"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000108",
+   "ref": "SECI/C&P/IPP/13/0008/23-24",
+   "title": "RfS for Selection of Hybrid Power Developers for Setting up of 2000 MW ISTS-connected Wind-Solar Hybrid Power Projects in India under Tariff-Based Competitive Bidding (SECI-Tranche-VII)",
+   "url": "https://www.seci.co.in/tender-details/YWJ_"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000107",
+   "ref": "SECI/C&P/IPP/11/0007/23-24",
+   "title": "RfS for Selection of Solar Power Developers for Setting up of 1000 MW ISTS-connected Solar PV Power Projects in India under Tariff-Based Competitive Bidding (SECI-ISTS-XII)",
+   "url": "https://www.seci.co.in/tender-details/YWJw"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000105",
+   "ref": "SECI/C&P/IPP/13/0006/23-24",
+   "title": "RfS for 1260 MW Firm and Dispatchable Power from ISTS-connected Renewable Energy (RE) Power Projects (SECI-FDRE-IV)",
+   "url": "https://www.seci.co.in/tender-details/YWJy"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000096",
+   "ref": "SECI/C&P/MI/00/0016/2023-24",
+   "title": "RfS for Setting up Production Facilities for Green Hydrogen in India under SIGHT Scheme (Mode-1-Tranche-I)",
+   "url": "https://www.seci.co.in/tender-details/aWQ"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000095",
+   "ref": "SECI/C&P/MI/00/0015/2023-24",
+   "title": "RfS for setting up Manufacturing Capacities for Electrolysers in India under SIGHT scheme (Tranche-I)",
+   "url": "https://www.seci.co.in/tender-details/aWc"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000092",
+   "ref": "SECI/C&P/AD/EOI/17/0001/2023-24",
+   "title": "EoI for the Empanelment for Agencies for Advertising and Publicity Services",
+   "url": "https://www.seci.co.in/tender-details/aWA"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000087",
+   "ref": "SECI/C&P/IPP/11/0009/22-23",
+   "title": "RfS for Selection of Solar Power Developers for Setting up of 2000 MW ISTS-connected Solar PV Power Projects (ISTS-XI)",
+   "url": "https://www.seci.co.in/tender-details/aGU"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000086",
+   "ref": "SECI/C&P/MI/00/0012/2022-23",
+   "title": "Empanelment of Vendors for Design, Supply, Installation, Testing and Commissioning including Warranty, Comprehensive Operation & Maintenance of Solar Power Projects-Rooftop and Ground mounted",
+   "url": "https://www.seci.co.in/tender-details/aGQ"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000081",
+   "ref": "SECI/C&P/IPP/12/0008/22-23",
+   "title": "RfS for Selection of Wind Power Developers for Setting up of 1200 MW ISTS-connected Wind Power Projects (Tranche-XIV)",
+   "url": "https://www.seci.co.in/tender-details/aGM"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000077",
+   "ref": "SECI/C&P/MI/00/0009/22-23",
+   "title": "RfS for Selection of Solar PV Module Manufacturers for Setting up Manufacturing Capacities for High Efficiency Solar PV Modules in India under the Production Linked Incentive Scheme (Tranche-II)",
+   "url": "https://www.seci.co.in/tender-details/Z2U"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000075",
+   "ref": "SECI/C&P/IPP/13/0007/22-23",
+   "title": "RfS for 1200 MW ISTS-Connected Wind-Solar Hybrid Power Projects with assured Peak Power supply in India (Tranche-VI)",
+   "url": "https://www.seci.co.in/tender-details/Z2c"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000073",
+   "ref": "SECI/C&P/EOI/17/0001/22-23",
+   "title": "Expression of Interest (EoI) from Advocates/Law Firms for Empanelment of Advocates/Law Firms in SECI",
+   "url": "https://www.seci.co.in/tender-details/Z2E"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000072",
+   "ref": "SECI/C&P/IPP/14/0005/22-23",
+   "title": "Request for Selection (RfS) Document for Selection Solar Power Developers for Setting up of Grid-Connected Rooftop Solar PV Projects on Government buildings under RESCO mode through",
+   "url": "https://www.seci.co.in/tender-details/Z2A"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000054",
+   "ref": "SECI/C&P/IPP/15/0001/22-23",
+   "title": "Request for Selection (RfS) Document for setting up of Pilot Projects of 500 MW/1000MWh Standalone Battery Energy Storage Systems in India under Tariff-Based Global Competitive Bidding (ESS-I)",
+   "url": "https://www.seci.co.in/tender-details/ZWY"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000047",
+   "ref": "SECI/C&P/IPP/12/0006/21-22",
+   "title": "RfS for Selection of Wind Power Developers for Setting up of 1200 MW ISTS-connected Wind Power Projects (Tranche-XIII)",
+   "url": "https://www.seci.co.in/tender-details/ZGU"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000043",
+   "ref": "SECI/C&P/IPP/13/0003/21-22",
+   "title": "RfS for Selection of Hybrid Power Developers for Setting up of 1200 MW ISTS-connected Wind-Solar Hybrid Power Projects (Tranche-V)",
+   "url": "https://www.seci.co.in/tender-details/ZGE"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000042",
+   "ref": "SECI/C&P/IPP/12/0002/21-22",
+   "title": "RfS for Selection of Wind Power Developers for Setting up of 1200 MW ISTS-connected Wind Power Projects (Tranche-XII)",
+   "url": "https://www.seci.co.in/tender-details/ZGA"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000036",
+   "ref": "SECI/C&P/SPD/ISTS-X/RfS/1200 MW/072021",
+   "title": "RfS for 1200 MW ISTS-connected Solar PV Projects in Karnataka (ISTS-X)",
+   "url": "https://www.seci.co.in/tender-details/Y2Q"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000033",
+   "ref": "SECI/C&P/WPD/1200MW/T11/RfS/052021",
+   "title": "RfS for Selection of Wind Power Developers for Setting up of 1200 MW ISTS-connected Wind Power Projects (Tranche-XI)",
+   "url": "https://www.seci.co.in/tender-details/Y2E"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000032",
+   "ref": "SECI/C&P/HPD/T4/1200MW/RfS/042021",
+   "title": "RfS for setting up of 1200 MW ISTS-Connected Wind-Solar Hybrid Power Projects (Tranche-IV)",
+   "url": "https://www.seci.co.in/tender-details/Y2A"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000030",
+   "ref": "SECI/C&P/SPD/RfS/RJ-IV/032021",
+   "title": "RfS for Setting up of 1785 MW Grid-Connected Solar PV Power projects in Rajasthan (Tranche-IV)",
+   "url": "https://www.seci.co.in/tender-details/Y2I"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000025",
+   "ref": "SECI/C&P/WPD/1200MW/T10/RfS/122020",
+   "title": "RfS for Selection of Wind Power Developers for Setting up of 1200 MW ISTS-connected Wind Power Projects (Tranche-X)",
+   "url": "https://www.seci.co.in/tender-details/Ymc"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000023",
+   "ref": "SECI/SD/EOI/20-21",
+   "title": "Expression of Interest for identification and empanelment of agencies for development of Electric / Transformative Mobility Space",
+   "url": "https://www.seci.co.in/tender-details/YmE"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000018",
+   "ref": "SECI/C&P/SPD/RfS/RJ-III/072020",
+   "title": "RfS for Setting up of 1070 MW Grid-Connected Solar PV Power projects in Rajasthan (Tranche-III)",
+   "url": "https://www.seci.co.in/tender-details/YWo"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000013",
+   "ref": "SECI/C&P/SPD/RfS/A&N/4MW/012020",
+   "title": "Request for Selection (RFS) for setting up of 04 MW Floating Solar Power Plant with 02 MW/01 MWh BESS at Kalpong Dam, Diglipur, North Andaman & Nicobar",
+   "url": "https://www.seci.co.in/tender-details/YWE"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000007",
+   "ref": "SECI/C&P/RPD/RTC-II/RfS/5000MW/032020",
+   "title": "RfS for Supply of 5000 MW RTC Power from ISTS-connected RE Power Projects, complemented with Coal based Thermal Power in India (RTC-II)",
+   "url": "https://www.seci.co.in/tender-details/Zw"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000006",
+   "ref": "SECI/C&P/SPD/ISTS-IX/RfS/2000MW/032020",
+   "title": "RfS for 2000 MW ISTS-connected Solar PV Power Projects in India (ISTS-IX)",
+   "url": "https://www.seci.co.in/tender-details/Zg"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000005",
+   "ref": "SECI/C&P/WPD/2000MW/T9/RfS/032020",
+   "title": "RfS for 2000 MW ISTS-connected Wind Power Projects in India (Tranche-IX)",
+   "url": "https://www.seci.co.in/tender-details/ZQ"
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000001",
+   "ref": "SECI/C&P/HPD/T3/1200MW/RfS/012020",
+   "title": "RfS for 1200 MW ISTS-connected Wind-Solar Hybrid Power Projects in India (Tranche-III)",
+   "url": "https://www.seci.co.in/tender-details/YQ"
+  }
+ ],
+ "events": [
+  {
+   "date": "2026-11-05",
+   "source": "SECI",
+   "id": "SECI000249",
+   "tender": "SECI-CfD-I",
+   "kind": "amendment",
+   "detail": "Amendment-04-SECI-CfD-I",
+   "url": "https://www.seci.co.in/tender-details/YmZ-"
+  },
+  {
+   "date": "2026-11-04",
+   "source": "NHPC",
+   "id": "9842",
+   "tender": "RfS of Developer for Setting up BESS and Supply of Solar- Plus -BESS P…",
+   "kind": "new tender",
+   "detail": "Battery storage (standalone BESS), 1,200 MW; for developers: a power-supply or tariff bid.",
+   "url": "https://www.nhpcindia.com/welcome/tender_detail/9842"
+  },
+  {
+   "date": "2026-11-03",
+   "source": "SECI",
+   "id": "SECI000286",
+   "tender": "SECI-ESS-IV",
+   "kind": "amendment",
+   "detail": "Amendment-02-SECI-ESS-IV",
+   "url": "https://www.seci.co.in/tender-details/Ympx"
+  }
+ ],
+ "counts": {
+  "tenders": 16,
+  "ipp": 12,
+  "seci": 15,
+  "nhpc": 1,
+  "newToday": 0
+ }
+}

@@ -127,7 +127,7 @@
 
   // ---- charts
   function scanChart(host) {
-    const pts = D.scan, W = 900, H = 330, L = 54, R = 18, T = 16, B = 40;
+    const pts = D.scan, W = 600, H = 380, L = 54, R = 14, T = 16, B = 40;
     const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
     const maxMw = pts[pts.length - 1].mw, lo = Math.floor(Math.min(...pts.map((p) => p.sp)) * 2) / 2 - 0.25, hi = Math.ceil(Math.max(...pts.map((p) => p.sp)) * 2) / 2;
     const x = (mw) => L + (mw / maxMw) * (W - L - R), y = (sp) => T + (1 - (sp - lo) / (hi - lo)) * (H - T - B);
@@ -147,7 +147,7 @@
     txt(bestG, x(best.mw) + 14, y(best.sp) + 26, `${best.mw} MWac · ${rs(best.sp)}/kWh, every day met`, { fill: V("ink"), "font-weight": 700 });
     host.replaceChildren(svg);
     const readout = $("#scan-readout");
-    const done = `Optimum: ${best.mw} MWac of own solar · strike price ${rs(best.sp)}/kWh · every day met. More solar costs more than the charging power it replaces.`;
+    const done = `Lowest at ${best.mw} MWac: every day is met and ${rs(best.sp)}/kWh on these example inputs. More solar costs more than the charging power it replaces.`;
     return {
       rest() { path.style.strokeDashoffset = "0"; bestG.setAttribute("opacity", 1); dot.setAttribute("opacity", 0); readout.textContent = done; },
       play() {
@@ -164,6 +164,68 @@
         requestAnimationFrame(frame);
       },
     };
+  }
+
+  function surfaceChart(host) {
+    const g = D.grid, nS = g.solar.length, nW = g.wind.length, W = 600, L = 50, R = 8, T = 6, B = 36, cw = (W - L - R) / nS, ch = 30, H = T + nW * ch + B;
+    const e0 = D.win.inputs.essCrPerMwh, q0 = D.win.inputs.targetEquityIrr;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+    const cells = [];
+    let lo = Infinity, hi = -Infinity, best = null;
+    for (let si = 0; si < nS; si += 1) for (let wi = 0; wi < nW; wi += 1) { const ok = !physAt(si, wi).checks.includes("f"), sp = priceAt(si, wi, e0, q0); cells.push({ si, wi, ok, sp }); if (ok) { lo = Math.min(lo, sp); hi = Math.max(hi, sp); if (!best || sp < best.sp) best = cells[cells.length - 1]; } }
+    const rects = cells.map((c) => {
+      const t = c.ok ? Math.sqrt((c.sp - lo) / (hi - lo)) : 0;
+      const r = el("rect", { x: L + c.si * cw + 1, y: T + (nW - 1 - c.wi) * ch + 1, width: cw - 2, height: ch - 2, rx: 2 }, svg);
+      r.style.fill = c.ok ? `color-mix(in srgb, var(--heat) ${Math.round(t * 100)}%, var(--power))` : "var(--line-2)";
+      r.style.opacity = c.ok ? 0.9 : 0.55;
+      el("title", {}, r).textContent = `${g.solar[c.si]} MWac solar, ${g.wind[c.wi]} MW wind: ${rs(c.sp, 3)}/kWh${c.ok ? "" : ", breaks a tender condition"}`;
+      return r;
+    });
+    const bx = L + best.si * cw, by = T + (nW - 1 - best.wi) * ch;
+    const mark = el("g", {}, svg);
+    el("rect", { x: bx - 1, y: by - 1, width: cw + 2, height: ch + 2, rx: 3, fill: "none", stroke: V("ink"), "stroke-width": 2.5 }, mark);
+    const note = `Lowest: ${rs(best.sp)} at ${g.solar[best.si]} MWac, no wind`, nw = note.length * 6.6 + 16;
+    el("rect", { x: bx + cw + 8, y: by - ch - 2, width: nw, height: 22, rx: 3, fill: V("panel"), stroke: V("ink"), "stroke-width": 1 }, mark);
+    el("line", { x1: bx + cw, y1: by, x2: bx + cw + 8, y2: by - ch + 18, stroke: V("ink"), "stroke-width": 1 }, mark);
+    txt(mark, bx + cw + 16, by - ch + 13, note, { fill: V("ink"), "font-weight": 700 });
+    g.wind.forEach((w, wi) => txt(svg, L - 8, T + (nW - 1 - wi) * ch + ch / 2 + 4, `${w} MW`, { "text-anchor": "end" }));
+    g.solar.forEach((sv, si) => { if (sv % 10 === 0) txt(svg, L + si * cw + cw / 2, H - B + 16, `${sv}`, { "text-anchor": "middle" }); });
+    txt(svg, (L + W - R) / 2, H - 4, "Own solar, MWac", { "text-anchor": "middle" });
+    host.replaceChildren(svg);
+    return {
+      rest() { rects.forEach((r) => { r.style.transition = "none"; r.style.visibility = ""; }); mark.setAttribute("opacity", 1); },
+      play() { // the search: a coarse pass over the sizes, then the plants around the best
+        mark.setAttribute("opacity", 0);
+        rects.forEach((r) => { r.style.visibility = "hidden"; });
+        const order = cells.map((c, k) => k).sort((a, b) => (cells[a].si % 2) - (cells[b].si % 2) || cells[a].wi - cells[b].wi || cells[a].si - cells[b].si);
+        order.forEach((k, i) => setTimeout(() => { rects[k].style.visibility = ""; }, i * 30 * speed));
+        setTimeout(() => mark.setAttribute("opacity", 1), order.length * 30 * speed + 150);
+      },
+    };
+  }
+
+  function mixChart(host) {
+    const g = D.grid, nS = g.solar.length, W = 600, H = 170, L = 50, R = 8, T = 8, B = 30;
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}` });
+    const rows = g.solar.map((sv, si) => physAt(si, 0)), max = Math.max(...rows.map((r) => r.own + r.market + r.group)) * 1.05;
+    const x = (si) => L + (si / (nS - 1)) * (W - L - R), y = (v) => T + (1 - v / max) * (H - T - B);
+    for (let v = 0; v <= max; v += 20) { el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: "grid" }, svg); txt(svg, L - 8, y(v) + 4, `${v}`, { "text-anchor": "end" }); }
+    const firstOk = rows.findIndex((r) => !r.checks.includes("f"));
+    el("rect", { x: L, y: T, width: x(firstOk) - L, height: H - T - B, fill: V("heat"), opacity: 0.09 }, svg);
+    txt(svg, L + 6, T + 14, "falls short", { fill: V("heat") });
+    const areas = [];
+    let acc = rows.map(() => 0);
+    for (const [key, tone] of [["own", "evidence"], ["market", "violet"], ["group", "accent"]]) {
+      const top = rows.map((r, k) => acc[k] + r[key]);
+      areas.push(el("polygon", { points: [...top.map((v, k) => `${x(k)},${y(v)}`), ...acc.map((v, k) => `${x(k)},${y(v)}`).reverse()].join(" "), fill: V(tone), opacity: 0.85 }, svg));
+      acc = top;
+    }
+    const bi = g.solar.indexOf(D.best);
+    el("line", { x1: x(bi), x2: x(bi), y1: T, y2: H - B, stroke: V("ink"), "stroke-width": 1.6, "stroke-dasharray": "4 3" }, svg);
+    txt(svg, x(bi) + 6, T + 14, "the optimum", { fill: V("ink"), "font-weight": 700 });
+    g.solar.forEach((sv, si) => { if (sv % 10 === 0) txt(svg, x(si), H - B + 16, `${sv}`, { "text-anchor": si === 0 ? "start" : "middle" }); });
+    host.replaceChildren(svg);
+    return { rest() { areas.forEach((a2) => { a2.style.transition = "none"; a2.style.opacity = ""; }); }, play() { areas.forEach((a2, i) => { a2.style.transition = "none"; a2.style.opacity = 0; requestAnimationFrame(() => requestAnimationFrame(() => { a2.style.transition = `opacity .6s ease ${(600 + i * 450) * speed}ms`; a2.style.opacity = ""; })); }); } };
   }
 
   function dayChart(host) {
@@ -475,7 +537,11 @@
     },
   };
 
-  S.size = { init() { charts.scan = scanChart($("#chart-scan")); }, rest() { charts.scan.rest(); }, async script(t) { charts.scan.play(); await wait(5600, t); } };
+  S.size = {
+    init() { charts.scan = scanChart($("#chart-scan")); charts.surface = surfaceChart($("#chart-surface")); charts.mix = mixChart($("#chart-mix")); },
+    rest() { charts.scan.rest(); charts.surface.rest(); charts.mix.rest(); },
+    async script(t) { charts.scan.play(); charts.surface.play(); charts.mix.play(); await moveTo(t, "#chart-scan", { fx: 0.2, fy: 0.3 }); await moveTo(t, "#chart-scan", { fx: 0.28, fy: 0.72, dur: 2400 }); await wait(1200, t); await moveTo(t, "#chart-surface", { fx: 0.3, fy: 0.75, dur: 1100 }); await wait(2600, t); await moveTo(t, "#chart-mix", { fx: 0.3, fy: 0.5, dur: 900 }); await wait(2200, t); },
+  };
   S.dispatch = {
     init() { charts.day = dayChart($("#chart-day")); charts.heat = heatMap($("#heat")); },
     rest() { charts.day.rest(); charts.heat.rest(); },
@@ -540,13 +606,29 @@
   };
   S.pack = { rest() {}, async script(t, p) { $$(".pack li", p).forEach((li, k) => { li.style.animationDelay = `${k * 120}ms`; }); await wait(3200, t); } };
 
-  // ---- the player
-  const setPlayLabel = () => { playBtn.textContent = playing ? "❚❚ Pause" : started ? "▶ Resume tour" : "▶ Play tour"; playBtn.setAttribute("aria-label", playing ? "Pause the tour" : "Play the tour"); };
-  const kill = () => { if (tok) tok.dead = true; tok = null; cursor.classList.remove("on", "down", "click"); bar.style.transition = "none"; bar.style.width = `${(cur / (panels.length - 1)) * 100}%`; };
+  // ---- the player: the cursor, the captions and the voice-over
+  const audio = new Audio();
+  audio.preload = "auto";
+  const voiceBtn = $("#sim-voice"), capBox = $("#sim-caption"), capText = $("#sim-caption-text");
+  let voice = false, voiceChosen = false, wantVoice = false;
+  const hasVoice = () => Object.values(D.narration || {}).some((n) => n.src);
+  const setVoice = (on) => { voice = Boolean(on) && hasVoice(); voiceBtn.setAttribute("aria-pressed", String(voice)); voiceBtn.classList.toggle("on", voice); voiceBtn.classList.remove("nudge"); voiceBtn.title = voice ? "Turn the voice-over off" : "Turn the voice-over on"; if (!voice) audio.pause(); };
+  // one screen's narration: resolves when the clip ends, fails to start, or the screen is left
+  const speak = (id, t) => new Promise((res) => {
+    const n = D.narration?.[id];
+    if (!voice || !n?.src) { res(); return; }
+    const done = () => { audio.onended = null; audio.onerror = null; res(); };
+    audio.onended = done; audio.onerror = done;
+    t.stop = () => { audio.pause(); done(); };
+    audio.src = n.src;
+    audio.play().catch(() => { setVoice(false); voiceBtn.classList.add("nudge"); done(); }); // the browser wants a click first
+  });
+  const setPlayLabel = () => { playBtn.textContent = playing ? "❚❚ Pause" : started ? "▶ Resume tour" : hasVoice() ? "▶ Play with voice" : "▶ Play tour"; playBtn.setAttribute("aria-label", playing ? "Pause the tour" : "Play the tour"); };
+  const kill = () => { if (tok) { tok.dead = true; tok.stop?.(); } tok = null; audio.pause(); cursor.classList.remove("on", "down", "click"); bar.style.transition = "none"; bar.style.width = `${(cur / (panels.length - 1)) * 100}%`; };
   function show(k, auto) {
     kill();
     cur = (k + panels.length) % panels.length;
-    const id = idOf(cur), p = panels[cur];
+    const id = idOf(cur), p = panels[cur], n = D.narration?.[id];
     railTabs.forEach((b, i) => { b.setAttribute("aria-selected", String(i === cur)); b.classList.toggle("done", i < cur); b.tabIndex = i === cur ? 0 : -1; });
     rail.scrollTo({ left: railTabs[cur].offsetLeft - rail.clientWidth / 2 + railTabs[cur].clientWidth / 2, behavior: reduce ? "auto" : "smooth" });
     panels.forEach((x, i) => { x.hidden = i !== cur; x.classList.remove("play", "staged"); });
@@ -554,39 +636,70 @@
     bar.style.width = `${(cur / (panels.length - 1)) * 100}%`;
     S[id]?.rest?.(p);
     void p.offsetWidth; p.classList.add("play");
+    capBox.hidden = !auto || !n;
     if (!auto) return;
+    if (n) capText.textContent = n.text;
+    capBox.classList.toggle("spoken", voice);
     p.classList.add("staged");
     const mine = { dead: false }; tok = mine;
     (async () => {
       try {
+        const t0 = performance.now(), said = speak(id, mine);
         await wait(450, mine);
         await (S[id]?.script || (async (t) => wait(3000, t)))(mine, p);
-        await wait(1300, mine);
+        await said;
+        if (mine.dead) throw CANCEL;
+        // without the voice, leave time to read the caption
+        if (!voice && n && !reduce) await new Promise((res, rej) => setTimeout(() => (mine.dead ? rej(CANCEL) : res()), Math.max(0, n.seconds * 620 - (performance.now() - t0))));
+        await wait(voice ? 500 : 1300, mine);
         cursor.classList.remove("on");
-        if (cur === panels.length - 1) { playing = false; setPlayLabel(); p.classList.remove("staged"); } else show(cur + 1, true);
+        if (cur === panels.length - 1) { playing = false; setPlayLabel(); p.classList.remove("staged"); capBox.hidden = true; } else show(cur + 1, true);
       } catch (e) { if (e !== CANCEL) throw e; }
     })();
   }
-  const pause = (byUser) => { if (!playing && !tok) return; playing = false; kill(); panels[cur].classList.remove("staged"); S[idOf(cur)]?.rest?.(panels[cur]); setPlayLabel(); modeTag.hidden = !byUser; };
-  const play = () => { started = true; playing = true; modeTag.hidden = true; setPlayLabel(); show(cur === panels.length - 1 ? 0 : cur, true); };
+  const pause = (byUser) => { if (!playing && !tok) return; playing = false; kill(); panels[cur].classList.remove("staged"); S[idOf(cur)]?.rest?.(panels[cur]); setPlayLabel(); modeTag.hidden = !byUser; capBox.hidden = true; };
+  const play = (withVoice) => { if (withVoice && !voiceChosen) setVoice(true); started = true; playing = true; modeTag.hidden = true; setPlayLabel(); show(cur === panels.length - 1 ? 0 : cur, true); };
+
+  // the landing page's first drawing: the tenders on the market, one after another
+  function heroRotator() {
+    const list = D.market?.hero || [], draw = $("#hero-draw"), cap = $("#hero-cap"), dots = $$("#hero-dots button");
+    if (list.length < 2 || !draw || !window.TOSIso) return;
+    let k = 0, timer = null, seen = true;
+    const go = (i) => {
+      k = (i + list.length) % list.length;
+      draw.classList.add("swap");
+      setTimeout(() => { draw.innerHTML = window.TOSIso.forTender(list[k]); cap.innerHTML = list[k].cap; draw.classList.remove("swap"); dots.forEach((d, j) => d.setAttribute("aria-selected", String(j === k))); }, reduce ? 0 : 260);
+    };
+    const arm = () => { clearInterval(timer); if (!reduce) timer = setInterval(() => { if (seen && !document.hidden) go(k + 1); }, 6500); };
+    dots.forEach((d, j) => d.addEventListener("click", () => { go(j); arm(); }));
+    if ("IntersectionObserver" in window) new IntersectionObserver((es) => { seen = es[es.length - 1].isIntersecting; }, { threshold: 0.2 }).observe(draw);
+    arm();
+  }
 
   fetch("/data/demo.json").then((r) => r.json()).then((data) => {
     D = data;
     panels.forEach((p, k) => S[idOf(k)]?.init?.(p));
     panels.forEach((p, k) => S[idOf(k)]?.rest?.(p));
     show(0, false);
-    playBtn.addEventListener("click", () => (playing ? pause(false) : play()));
+    setPlayLabel();
+    voiceBtn.hidden = !hasVoice();
+    heroRotator();
+    playBtn.addEventListener("click", () => (playing ? pause(false) : play(true)));
+    voiceBtn.addEventListener("click", () => { voiceChosen = true; setVoice(!voice); if (playing) show(cur, true); });
     $("#sim-prev").addEventListener("click", () => { pause(true); show(cur - 1, false); });
     $("#sim-next").addEventListener("click", () => { pause(true); show(cur + 1, false); });
     railTabs.forEach((b, k) => b.addEventListener("click", () => { pause(true); show(k, false); }));
     rail.addEventListener("keydown", (e) => { if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return; e.preventDefault(); pause(true); show(cur + (e.key === "ArrowRight" ? 1 : -1), false); railTabs[cur].focus(); });
     // the visitor takes the mouse: the tour stops where it is and the screen is theirs
     for (const type of ["pointerdown", "wheel", "keydown"]) screen.addEventListener(type, (e) => { if (e.isTrusted && playing) pause(true); }, { capture: true, passive: true });
+    // a click on a link to the tour is a request to watch it: it may start with the voice
+    $$('a[href="#tour"]').forEach((a) => a.addEventListener("click", () => { wantVoice = true; }));
     if ("IntersectionObserver" in window) {
       let away = false;
       new IntersectionObserver((es) => {
         inView = es[es.length - 1].isIntersecting;
-        if (inView && !started && !reduce) play();
+        // coming into view starts the tour silently, with captions; the voice waits for a click
+        if (inView && !started && !reduce) { play(wantVoice); if (!voice) voiceBtn.classList.add("nudge"); }
         else if (!inView && playing) { away = true; kill(); }
         else if (inView && away && playing) { away = false; show(cur, true); }
       }, { threshold: 0.3 }).observe(sim);

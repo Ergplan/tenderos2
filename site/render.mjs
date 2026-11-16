@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUB = join(HERE, "public");
-const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".pdf": "application/pdf", ".txt": "text/plain; charset=utf-8", ".csv": "text/csv", ".xml": "application/xml" };
+const TYPES = { ".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "text/javascript", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".mp3": "audio/mpeg", ".pdf": "application/pdf", ".txt": "text/plain; charset=utf-8", ".csv": "text/csv", ".xml": "application/xml" };
 const shotsAt = process.argv.indexOf("--shots");
 const SHOTS = shotsAt > 0 ? process.argv[shotsAt + 1] : null;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
@@ -56,7 +56,7 @@ try {
     .k{display:flex;gap:44px}.k div{font-size:19px;color:#cbcac6}.k b{display:block;font-size:40px;font-weight:700;color:#3dd68c}
     .f{position:absolute;bottom:34px;left:80px;font-size:18px;color:#939190;font-family:"IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase}</style></head><body>
     <div class="b"><i>Tender</i>OS</div><h1>Months of bid work.<em>Done in hours.</em></h1>
-    <div class="k"><div><b>${data.tender.conditions}</b>conditions with pages</div><div><b>${data.tender.changes}</b>amendment changes</div><div><b>₹${data.win.tariff.toFixed(2)}</b>strike price, SECI CfD-I</div><div><b>${data.stats.sims}</b>15-year simulations</div></div>
+    <div class="k"><div><b>${data.tender.conditions}</b>conditions with pages</div><div><b>${data.tender.changes}</b>amendment changes</div><div><b>Daily</b>SECI and NHPC market scan</div><div><b>${data.stats.sims}</b>15-year simulations</div></div>
     <div class="f">tenderos.joulewise.tech · by jouleWise · on your premises</div></body></html>`);
   await og.waitForLoadState("networkidle"); await og.evaluate(() => document.fonts.ready);
   await og.screenshot({ path: join(PUB, "og.jpg"), type: "jpeg", quality: 86 });
@@ -110,6 +110,15 @@ try {
     for (const c of await page.locator(`#${id} .chart`).all()) check(await c.locator("svg").count() === 1, `${id}: a chart is empty`);
     if (SHOTS) await sim.screenshot({ path: join(SHOTS, `stage-${String(k + 1).padStart(2, "0")}-${id.replace("st-", "")}.png`) });
   }
+  // the landing page: no price in the hero, the phone number, the tenders on the market
+  check(!(await page.locator(".hero").textContent()).includes("₹"), "hero: a price is shown on the landing page");
+  check(await page.locator('a[href="tel:+918796792724"]').count() >= 4, "phone: the number is missing somewhere");
+  const dots = await page.locator("#hero-dots button").count();
+  check(dots >= 3 && await page.locator("#hero-draw svg.iso").count() === 1, `hero: ${dots} tenders drawn`);
+  const cap0 = await page.locator("#hero-cap b").textContent();
+  await page.locator("#hero-dots button").nth(1).click(); await page.waitForTimeout(150);
+  check((await page.locator("#hero-cap b").textContent()) !== cap0, "hero: the drawing did not change with the tender");
+  check(await page.locator(".events li").count() >= 1 && await page.locator(".open-tenders .src-nhpc").count() >= 1, "market: no change feed, or no NHPC tender");
   // tender types, sections
   for (const tt of ["fdre", "bess", "cfd"]) { await page.locator(`#tt-tabs button[data-tt="${tt}"]`).click(); check(await page.locator(`#tt-${tt} svg.iso`).isVisible(), `tender type ${tt}: no drawing`); if (SHOTS) await page.locator("#tenders").screenshot({ path: join(SHOTS, `tenders-${tt}.png`) }); }
   if (SHOTS) { await page.screenshot({ path: join(SHOTS, "hero.png") }); for (const s of ["time", "optimiser", "team", "security", "what"]) await page.locator(`#${s}`).screenshot({ path: join(SHOTS, `section-${s}.png`) }); }
@@ -131,6 +140,21 @@ try {
   check(await tour.locator("#sim-mode").isVisible() && !(await tour.locator("#cursor").evaluate((c) => c.classList.contains("on"))), "tour: taking the mouse did not stop it");
   await tour.close();
 
+  // ---- the voice-over: Play turns it on, the caption carries the same words, the button turns it off
+  const vo = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "dark", reducedMotion: "reduce" });
+  watch(vo, "voice");
+  await ready(vo);
+  check(await vo.locator("#sim-voice").isVisible() && (await vo.locator("#sim-play").textContent()).includes("voice"), "voice: no voice control");
+  await vo.locator("#sim-play").click();
+  await vo.waitForTimeout(900);
+  const asked = await vo.evaluate(() => performance.getEntriesByType("resource").filter((r) => r.name.includes("/audio/")).map((r) => r.name.split("/").pop()));
+  check(await vo.locator("#sim-voice").getAttribute("aria-pressed") === "true" && asked.some((n) => n.startsWith("upload-")), `voice: not playing the first clip (${asked.join(", ") || "no clip requested"})`);
+  check(await vo.locator("#sim-caption").isVisible() && (await vo.locator("#sim-caption-text").textContent()).includes("Contract for Difference"), "voice: no caption");
+  if (SHOTS) await vo.locator("#sim").screenshot({ path: join(SHOTS, "voice-caption.png") });
+  await vo.locator("#sim-voice").click();
+  check(await vo.locator("#sim-voice").getAttribute("aria-pressed") === "false", "voice: the button did not turn it off");
+  await vo.close();
+
   // ---- day mode and the toggle; a phone
   const day = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "light", reducedMotion: "reduce" });
   watch(day, "day");
@@ -151,4 +175,4 @@ try {
   server.close();
 }
 if (errors.length) { console.error("render: FAILED\n  " + errors.join("\n  ")); process.exit(1); }
-console.log(`render: 13 screens, studio, what-if, guided tour, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);
+console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);
