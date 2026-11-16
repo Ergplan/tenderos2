@@ -65,3 +65,36 @@ with the answers addressed to the sales address (`CONTACT_EMAIL` in `build.mjs`)
 form service or CRM endpoint when one is chosen. The tour has two routes (90-second overview of
 five screens, full tour of thirteen); it is held, voice included, while more than half of its window
 is out of view, and scrolling alone never stops it.
+
+## Visit analytics and personal links
+
+`src/track.js` (served as `/assets/track.js`, loaded before `app.js`) does two things.
+
+**Counting.** It loads Vercel Web Analytics (`/_vercel/insights/script.js`, no cookies; Web
+Analytics must be enabled on the Vercel project) and sends named events through
+`window.TOSTrack(name, data, once)`:
+
+| Event | Detail |
+|---|---|
+| Tour started, Tour finished, Voice-over heard | `route`: full tour or 90-second overview |
+| Tour screen, Took the controls | `screen`: upload, read, amend … pack |
+| Section read | `section`: the section's id, once it has held the middle of the screen for a second |
+| Time on page | `reached`: 30 seconds, 2, 5, 10, 20 minutes, counted while the tab is in front |
+| Deck downloaded, Call tapped, Email tapped, Book a demo clicked, Watch the tour clicked | `where`: header, footer, floating button or the section |
+| Demo form | `step`: started, sent to mail (never what was typed) |
+| Tender type opened, Design studio, Scenario saved, Data file opened, Outbound link | one detail each |
+
+Only the visitor's own clicks count (`isTrusted`): the tour's cursor presses buttons too. Each
+event carries one detail at most, plus `ref` on a personal visit, so no event has more than two
+properties. Nothing is sent from `localhost`, where the tests read `window.TOSTrack.log`.
+
+**Personal links.** `https://tenderos.joulewise.tech/for/<label>` is the home page
+(`vercel.json` rewrites it; `/?ref=<label>` is turned into the same path). The label is kept in
+the browser's `localStorage` (`tos-ref`) for 90 days and attached to every event as `ref`; the
+first event of such a visit is `Personal link` with `visit`: opened the link, opened the link
+again, or came back without the link. `/links` (not linked from the site, not indexed) makes
+the links for the sales team. In Vercel Analytics a personal visit shows under Pages as
+`/for/<label>`, and any event can be broken down by `ref`.
+
+`/privacy` says what is counted and lets a visitor forget their label or turn counting off in
+their browser (`tos-notrack`), after which neither the script nor any event is loaded or sent.

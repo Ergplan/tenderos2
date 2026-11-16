@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal links | TenderOS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark light">
+<script>try{var t=localStorage.getItem("tos-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<header class="top"><div class="wrap nav"><a href="/" class="brand" aria-label="TenderOS home"><span class="w1">Tender</span><span class="w2">OS</span><span class="by">by jouleWise</span></a><nav aria-label="Sections"><a href="/">Back to the site</a></nav></div></header>
+<main id="main" class="wrap prose">
+  <p class="eyebrow">For the jouleWise sales team</p>
+  <h1>Make a personal link</h1>
+  <p>Give each prospect their own link. Their visits and what they used on the site are then recorded under that label, in Vercel Analytics, for as long as their browser keeps it (90 days from the last time they open the link).</p>
+  <form class="demo-form" id="link-form" onsubmit="return false">
+    <label class="wide">Company, and the person if you want to tell colleagues apart<input id="link-name" placeholder="e.g. Acme Renewables, bid team" autocomplete="off" required></label>
+    <label class="wide">Their link<input id="link-out" readonly></label>
+    <button class="btn wide" type="button" id="link-copy">Copy the link</button>
+    <p class="wide muted small" id="link-note">The label is visible to the prospect in the address bar: use a company name or initials, nothing you would not show them. Open links you are only testing in a private window, or your own browser will carry the label.</p>
+  </form>
+  <h2>Where to see who came</h2>
+  <p>In this site's Vercel Analytics. Under Pages, a personal visit shows as <code>/for/the-label</code>. Under Events, open any event (Personal link, Tour screen, Deck downloaded, Call tapped) and break it down by <code>ref</code>.</p>
+</main>
+<script>
+(function () {
+  var name = document.getElementById("link-name"), out = document.getElementById("link-out"), copy = document.getElementById("link-copy");
+  var slug = function (s) { return s.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 48); };
+  var make = function () { var t = slug(name.value); out.value = t ? "https://tenderos.joulewise.tech/for/" + t : ""; };
+  name.addEventListener("input", make);
+  copy.addEventListener("click", function () { if (!out.value) { name.focus(); return; } out.select(); (navigator.clipboard ? navigator.clipboard.writeText(out.value) : Promise.reject()).then(function () { copy.textContent = "Copied ✓"; }, function () { document.execCommand("copy"); copy.textContent = "Copied ✓"; }); setTimeout(function () { copy.textContent = "Copy the link"; }, 1800); });
+})();
+</script>
+</body>
+</html>

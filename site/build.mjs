@@ -819,7 +819,7 @@ ${FAQ.map(([q, a]) => `  <details><summary>${esc(q)}</summary><p>${esc(a)}</p></
       <label class="wide">Preferred time <span class="opt">optional</span><input name="when" placeholder="e.g. weekday afternoons, India time"></label>
       <button class="btn wide" type="submit">Request the demo</button>
       <p class="wide muted small" id="demo-sent" hidden>Your mail application has opened with the request addressed to ${CONTACT_EMAIL}: send it from there. If nothing opened, call ${PHONE}.</p>
-      <p class="wide muted small">This opens your own mail with the details filled in; nothing is stored on this page.</p>
+      <p class="wide muted small">This opens your own mail with the details filled in; nothing you type here is stored or sent by this page. <a href="/privacy">Privacy</a>.</p>
     </form>
   </div>
 </section>
@@ -827,15 +827,95 @@ ${FAQ.map(([q, a]) => `  <details><summary>${esc(q)}</summary><p>${esc(a)}</p></
 
 <footer class="wrap foot-site">
   <p><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span> is a product of <a href="https://www.joulewise.tech">jouleWise</a>. Call <a href="tel:${TEL}">${PHONE}</a> or write to <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Auction data from <a href="${SECI_SITE}" rel="noopener">SECI's result notices</a>; tender pages and quotes from the SECI CfD-I RfS and its amendments, SECI's documents, shown to illustrate the reading. Model figures from the application's own code, built ${dateWords(BUILT)}.</p>
-  <p class="small"><a href="/llms.txt">llms.txt</a> · <a href="/llms-full.txt">llms-full.txt</a> · <a href="/data/seci-results.csv">SECI results (CSV)</a> · <a href="/data/cfd-demo.json">demo data (JSON)</a> · <a href="/sitemap.xml">sitemap</a></p>
+  <p class="small"><a href="/llms.txt">llms.txt</a> · <a href="/llms-full.txt">llms-full.txt</a> · <a href="/data/seci-results.csv">SECI results (CSV)</a> · <a href="/data/cfd-demo.json">demo data (JSON)</a> · <a href="/sitemap.xml">sitemap</a> · <a href="/privacy">privacy</a></p>
 </footer>
 <a class="sticker" href="tel:${TEL}" aria-label="Speak to the jouleWise sales team on ${PHONE}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4.5-2 1.2a11 11 0 006.3 6.3l1.2-2L21 14.5v3A2.5 2.5 0 0118.5 20 15.5 15.5 0 013 5.5 2.5 2.5 0 015.5 3z"/></svg><span><b>Speak to the jouleWise sales team</b><small>${PHONE}</small></span></a>
+<script src="/assets/track.js" defer></script>
 <script src="/assets/iso.js" defer></script>
 <script src="/assets/app.js" defer></script>
 </body>
 </html>
 `;
 write("index.html", page);
+
+// ------------------------------------------------------------------ the privacy notice
+write("privacy/index.html", `<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy | TenderOS by jouleWise</title>
+<meta name="description" content="What the TenderOS site counts about a visit, what a personal link is, and how to turn both off.">
+<link rel="canonical" href="${SITE}/privacy">
+<meta name="color-scheme" content="dark light">
+<script>try{var t=localStorage.getItem("tos-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+${FONTS}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<header class="top"><div class="wrap nav"><a href="/" class="brand" aria-label="TenderOS home"><span class="w1">Tender</span><span class="w2">OS</span><span class="by">by jouleWise</span></a><nav aria-label="Sections"><a href="/">Back to the site</a></nav><a class="nav-tel" href="tel:${TEL}">${PHONE}</a></div></header>
+<main id="main" class="wrap prose">
+  <p class="eyebrow">Privacy</p>
+  <h1>What this site counts</h1>
+  <p>This notice covers the public site ${SITE.replace("https://", "")}. The TenderOS application itself runs on your own premises and sends jouleWise nothing.</p>
+  <h2>Visits</h2>
+  <p>Visits are counted with Vercel Web Analytics, a service of our hosting provider. It sets no cookies and keeps no advertising profile. For each page view it records the page, the site you came from, the country, and the kind of device and browser. Visitors are told apart by a hash that is reset every day, so a visit today cannot be joined to a visit tomorrow.</p>
+  <p>The site also records what was used: that the guided tour was started and which screens were reached, that the deck was downloaded, that the phone number or the demo button was pressed, which sections were read and roughly how long the page stayed open. Nothing you type is recorded: not the design studio's numbers, and not the demo request, which opens in your own mail application and is sent from there.</p>
+  <h2>Personal links</h2>
+  <p>If jouleWise sent you a link of the form <code>${SITE.replace("https://", "")}/for/a-name</code>, that name is a label for you or your company. It is kept in your browser for 90 days and attached to the events above, so that we know the person we wrote to has looked at the site and what interested them. We use it to follow up with you and for nothing else. A visit without such a link carries no label.</p>
+  <h2>Your choice</h2>
+  <p id="track-state" class="note" aria-live="polite"></p>
+  <p class="cta-row"><button class="btn ghost" type="button" data-track="forget">Forget my personal link</button><button class="btn ghost" type="button" data-track="off">Stop counting my visits</button><button class="btn ghost" type="button" data-track="on">Count my visits again</button></p>
+  <p>These switches act on this browser only. To have what was recorded under your personal link deleted, or to ask anything else, write to <a href="mailto:${CONTACT_EMAIL}?subject=TenderOS%20privacy">${CONTACT_EMAIL}</a> or call <a href="tel:${TEL}">${PHONE}</a>.</p>
+  <p class="small muted">jouleWise · last changed ${dateWords(BUILT)}</p>
+</main>
+<script src="/assets/track.js" defer></script>
+</body>
+</html>
+`);
+
+// ------------------------------------------------------------------ the sales team's link maker (not linked from the site)
+write("links/index.html", `<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Personal links | TenderOS</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="dark light">
+<script>try{var t=localStorage.getItem("tos-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+${FONTS}
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+<header class="top"><div class="wrap nav"><a href="/" class="brand" aria-label="TenderOS home"><span class="w1">Tender</span><span class="w2">OS</span><span class="by">by jouleWise</span></a><nav aria-label="Sections"><a href="/">Back to the site</a></nav></div></header>
+<main id="main" class="wrap prose">
+  <p class="eyebrow">For the jouleWise sales team</p>
+  <h1>Make a personal link</h1>
+  <p>Give each prospect their own link. Their visits and what they used on the site are then recorded under that label, in Vercel Analytics, for as long as their browser keeps it (90 days from the last time they open the link).</p>
+  <form class="demo-form" id="link-form" onsubmit="return false">
+    <label class="wide">Company, and the person if you want to tell colleagues apart<input id="link-name" placeholder="e.g. Acme Renewables, bid team" autocomplete="off" required></label>
+    <label class="wide">Their link<input id="link-out" readonly></label>
+    <button class="btn wide" type="button" id="link-copy">Copy the link</button>
+    <p class="wide muted small" id="link-note">The label is visible to the prospect in the address bar: use a company name or initials, nothing you would not show them. Open links you are only testing in a private window, or your own browser will carry the label.</p>
+  </form>
+  <h2>Where to see who came</h2>
+  <p>In this site's Vercel Analytics. Under Pages, a personal visit shows as <code>/for/the-label</code>. Under Events, open any event (Personal link, Tour screen, Deck downloaded, Call tapped) and break it down by <code>ref</code>.</p>
+</main>
+<script>
+(function () {
+  var name = document.getElementById("link-name"), out = document.getElementById("link-out"), copy = document.getElementById("link-copy");
+  var slug = function (s) { return s.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^[-.]+|[-.]+$/g, "").slice(0, 48); };
+  var make = function () { var t = slug(name.value); out.value = t ? "${SITE}/for/" + t : ""; };
+  name.addEventListener("input", make);
+  copy.addEventListener("click", function () { if (!out.value) { name.focus(); return; } out.select(); (navigator.clipboard ? navigator.clipboard.writeText(out.value) : Promise.reject()).then(function () { copy.textContent = "Copied ✓"; }, function () { document.execCommand("copy"); copy.textContent = "Copied ✓"; }); setTimeout(function () { copy.textContent = "Copy the link"; }, 1800); });
+})();
+</script>
+</body>
+</html>
+`);
 
 // ------------------------------------------------------------------ the deck (rendered to PDF by render.mjs)
 const slide = (cls, inner) => `<section class="slide ${cls}">${inner}<footer><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span><span>tenderos.joulewise.tech</span></footer></section>`;
@@ -1001,20 +1081,24 @@ Sitemap: ${SITE}/sitemap.xml
 `);
 write("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${["/", "/TenderOS-deck.pdf", "/llms.txt", "/llms-full.txt", "/data/seci-results.csv", "/data/seci-results.json", "/data/market-scan.json", "/data/cfd-demo.json"].map((p) => `  <url><loc>${SITE}${p}</loc><lastmod>${BUILT}</lastmod></url>`).join("\n")}
+${["/", "/privacy", "/TenderOS-deck.pdf", "/llms.txt", "/llms-full.txt", "/data/seci-results.csv", "/data/seci-results.json", "/data/market-scan.json", "/data/cfd-demo.json"].map((p) => `  <url><loc>${SITE}${p}</loc><lastmod>${BUILT}</lastmod></url>`).join("\n")}
 </urlset>
 `);
 write("vercel.json", JSON.stringify({
   cleanUrls: true,
+  // a personal link, /for/<tag>, is the home page: src/track.js reads the tag from the path
+  rewrites: [{ source: "/for/:tag", destination: "/" }],
   headers: [
     { source: "/assets/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=600" }] },
     { source: "/pages/(.*)", headers: [{ key: "Cache-Control", value: "public, max-age=86400" }, { key: "X-Robots-Tag", value: "noindex" }] },
     { source: "/(.*)", headers: [{ key: "X-Content-Type-Options", value: "nosniff" }, { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }] },
+    { source: "/for/(.*)", headers: [{ key: "X-Robots-Tag", value: "noindex" }] },
+    { source: "/links", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
     { source: "/data/(.*)", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
     { source: "/TenderOS-deck.pdf", headers: [{ key: "Content-Disposition", value: "attachment; filename=\"TenderOS-deck.pdf\"" }] },
   ],
 }, null, 2));
 mkdirSync(join(OUT, "assets"), { recursive: true });
-for (const f of ["styles.css", "iso.css", "app.js", "iso.js", "deck.css"]) copyFileSync(join(HERE, "src", f), join(OUT, "assets", f));
+for (const f of ["styles.css", "iso.css", "app.js", "iso.js", "track.js", "deck.css"]) copyFileSync(join(HERE, "src", f), join(OUT, "assets", f));
 copyFileSync(join(HERE, "src/favicon.svg"), join(OUT, "favicon.svg"));
 log(`wrote ${OUT} (index.html ${Math.round(page.length / 1024)} KB, demo.json ${Math.round(JSON.stringify(demo).length / 1024)} KB)`);

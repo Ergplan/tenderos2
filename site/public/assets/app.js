@@ -618,6 +618,9 @@
   S.pack = { rest() {}, async script(t, p) { $$(".pack li", p).forEach((li, k) => { li.style.animationDelay = `${k * 120}ms`; }); await wait(3200, t); } };
 
   // ---- the player: the cursor, the captions and the voice-over
+  // what a visitor watched goes to the site's visit analytics (src/track.js); nothing if that is off
+  const track = (name, data, once) => window.TOSTrack?.(name, data, once);
+  const routeName = () => (route ? "90-second overview" : "full tour");
   const audio = new Audio();
   audio.preload = "auto";
   const voiceBtn = $("#sim-voice"), capBox = $("#sim-caption"), capText = $("#sim-caption-text");
@@ -632,7 +635,7 @@
     audio.onended = done; audio.onerror = done;
     t.stop = () => { audio.pause(); done(); };
     audio.src = n.src;
-    audio.play().catch(() => { setVoice(false); voiceBtn.classList.add("nudge"); done(); }); // the browser wants a click first
+    audio.play().then(() => track("Voice-over heard", { route: routeName() }, true)).catch(() => { setVoice(false); voiceBtn.classList.add("nudge"); done(); }); // the browser wants a click first
   });
   const setPlayLabel = () => { playBtn.textContent = playing ? "❚❚ Pause" : started ? "▶ Resume tour" : hasVoice() ? "▶ Play with voice" : "▶ Play tour"; playBtn.setAttribute("aria-label", playing ? "Pause the tour" : "Play the tour"); };
   const kill = () => { if (tok) { tok.dead = true; tok.stop?.(); } tok = null; audio.pause(); cursor.classList.remove("on", "down", "click"); bar.style.transition = "none"; bar.style.width = `${(cur / (panels.length - 1)) * 100}%`; };
@@ -646,6 +649,7 @@
     title.textContent = `TenderOS · SECI CfD-I · ${$(".t", railTabs[cur]).textContent}`;
     bar.style.width = `${(cur / (panels.length - 1)) * 100}%`;
     S[id]?.rest?.(p);
+    if (auto || sim.dataset.ready) track("Tour screen", { screen: id }, true);
     void p.offsetWidth; p.classList.add("play");
     capBox.hidden = !auto || !n;
     if (!auto) return;
@@ -664,12 +668,12 @@
         if (!voice && n && !reduce) await new Promise((res, rej) => setTimeout(() => (mine.dead ? rej(CANCEL) : res()), Math.max(0, n.seconds * 620 - (performance.now() - t0))));
         await wait(voice ? 500 : 1300, mine);
         cursor.classList.remove("on");
-        if (after(cur) < 0) { playing = false; setPlayLabel(); p.classList.remove("staged"); capBox.hidden = true; } else show(after(cur), true);
+        if (after(cur) < 0) { playing = false; setPlayLabel(); p.classList.remove("staged"); capBox.hidden = true; track("Tour finished", { route: routeName() }, true); } else show(after(cur), true);
       } catch (e) { if (e !== CANCEL) throw e; }
     })();
   }
   const pause = (byUser) => { if (!playing && !tok) return; playing = false; hold = false; sim.classList.remove("held"); kill(); panels[cur].classList.remove("staged"); S[idOf(cur)]?.rest?.(panels[cur]); setPlayLabel(); modeTag.hidden = !byUser; capBox.hidden = true; };
-  const play = (withVoice) => { if (withVoice && !voiceChosen) setVoice(true); started = true; playing = true; modeTag.hidden = true; setPlayLabel(); show(after(cur) < 0 || !onRoute(cur) ? first() : cur, true); };
+  const play = (withVoice) => { if (withVoice && !voiceChosen) setVoice(true); track("Tour started", { route: routeName() }, true); started = true; playing = true; modeTag.hidden = true; setPlayLabel(); show(after(cur) < 0 || !onRoute(cur) ? first() : cur, true); };
 
   // the landing page's first drawing: the tenders on the market, one after another
   function heroRotator() {
@@ -719,7 +723,7 @@
     rail.addEventListener("keydown", (e) => { if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return; e.preventDefault(); pause(true); show(cur + (e.key === "ArrowRight" ? 1 : -1), false); railTabs[cur].focus(); });
     // the visitor takes the controls (a click, a slider, a key): the tour stops and the screen is
     // theirs. Scrolling over the window is not taking the controls: the tour and its voice go on.
-    for (const type of ["click", "input", "keydown"]) screen.addEventListener(type, (e) => { if (e.isTrusted && playing) pause(true); }, { capture: true, passive: true });
+    for (const type of ["click", "input", "keydown"]) screen.addEventListener(type, (e) => { if (e.isTrusted && playing) { track("Took the controls", { screen: idOf(cur) }, true); pause(true); } }, { capture: true, passive: true });
     // a click on a link to the tour is a request to watch it: it may start with the voice
     document.querySelectorAll('a[href="#tour"]').forEach((link) => link.addEventListener("click", () => { wantVoice = true; }));
     // how much of the window is on screen, of what could be (a window taller than the screen counts

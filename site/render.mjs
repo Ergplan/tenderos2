@@ -19,7 +19,8 @@ const SHOTS = shotsAt > 0 ? process.argv[shotsAt + 1] : null;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
 const server = createServer((req, res) => {
-  const p = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  if (/^\/for\/[^/]+\/?$/.test(p)) p = "/"; // a personal link is the home page (vercel.json rewrites it)
   let f = join(PUB, p);
   if (existsSync(f) && statSync(f).isDirectory()) f = join(f, "index.html");
   if (!existsSync(f)) { res.writeHead(404); res.end("not found"); return; }
@@ -131,7 +132,43 @@ try {
   // tender types, sections
   for (const tt of ["fdre", "bess", "cfd"]) { await page.locator(`#tt-tabs button[data-tt="${tt}"]`).click(); check(await page.locator(`#tt-${tt} svg.iso`).isVisible(), `tender type ${tt}: no drawing`); if (SHOTS) await page.locator("#tenders").screenshot({ path: join(SHOTS, `tenders-${tt}.png`) }); }
   if (SHOTS) { await page.screenshot({ path: join(SHOTS, "hero.png") }); for (const s of ["time", "optimiser", "team", "security", "what"]) await page.locator(`#${s}`).screenshot({ path: join(SHOTS, `section-${s}.png`) }); }
+  // an ordinary visit: what was used is recorded, with no label on it
+  const plain = await page.evaluate(() => window.TOSTrack.log);
+  check(plain.some((e) => e.name === "Tour screen" && e.data.screen === "studio") && plain.some((e) => e.name === "Tender type opened" && e.data.type === "bess") && plain.some((e) => e.name === "Scenario saved"), `analytics: an ordinary visit recorded ${[...new Set(plain.map((e) => e.name))].join(", ")}`);
+  check(plain.every((e) => !("ref" in e.data) && Object.keys(e.data).length <= 1) && !plain.some((e) => e.name === "Personal link"), "analytics: an ordinary visit carries a label");
   await page.close();
+
+  // ---- personal links: /for/<tag> and /?ref=<tag> label a prospect's visits; /privacy turns it off
+  const who = await browser.newContext({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
+  const link = await who.newPage();
+  watch(link, "personal link");
+  const sent = () => link.evaluate(() => window.TOSTrack.log);
+  await link.goto(`${base}/for/Acme%20Bid-Team`, { waitUntil: "networkidle" }); await link.waitForSelector("#sim[data-ready]");
+  let ev = await sent();
+  check(ev[0]?.name === "Personal link" && ev[0].data.ref === "acme-bid-team" && ev[0].data.visit === "opened the link", `personal link: first event ${JSON.stringify(ev[0])}`);
+  await link.locator('header a[href="#demo"]').click();
+  await link.locator('#tt-tabs button[data-tt="fdre"]').click();
+  await link.locator("#demo-form input[name=name]").fill("A visitor");
+  ev = await sent();
+  check(ev.some((e) => e.name === "Book a demo clicked" && e.data.where === "header" && e.data.ref === "acme-bid-team") && ev.some((e) => e.name === "Demo form" && e.data.step === "started"), `personal link: clicks recorded as ${ev.map((e) => e.name).join(", ")}`);
+  check(ev.every((e) => e.data.ref === "acme-bid-team" && Object.keys(e.data).length <= 2) && !JSON.stringify(ev).includes("A visitor"), "personal link: an event lacks the label, has more than two properties, or carries what was typed");
+  await link.goto(`${base}/`, { waitUntil: "networkidle" });
+  ev = await sent();
+  check(ev[0]?.name === "Personal link" && ev[0].data.visit === "came back without the link" && ev[0].data.ref === "acme-bid-team", `personal link: the return visit recorded ${JSON.stringify(ev[0])}`);
+  await link.goto(`${base}/?ref=Zed+Power&x=1#tour`, { waitUntil: "networkidle" });
+  ev = await sent();
+  check(await link.evaluate(() => location.pathname + location.search + location.hash) === "/for/zed-power?x=1#tour" && ev[0]?.data.ref === "zed-power", `personal link: ?ref= gave ${await link.evaluate(() => location.pathname + location.search)} ${JSON.stringify(ev[0])}`);
+  await link.goto(`${base}/privacy`, { waitUntil: "networkidle" });
+  check((await link.locator("#track-state").textContent()).includes("holds a personal link"), "privacy: the page does not say a personal link is held");
+  await link.locator('button[data-track="off"]').click();
+  check((await link.locator("#track-state").textContent()).includes("off"), "privacy: the switch did not turn counting off");
+  await link.goto(`${base}/for/acme-bid-team`, { waitUntil: "networkidle" }); await link.waitForSelector("#sim[data-ready]");
+  await link.locator('header a[href="#demo"]').click();
+  check((await sent()).length === 0 && await link.evaluate(() => !window.vaq && !localStorage.getItem("tos-ref")), "privacy: events were still sent after the visitor turned counting off");
+  await link.goto(`${base}/links`, { waitUntil: "networkidle" });
+  await link.locator("#link-name").fill("Acme Renewables, bid team");
+  check((await link.locator("#link-out").inputValue()).endsWith("/for/acme-renewables-bid-team"), `link maker: ${await link.locator("#link-out").inputValue()}`);
+  await who.close();
 
   // ---- the guided tour: the cursor drives, then the visitor takes over
   const tour = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
@@ -198,4 +235,4 @@ try {
   server.close();
 }
 if (errors.length) { console.error("render: FAILED\n  " + errors.join("\n  ")); process.exit(1); }
-console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);
+console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, visit analytics and personal links, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);

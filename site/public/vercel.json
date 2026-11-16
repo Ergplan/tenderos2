@@ -1,5 +1,11 @@
 {
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/for/:tag",
+      "destination": "/"
+    }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
@@ -33,6 +39,24 @@
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    },
+    {
+      "source": "/for/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/links",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
         }
       ]
     },
