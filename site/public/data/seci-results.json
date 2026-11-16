@@ -1,0 +1,994 @@
+{
+ "name": "SECI renewable energy auction results, 2025–2026",
+ "description": "Every bidder awarded and not awarded, with capacity bid, capacity awarded and final tariff, in eight Solar Energy Corporation of India (SECI) e-reverse auctions from May 2025 to August 2026: FDRE peak power, FDRE round-the-clock, wind, solar with storage and RTC.",
+ "publisher": "jouleWise (TenderOS)",
+ "source": "https://www.seci.co.in/tenders/results",
+ "note": "Discovered tariffs, as SECI's result notices give them. SECI sells on to the buying utilities at the tariff plus its trading margin.",
+ "updated": "2026-11-16",
+ "license": "Facts from SECI's public result notices; cite SECI and link the notice.",
+ "auctions": [
+  {
+   "id": "seci-fdre-ix",
+   "agency": "SECI",
+   "product": "FDRE peak power",
+   "tender": "Assured peak supply, 6000 MWh (1500 MW × 4 h) (SECI-FDRE-IX)",
+   "rfsNo": "SECI/C&P/IPP/13/0006/26-27",
+   "rfsDate": "2026-06-05",
+   "auctionDate": "2026-08-21",
+   "loaDate": "2026-08-27",
+   "tenderedMw": 1500,
+   "storageMwh": 6000,
+   "awardedMw": 1500,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 5.99,
+   "tariffHigh": 6,
+   "tariffWeighted": 5.995,
+   "winners": [
+    {
+     "name": "Waaree Forever Energies Private Limited",
+     "bidMw": 700,
+     "awardedMw": 700,
+     "tariff": 5.99
+    },
+    {
+     "name": "NTPC Renewable Energy Limited",
+     "bidMw": 500,
+     "awardedMw": 500,
+     "tariff": 6
+    },
+    {
+     "name": "ACME Solar Holdings Limited",
+     "bidMw": 750,
+     "awardedMw": 300,
+     "tariff": 6
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "JGRJ Seven Renewable Private Limited",
+     "bidMw": 150,
+     "tariff": 6.02
+    },
+    {
+     "name": "SAEL Industries Limited",
+     "bidMw": 600,
+     "tariff": 6.02
+    },
+    {
+     "name": "EMIF II Holding V II Coöperatief W.A.",
+     "bidMw": 300,
+     "tariff": 6.08
+    },
+    {
+     "name": "Avaada BESS Private Limited",
+     "bidMw": 300,
+     "tariff": 6.21
+    },
+    {
+     "name": "Rama Reflection India Private Limited",
+     "bidMw": 60,
+     "tariff": 6.25
+    },
+    {
+     "name": "MB Power (Madhya Pradesh) Limited",
+     "bidMw": 150,
+     "tariff": 6.35
+    },
+    {
+     "name": "Engie Energy India Private Limited",
+     "bidMw": 125,
+     "tariff": 6.4
+    },
+    {
+     "name": "ReNew Solar Power Private Limited",
+     "bidMw": 400,
+     "tariff": 6.5
+    },
+    {
+     "name": "Purvah Green Power Private Limited",
+     "bidMw": 300,
+     "tariff": 6.72
+    },
+    {
+     "name": "ABC Solar (India) Private Limited",
+     "bidMw": 270,
+     "tariff": 6.82
+    },
+    {
+     "name": "Resolven One Energy Private Limited",
+     "bidMw": 300,
+     "tariff": 6.88
+    },
+    {
+     "name": "Juniper Green Energy Limited",
+     "bidMw": 150,
+     "tariff": 6.9
+    },
+    {
+     "name": "NLC India Renewables Limited",
+     "bidMw": 300,
+     "tariff": 6.98
+    }
+   ],
+   "note": "A peak-power product: 4 hours of assured supply a day.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-IX-_6000_MWh_result_website_upload.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/Ymd_"
+    }
+   ]
+  },
+  {
+   "id": "seci-fdre-rtc-v",
+   "agency": "SECI",
+   "product": "FDRE-RTC",
+   "tender": "1000 MW firm and dispatchable RE, round the clock (SECI-FDRE-RTC-V)",
+   "rfsNo": "SECI/C&P/IPP/13/0020/25-26",
+   "rfsDate": "2026-03-10",
+   "auctionDate": "2026-08-06",
+   "loaDate": "2026-08-14",
+   "tenderedMw": 1000,
+   "storageMwh": null,
+   "awardedMw": 1000,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 5.25,
+   "tariffHigh": 5.26,
+   "tariffWeighted": 5.254,
+   "winners": [
+    {
+     "name": "EMIF II Holding V II Coöperatief W.A.",
+     "bidMw": 100,
+     "awardedMw": 100,
+     "tariff": 5.25
+    },
+    {
+     "name": "Hero Solar Energy Private Limited",
+     "bidMw": 120,
+     "awardedMw": 120,
+     "tariff": 5.25
+    },
+    {
+     "name": "Purvah Green Power Private Limited",
+     "bidMw": 70,
+     "awardedMw": 70,
+     "tariff": 5.25
+    },
+    {
+     "name": "Resolven Four Energy Private Limited",
+     "bidMw": 150,
+     "awardedMw": 150,
+     "tariff": 5.25
+    },
+    {
+     "name": "Kengeri Prime Solar Power Private Limited",
+     "bidMw": 180,
+     "awardedMw": 180,
+     "tariff": 5.25
+    },
+    {
+     "name": "Hexa Climate Solutions Private Limited",
+     "bidMw": 150,
+     "awardedMw": 150,
+     "tariff": 5.26
+    },
+    {
+     "name": "Juniper Green Energy Limited",
+     "bidMw": 300,
+     "awardedMw": 230,
+     "tariff": 5.26
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "ReNew Private Limited",
+     "bidMw": 140,
+     "tariff": 5.27
+    },
+    {
+     "name": "Adyant Enersol Private Limited",
+     "bidMw": 70,
+     "tariff": 5.27
+    },
+    {
+     "name": "ACME Solar Holdings Limited",
+     "bidMw": 250,
+     "tariff": 5.28
+    },
+    {
+     "name": "Serentica Renewables India Private Limited",
+     "bidMw": 100,
+     "tariff": 5.29
+    },
+    {
+     "name": "NTPC Renewable Energy Limited",
+     "bidMw": 300,
+     "tariff": 5.39
+    },
+    {
+     "name": "Solarcraft Power India 4 Private Limited",
+     "bidMw": 100,
+     "tariff": 5.68
+    },
+    {
+     "name": "Greenko Solar Energy Private Limited",
+     "bidMw": 350,
+     "tariff": 5.7
+    },
+    {
+     "name": "Waaree Forever Energies Private Limited",
+     "bidMw": 100,
+     "tariff": 6.08
+    },
+    {
+     "name": "Adani Renewable Energy Holding Nine Limited",
+     "bidMw": 500,
+     "tariff": 6.74
+    }
+   ],
+   "note": "Juniper Green Energy bid 300 MW and was awarded 230 MW, filling the tender to 1,000 MW.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-RTC-V-_1000_MW_result_website_upload.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/YmZ3"
+    }
+   ]
+  },
+  {
+   "id": "seci-wind-xx",
+   "agency": "SECI",
+   "product": "Wind",
+   "tender": "2000 MW ISTS-connected wind (SECI-Tranche-XX)",
+   "rfsNo": "SECI/C&P/IPP/12/0003/26-27",
+   "rfsDate": "2026-04-21",
+   "auctionDate": "2026-07-15",
+   "loaDate": "2026-08-05",
+   "tenderedMw": 2000,
+   "storageMwh": null,
+   "awardedMw": 1495,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 3.78,
+   "tariffHigh": 3.85,
+   "tariffWeighted": 3.841,
+   "winners": [
+    {
+     "name": "Gentari Renewables India Castor One Private Limited",
+     "bidMw": 200,
+     "awardedMw": 200,
+     "tariff": 3.78
+    },
+    {
+     "name": "Adyant Enersol Private Limited",
+     "bidMw": 110,
+     "awardedMw": 110,
+     "tariff": 3.85
+    },
+    {
+     "name": "Torrent Green Energy Private Limited",
+     "bidMw": 150,
+     "awardedMw": 150,
+     "tariff": 3.85
+    },
+    {
+     "name": "Opera Energy Private Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 3.85
+    },
+    {
+     "name": "Halvad Renewables Private Limited",
+     "bidMw": 130,
+     "awardedMw": 130,
+     "tariff": 3.85
+    },
+    {
+     "name": "Ayana Renewable Power Private Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 3.85
+    },
+    {
+     "name": "Ganeko Four Energy Private Limited",
+     "bidMw": 200,
+     "awardedMw": 200,
+     "tariff": 3.85
+    },
+    {
+     "name": "NLC India Renewables Limited",
+     "bidMw": 200,
+     "awardedMw": 200,
+     "tariff": 3.85
+    },
+    {
+     "name": "Powerica Limited",
+     "bidMw": 100,
+     "awardedMw": 100,
+     "tariff": 3.85
+    },
+    {
+     "name": "Refex Green Power Limited",
+     "bidMw": 80,
+     "awardedMw": 80,
+     "tariff": 3.85
+    },
+    {
+     "name": "Atriwal Infrastructure Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 3.85
+    },
+    {
+     "name": "Purvah Green Power Private Limited",
+     "bidMw": 175,
+     "awardedMw": 175,
+     "tariff": 3.85
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "ABReL SPV 2 Limited",
+     "bidMw": 201.3,
+     "tariff": 3.9
+    },
+    {
+     "name": "Bhojraj Developers Private Limited",
+     "bidMw": 160,
+     "tariff": 4.18
+    },
+    {
+     "name": "Waaree Forever Energies Private Limited",
+     "bidMw": 500,
+     "tariff": 4.32
+    }
+   ],
+   "note": "1,885 MW was eligible for award; 1,495 MW was awarded, to the bidders who matched ₹3.85 or bid lower.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_Wind-_2000_MW_(Tranche-XX)_result_website_upload.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/Ymd3"
+    }
+   ]
+  },
+  {
+   "id": "seci-fdre-vii",
+   "agency": "SECI",
+   "product": "FDRE peak power",
+   "tender": "Assured peak supply, 4800 MWh (1200 MW × 4 h) (SECI-FDRE-VII)",
+   "rfsNo": "SECI/C&P/IPP/13/0012/25-26",
+   "rfsDate": "2025-09-30",
+   "auctionDate": "2026-02-05",
+   "loaDate": "2026-02-10",
+   "tenderedMw": 1200,
+   "storageMwh": 4800,
+   "awardedMw": 1200,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 6.27,
+   "tariffHigh": 6.28,
+   "tariffWeighted": 6.279,
+   "winners": [
+    {
+     "name": "Adyant Enersol Private Limited",
+     "bidMw": 100,
+     "awardedMw": 100,
+     "tariff": 6.27
+    },
+    {
+     "name": "Serentica Renewables India Private Limited",
+     "bidMw": 600,
+     "awardedMw": 600,
+     "tariff": 6.28
+    },
+    {
+     "name": "AMPIN Energy Utility Nine Private Limited",
+     "bidMw": 199,
+     "awardedMw": 199,
+     "tariff": 6.28
+    },
+    {
+     "name": "ACME Solar Holdings Limited",
+     "bidMw": 600,
+     "awardedMw": 301,
+     "tariff": 6.28
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "Onward Solar Power Private Limited",
+     "bidMw": 96,
+     "tariff": 6.29
+    },
+    {
+     "name": "Engie Energy India Private Limited",
+     "bidMw": 150,
+     "tariff": 6.31
+    },
+    {
+     "name": "Shiva Corporation (India) Limited",
+     "bidMw": 100,
+     "tariff": 6.34
+    },
+    {
+     "name": "Purvah Green Power Private Limited",
+     "bidMw": 300,
+     "tariff": 6.39
+    },
+    {
+     "name": "Jakson Green Limited",
+     "bidMw": 600,
+     "tariff": 6.54
+    },
+    {
+     "name": "Apraava Energy Private Limited",
+     "bidMw": 200,
+     "tariff": 6.56
+    },
+    {
+     "name": "MB Power (Madhya Pradesh) Limited",
+     "bidMw": 150,
+     "tariff": 6.62
+    },
+    {
+     "name": "NTPC Renewable Energy Limited",
+     "bidMw": 300,
+     "tariff": 6.66
+    },
+    {
+     "name": "Twishi Renewable (Nine) Private Limited",
+     "bidMw": 150,
+     "tariff": 6.7
+    },
+    {
+     "name": "Chinta Green Energy Private Limited",
+     "bidMw": 200,
+     "tariff": 6.71
+    },
+    {
+     "name": "Hexa Climate Solutions Private Limited",
+     "bidMw": 250,
+     "tariff": 6.76
+    },
+    {
+     "name": "Rays Power Infra Limited",
+     "bidMw": 300,
+     "tariff": 6.95
+    },
+    {
+     "name": "Waaree Forever Energies Private Limited",
+     "bidMw": 600,
+     "tariff": 7.47
+    },
+    {
+     "name": "ReNew Solar Power Private Limited",
+     "bidMw": 300,
+     "tariff": 7.89
+    },
+    {
+     "name": "Solarcraft Power India 8 Private Limited",
+     "bidMw": 150,
+     "tariff": 7.9
+    },
+    {
+     "name": "Avaada Energy Private Limited",
+     "bidMw": 200,
+     "tariff": 7.97
+    }
+   ],
+   "note": "A peak-power product: 4 hours of assured supply a day, not 24-hour supply.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-VII-_4800_MWh_result_website_upload.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/YmB2"
+    }
+   ]
+  },
+  {
+   "id": "seci-wind-xix",
+   "agency": "SECI",
+   "product": "Wind",
+   "tender": "1200 MW ISTS-connected wind (SECI-Tranche-XIX)",
+   "rfsNo": "SECI/C&P/IPP/12/0013/25-26",
+   "rfsDate": "2025-10-15",
+   "auctionDate": "2026-02-04",
+   "loaDate": "2026-02-10",
+   "tenderedMw": 1200,
+   "storageMwh": null,
+   "awardedMw": 1200,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 3.67,
+   "tariffHigh": 3.69,
+   "tariffWeighted": 3.684,
+   "winners": [
+    {
+     "name": "K.P. Energy Limited",
+     "bidMw": 100,
+     "awardedMw": 100,
+     "tariff": 3.67
+    },
+    {
+     "name": "Ganeko Three Energy Private Limited",
+     "bidMw": 180,
+     "awardedMw": 180,
+     "tariff": 3.68
+    },
+    {
+     "name": "Waaree Forever Energies Private Limited",
+     "bidMw": 300,
+     "awardedMw": 300,
+     "tariff": 3.68
+    },
+    {
+     "name": "Opera Energy Private Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 3.68
+    },
+    {
+     "name": "Purvah Green Power Private Limited",
+     "bidMw": 250,
+     "awardedMw": 250,
+     "tariff": 3.69
+    },
+    {
+     "name": "Vena Energy Aura Private Limited",
+     "bidMw": 124,
+     "awardedMw": 124,
+     "tariff": 3.69
+    },
+    {
+     "name": "Refex Holding Private Limited",
+     "bidMw": 600,
+     "awardedMw": 196,
+     "tariff": 3.69
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "Torrent Green Energy Private Limited",
+     "bidMw": 300,
+     "tariff": 3.7
+    },
+    {
+     "name": "Wyn Renewables Project 6 Private Limited",
+     "bidMw": 130,
+     "tariff": 4.14
+    },
+    {
+     "name": "Gentari Renewables India Castor One Private Limited",
+     "bidMw": 200,
+     "tariff": 4.15
+    },
+    {
+     "name": "ABC Cleantech Private Limited",
+     "bidMw": 250,
+     "tariff": 4.16
+    },
+    {
+     "name": "Ijya Four Renewables Private Limited",
+     "bidMw": 120,
+     "tariff": 4.19
+    },
+    {
+     "name": "Jindal India Power Limited",
+     "bidMw": 300,
+     "tariff": 4.34
+    },
+    {
+     "name": "Prozeal Green Energy Limited",
+     "bidMw": 50,
+     "tariff": 4.55
+    },
+    {
+     "name": "Solarcraft Power India 7 Private Limited",
+     "bidMw": 50,
+     "tariff": 4.6
+    }
+   ],
+   "note": "Refex Holding bid 600 MW and was awarded 196 MW.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_Wind-_1200_MW_(Tranche-XIX)_result_website_upload.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/YmB1"
+    }
+   ]
+  },
+  {
+   "id": "seci-ists-xxi",
+   "agency": "SECI",
+   "product": "Solar + ESS",
+   "tender": "1200 MW ISTS solar with 600 MW / 3600 MWh ESS (SECI-ISTS-XXI)",
+   "rfsNo": "SECI/C&P/IPP/11/0006/25-26",
+   "rfsDate": "2025-06-19",
+   "auctionDate": "2026-01-09",
+   "loaDate": "2026-01-29",
+   "tenderedMw": 1200,
+   "storageMwh": 3600,
+   "awardedMw": 1200,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 3.12,
+   "tariffHigh": 3.13,
+   "tariffWeighted": 3.123,
+   "winners": [
+    {
+     "name": "Engie Energy India Private Limited",
+     "bidMw": 200,
+     "awardedMw": 200,
+     "tariff": 3.12
+    },
+    {
+     "name": "NLC India Renewables Limited",
+     "bidMw": 600,
+     "awardedMw": 600,
+     "tariff": 3.12
+    },
+    {
+     "name": "RPIL Power Three Private Limited",
+     "bidMw": 300,
+     "awardedMw": 300,
+     "tariff": 3.13
+    },
+    {
+     "name": "Oriana Power Limited",
+     "bidMw": 300,
+     "awardedMw": 100,
+     "tariff": 3.13
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "Welspun Renewable Energy Private Limited",
+     "bidMw": 200,
+     "tariff": 3.16
+    },
+    {
+     "name": "Apraava Energy Private Limited",
+     "bidMw": 200,
+     "tariff": 3.18
+    },
+    {
+     "name": "Chinta Green Energy Private Limited",
+     "bidMw": 600,
+     "tariff": 3.29
+    },
+    {
+     "name": "Ayana Renewable Power Private Limited",
+     "bidMw": 200,
+     "tariff": 3.3
+    },
+    {
+     "name": "Purvah Green Power Private Limited",
+     "bidMw": 300,
+     "tariff": 3.43
+    },
+    {
+     "name": "Solar91 Cleantech Limited",
+     "bidMw": 50,
+     "tariff": 3.44
+    },
+    {
+     "name": "Solarcraft Power India 8 Private Limited",
+     "bidMw": 150,
+     "tariff": 3.75
+    },
+    {
+     "name": "ReNew Private Limited",
+     "bidMw": 300,
+     "tariff": 3.8
+    },
+    {
+     "name": "ACME Solar Holdings Limited",
+     "bidMw": 600,
+     "tariff": 3.9
+    },
+    {
+     "name": "Waaree Forever Energies Private Limited",
+     "bidMw": 250,
+     "tariff": 3.96
+    },
+    {
+     "name": "Serentica Renewables India Private Limited",
+     "bidMw": 300,
+     "tariff": 3.98
+    },
+    {
+     "name": "Sprng Energy Private Limited",
+     "bidMw": 200,
+     "tariff": 3.99
+    },
+    {
+     "name": "MB Power (Madhya Pradesh) Limited",
+     "bidMw": 150,
+     "tariff": 3.99
+    },
+    {
+     "name": "Hexa Climate Solutions Private Limited",
+     "bidMw": 100,
+     "tariff": 3.99
+    },
+    {
+     "name": "Vishvaraj Renewables Private Limited",
+     "bidMw": 300,
+     "tariff": 4.01
+    },
+    {
+     "name": "Hero Solar Energy Private Limited",
+     "bidMw": 150,
+     "tariff": 4.17
+    },
+    {
+     "name": "Greenko Energies Private Limited",
+     "bidMw": 500,
+     "tariff": 4.35
+    },
+    {
+     "name": "LC Infra Projects Private Limited",
+     "bidMw": 50,
+     "tariff": 4.95
+    },
+    {
+     "name": "Sangamam Power Projects Private Limited",
+     "bidMw": 60,
+     "tariff": 5
+    }
+   ],
+   "note": "Oriana Power bid 300 MW and was awarded 100 MW.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_Solar_1200_MW_with_ESS_(ISTS-XXI)_result_website_upload.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/YmJz"
+    }
+   ]
+  },
+  {
+   "id": "seci-ists-xx",
+   "agency": "SECI",
+   "product": "Solar + ESS",
+   "tender": "2000 MW ISTS solar with 1000 MW / 4000 MWh ESS (SECI-ISTS-XX)",
+   "rfsNo": "SECI/C&P/IPP/11/0004/25-26",
+   "rfsDate": "2025-06-12",
+   "auctionDate": "2025-10-15",
+   "loaDate": "2025-10-27",
+   "tenderedMw": 2000,
+   "storageMwh": 4000,
+   "awardedMw": 2000,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 2.86,
+   "tariffHigh": 2.87,
+   "tariffWeighted": 2.862,
+   "winners": [
+    {
+     "name": "Welspun Renewable Energy Private Limited",
+     "bidMw": 200,
+     "awardedMw": 200,
+     "tariff": 2.86
+    },
+    {
+     "name": "MB Power (Madhya Pradesh) Limited",
+     "bidMw": 150,
+     "awardedMw": 150,
+     "tariff": 2.86
+    },
+    {
+     "name": "Shivalaya Construction Limited",
+     "bidMw": 600,
+     "awardedMw": 600,
+     "tariff": 2.86
+    },
+    {
+     "name": "Oswal Cables Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 2.86
+    },
+    {
+     "name": "Purvah Green Power Private Limited",
+     "bidMw": 300,
+     "awardedMw": 300,
+     "tariff": 2.86
+    },
+    {
+     "name": "Banyan Insolation Private Limited",
+     "bidMw": 100,
+     "awardedMw": 100,
+     "tariff": 2.86
+    },
+    {
+     "name": "LC Infra Projects Private Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 2.86
+    },
+    {
+     "name": "Stockwell Solar Services Private Limited",
+     "bidMw": 80,
+     "awardedMw": 80,
+     "tariff": 2.86
+    },
+    {
+     "name": "SAEL Industries Limited",
+     "bidMw": 300,
+     "awardedMw": 300,
+     "tariff": 2.87
+    },
+    {
+     "name": "GH2 Solar Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 2.87
+    },
+    {
+     "name": "Navayuga Green Energy Private Limited",
+     "bidMw": 300,
+     "awardedMw": 120,
+     "tariff": 2.87
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "Apraava Energy Private Limited",
+     "bidMw": 400,
+     "tariff": 2.87
+    },
+    {
+     "name": "Solarcraft Power India 8 Private Limited",
+     "bidMw": 150,
+     "tariff": 2.89
+    },
+    {
+     "name": "NTPC Renewable Energy Limited",
+     "bidMw": 500,
+     "tariff": 3.06
+    },
+    {
+     "name": "Gentari Renewables India Pte. Ltd.",
+     "bidMw": 200,
+     "tariff": 3.12
+    },
+    {
+     "name": "Waaree Forever Energies Private Limited",
+     "bidMw": 700,
+     "tariff": 3.15
+    },
+    {
+     "name": "Bhalki Prime Solar Power Private Limited",
+     "bidMw": 300,
+     "tariff": 3.23
+    },
+    {
+     "name": "Pace Digitek Limited",
+     "bidMw": 100,
+     "tariff": 3.25
+    },
+    {
+     "name": "Sunsure Solar Park RJ One Private Limited",
+     "bidMw": 120,
+     "tariff": 3.31
+    },
+    {
+     "name": "ReNew Solar Power Private Limited",
+     "bidMw": 300,
+     "tariff": 3.51
+    },
+    {
+     "name": "ACME Solar Holdings Limited",
+     "bidMw": 600,
+     "tariff": 3.56
+    },
+    {
+     "name": "Refex Holding Private Limited",
+     "bidMw": 100,
+     "tariff": 3.59
+    },
+    {
+     "name": "PNC Infratech Limited",
+     "bidMw": 300,
+     "tariff": 3.9
+    },
+    {
+     "name": "Adani Renewable Energy Holding Nine Limited",
+     "bidMw": 1000,
+     "tariff": 3.98
+    },
+    {
+     "name": "Power Mech Projects Limited",
+     "bidMw": 50,
+     "tariff": 4.04
+    }
+   ],
+   "note": "Navayuga Green Energy bid 300 MW and was awarded 120 MW.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_Solar_2000_MW_with_ESS_(ISTS-XX)_result_website_upload2.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/YmJ1"
+    }
+   ]
+  },
+  {
+   "id": "seci-rtc-iv",
+   "agency": "SECI",
+   "product": "RTC (round-the-clock RE)",
+   "tender": "1200 MW RTC power from ISTS-connected RE projects (SECI-RTC-IV)",
+   "rfsNo": "SECI/C&P/IPP/13/0019/24-25",
+   "rfsDate": "2024-10-28",
+   "auctionDate": "2025-05-26",
+   "loaDate": "2025-06-11",
+   "tenderedMw": 1200,
+   "storageMwh": null,
+   "awardedMw": 420,
+   "tariffUnit": "₹/kWh",
+   "tariffLow": 5.06,
+   "tariffHigh": 5.07,
+   "tariffWeighted": 5.065,
+   "winners": [
+    {
+     "name": "Hero Solar Energy Private Limited",
+     "bidMw": 120,
+     "awardedMw": 120,
+     "tariff": 5.06
+    },
+    {
+     "name": "Hexa Climate Solutions Private Limited",
+     "bidMw": 100,
+     "awardedMw": 100,
+     "tariff": 5.06
+    },
+    {
+     "name": "Sembcorp Green Infra Private Limited",
+     "bidMw": 50,
+     "awardedMw": 50,
+     "tariff": 5.07
+    },
+    {
+     "name": "Jindal India Power Limited",
+     "bidMw": 150,
+     "awardedMw": 150,
+     "tariff": 5.07
+    }
+   ],
+   "notAwarded": [
+    {
+     "name": "ABC Cleantech Private Limited",
+     "bidMw": 120,
+     "tariff": 5.08
+    }
+   ],
+   "note": "Capacity eligible for award was 432 MW; 420 MW awarded.",
+   "sources": [
+    {
+     "label": "SECI result notice (PDF)",
+     "url": "https://www.seci.co.in/uploads/tenders/bidders/SECI_RTC-IV-_1200_MW_result_website_upload.pdf"
+    },
+    {
+     "label": "SECI tender page",
+     "url": "https://www.seci.co.in/tender-details/YWVx"
+    }
+   ]
+  }
+ ]
+}

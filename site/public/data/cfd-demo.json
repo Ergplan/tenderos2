@@ -1,0 +1,753 @@
+{
+ "tender": {
+  "short": "SECI CfD-I",
+  "title": "Selection of RE Power Developers under Contract for Difference (CfD) Mechanism for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) from ISTS-Connected RE Projects in India under Tariff-Based Competitive Bidding (SECI-CfD-I)",
+  "rfsNo": "SECI/C&P/IPP/13/0002/26-27",
+  "tenderedMw": 500,
+  "documents": [
+   {
+    "id": "rfs",
+    "title": "RfS",
+    "kind": "tender",
+    "date": "2026-07-15",
+    "pages": 129,
+    "summary": "The tender as revised on 15.07.2026 (it replaces the RfS of the same number dated 17.04.2026): 500 MW of assured peak supply, 2 MWh per MW every evening through the power exchanges, settled against the strike price by SECI's CfD Pool; the bid, the e-Reverse Auction, eligibility, guarantees, milestones and the formats (Section 7). Read with the amendments, which override it."
+   },
+   {
+    "id": "cfda",
+    "title": "Standard CfD Agreement (CfDA)",
+    "kind": "agreement",
+    "date": null,
+    "pages": 69,
+    "summary": "The agreement every winner signs: the daily supply, the time-block settlement against the strike price, the weekly shortfall penalty, the Letter of Credit, the events of default. It prevails over the RfS where they differ (CfDA 1.2.18)."
+   },
+   {
+    "id": "amd1",
+    "title": "Amendment-01",
+    "kind": "amendment",
+    "date": "2026-07-17",
+    "pages": 2,
+    "summary": "SECI keeps the CfD Pool funded for the whole term; gains above ₹10/kWh split 50:50 (the sharing itself was later replaced by Amendment-03's full pass-through)."
+   },
+   {
+    "id": "amd2",
+    "title": "Amendment-02",
+    "kind": "amendment",
+    "date": "2026-08-03",
+    "pages": 5,
+    "summary": "A battery of X MW / 2X MWh owned by the bidder becomes mandatory; the SCD applies to the battery (15 months) with the RE generation due by 36 months; the green-market share (25%, plus 75% for charging until month 36, then 50% from group companies); the penalties re-cut for the two deadlines."
+   },
+   {
+    "id": "amd3",
+    "title": "Amendment-03",
+    "kind": "amendment",
+    "date": "2026-10-08",
+    "pages": 5,
+    "summary": "The term becomes 15 years; the ₹5.80/kWh ceiling goes; the CfD settlement becomes a full pass-through (the bidder nets the strike price on every kWh, the Pool keeps every gain and bears every loss); TAM and G-TAM join the markets; SECI may designate the hours and bid on the RPD's behalf; the EMD validity rule; a new contact."
+   },
+   {
+    "id": "amd4",
+    "title": "Amendment-04",
+    "kind": "amendment",
+    "date": "2026-11-05",
+    "pages": 6,
+    "summary": "How SECI's designation of the Peak Hours works: the RPD declares the day's availability (MWh) by 06:00 on D-1, or 100% of the contracted capacity is deemed available; SECI instructs the time blocks, price and quantum by 08:00 on D-1, or bids on the RPD's behalf; up to 80% of the availability may go through TAM/G-TAM and the balance through the day-ahead markets, never above the contracted capacity in a block; deviations, DSM and every exchange charge are the RPD's; sale elsewhere when MCPs stay below the strike price needs SECI/MNRE approval. And SECI may restrict the capacity awarded to what the CfD corpus can bear at the discovered tariff."
+   }
+  ],
+  "totalPages": 216,
+  "conditions": 262,
+  "groups": {
+   "Scheme and bid": 39,
+   "Auction": 20,
+   "Daily supply": 32,
+   "CfD settlement": 19,
+   "Plant": 44,
+   "Energy sourcing": 6,
+   "Dates": 20,
+   "Bid security and charges": 27,
+   "Penalties and security": 9,
+   "Eligibility": 26,
+   "Bid documents": 20
+  },
+  "changesQuoted": 40
+ },
+ "changes": [
+  {
+   "id": "a2-rfs-4.3",
+   "doc": "Amendment-02",
+   "document": "RfS",
+   "clause": "4.3",
+   "topic": "The battery becomes mandatory and yours",
+   "before": "In case ESS is installed by the RPD as part of the Project, such ESS may be owned by the RPD or may be tied-up separately with a third party by the RPD, for supply of power through Power Exchanges.",
+   "after": "For a ‘X’ MW Contracted Capacity, RPD shall mandatorily install ESS of ‘X’ MW/ ‘2X’ MWh capacity as part of the Project. Such ESS shall be owned by the RPD for supply of power through Power Exchanges.",
+   "page": 1,
+   "effect": "Storage is no longer optional or leasable: for every contracted MW you build and own at least 1 MW / 2 MWh of battery."
+  },
+  {
+   "id": "a3-rfs-40.3",
+   "doc": "Amendment-03",
+   "document": "RfS",
+   "clause": "40.3",
+   "topic": "No ceiling tariff",
+   "before": "The Bidder including its Parent, Affiliate or Ultimate Parent or any Group Company will have to submit a single bid (single application) quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. The tariff has to be less than or equal to INR 5.80/kWh and shall be quoted up to two places of decimal only. If it is quoted with more than two digits after decimal, digits after first two decimal places shall be ignored. (For e.g. if the quoted tariff is INR 3.337, then it shall be considered as INR 3.33). Further, the bids where the tariff quoted are more than INR 5.80/kWh shall be summarily rejected.",
+   "after": "The Bidder including its Parent, Affiliate or Ultimate Parent or any Group Company will have to submit a single bid (single application) quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. If it is quoted with more than two digits after decimal, digits after first two decimal places shall be ignored. (For e.g. if the quoted tariff is INR 3.337, then it shall be considered as INR 3.33).",
+   "page": 4,
+   "effect": "The ₹5.80/kWh ceiling and the summary rejection above it are removed; one first-round tariff, two decimals."
+  },
+  {
+   "id": "a3-rfs-9.3.a.iv",
+   "doc": "Amendment-03",
+   "document": "RfS",
+   "clause": "9.3.a.iv",
+   "topic": "Settlement: full pass-through",
+   "before": "Sharing of Profit/ Gains and Losses: Profit/ Gains and losses shall be shared between the RPD and the CfD Stabilization Fund (“Pool”), in a dynamic grading as follows:",
+   "after": "Sharing of Profit/ Gains and Losses: The profit/gain and loss arising from the sale of electricity by the RPD through the Power Exchanges shall be settled between the RPD and the CfD Stabilization Fund (“CfD Pool”) in respect of each Time-Block, such that the RPD shall be entitled to receive the Strike Price (“SP”) for the electricity supplied from the Project, subject to the following: a. In case the MCP is higher than the SP: The amount corresponding to the difference between the MCP and the SP, i.e. (MCP – SP), shall constitute the profit/gain for the respective Time-Block. The entire amount of such profit/gain shall be passed on by the RPD to the CfD Pool. b. In case the MCP is lower than the SP: The RPD shall be compensated from the CfD Pool for the difference between the SP and the MCP, i.e. (SP – MCP), for the respective Time-Block, such that the RPD receives an amount equivalent to the SP for the electricity supplied from the Project. c. In case the MCP is equal to the SP: No amount shall be payable by either the RPD or the CfD Pool on account of gain or loss for the respective Time-Block. Accordingly, the RPD shall neither retain any profit/gain nor bear any loss on account of variation between the MCP and the SP. While calculating the profit/gain or loss, rounding off the difference between MCP and SP shall not be carried out. The settlement of profit/gains or losses between the CfD Pool and the RPD shall be inclusive of applicable taxes, if any.",
+   "page": 2,
+   "effect": "The slab sharing (70:30, 50:50, 30:70) goes: the Pool takes the whole gain when the market clears above the strike price and pays the whole shortfall when it clears below, so you net the strike price on every kWh settled. Amendment-01's split above ₹10/kWh is replaced with it."
+  },
+  {
+   "id": "a4-rfs-42.2.b",
+   "doc": "Amendment-04",
+   "document": "RfS",
+   "clause": "42.2.b",
+   "topic": "SECI may award less than 500 MW",
+   "before": "will not be eligible to be declared as Successful Bidders.",
+   "after": "Notwithstanding the above, the final capacity to be awarded under the RfS shall be determined by SECI based on an assessment of the financial viability of the discovered Tariff and the corresponding requirement of the CfD Pool, within the available CfD corpus. Accordingly, SECI reserves the right to restrict the total capacity to be awarded under the RfS, as considered necessary, to ensure that the financial implications of the award remain within the available CfD corpus.",
+   "page": 3,
+   "effect": "The award is no longer 500 MW by right: SECI will award only what the CfD corpus can carry at the discovered strike price. A high price wins less capacity, or none; the Bid review sizes the Pool's pay-out at your price against the corpus."
+  }
+ ],
+ "terms": [
+  {
+   "id": "scheme",
+   "group": "Scheme and bid",
+   "label": "What is procured",
+   "display": "Assured peak supply of 1000 MWh a day (500 MW × 2 hours) from ISTS-connected RE projects, sold through the power exchanges, settled by SECI under a CfD",
+   "doc": "Standard CfD Agreement (CfDA)",
+   "clause": "Recital D",
+   "page": 3,
+   "quote": "SECI had initiated a Tariff Based Competitive Bid Process for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) from ISTS-Connected RE Projects under CfD mechanism"
+  },
+  {
+   "id": "bid",
+   "group": "Scheme and bid",
+   "label": "What you bid",
+   "display": "One strike price in ₹/kWh for all projects applied for; digits after two decimals are ignored",
+   "doc": "Amendment-03",
+   "clause": "RfS 40.3 (amended)",
+   "page": 4,
+   "quote": "quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. If it is quoted with more than two digits after decimal, digits after first two decimal places shall be ignored."
+  },
+  {
+   "id": "ceiling",
+   "group": "Scheme and bid",
+   "label": "Ceiling tariff",
+   "display": "None: the ₹5.80/kWh ceiling of the RfS was removed by Amendment-03",
+   "doc": "Amendment-03",
+   "clause": "RfS 40.3 (original, removed)",
+   "page": 4,
+   "quote": "The tariff has to be less than or equal to INR 5.80/kWh"
+  },
+  {
+   "id": "spFixed",
+   "group": "Scheme and bid",
+   "label": "Strike price over the term",
+   "display": "Fixed for the whole term (no escalation)",
+   "doc": "Standard CfD Agreement (CfDA)",
+   "clause": "9.1",
+   "page": 40,
+   "quote": "the Strike Price shall be fixed for the entire term of this Agreement"
+  },
+  {
+   "id": "seciHours4",
+   "group": "Daily supply",
+   "label": "SECI may set the hours",
+   "display": "SECI may designate the Peak Hours and time blocks; you must make the power available in them and sell it on the exchanges as it instructs",
+   "doc": "Amendment-04",
+   "clause": "RfS 9.2.c (amended)",
+   "page": 1,
+   "quote": "SECI shall have the right, as deemed necessary, to designate the Peak Hours (including specific Time-Blocks) during which the RPD shall make available and sell power from the Project through the Power Exchanges. The RPD shall ensure availability of power during the Peak Hours/Time-Blocks so designated by SECI"
+  },
+  {
+   "id": "declareAvail",
+   "group": "Daily supply",
+   "label": "Declare the day's availability by 06:00 on D-1",
+   "display": "In MWh, day-ahead; the declaration drives what SECI schedules",
+   "doc": "Amendment-04",
+   "clause": "RfS 9.2.c (b)",
+   "page": 1,
+   "quote": "The RPD shall declare the availability of energy from the Project, in MWh, on a day-ahead basis, latest by 06:00 hours on the day immediately preceding the day of delivery (‘D-1’ Day for delivery on Day ‘D’)."
+  },
+  {
+   "id": "tamShare",
+   "group": "Daily supply",
+   "label": "Up to 80% term-ahead, the rest day-ahead",
+   "display": "TAM/G-TAM may take up to 80% of the declared availability; the balance goes to DAM/GDAM/HP-DAM; never above the contracted capacity in any block, never sold twice",
+   "doc": "Amendment-04",
+   "clause": "RfS 9.2.c (e)",
+   "page": 2,
+   "quote": "For the purpose of sale of power through the TAM and G-TAM, up to 80% of the availability shall be considered for offering/scheduling, as applicable, in the aforesaid markets"
+  },
+  {
+   "id": "dsmOnRpd",
+   "group": "Daily supply",
+   "label": "Deviations and DSM are yours",
+   "display": "Schedule revisions, deviations, DSM and any scheduling non-compliance are borne by you, with an indemnity to SECI",
+   "doc": "Amendment-04",
+   "clause": "RfS 9.2.c (f)",
+   "page": 2,
+   "quote": "Any penalties, charges or financial liabilities arising on account of revisions to the schedule, deviations from the schedule, deviation settlement mechanism (DSM) or any other scheduling-related non-compliance attributable to the RPD, including failure to maintain the declared availability or to comply with SECI's instructions, shall be borne entirely by the RPD."
+  },
+  {
+   "id": "corpusCap",
+   "group": "Auction",
+   "label": "SECI may award less than 500 MW",
+   "display": "The capacity awarded is what the CfD corpus can carry at the discovered tariff; SECI may restrict the total award",
+   "doc": "Amendment-04",
+   "clause": "RfS 42.2.b (amended)",
+   "page": 3,
+   "quote": "the final capacity to be awarded under the RfS shall be determined by SECI based on an assessment of the financial viability of the discovered Tariff and the corresponding requirement of the CfD Pool, within the available CfD corpus. Accordingly, SECI reserves the right to restrict the total capacity to be awarded under the RfS, as considered necessary, to ensure that the financial implications of the award remain within the available CfD corpus."
+  }
+ ],
+ "winning": {
+  "contractedMw": 100,
+  "solarMwac": 10,
+  "tariff": 8.322,
+  "equityIrr": 0.13,
+  "projectIrr": 0.0876,
+  "minDscr": 1.2,
+  "inputs": {
+   "contractedMw": 100,
+   "essMwhPerMw": 2,
+   "extraEssMwhPerMw": 0,
+   "essMwPerMw": 1,
+   "solarMw": 10,
+   "windMw": 0,
+   "reCodMonths": 21,
+   "availability": 0.97,
+   "solarCuf": 0.25,
+   "solarDcAc": 1.4,
+   "solarDegradation": 0.005,
+   "windCuf": 0.33,
+   "windDegradation": 0,
+   "rte": 0.87,
+   "essSocMin": null,
+   "essSocMax": null,
+   "essDegradation": 0.02,
+   "marketCharges": 0.3,
+   "groupPrice": 2.5,
+   "groupCharges": 0,
+   "priceEscalation": 0,
+   "gdamShareCap": 0.2,
+   "recPrice": 150,
+   "essCrPerMwh": 0.85,
+   "solarCrPerMw": 3.6,
+   "windCrPerMw": 6.5,
+   "evacuationCrPerMw": 0.3,
+   "preopPct": 0.05,
+   "augDecline": 0.05,
+   "essOmLakhPerMwh": 1.2,
+   "solarOmLakhPerMw": 4,
+   "windOmLakhPerMw": 9,
+   "otherFixedLakhPerMw": 2,
+   "insurancePct": 0.003,
+   "omEscalation": 0.05,
+   "pxFee": 0.02,
+   "lcCostPct": 0.01,
+   "pbgCostPct": 0.01,
+   "gstRate": 0.18,
+   "targetEquityIrr": 0.13,
+   "debtFraction": 0.75,
+   "interestRate": 0.0875,
+   "tenorYears": 15,
+   "taxRate": 0.2517,
+   "essLifeYears": 15,
+   "reLifeYears": 25,
+   "discountRate": 0.1,
+   "effectiveDate": "2027-02-01",
+   "sellMarket": "DAM",
+   "useMarket": true,
+   "useGroup": true,
+   "merchant": true,
+   "augmentation": "annual",
+   "afterTerm": "none",
+   "merchantYears": 0,
+   "shortfallPolicy": "meet",
+   "priceScenario": "flat"
+  }
+ },
+ "scan": [
+  {
+   "mw": 0,
+   "sp": 9.501,
+   "shortMwh": 234595
+  },
+  {
+   "mw": 2,
+   "sp": 9.241,
+   "shortMwh": 185898
+  },
+  {
+   "mw": 4,
+   "sp": 8.984,
+   "shortMwh": 137201
+  },
+  {
+   "mw": 6,
+   "sp": 8.773,
+   "shortMwh": 88505
+  },
+  {
+   "mw": 8,
+   "sp": 8.517,
+   "shortMwh": 39808
+  },
+  {
+   "mw": 10,
+   "sp": 8.322,
+   "shortMwh": 0
+  },
+  {
+   "mw": 12,
+   "sp": 8.366,
+   "shortMwh": 0
+  },
+  {
+   "mw": 14,
+   "sp": 8.407,
+   "shortMwh": 0
+  },
+  {
+   "mw": 16,
+   "sp": 8.455,
+   "shortMwh": 0
+  },
+  {
+   "mw": 18,
+   "sp": 8.498,
+   "shortMwh": 0
+  },
+  {
+   "mw": 20,
+   "sp": 8.531,
+   "shortMwh": 0
+  },
+  {
+   "mw": 22,
+   "sp": 8.575,
+   "shortMwh": 0
+  },
+  {
+   "mw": 24,
+   "sp": 8.626,
+   "shortMwh": 0
+  },
+  {
+   "mw": 26,
+   "sp": 8.686,
+   "shortMwh": 0
+  },
+  {
+   "mw": 28,
+   "sp": 8.753,
+   "shortMwh": 0
+  },
+  {
+   "mw": 30,
+   "sp": 8.817,
+   "shortMwh": 0
+  },
+  {
+   "mw": 32,
+   "sp": 8.864,
+   "shortMwh": 0
+  },
+  {
+   "mw": 34,
+   "sp": 8.901,
+   "shortMwh": 0
+  },
+  {
+   "mw": 36,
+   "sp": 8.927,
+   "shortMwh": 0
+  },
+  {
+   "mw": 38,
+   "sp": 8.944,
+   "shortMwh": 0
+  },
+  {
+   "mw": 40,
+   "sp": 8.952,
+   "shortMwh": 0
+  },
+  {
+   "mw": 42,
+   "sp": 8.961,
+   "shortMwh": 0
+  },
+  {
+   "mw": 44,
+   "sp": 8.977,
+   "shortMwh": 0
+  },
+  {
+   "mw": 46,
+   "sp": 8.999,
+   "shortMwh": 0
+  },
+  {
+   "mw": 48,
+   "sp": 9.025,
+   "shortMwh": 0
+  },
+  {
+   "mw": 50,
+   "sp": 9.061,
+   "shortMwh": 0
+  },
+  {
+   "mw": 52,
+   "sp": 9.098,
+   "shortMwh": 0
+  },
+  {
+   "mw": 54,
+   "sp": 9.136,
+   "shortMwh": 0
+  },
+  {
+   "mw": 56,
+   "sp": 9.175,
+   "shortMwh": 0
+  },
+  {
+   "mw": 58,
+   "sp": 9.214,
+   "shortMwh": 0
+  },
+  {
+   "mw": 60,
+   "sp": 9.255,
+   "shortMwh": 0
+  }
+ ],
+ "day": {
+  "date": "2031-09-29",
+  "chosen": [
+   19,
+   20
+  ],
+  "solar": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0.05,
+   2.71,
+   4.77,
+   7.12,
+   8.38,
+   9.03,
+   9.49,
+   9.76,
+   8.64,
+   6.2,
+   4,
+   1.47,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "charge": [
+   100,
+   51.38,
+   0,
+   0,
+   0,
+   0,
+   0.05,
+   2.71,
+   4.77,
+   7.12,
+   8.38,
+   9.03,
+   9.49,
+   9.76,
+   8.64,
+   6.2,
+   4,
+   1.47,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "own": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0.05,
+   2.71,
+   4.77,
+   7.12,
+   8.38,
+   9.03,
+   9.49,
+   9.76,
+   8.64,
+   6.2,
+   4,
+   1.47,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "bought": [
+   100,
+   51.38,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  "discharge": [
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   0,
+   97,
+   97,
+   0,
+   0,
+   0
+  ],
+  "price": [
+   3.65,
+   3.18,
+   3.06,
+   2.69,
+   2.38,
+   2.03,
+   2.22,
+   2.08,
+   1.83,
+   1.81,
+   1.8,
+   1.78,
+   1.8,
+   1.35,
+   1.83,
+   2.28,
+   2.87,
+   3.57,
+   6.24,
+   10,
+   10,
+   6.56,
+   4.54,
+   4.36
+  ],
+  "delivered": 194,
+  "required": 200,
+  "availability": 0.97
+ },
+ "evening": {
+  "chosen": 8.3,
+  "all": 6.73
+ },
+ "pool": [
+  {
+   "sp": 5.5,
+   "cr": -98.7,
+   "yours": false
+  },
+  {
+   "sp": 6,
+   "cr": -81.1,
+   "yours": false
+  },
+  {
+   "sp": 6.5,
+   "cr": -63.5,
+   "yours": false
+  },
+  {
+   "sp": 7,
+   "cr": -45.9,
+   "yours": false
+  },
+  {
+   "sp": 7.5,
+   "cr": -28.3,
+   "yours": false
+  },
+  {
+   "sp": 8,
+   "cr": -10.7,
+   "yours": false
+  },
+  {
+   "sp": 8.32,
+   "cr": 0.7,
+   "yours": true
+  },
+  {
+   "sp": 8.5,
+   "cr": 7,
+   "yours": false
+  },
+  {
+   "sp": 9,
+   "cr": 24.6,
+   "yours": false
+  },
+  {
+   "sp": 9.5,
+   "cr": 42.2,
+   "yours": false
+  },
+  {
+   "sp": 10,
+   "cr": 59.8,
+   "yours": false
+  }
+ ],
+ "verdict": {
+  "tone": "good",
+  "text": "At ₹8.33 the quote sits at the evening market (₹8.30 in the two chosen hours): the Pool is about neutral on your 100 MW (₹0.2 cr a year paid), so the corpus carries the full 500 MW at the price year's prices; on a lower evening view SECI would weigh the gap."
+ },
+ "review": {
+  "winning": {
+   "tariff": 8.32,
+   "summary": "nothing blocking, 1 that carries cost, 4 to note.",
+   "findings": [
+    {
+     "severity": "warn",
+     "title": "₹8.32/kWh is above the highest FDRE peak-power award (₹6.00)"
+    },
+    {
+     "severity": "note",
+     "title": "Buying the charging power is the right call here: more own solar would raise the price"
+    },
+    {
+     "severity": "note",
+     "title": "What carries the ₹8.32: the battery's capex ₹3.15/kWh, then charging power and exchange fees ₹1.99"
+    },
+    {
+     "severity": "note",
+     "title": "Green-market charging reaches 25.0% of the supply after month 36 (limit 25%)"
+    },
+    {
+     "severity": "note",
+     "title": "4 inputs far from the benchmark in the direction that lowers the price"
+    }
+   ]
+  },
+  "overbuilt": {
+   "tariff": 19.92,
+   "summary": "4 blocking findings, 5 that carry cost, 4 to note.",
+   "findings": [
+    {
+     "severity": "block",
+     "title": "Tender condition not met: Green market within 25% (+75% until month 36)"
+    },
+    {
+     "severity": "block",
+     "title": "Tender condition not met: 2 MWh/MW every day"
+    },
+    {
+     "severity": "note",
+     "title": "Tender condition to watch: Weekly shortfall within 10%"
+    },
+    {
+     "severity": "block",
+     "title": "A strike price of ₹19.92/kWh is 3.3× the highest FDRE peak-power award"
+    },
+    {
+     "severity": "note",
+     "title": "At ₹19.92 the Pool pays about ₹62 cr a year for your 150 MW; the full 500 MW would need ₹206 cr a year against a ₹76 cr corpus"
+    },
+    {
+     "severity": "warn",
+     "title": "Own solar is not at its best: 29 MWac instead of 14 lowers the screening price by ₹3.970/kWh"
+    },
+    {
+     "severity": "warn",
+     "title": "Little own RE (14 MWac for 150 MW): nearly all charging power is bought"
+    },
+    {
+     "severity": "note",
+     "title": "What carries the ₹19.92: the battery's capex ₹12.11/kWh, then O&M, insurance, fixed costs and the LC ₹2.53"
+    },
+    {
+     "severity": "warn",
+     "title": "The extra battery for evening sale (1.00 MWh/MW, 150 MWh) costs ₹25.5 cr a year and earns ₹0.0 cr"
+    },
+    {
+     "severity": "warn",
+     "title": "The battery fades below the need: the last year supplies 43.7% of the mandate"
+    },
+    {
+     "severity": "warn",
+     "title": "1 input far from the benchmark in the direction that raises the price"
+    },
+    {
+     "severity": "block",
+     "title": "Minimum DSCR 1.02× is below the lender's 1.10×"
+    },
+    {
+     "severity": "note",
+     "title": "A 16.0% equity IRR target is high for a contracted supply"
+    }
+   ]
+  }
+ }
+}

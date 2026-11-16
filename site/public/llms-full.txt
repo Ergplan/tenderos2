@@ -1,0 +1,153 @@
+# TenderOS by jouleWise
+
+> TenderOS is a bid workspace for renewable energy tenders in India (SECI, NHPC, NTPC, state utilities). It reads a tender and its amendments with every value tied to its document, page and quote; sizes solar, wind and battery plants against the tender's conditions with HiGHS optimisation; prices the bid for a target equity IRR through a 25-year financial model exported as a live Excel workbook; reviews the bid against the tender and recent awards; and produces the bid pack. It runs on the client's own infrastructure.
+
+Key facts:
+- Maker: jouleWise (https://www.joulewise.tech). Contact: sales@joulewise.com, https://www.joulewise.tech/contact
+- Tender types: FDRE round-the-clock, assured peak supply, Contract for Difference (SECI CfD-I), standalone BESS, solar or wind with storage.
+- Language models read documents and draft summaries only; a person confirms every value. Sizing, dispatch, the financial model and the bid review are deterministic code.
+- Demo result on SECI CfD-I (RfS SECI/C&P/IPP/13/0002/26-27, 500 MW × 2 h, bids due 20 Nov 2026): 262 conditions with pages, 40 amendment changes quoted; for a 100 MW bid with competitive inputs the optimiser keeps 10 MWac of own solar and prices the strike at ₹8.32/kWh at a 13.0% equity IRR (minimum DSCR 1.20).
+
+## Pages
+- [Demo and product overview](https://tenderos.joulewise.tech/): the eleven-step simulation, the modules, SECI results, open SECI tenders, FAQ
+- [Deck (PDF)](https://tenderos.joulewise.tech/TenderOS-deck.pdf)
+- [Full text for language models](https://tenderos.joulewise.tech/llms-full.txt)
+
+## Data
+- [SECI auction results, CSV](https://tenderos.joulewise.tech/data/seci-results.csv): one row per bidder in eight SECI e-reverse auctions (May 2025 – Aug 2026), awarded or not, with bid MW, awarded MW and final tariff, and the SECI notice
+- [SECI auction results, JSON](https://tenderos.joulewise.tech/data/seci-results.json)
+- [Open SECI tenders, JSON](https://tenderos.joulewise.tech/data/seci-open-tenders.json): scanned 16 Nov 2026 from www.seci.co.in/tenders
+- [CfD-I demo numbers, JSON](https://tenderos.joulewise.tech/data/cfd-demo.json): the optimiser scan, a day's dispatch, the Pool table, bid-review findings
+
+## What a bid team gets
+- **Tender to Bid**: Upload an RfS with its amendments, clarifications and PPA/PSA (up to 20 files). TenderOS reads them, applies every amendment, quotes each change was/now, and gives every value its document and page. A reviewer confirms the reading before it reaches the bid.
+- **SECI FDRE-RTC tender**: The 1,000 MW firm and dispatchable round-the-clock tender worked end to end: block-wise supply floors, storage, penalties at multiples of the tariff, the bid forms in SECI's own wording, and how the winners reached ₹5.25/kWh.
+- **CfD bid (SECI CfD-I)**: A Contract for Difference explained in plain words; the RfS and four amendments with 40 changes quoted; 262 conditions with their pages; own solar sized for the least strike price; the Pool and Amendment-04's corpus test; the 17 formats as letters.
+- **BESS tenders**: Standalone battery tenders: capacity and energy, round-trip efficiency, cycles and augmentation, availability and the payment by the buying utility.
+- **Plant sizing optimiser**: HiGHS optimisation sizes solar, wind and storage against every block floor, storage mandate and sale rule, hour by hour over every year of the contract, minimising the tariff for the target equity IRR.
+- **15-minute dispatch**: Every day of the term in 96 time blocks (the Grid Code's scheduling block): charging, discharge, state of charge, supply due and delivered, surplus sold. Downloadable per Contract Year as CSV or a streaming Excel file.
+- **Financial model and Excel twin**: A 25-year model from construction: IDC, six repayment methods, refinancing, working capital, DSRA, tax with losses carried, DSCR/LLCR. One click gives the live Excel workbook, every number a formula, recalculated in tests against the application.
+- **What-if and tariff levers**: Set the price you want to quote and the levers table shows, input by input, what moves the tariff and how far. Freeze a lever with evidence, reject one so the model searches others. Contract size is never offered as a lever.
+- **Bid review**: Why a bid is not optimal: tender conditions failed, prices far above recent awards, a plant not at its best size, a battery that fades below the need, inputs far from benchmarks, a DSCR the lender will not accept. Each finding says where to fix it.
+- **New tenders radar**: Scans SECI's tender list and details pages, never the documents, and writes a summary per tender: what it is, who may bid, the dates. New, changed and closed tenders are marked at every scan.
+- **Recent results**: SECI's e-reverse auction results: every bidder awarded and not, capacity and final tariff, linked to SECI's notices. The reference for what wins.
+- **Voice agent and Claude connector**: Ask the tender by voice or chat, or connect Claude through MCP (18 tools): look up a condition with its page, set an input, run the optimiser, read the financials, explain what wins.
+- **Team, evidence and sign-off**: Steps by team (Projects, Design, Finance), a paperclip for evidence on every input, sign-off that turns amber when a value changes, pings and threads, saved bids with versions, an activity log.
+- **Runs on your infrastructure**: Docker on any cloud or on-premises. The enterprise edition splits an intake zone (documents and cloud models) from a core zone where the bid, the costs and the model live with no cloud client. Signed patches under the AMC.
+
+## The demo, step by step (SECI CfD-I)
+1. Tender in: Six documents of SECI CfD-I
+2. Read with evidence: Every value with its page and quote
+3. Amendments applied: Was / now, quoted
+4. Conditions: 262 conditions in 11 groups
+5. Inputs by team: Fill with competitive values
+6. Size the plant: Least strike price, every day met
+7. Dispatch: Hour by hour, 15-minute blocks
+8. Financial model: Tariff for the target IRR
+9. What wins: The CfD Pool and the corpus
+10. Bid review: Why a bid is not optimal
+11. Bid pack: Excel, letters, dispatch files
+
+### The tender set
+- RfS (129 pages, 2026-07-15): The tender as revised on 15.07.2026 (it replaces the RfS of the same number dated 17.04.2026): 500 MW of assured peak supply, 2 MWh per MW every evening through the power exchanges, settled against the strike price by SECI's CfD Pool; the bid, the e-Reverse Auction, eligibility, guarantees, milestones and the formats (Section 7). Read with the amendments, which override it.
+- Standard CfD Agreement (CfDA) (69 pages): The agreement every winner signs: the daily supply, the time-block settlement against the strike price, the weekly shortfall penalty, the Letter of Credit, the events of default. It prevails over the RfS where they differ (CfDA 1.2.18).
+- Amendment-01 (2 pages, 2026-07-17): SECI keeps the CfD Pool funded for the whole term; gains above ₹10/kWh split 50:50 (the sharing itself was later replaced by Amendment-03's full pass-through).
+- Amendment-02 (5 pages, 2026-08-03): A battery of X MW / 2X MWh owned by the bidder becomes mandatory; the SCD applies to the battery (15 months) with the RE generation due by 36 months; the green-market share (25%, plus 75% for charging until month 36, then 50% from group companies); the penalties re-cut for the two deadlines.
+- Amendment-03 (5 pages, 2026-10-08): The term becomes 15 years; the ₹5.80/kWh ceiling goes; the CfD settlement becomes a full pass-through (the bidder nets the strike price on every kWh, the Pool keeps every gain and bears every loss); TAM and G-TAM join the markets; SECI may designate the hours and bid on the RPD's behalf; the EMD validity rule; a new contact.
+- Amendment-04 (6 pages, 2026-11-05): How SECI's designation of the Peak Hours works: the RPD declares the day's availability (MWh) by 06:00 on D-1, or 100% of the contracted capacity is deemed available; SECI instructs the time blocks, price and quantum by 08:00 on D-1, or bids on the RPD's behalf; up to 80% of the availability may go through TAM/G-TAM and the balance through the day-ahead markets, never above the contracted capacity in a block; deviations, DSM and every exchange charge are the RPD's; sale elsewhere when MCPs stay below the strike price needs SECI/MNRE approval. And SECI may restrict the capacity awarded to what the CfD corpus can bear at the discovered tariff.
+
+### Conditions by group (262)
+- Scheme and bid: 39
+- Auction: 20
+- Daily supply: 32
+- CfD settlement: 19
+- Plant: 44
+- Energy sourcing: 6
+- Dates: 20
+- Bid security and charges: 27
+- Penalties and security: 9
+- Eligibility: 26
+- Bid documents: 20
+
+### Sample conditions with evidence
+- What is procured: Assured peak supply of 1000 MWh a day (500 MW × 2 hours) from ISTS-connected RE projects, sold through the power exchanges, settled by SECI under a CfD [Standard CfD Agreement (CfDA), Recital D, page 3] Quote: "SECI had initiated a Tariff Based Competitive Bid Process for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) from ISTS-Connected RE Projects under CfD mechanism"
+- What you bid: One strike price in ₹/kWh for all projects applied for; digits after two decimals are ignored [Amendment-03, RfS 40.3 (amended), page 4] Quote: "quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. If it is quoted with more than two digits after decimal, digits after first two decimal places shall be ignored."
+- Ceiling tariff: None: the ₹5.80/kWh ceiling of the RfS was removed by Amendment-03 [Amendment-03, RfS 40.3 (original, removed), page 4] Quote: "The tariff has to be less than or equal to INR 5.80/kWh"
+- Strike price over the term: Fixed for the whole term (no escalation) [Standard CfD Agreement (CfDA), 9.1, page 40] Quote: "the Strike Price shall be fixed for the entire term of this Agreement"
+- SECI may set the hours: SECI may designate the Peak Hours and time blocks; you must make the power available in them and sell it on the exchanges as it instructs [Amendment-04, RfS 9.2.c (amended), page 1] Quote: "SECI shall have the right, as deemed necessary, to designate the Peak Hours (including specific Time-Blocks) during which the RPD shall make available and sell power from the Project through the Power Exchanges. The RPD shall ensure availability of power during the Peak Hours/Time-Blocks so designated by SECI"
+- Declare the day's availability by 06:00 on D-1: In MWh, day-ahead; the declaration drives what SECI schedules [Amendment-04, RfS 9.2.c (b), page 1] Quote: "The RPD shall declare the availability of energy from the Project, in MWh, on a day-ahead basis, latest by 06:00 hours on the day immediately preceding the day of delivery (‘D-1’ Day for delivery on Day ‘D’)."
+- Up to 80% term-ahead, the rest day-ahead: TAM/G-TAM may take up to 80% of the declared availability; the balance goes to DAM/GDAM/HP-DAM; never above the contracted capacity in any block, never sold twice [Amendment-04, RfS 9.2.c (e), page 2] Quote: "For the purpose of sale of power through the TAM and G-TAM, up to 80% of the availability shall be considered for offering/scheduling, as applicable, in the aforesaid markets"
+- Deviations and DSM are yours: Schedule revisions, deviations, DSM and any scheduling non-compliance are borne by you, with an indemnity to SECI [Amendment-04, RfS 9.2.c (f), page 2] Quote: "Any penalties, charges or financial liabilities arising on account of revisions to the schedule, deviations from the schedule, deviation settlement mechanism (DSM) or any other scheduling-related non-compliance attributable to the RPD, including failure to maintain the declared availability or to comply with SECI's instructions, shall be borne entirely by the RPD."
+- SECI may award less than 500 MW: The capacity awarded is what the CfD corpus can carry at the discovered tariff; SECI may restrict the total award [Amendment-04, RfS 42.2.b (amended), page 3] Quote: "the final capacity to be awarded under the RfS shall be determined by SECI based on an assessment of the financial viability of the discovered Tariff and the corresponding requirement of the CfD Pool, within the available CfD corpus. Accordingly, SECI reserves the right to restrict the total capacity to be awarded under the RfS, as considered necessary, to ensure that the financial implications of the award remain within the available CfD corpus."
+
+### Amendment changes (sample)
+- The battery becomes mandatory and yours (Amendment-02, RfS 4.3, page 1): Storage is no longer optional or leasable: for every contracted MW you build and own at least 1 MW / 2 MWh of battery.
+- No ceiling tariff (Amendment-03, RfS 40.3, page 4): The ₹5.80/kWh ceiling and the summary rejection above it are removed; one first-round tariff, two decimals.
+- Settlement: full pass-through (Amendment-03, RfS 9.3.a.iv, page 2): The slab sharing (70:30, 50:50, 30:70) goes: the Pool takes the whole gain when the market clears above the strike price and pays the whole shortfall when it clears below, so you net the strike price on every kWh settled. Amendment-01's split above ₹10/kWh is replaced with it.
+- SECI may award less than 500 MW (Amendment-04, RfS 42.2.b, page 3): The award is no longer 500 MW by right: SECI will award only what the CfD corpus can carry at the discovered strike price. A high price wins less capacity, or none; the Bid review sizes the Pool's pay-out at your price against the corpus.
+
+### Sizing scan (100 MW, competitive inputs): own solar MWac → strike price ₹/kWh (days short)
+0 → 9.501 (short 2,34,595 MWh over the term); 2 → 9.241 (short 1,85,898 MWh over the term); 4 → 8.984 (short 1,37,201 MWh over the term); 6 → 8.773 (short 88,505 MWh over the term); 8 → 8.517 (short 39,808 MWh over the term); 10 → 8.322; 12 → 8.366; 14 → 8.407; 16 → 8.455; 18 → 8.498; 20 → 8.531; 22 → 8.575; 24 → 8.626; 26 → 8.686; 28 → 8.753; 30 → 8.817; 32 → 8.864; 34 → 8.901; 36 → 8.927; 38 → 8.944; 40 → 8.952; 42 → 8.961; 44 → 8.977; 46 → 8.999; 48 → 9.025; 50 → 9.061; 52 → 9.098; 54 → 9.136; 56 → 9.175; 58 → 9.214; 60 → 9.255
+
+### Financial result
+Strike price ₹8.322/kWh; equity IRR 13.0%; project IRR 8.8%; minimum DSCR 1.20. Evening market in the two chosen hours ₹8.30/kWh, all evening hours ₹6.73/kWh.
+
+### What wins: CfD Pool net flow a year for 500 MW (positive = the Pool pays)
+₹5.50 → ₹-98.7 cr; ₹6.00 → ₹-81.1 cr; ₹6.50 → ₹-63.5 cr; ₹7.00 → ₹-45.9 cr; ₹7.50 → ₹-28.3 cr; ₹8.00 → ₹-10.7 cr; ₹8.32 → ₹0.7 cr; ₹8.50 → ₹7.0 cr; ₹9.00 → ₹24.6 cr; ₹9.50 → ₹42.2 cr; ₹10.00 → ₹59.8 cr. At ₹8.33 the quote sits at the evening market (₹8.30 in the two chosen hours): the Pool is about neutral on your 100 MW (₹0.2 cr a year paid), so the corpus carries the full 500 MW at the price year's prices; on a lower evening view SECI would weigh the gap.
+
+### Bid review
+- Competitive bid ₹8.32: nothing blocking, 1 that carries cost, 4 to note. [warn] ₹8.32/kWh is above the highest FDRE peak-power award (₹6.00); [note] Buying the charging power is the right call here: more own solar would raise the price; [note] What carries the ₹8.32: the battery's capex ₹3.15/kWh, then charging power and exchange fees ₹1.99; [note] Green-market charging reaches 25.0% of the supply after month 36 (limit 25%); [note] 4 inputs far from the benchmark in the direction that lowers the price
+- Over-built bid ₹19.92: 4 blocking findings, 5 that carry cost, 4 to note. [block] Tender condition not met: Green market within 25% (+75% until month 36); [block] Tender condition not met: 2 MWh/MW every day; [note] Tender condition to watch: Weekly shortfall within 10%; [block] A strike price of ₹19.92/kWh is 3.3× the highest FDRE peak-power award; [note] At ₹19.92 the Pool pays about ₹62 cr a year for your 150 MW; the full 500 MW would need ₹206 cr a year against a ₹76 cr corpus; [warn] Own solar is not at its best: 29 MWac instead of 14 lowers the screening price by ₹3.970/kWh; [warn] Little own RE (14 MWac for 150 MW): nearly all charging power is bought; [note] What carries the ₹19.92: the battery's capex ₹12.11/kWh, then O&M, insurance, fixed costs and the LC ₹2.53; [warn] The extra battery for evening sale (1.00 MWh/MW, 150 MWh) costs ₹25.5 cr a year and earns ₹0.0 cr; [warn] The battery fades below the need: the last year supplies 43.7% of the mandate; [warn] 1 input far from the benchmark in the direction that raises the price; [block] Minimum DSCR 1.02× is below the lender's 1.10×; [note] A 16.0% equity IRR target is high for a contracted supply
+
+## SECI auction results (₹/kWh as discovered; Discovered tariffs, as SECI's result notices give them. SECI sells on to the buying utilities at the tariff plus its trading margin.)
+| Auction | Product | Tendered MW | Awarded MW | Tariff range | Weighted | Auction date | Winners | Source |
+|---|---|---|---|---|---|---|---|---|
+| Assured peak supply, 6000 MWh (1500 MW × 4 h) (SECI-FDRE-IX) | FDRE peak power | 1500 (6000 MWh) | 1500 | 5.99–6.00 | 5.995 | 2026-08-21 | Waaree Forever Energies Private Limited 700 MW @ 5.99; NTPC Renewable Energy Limited 500 MW @ 6.00; ACME Solar Holdings Limited 300 MW @ 6.00 | https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-IX-_6000_MWh_result_website_upload.pdf |
+| 1000 MW firm and dispatchable RE, round the clock (SECI-FDRE-RTC-V) | FDRE-RTC | 1000 | 1000 | 5.25–5.26 | 5.254 | 2026-08-06 | EMIF II Holding V II Coöperatief W.A. 100 MW @ 5.25; Hero Solar Energy Private Limited 120 MW @ 5.25; Purvah Green Power Private Limited 70 MW @ 5.25; Resolven Four Energy Private Limited 150 MW @ 5.25; Kengeri Prime Solar Power Private Limited 180 MW @ 5.25; Hexa Climate Solutions Private Limited 150 MW @ 5.26; Juniper Green Energy Limited 230 MW @ 5.26 | https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-RTC-V-_1000_MW_result_website_upload.pdf |
+| 2000 MW ISTS-connected wind (SECI-Tranche-XX) | Wind | 2000 | 1495 | 3.78–3.85 | 3.841 | 2026-07-15 | Gentari Renewables India Castor One Private Limited 200 MW @ 3.78; Adyant Enersol Private Limited 110 MW @ 3.85; Torrent Green Energy Private Limited 150 MW @ 3.85; Opera Energy Private Limited 50 MW @ 3.85; Halvad Renewables Private Limited 130 MW @ 3.85; Ayana Renewable Power Private Limited 50 MW @ 3.85; Ganeko Four Energy Private Limited 200 MW @ 3.85; NLC India Renewables Limited 200 MW @ 3.85; Powerica Limited 100 MW @ 3.85; Refex Green Power Limited 80 MW @ 3.85; Atriwal Infrastructure Limited 50 MW @ 3.85; Purvah Green Power Private Limited 175 MW @ 3.85 | https://www.seci.co.in/uploads/tenders/bidders/SECI_Wind-_2000_MW_(Tranche-XX)_result_website_upload.pdf |
+| Assured peak supply, 4800 MWh (1200 MW × 4 h) (SECI-FDRE-VII) | FDRE peak power | 1200 (4800 MWh) | 1200 | 6.27–6.28 | 6.279 | 2026-02-05 | Adyant Enersol Private Limited 100 MW @ 6.27; Serentica Renewables India Private Limited 600 MW @ 6.28; AMPIN Energy Utility Nine Private Limited 199 MW @ 6.28; ACME Solar Holdings Limited 301 MW @ 6.28 | https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-VII-_4800_MWh_result_website_upload.pdf |
+| 1200 MW ISTS-connected wind (SECI-Tranche-XIX) | Wind | 1200 | 1200 | 3.67–3.69 | 3.684 | 2026-02-04 | K.P. Energy Limited 100 MW @ 3.67; Ganeko Three Energy Private Limited 180 MW @ 3.68; Waaree Forever Energies Private Limited 300 MW @ 3.68; Opera Energy Private Limited 50 MW @ 3.68; Purvah Green Power Private Limited 250 MW @ 3.69; Vena Energy Aura Private Limited 124 MW @ 3.69; Refex Holding Private Limited 196 MW @ 3.69 | https://www.seci.co.in/uploads/tenders/bidders/SECI_Wind-_1200_MW_(Tranche-XIX)_result_website_upload.pdf |
+| 1200 MW ISTS solar with 600 MW / 3600 MWh ESS (SECI-ISTS-XXI) | Solar + ESS | 1200 (3600 MWh) | 1200 | 3.12–3.13 | 3.123 | 2026-01-09 | Engie Energy India Private Limited 200 MW @ 3.12; NLC India Renewables Limited 600 MW @ 3.12; RPIL Power Three Private Limited 300 MW @ 3.13; Oriana Power Limited 100 MW @ 3.13 | https://www.seci.co.in/uploads/tenders/bidders/SECI_Solar_1200_MW_with_ESS_(ISTS-XXI)_result_website_upload.pdf |
+| 2000 MW ISTS solar with 1000 MW / 4000 MWh ESS (SECI-ISTS-XX) | Solar + ESS | 2000 (4000 MWh) | 2000 | 2.86–2.87 | 2.862 | 2025-10-15 | Welspun Renewable Energy Private Limited 200 MW @ 2.86; MB Power (Madhya Pradesh) Limited 150 MW @ 2.86; Shivalaya Construction Limited 600 MW @ 2.86; Oswal Cables Limited 50 MW @ 2.86; Purvah Green Power Private Limited 300 MW @ 2.86; Banyan Insolation Private Limited 100 MW @ 2.86; LC Infra Projects Private Limited 50 MW @ 2.86; Stockwell Solar Services Private Limited 80 MW @ 2.86; SAEL Industries Limited 300 MW @ 2.87; GH2 Solar Limited 50 MW @ 2.87; Navayuga Green Energy Private Limited 120 MW @ 2.87 | https://www.seci.co.in/uploads/tenders/bidders/SECI_Solar_2000_MW_with_ESS_(ISTS-XX)_result_website_upload2.pdf |
+| 1200 MW RTC power from ISTS-connected RE projects (SECI-RTC-IV) | RTC (round-the-clock RE) | 1200 | 420 | 5.06–5.07 | 5.065 | 2025-05-26 | Hero Solar Energy Private Limited 120 MW @ 5.06; Hexa Climate Solutions Private Limited 100 MW @ 5.06; Sembcorp Green Infra Private Limited 50 MW @ 5.07; Jindal India Power Limited 150 MW @ 5.07 | https://www.seci.co.in/uploads/tenders/bidders/SECI_RTC-IV-_1200_MW_result_website_upload.pdf |
+
+## Open SECI tenders (scanned 2026-11-16T09:30:18, no documents opened)
+- 700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&I-1) (SECI/C&P/IPP/15/0009/26-27), bids due 2026-11-16: Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 16 Nov 2026, 18:00. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 19 Nov 2026, 10:00.
+- RfS for Green Ammonia (Mode-2A-Tranche-II) (SECI/C&P/MI/00/06/2026-27), bids due 2026-11-17: Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 17 Nov 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 20 Nov 2026, 10:00.
+- Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat (SECI/C&P/IPP/15/0013/26-27), bids due 2026-11-19: Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 19 Nov 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 24 Nov 2026, 10:00.
+- RfS for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) under CfD Mechanism from ISTS-Connected RE Projects (SECI-CfD-I) (SECI/C&P/IPP/13/0002/26-27), bids due 2026-11-20: Contract for Difference (peak supply), 500 MW / 1,000 MWh (SECI-CfD-I); for developers: a power-supply or tariff bid. Bids are due 20 Nov 2026, 18:00. Pre-bid meeting 4 May 2026, 11:30. Bids open 26 Nov 2026, 10:00.
+- Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wind) (SECI/C&P/OP/11/0003/26-27), bids due 2026-11-20: Wind power, 45.6 MW; for EPC contractors: build the plant for SECI. Bids are due 20 Nov 2026, 18:00. Pre-bid meeting 3 Aug 2026, 15:30. Bids open 25 Nov 2026, 10:30.
+- RfS for 1200 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XXI) (SECI/C&P/IPP/12/0011/26-27), bids due 2026-11-24: Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 27 Nov 2026, 10:00.
+- RfS for setting up of 4083.75 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode at Constituent Colleges/Institutions of Central Agricultural University (CAU), Imphal - North Eastern Region (RTSPV T-XIII) (SECI/C&P/IPP/11/0008/26-27), bids due 2026-11-24: Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 30 Sep 2026, 14:30. Bids open 27 Nov 2026, 10:00.
+- Request for Selection (RfS Document) of Solar Power Developers for Setting up of 11,159 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode through Tariff-Based Competitive Bidding (RTSPV-Tranche-XIV) (SECI/C&P/IPP/11/0009/26-27), bids due 2026-11-24: Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 7 Oct 2026, 14:30. Bids open 27 Nov 2026, 10:00.
+- RfS for Supply of Energy from 800 MW/ 3200 MWh Standalone Battery Energy Storage Systems in India (SECI-ESS-IV) (SECI/C&P/IPP/15/0010/26-27), bids due 2026-11-25: Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 9 Oct 2026, 16:00. Bids open 30 Nov 2026, 10:00.
+- Call for Proposals (CfP) for Selection of Executing Agency(ies) for preparation of Detailed Project Reports (DPRs) for Green Hydrogen Hubs in India under Component-B1 of the National Green Hydrogen Mission (SECI/C&P/EOI/17/0005/26-27), bids due 2026-11-30: Green hydrogen and ammonia; for consultants and service providers. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 6 Oct 2026, 14:30. Bids open 1 Dec 2026, 10:00.
+- RfS for Assured Peak Supply of 4800 MWh (1200 MW x 4 Hrs.) from ISTS-Connected RE Projects in India (SECI-FDRE-X) (SECI/C&P/IPP/13/0012/26-27), bids due 2026-12-01: Assured peak supply (FDRE), 1,200 MW / 4,800 MWh (SECI-FDRE-X); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 4 Dec 2026, 10:00.
+- Request for Selection (RfS) of Solar Power Developer for setting up of 3680 kW Grid-Connected Rooftop Solar PV Projects on NDMC Buildings under RESCO Mode through Tariff-based Competitive Bidding (RTSPV T-XV) (SECI/C&P/IPP/11/0010/26-27), bids due 2026-12-01: Rooftop solar (RESCO), 3,680 kW (RTSPV T-XV); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 9 Nov 2026, 14:30. Bids open 4 Dec 2026, 10:00.
+- Tender for Design, Engineering, Supply, Construction, Erection, Testing, Commissioning and O&M of ISTS-Connected 60 MW (AC) Solar PV Power Plant at Gaya, Bihar, India (SECI/C&P/OP/11/0007/26-27), bids due 2026-12-03: Solar power, 60 MW; for EPC contractors: build the plant for SECI. Bids are due 3 Dec 2026, 18:00. Pre-bid meeting 15 Oct 2026, 15:30. Bids open 8 Dec 2026, 10:00.
+- RfS for setting up Solar PV Power Project for NHAI (Phase-I) under Tariff-Based Competitive Bidding (SECI/C&P/PMC/11/07/2025-26), bids due 2026-12-14: Solar power; for developers: a power-supply or tariff bid. Bids are due 14 Dec 2026, 18:00. Pre-bid meeting 12 Nov 2026, 14:30. Bids open 17 Dec 2026, 10:00.
+
+## FAQ
+### What is TenderOS?
+TenderOS is a bid workspace for renewable power tenders in India, made by jouleWise. It reads a tender and its amendments with every value tied to its page, sizes the plant against the tender's conditions, prices the bid for the equity return you target, and produces the bid pack: the financial model as a live Excel workbook, the tender's formats and letters, and the sensitivities for bid day.
+
+### Which tenders does it handle?
+Firm and dispatchable renewable energy (FDRE) and round-the-clock tenders, assured peak supply, Contracts for Difference (SECI CfD-I), standalone battery storage, and solar or wind with storage, from SECI, NHPC, NTPC and state utilities. A new tender type is added as a tender pack.
+
+### Does the AI decide the bid?
+No. Language models read documents and draft summaries; every value they read carries its document, page and quote, and a person confirms it before it reaches the bid. Sizing, dispatch and the financial model are deterministic code (HiGHS optimisation and a formula model), and the Excel twin shows every formula.
+
+### How accurate is the financial model?
+The model is exported as a live Excel workbook in which every number is a formula on the blue input cells. The product's own tests recalculate that workbook in LibreOffice and compare it with the application's numbers, so the workbook a lender reads and the application agree.
+
+### Where does the SECI auction data come from?
+From SECI's own result notices (https://www.seci.co.in/tenders/results), linked per auction. The dataset is free to download as CSV or JSON from this page. Tariffs are as discovered in the e-reverse auction; SECI sells on to the buying utilities at the tariff plus its trading margin.
+
+### What did the model find for SECI CfD-I?
+With competitive inputs for a 100 MW bid, the optimiser keeps 10 MWac of own solar and buys the rest of the charging power, for a strike price of ₹8.32/kWh at a 13% equity IRR. The two dearest evening hours averaged ₹8.30/kWh in the price year, so a quote near that leaves SECI's CfD Pool about neutral, which matters because Amendment-04 lets SECI cut the award to what its ₹76 crore corpus can carry.
+
+### Can it run on our own servers?
+Yes. TenderOS installs with Docker on any cloud or on-premises. The enterprise edition separates an intake zone (tender documents and cloud models) from a core zone on your network where bids, costs and the model live with no cloud client.
+
+### How do we get access?
+Ask jouleWise for a walkthrough on your own tender: https://www.joulewise.tech/contact or sales@joulewise.com.

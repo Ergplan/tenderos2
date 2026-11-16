@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TenderOS: from tender PDF to winning bid for Indian renewable energy tenders | jouleWise</title>
+<meta name="description" content="TenderOS by jouleWise turns an Indian renewable energy tender into a bid: it reads the RfS and amendments with page-level evidence, sizes solar, wind and battery against every condition, prices the bid for your target IRR and builds the Excel model and bid pack. Live demo with SECI auction results.">
+<link rel="canonical" href="https://tenderos.joulewise.tech/">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<meta name="theme-color" content="#1d1705">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="TenderOS by jouleWise">
+<meta property="og:title" content="TenderOS: from tender PDF to winning bid">
+<meta property="og:description" content="Watch a SECI tender become a bid: read with page evidence, amendments applied, plant sized, model priced, bid reviewed. With SECI's recent auction results.">
+<meta property="og:url" content="https://tenderos.joulewise.tech/">
+<meta property="og:image" content="https://tenderos.joulewise.tech/og.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_IN">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TenderOS: from tender PDF to winning bid">
+<meta name="twitter:description" content="Bid workspace for Indian RE tenders: evidence-linked reading, plant sizing, financial model, bid review. Demo and SECI auction data.">
+<meta name="twitter:image" content="https://tenderos.joulewise.tech/og.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate" type="text/plain" href="/llms.txt" title="LLM summary">
+<link rel="alternate" type="text/csv" href="/data/seci-results.csv" title="SECI auction results (CSV)">
+<link rel="stylesheet" href="/assets/styles.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"TenderOS","applicationCategory":"BusinessApplication","operatingSystem":"Web, Docker (any cloud or on-premises)","url":"https://tenderos.joulewise.tech","image":"https://tenderos.joulewise.tech/og.jpg","description":"Bid workspace for Indian renewable energy tenders: reads the RfS and amendments with page-level evidence, sizes solar, wind and battery plants against the tender's conditions, prices the bid for a target equity IRR, and produces the financial model as a live Excel workbook and the bid pack.","publisher":{"@type":"Organization","name":"jouleWise","url":"https://www.joulewise.tech"},"featureList":["Tender to Bid","SECI FDRE-RTC tender","CfD bid (SECI CfD-I)","BESS tenders","Plant sizing optimiser","15-minute dispatch","Financial model and Excel twin","What-if and tariff levers","Bid review","New tenders radar","Recent results","Voice agent and Claude connector","Team, evidence and sign-off","Runs on your infrastructure"],"offers":{"@type":"Offer","availability":"https://schema.org/InStock","url":"https://www.joulewise.tech/contact","description":"Licence with installation and annual maintenance (AMC); priced per engagement"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"jouleWise","url":"https://www.joulewise.tech","email":"sales@joulewise.com","sameAs":["https://www.linkedin.com/company/joulewiseadvisoryservices/"]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Dataset","name":"SECI renewable energy auction results, 2025–2026","description":"Every bidder awarded and not awarded, with capacity bid, capacity awarded and final tariff, in eight Solar Energy Corporation of India (SECI) e-reverse auctions from May 2025 to August 2026: FDRE peak power, FDRE round-the-clock, wind, solar with storage and RTC.","url":"https://tenderos.joulewise.tech/#results","creator":{"@type":"Organization","name":"jouleWise"},"isBasedOn":"https://www.seci.co.in/tenders/results","dateModified":"2026-11-16","temporalCoverage":"2025-05/2026-08","spatialCoverage":"India","distribution":[{"@type":"DataDownload","encodingFormat":"text/csv","contentUrl":"https://tenderos.joulewise.tech/data/seci-results.csv"},{"@type":"DataDownload","encodingFormat":"application/json","contentUrl":"https://tenderos.joulewise.tech/data/seci-results.json"}],"variableMeasured":["Tendered capacity (MW)","Awarded capacity (MW)","Discovered tariff (INR/kWh)","Bidder"]}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"What is TenderOS?","acceptedAnswer":{"@type":"Answer","text":"TenderOS is a bid workspace for renewable power tenders in India, made by jouleWise. It reads a tender and its amendments with every value tied to its page, sizes the plant against the tender's conditions, prices the bid for the equity return you target, and produces the bid pack: the financial model as a live Excel workbook, the tender's formats and letters, and the sensitivities for bid day."}},{"@type":"Question","name":"Which tenders does it handle?","acceptedAnswer":{"@type":"Answer","text":"Firm and dispatchable renewable energy (FDRE) and round-the-clock tenders, assured peak supply, Contracts for Difference (SECI CfD-I), standalone battery storage, and solar or wind with storage, from SECI, NHPC, NTPC and state utilities. A new tender type is added as a tender pack."}},{"@type":"Question","name":"Does the AI decide the bid?","acceptedAnswer":{"@type":"Answer","text":"No. Language models read documents and draft summaries; every value they read carries its document, page and quote, and a person confirms it before it reaches the bid. Sizing, dispatch and the financial model are deterministic code (HiGHS optimisation and a formula model), and the Excel twin shows every formula."}},{"@type":"Question","name":"How accurate is the financial model?","acceptedAnswer":{"@type":"Answer","text":"The model is exported as a live Excel workbook in which every number is a formula on the blue input cells. The product's own tests recalculate that workbook in LibreOffice and compare it with the application's numbers, so the workbook a lender reads and the application agree."}},{"@type":"Question","name":"Where does the SECI auction data come from?","acceptedAnswer":{"@type":"Answer","text":"From SECI's own result notices (https://www.seci.co.in/tenders/results), linked per auction. The dataset is free to download as CSV or JSON from this page. Tariffs are as discovered in the e-reverse auction; SECI sells on to the buying utilities at the tariff plus its trading margin."}},{"@type":"Question","name":"What did the model find for SECI CfD-I?","acceptedAnswer":{"@type":"Answer","text":"With competitive inputs for a 100 MW bid, the optimiser keeps 10 MWac of own solar and buys the rest of the charging power, for a strike price of ₹8.32/kWh at a 13% equity IRR. The two dearest evening hours averaged ₹8.30/kWh in the price year, so a quote near that leaves SECI's CfD Pool about neutral, which matters because Amendment-04 lets SECI cut the award to what its ₹76 crore corpus can carry."}},{"@type":"Question","name":"Can it run on our own servers?","acceptedAnswer":{"@type":"Answer","text":"Yes. TenderOS installs with Docker on any cloud or on-premises. The enterprise edition separates an intake zone (tender documents and cloud models) from a core zone on your network where bids, costs and the model live with no cloud client."}},{"@type":"Question","name":"How do we get access?","acceptedAnswer":{"@type":"Answer","text":"Ask jouleWise for a walkthrough on your own tender: https://www.joulewise.tech/contact or sales@joulewise.com."}}]}</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <div class="wrap nav">
+    <a href="/" class="brand" aria-label="TenderOS home"><span class="w1">Tender</span><span class="w2">OS</span><span class="by">by jouleWise</span></a>
+    <nav aria-label="Sections"><a href="#simulation">Demo</a><a href="#what">Modules</a><a href="#results">SECI results</a><a href="#faq">FAQ</a></nav>
+    <a class="btn small" href="/TenderOS-deck.pdf" download>Deck (PDF)</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <p class="eyebrow">For bid teams at renewable energy developers in India</p>
+      <h1>From the tender PDF to a winning bid, <em>with every number traceable</em>.</h1>
+      <p class="lede">TenderOS reads a SECI, NHPC or NTPC tender and its amendments, ties every value to its page, sizes the solar, wind and battery plant against each condition, prices the bid for your target equity return and builds the bid pack, including the financial model as a live Excel workbook.</p>
+      <div class="cta-row"><a class="btn" href="#simulation">Watch a tender become a bid</a><a class="btn ghost" href="/TenderOS-deck.pdf" download>Download the deck (PDF)</a></div>
+      <p class="muted small">The demo below runs on SECI's CfD-I tender (bids due 20 Nov 2026) and the product's own model. Nothing on this page is a mock-up number.</p>
+    </div>
+    <div class="hero-card" aria-label="Key results of the demo">
+      <div class="kpi"><span class="k">262</span><span class="l">tender conditions read, each with its page and quote</span></div>
+      <div class="kpi"><span class="k">40</span><span class="l">amendment changes applied across 4 amendments</span></div>
+      <div class="kpi"><span class="k">₹8.32</span><span class="l">strike price found for a 100 MW bid at a 13% equity IRR</span></div>
+      <div class="kpi"><span class="k">96</span><span class="l">15-minute blocks a day, dispatched for every day of the 15-year term</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="sell">
+  <div class="wrap three">
+    <div><h2 class="h3">The problem</h2><p>A tender set runs to hundreds of pages and keeps changing: CfD-I had four amendments in four months, and one removed the ceiling tariff. Bid teams rebuild spreadsheets each time, and nobody can say which page a number came from.</p></div>
+    <div><h2 class="h3">What TenderOS does</h2><p>It reads the tender once with evidence, keeps the amendments applied, sizes the plant and prices the bid under the tender's own rules, then reviews the bid against those rules and recent awards before you submit.</p></div>
+    <div><h2 class="h3">What you get</h2><p>The application on your infrastructure, the Excel workbook of every bid, the bid forms and letters, a 15-minute compliance file, and patches and new tender packs under an annual maintenance contract.</p></div>
+  </div>
+</section>
+
+<section id="simulation" class="sim-section">
+  <div class="wrap">
+    <p class="eyebrow">Live simulation</p>
+    <h2>Watch SECI CfD-I become a bid, in eleven steps</h2>
+    <p class="lede narrow">Press play, or click any step. Each screen shows what the application does and the numbers it produced on this tender. Amendment quotes are SECI's own words, with the page they come from.</p>
+    <div class="sim" id="sim">
+      <ol class="sim-rail" role="tablist" aria-label="Simulation steps">
+        <li><button role="tab" id="tab-upload" aria-controls="st-upload" aria-selected="true" data-stage="0"><span class="n">1</span><span class="t">Tender in</span><span class="s">Six documents of SECI CfD-I</span></button></li>
+        <li><button role="tab" id="tab-read" aria-controls="st-read" aria-selected="false" data-stage="1"><span class="n">2</span><span class="t">Read with evidence</span><span class="s">Every value with its page and quote</span></button></li>
+        <li><button role="tab" id="tab-amend" aria-controls="st-amend" aria-selected="false" data-stage="2"><span class="n">3</span><span class="t">Amendments applied</span><span class="s">Was / now, quoted</span></button></li>
+        <li><button role="tab" id="tab-conditions" aria-controls="st-conditions" aria-selected="false" data-stage="3"><span class="n">4</span><span class="t">Conditions</span><span class="s">262 conditions in 11 groups</span></button></li>
+        <li><button role="tab" id="tab-inputs" aria-controls="st-inputs" aria-selected="false" data-stage="4"><span class="n">5</span><span class="t">Inputs by team</span><span class="s">Fill with competitive values</span></button></li>
+        <li><button role="tab" id="tab-size" aria-controls="st-size" aria-selected="false" data-stage="5"><span class="n">6</span><span class="t">Size the plant</span><span class="s">Least strike price, every day met</span></button></li>
+        <li><button role="tab" id="tab-dispatch" aria-controls="st-dispatch" aria-selected="false" data-stage="6"><span class="n">7</span><span class="t">Dispatch</span><span class="s">Hour by hour, 15-minute blocks</span></button></li>
+        <li><button role="tab" id="tab-finance" aria-controls="st-finance" aria-selected="false" data-stage="7"><span class="n">8</span><span class="t">Financial model</span><span class="s">Tariff for the target IRR</span></button></li>
+        <li><button role="tab" id="tab-wins" aria-controls="st-wins" aria-selected="false" data-stage="8"><span class="n">9</span><span class="t">What wins</span><span class="s">The CfD Pool and the corpus</span></button></li>
+        <li><button role="tab" id="tab-review" aria-controls="st-review" aria-selected="false" data-stage="9"><span class="n">10</span><span class="t">Bid review</span><span class="s">Why a bid is not optimal</span></button></li>
+        <li><button role="tab" id="tab-pack" aria-controls="st-pack" aria-selected="false" data-stage="10"><span class="n">11</span><span class="t">Bid pack</span><span class="s">Excel, letters, dispatch files</span></button></li>
+      </ol>
+      <div class="sim-screen">
+        <div class="sim-bar"><span class="dots"><i></i><i></i><i></i></span><span class="sim-title" id="sim-title">TenderOS · SECI CfD-I</span><span class="sim-ctl"><button id="sim-prev" aria-label="Previous step">‹</button><button id="sim-play" aria-label="Play">▶ Play</button><button id="sim-next" aria-label="Next step">›</button></span></div>
+        <div class="sim-progress"><i id="sim-progress"></i></div>
+
+        <div class="stage" id="st-upload" role="tabpanel" aria-labelledby="tab-upload">
+          <h3>1 · Tender in: the RfS, the agreement and four amendments</h3>
+          <p class="muted">The set is dropped in at once; each file is identified and counted. Later amendments override earlier text, and the agreement prevails over the RfS where they differ.</p>
+          <ul class="files">
+            <li class="file" data-kind="tender"><span class="fi">PDF</span><span class="fn"><b>RfS</b><span class="muted small">129 pages · 15 Jul 2026</span></span><span class="tag">tender</span></li>
+            <li class="file" data-kind="agreement"><span class="fi">PDF</span><span class="fn"><b>Standard CfD Agreement (CfDA)</b><span class="muted small">69 pages</span></span><span class="tag">agreement</span></li>
+            <li class="file" data-kind="amendment"><span class="fi">PDF</span><span class="fn"><b>Amendment-01</b><span class="muted small">2 pages · 17 Jul 2026</span></span><span class="tag">amendment</span></li>
+            <li class="file" data-kind="amendment"><span class="fi">PDF</span><span class="fn"><b>Amendment-02</b><span class="muted small">5 pages · 3 Aug 2026</span></span><span class="tag">amendment</span></li>
+            <li class="file" data-kind="amendment"><span class="fi">PDF</span><span class="fn"><b>Amendment-03</b><span class="muted small">5 pages · 8 Oct 2026</span></span><span class="tag">amendment</span></li>
+            <li class="file" data-kind="amendment"><span class="fi">PDF</span><span class="fn"><b>Amendment-04</b><span class="muted small">6 pages · 5 Nov 2026</span></span><span class="tag">amendment</span></li>
+          </ul>
+          <p class="foot">216 pages in the set · RfS SECI/C&amp;P/IPP/13/0002/26-27</p>
+        </div>
+
+        <div class="stage" id="st-read" role="tabpanel" aria-labelledby="tab-read" hidden>
+          <h3>2 · Read with evidence: every value carries its page</h3>
+          <div class="meter"><span>Reading pages</span><b id="read-count">0</b><span>/ 216</span></div>
+          <ul class="terms">
+            <li><div class="tl"><b>What is procured</b><span class="cite">Standard CfD Agreement (CfDA) · Recital D · p.3</span></div><p>Assured peak supply of 1000 MWh a day (500 MW × 2 hours) from ISTS-connected RE projects, sold through the power exchanges, settled by SECI under a CfD</p><blockquote>“SECI had initiated a Tariff Based Competitive Bid Process for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) from ISTS-Connected RE Projects under CfD mechanism”</blockquote></li>
+            <li><div class="tl"><b>What you bid</b><span class="cite">Amendment-03 · RfS 40.3 (amended) · p.4</span></div><p>One strike price in ₹/kWh for all projects applied for; digits after two decimals are ignored</p><blockquote>“quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. If it is quoted with more than two digits after decimal, digits after first two decimal places shall be ignored.”</blockquote></li>
+            <li><div class="tl"><b>Ceiling tariff</b><span class="cite">Amendment-03 · RfS 40.3 (original, removed) · p.4</span></div><p>None: the ₹5.80/kWh ceiling of the RfS was removed by Amendment-03</p><blockquote>“The tariff has to be less than or equal to INR 5.80/kWh”</blockquote></li>
+            <li><div class="tl"><b>Strike price over the term</b><span class="cite">Standard CfD Agreement (CfDA) · 9.1 · p.40</span></div><p>Fixed for the whole term (no escalation)</p><blockquote>“the Strike Price shall be fixed for the entire term of this Agreement”</blockquote></li>
+            <li><div class="tl"><b>SECI may set the hours</b><span class="cite">Amendment-04 · RfS 9.2.c (amended) · p.1</span></div><p>SECI may designate the Peak Hours and time blocks; you must make the power available in them and sell it on the exchanges as it instructs</p><blockquote>“SECI shall have the right, as deemed necessary, to designate the Peak Hours (including specific Time-Blocks) during which the RPD shall make available and sell power from the Project through the Power Exchanges. The RP…”</blockquote></li>
+            <li><div class="tl"><b>Declare the day's availability by 06:00 on D-1</b><span class="cite">Amendment-04 · RfS 9.2.c (b) · p.1</span></div><p>In MWh, day-ahead; the declaration drives what SECI schedules</p><blockquote>“The RPD shall declare the availability of energy from the Project, in MWh, on a day-ahead basis, latest by 06:00 hours on the day immediately preceding the day of delivery (‘D-1’ Day for delivery on Day ‘D’).”</blockquote></li>
+            <li><div class="tl"><b>Up to 80% term-ahead, the rest day-ahead</b><span class="cite">Amendment-04 · RfS 9.2.c (e) · p.2</span></div><p>TAM/G-TAM may take up to 80% of the declared availability; the balance goes to DAM/GDAM/HP-DAM; never above the contracted capacity in any block, never sold twice</p><blockquote>“For the purpose of sale of power through the TAM and G-TAM, up to 80% of the availability shall be considered for offering/scheduling, as applicable, in the aforesaid markets”</blockquote></li>
+            <li><div class="tl"><b>Deviations and DSM are yours</b><span class="cite">Amendment-04 · RfS 9.2.c (f) · p.2</span></div><p>Schedule revisions, deviations, DSM and any scheduling non-compliance are borne by you, with an indemnity to SECI</p><blockquote>“Any penalties, charges or financial liabilities arising on account of revisions to the schedule, deviations from the schedule, deviation settlement mechanism (DSM) or any other scheduling-related non-compliance attribu…”</blockquote></li>
+            <li><div class="tl"><b>SECI may award less than 500 MW</b><span class="cite">Amendment-04 · RfS 42.2.b (amended) · p.3</span></div><p>The capacity awarded is what the CfD corpus can carry at the discovered tariff; SECI may restrict the total award</p><blockquote>“the final capacity to be awarded under the RfS shall be determined by SECI based on an assessment of the financial viability of the discovered Tariff and the corresponding requirement of the CfD Pool, within the availa…”</blockquote></li>
+          </ul>
+        </div>
+
+        <div class="stage" id="st-amend" role="tabpanel" aria-labelledby="tab-amend" hidden>
+          <h3>3 · Amendments applied: what changed, in SECI's words</h3>
+          <div class="changes">
+            <article class="change"><header><b>The battery becomes mandatory and yours</b><span class="cite">Amendment-02 · RfS 4.3 · p.1</span></header>
+              <p class="was"><span>Was</span>In case ESS is installed by the RPD as part of the Project, such ESS may be owned by the RPD or may be tied-up separately with a third party by the RPD, for supply of power through Power Exchanges.</p>
+              <p class="now"><span>Now</span>For a ‘X’ MW Contracted Capacity, RPD shall mandatorily install ESS of ‘X’ MW/ ‘2X’ MWh capacity as part of the Project. Such ESS shall be owned by the RPD for supply of power through Power Exchanges.</p>
+              <p class="effect">Storage is no longer optional or leasable: for every contracted MW you build and own at least 1 MW / 2 MWh of battery.</p></article>
+            <article class="change"><header><b>No ceiling tariff</b><span class="cite">Amendment-03 · RfS 40.3 · p.4</span></header>
+              <p class="was"><span>Was</span>The Bidder including its Parent, Affiliate or Ultimate Parent or any Group Company will have to submit a single bid (single application) quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. The tariff has to be less…</p>
+              <p class="now"><span>Now</span>The Bidder including its Parent, Affiliate or Ultimate Parent or any Group Company will have to submit a single bid (single application) quoting a single “First Round Tariff” in Indian Rupee per kWh for all the Projects applied for. If it is quoted with more than two digits after decimal, digits a…</p>
+              <p class="effect">The ₹5.80/kWh ceiling and the summary rejection above it are removed; one first-round tariff, two decimals.</p></article>
+            <article class="change"><header><b>Settlement: full pass-through</b><span class="cite">Amendment-03 · RfS 9.3.a.iv · p.2</span></header>
+              <p class="was"><span>Was</span>Sharing of Profit/ Gains and Losses: Profit/ Gains and losses shall be shared between the RPD and the CfD Stabilization Fund (“Pool”), in a dynamic grading as follows:</p>
+              <p class="now"><span>Now</span>Sharing of Profit/ Gains and Losses: The profit/gain and loss arising from the sale of electricity by the RPD through the Power Exchanges shall be settled between the RPD and the CfD Stabilization Fund (“CfD Pool”) in respect of each Time-Block, such that the RPD shall be entitled to receive the S…</p>
+              <p class="effect">The slab sharing (70:30, 50:50, 30:70) goes: the Pool takes the whole gain when the market clears above the strike price and pays the whole shortfall when it clears below, so you net the strike price on every kWh settled. Amendment-01's split above ₹10/kWh is replaced with it.</p></article>
+            <article class="change"><header><b>SECI may award less than 500 MW</b><span class="cite">Amendment-04 · RfS 42.2.b · p.3</span></header>
+              <p class="was"><span>Was</span>will not be eligible to be declared as Successful Bidders.</p>
+              <p class="now"><span>Now</span>Notwithstanding the above, the final capacity to be awarded under the RfS shall be determined by SECI based on an assessment of the financial viability of the discovered Tariff and the corresponding requirement of the CfD Pool, within the available CfD corpus. Accordingly, SECI reserves the right …</p>
+              <p class="effect">The award is no longer 500 MW by right: SECI will award only what the CfD corpus can carry at the discovered strike price. A high price wins less capacity, or none; the Bid review sizes the Pool's pay-out at your price against the corpus.</p></article>
+          </div>
+        </div>
+
+        <div class="stage" id="st-conditions" role="tabpanel" aria-labelledby="tab-conditions" hidden>
+          <h3>4 · 262 conditions, grouped, as a checklist against the bid</h3>
+          <div class="groups">
+            <div class="grp"><span class="gl">Plant</span><span class="gb"><i style="--w:100.0%"></i></span><span class="gn">44</span></div>
+            <div class="grp"><span class="gl">Scheme and bid</span><span class="gb"><i style="--w:88.6%"></i></span><span class="gn">39</span></div>
+            <div class="grp"><span class="gl">Daily supply</span><span class="gb"><i style="--w:72.7%"></i></span><span class="gn">32</span></div>
+            <div class="grp"><span class="gl">Bid security and charges</span><span class="gb"><i style="--w:61.4%"></i></span><span class="gn">27</span></div>
+            <div class="grp"><span class="gl">Eligibility</span><span class="gb"><i style="--w:59.1%"></i></span><span class="gn">26</span></div>
+            <div class="grp"><span class="gl">Auction</span><span class="gb"><i style="--w:45.5%"></i></span><span class="gn">20</span></div>
+            <div class="grp"><span class="gl">Dates</span><span class="gb"><i style="--w:45.5%"></i></span><span class="gn">20</span></div>
+            <div class="grp"><span class="gl">Bid documents</span><span class="gb"><i style="--w:45.5%"></i></span><span class="gn">20</span></div>
+            <div class="grp"><span class="gl">CfD settlement</span><span class="gb"><i style="--w:43.2%"></i></span><span class="gn">19</span></div>
+            <div class="grp"><span class="gl">Penalties and security</span><span class="gb"><i style="--w:20.5%"></i></span><span class="gn">9</span></div>
+            <div class="grp"><span class="gl">Energy sourcing</span><span class="gb"><i style="--w:13.6%"></i></span><span class="gn">6</span></div>
+          </div>
+          <p class="foot">Each condition is tested against the sized plant: met, failed or pending. Supply floors, storage, sourcing limits, penalties, guarantees and dates.</p>
+        </div>
+
+        <div class="stage" id="st-inputs" role="tabpanel" aria-labelledby="tab-inputs" hidden>
+          <h3>5 · Inputs by team, filled with what winning bidders show lenders</h3>
+          <p class="muted">Projects, Design and Finance each own a step. “Fill for me” puts competitive values in the empty boxes, marked until someone replaces them with their own and attaches the evidence.</p>
+          <table class="inputs"><thead><tr><th>Input</th><th>Team</th><th class="num">Value</th><th>Source</th></tr></thead><tbody>
+            <tr><td>Contracted capacity</td><td>Projects</td><td class="num">100 MW</td><td><span class="tag you">Your input</span></td></tr>
+            <tr><td>Battery, all-in capex</td><td>Design</td><td class="num">₹0.85 cr/MWh</td><td><span class="tag win">Competitive</span></td></tr>
+            <tr><td>Solar, all-in capex</td><td>Design</td><td class="num">₹3.60 cr/MWac</td><td><span class="tag win">Competitive</span></td></tr>
+            <tr><td>Group RE price for charging</td><td>Projects</td><td class="num">₹2.50/kWh</td><td><span class="tag win">Competitive</span></td></tr>
+            <tr><td>Target equity IRR</td><td>Finance</td><td class="num">13.0%</td><td><span class="tag win">Competitive</span></td></tr>
+            <tr><td>Interest rate · tenor</td><td>Finance</td><td class="num">8.8% · 15 yrs</td><td><span class="tag win">Competitive</span></td></tr>
+            <tr><td>Repayment</td><td>Finance</td><td class="num">Sculpted, DSCR 1.20</td><td><span class="tag win">Competitive</span></td></tr>
+          </tbody></table>
+        </div>
+
+        <div class="stage" id="st-size" role="tabpanel" aria-labelledby="tab-size" hidden>
+          <h3>6 · Size the plant: the optimiser tries every solar size</h3>
+          <p class="muted">For each size the model runs all 15 years, day by day, and prices the bid through the full financial model. Below 10 MWac some days fall short of 2 MWh per MW; above it, solar costs more than the charging power it replaces.</p>
+          <div class="chart" id="chart-scan" role="img" aria-label="Strike price against own solar size: lowest at 10 MWac, ₹8.32 per kWh"></div>
+          <p class="foot" id="scan-readout">Own solar 10 MWac · strike price ₹8.32/kWh · every day met</p>
+        </div>
+
+        <div class="stage" id="st-dispatch" role="tabpanel" aria-labelledby="tab-dispatch" hidden>
+          <h3>7 · Dispatch: one day of the plant, 29 Sept 2031</h3>
+          <p class="muted">The battery charges from own solar and from group renewable power bought at the planned price, then supplies in the two dearest evening hours. The model does this for every day; the 15-minute file splits each hour into four Grid Code blocks.</p>
+          <div class="chart" id="chart-day" role="img" aria-label="Hourly charging, discharge and market price for one day"></div>
+          <p class="legend"><span class="sw s-solar"></span>Own solar charging <span class="sw s-bought"></span>Bought RE charging <span class="sw s-dis"></span>Battery supply <span class="sw s-price"></span>Exchange price ₹/kWh</p>
+          <p class="foot">Supplied 194 MWh in the hours from 19:00 and 20:00: the 200 MWh due a day at the 97% availability the bidder declares (Amendment-04), so the day is met</p>
+        </div>
+
+        <div class="stage" id="st-finance" role="tabpanel" aria-labelledby="tab-finance" hidden>
+          <h3>8 · The financial model: the strike price for the target return</h3>
+          <div class="tiles">
+            <div class="tile"><span class="l">Strike price</span><b data-count="8.322" data-dec="2" data-pre="₹">₹8.32</b><span class="s">per kWh, fixed for 15 years</span></div>
+            <div class="tile"><span class="l">Equity IRR</span><b data-count="13.0" data-dec="1" data-suf="%">13.0%</b><span class="s">the target, met</span></div>
+            <div class="tile"><span class="l">Project IRR</span><b data-count="8.8" data-dec="1" data-suf="%">8.8%</b><span class="s">pre-financing</span></div>
+            <div class="tile"><span class="l">Minimum DSCR</span><b data-count="1.2" data-dec="2" data-suf="×">1.20×</b><span class="s">sculpted to the lender</span></div>
+          </div>
+          <p class="foot">Click any number in the application to open its formula and the inputs it rests on. The same model downloads as a live Excel workbook: Live model, Construction, P&amp;L, Cash flow, Balance sheet, Debt, Tax, Working capital, Sensitivity and dispatch sheets.</p>
+        </div>
+
+        <div class="stage" id="st-wins" role="tabpanel" aria-labelledby="tab-wins" hidden>
+          <h3>9 · What wins: will SECI's CfD Pool carry this price?</h3>
+          <p class="muted">Under the CfD the bidder sells in the evening market and SECI's Pool pays (or collects) the difference to the strike price. Amendment-04 lets SECI award only what its ₹76 crore corpus can carry. Net Pool pay-out a year for the full 500 MW:</p>
+          <div class="chart" id="chart-pool" role="img" aria-label="CfD Pool net flow per year against strike price"></div>
+          <p class="verdict">At ₹8.33 the quote sits at the evening market (₹8.30 in the two chosen hours): the Pool is about neutral on your 100 MW (₹0.2 cr a year paid), so the corpus carries the full 500 MW at the price year's prices; on a lower evening view SECI would weigh the gap.</p>
+        </div>
+
+        <div class="stage" id="st-review" role="tabpanel" aria-labelledby="tab-review" hidden>
+          <h3>10 · Bid review: the same tender, two bids</h3>
+          <div class="review-cols">
+            <div class="rv good"><header><b>Competitive bid · ₹8.32</b><span>nothing blocking, 1 that carries cost, 4 to note.</span></header><ul><li class="warn"><span>Cost</span>₹8.32/kWh is above the highest FDRE peak-power award (₹6.00)</li><li class="note"><span>Note</span>Buying the charging power is the right call here: more own solar would raise the price</li><li class="note"><span>Note</span>What carries the ₹8.32: the battery's capex ₹3.15/kWh, then charging power and exchange fees ₹1.99</li><li class="note"><span>Note</span>Green-market charging reaches 25.0% of the supply after month 36 (limit 25%)</li><li class="note"><span>Note</span>4 inputs far from the benchmark in the direction that lowers the price</li></ul></div>
+            <div class="rv bad"><header><b>Over-built bid · ₹19.92</b><span>4 blocking findings, 5 that carry cost, 4 to note.</span></header><ul><li class="block"><span>Blocks</span>Tender condition not met: Green market within 25% (+75% until month 36)</li><li class="block"><span>Blocks</span>Tender condition not met: 2 MWh/MW every day</li><li class="note"><span>Note</span>Tender condition to watch: Weekly shortfall within 10%</li><li class="block"><span>Blocks</span>A strike price of ₹19.92/kWh is 3.3× the highest FDRE peak-power award</li><li class="note"><span>Note</span>At ₹19.92 the Pool pays about ₹62 cr a year for your 150 MW; the full 500 MW would need ₹206 cr a year against a ₹76 cr corpus</li><li class="warn"><span>Cost</span>Own solar is not at its best: 29 MWac instead of 14 lowers the screening price by ₹3.970/kWh</li><li class="warn"><span>Cost</span>Little own RE (14 MWac for 150 MW): nearly all charging power is bought</li><li class="note"><span>Note</span>What carries the ₹19.92: the battery's capex ₹12.11/kWh, then O&amp;M, insurance, fixed costs and the LC ₹2.53</li></ul></div>
+          </div>
+          <p class="foot">The over-built case is a pattern bid teams fall into: a battery used only between 0.05% and 50% charge, an extra battery for evening sale, dear battery capex and a 16% equity target. The review names each cost and where to fix it (8 of 13 findings shown).</p>
+        </div>
+
+        <div class="stage" id="st-pack" role="tabpanel" aria-labelledby="tab-pack" hidden>
+          <h3>11 · The bid pack, ready for the bid committee</h3>
+          <ul class="pack">
+            <li><b>Financial model, Excel</b><span>Live workbook, every number a formula on the blue inputs; Goal Seek the tariff</span></li>
+            <li><b>17 RfS formats as letters</b><span>Filled from the bid in SECI's own wording; Word and PDF</span></li>
+            <li><b>15-minute dispatch</b><span>96 blocks a day for 15 years, one file per Contract Year</span></li>
+            <li><b>Conditions checklist</b><span>262 conditions, met / failed / pending, each with its page</span></li>
+            <li><b>Pre-bid queries</b><span>The points to raise with SECI, drafted from the tender's gaps</span></li>
+            <li><b>Evidence register</b><span>Every input, who set it, the evidence attached and the sign-off</span></li>
+          </ul>
+          <div class="cta-row"><a class="btn" href="https://www.joulewise.tech/contact">Book a walkthrough on your tender</a></div>
+        </div>
+      </div>
+    </div>
+    <noscript><p class="muted">The simulation animates with JavaScript; all its content is shown above as text.</p></noscript>
+  </div>
+</section>
+
+<section id="what" class="band">
+  <div class="wrap">
+    <p class="eyebrow">Everything in the application</p>
+    <h2>Fourteen modules, one bid</h2>
+    <div class="modules">
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg><h3>Tender to Bid</h3><p>Upload an RfS with its amendments, clarifications and PPA/PSA (up to 20 files). TenderOS reads them, applies every amendment, quotes each change was/now, and gives every value its document and page. A reviewer confirms the reading before it reaches the bid.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg><h3>SECI FDRE-RTC tender</h3><p>The 1,000 MW firm and dispatchable round-the-clock tender worked end to end: block-wise supply floors, storage, penalties at multiples of the tariff, the bid forms in SECI's own wording, and how the winners reached ₹5.25/kWh.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M4 17l5-5 4 3 7-8"/><path d="M4 7h4M16 17h4"/></svg><h3>CfD bid (SECI CfD-I)</h3><p>A Contract for Difference explained in plain words; the RfS and four amendments with 40 changes quoted; 262 conditions with their pages; own solar sized for the least strike price; the Pool and Amendment-04's corpus test; the 17 formats as letters.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><rect x="4" y="7" width="15" height="10" rx="1.5"/><path d="M19 10h2v4h-2M8 12h4"/></svg><h3>BESS tenders</h3><p>Standalone battery tenders: capacity and energy, round-trip efficiency, cycles and augmentation, availability and the payment by the buying utility.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M4 18c3-9 5-12 8-12s5 3 8 12"/><circle cx="12" cy="6" r="1.6"/></svg><h3>Plant sizing optimiser</h3><p>HiGHS optimisation sizes solar, wind and storage against every block floor, storage mandate and sale rule, hour by hour over every year of the contract, minimising the tariff for the target equity IRR.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M4 20V10M8 20V6M12 20v-8M16 20V8M20 20v-5"/></svg><h3>15-minute dispatch</h3><p>Every day of the term in 96 time blocks (the Grid Code's scheduling block): charging, discharge, state of charge, supply due and delivered, surplus sold. Downloadable per Contract Year as CSV or a streaming Excel file.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 9h16M9 9v11M14 9v11"/></svg><h3>Financial model and Excel twin</h3><p>A 25-year model from construction: IDC, six repayment methods, refinancing, working capital, DSRA, tax with losses carried, DSCR/LLCR. One click gives the live Excel workbook, every number a formula, recalculated in tests against the application.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M5 6h14M5 12h14M5 18h14"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg><h3>What-if and tariff levers</h3><p>Set the price you want to quote and the levers table shows, input by input, what moves the tariff and how far. Freeze a lever with evidence, reject one so the model searches others. Contract size is never offered as a lever.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M11 4a7 7 0 105 12l4 4"/><path d="M8 11l2 2 4-4"/></svg><h3>Bid review</h3><p>Why a bid is not optimal: tender conditions failed, prices far above recent awards, a plant not at its best size, a battery that fades below the need, inputs far from benchmarks, a DSCR the lender will not accept. Each finding says where to fix it.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="5"/></svg><h3>New tenders radar</h3><p>Scans SECI's tender list and details pages, never the documents, and writes a summary per tender: what it is, who may bid, the dates. New, changed and closed tenders are marked at every scan.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M4 20h16M7 16V9M12 16V5M17 16v-4"/></svg><h3>Recent results</h3><p>SECI's e-reverse auction results: every bidder awarded and not, capacity and final tariff, linked to SECI's notices. The reference for what wins.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0012 0M12 17v4"/></svg><h3>Voice agent and Claude connector</h3><p>Ask the tender by voice or chat, or connect Claude through MCP (18 tools): look up a condition with its page, set an input, run the optimiser, read the financials, explain what wins.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3 20c0-4 3-6 6-6s6 2 6 6M15 14c3 0 6 1.5 6 5"/></svg><h3>Team, evidence and sign-off</h3><p>Steps by team (Projects, Design, Finance), a paperclip for evidence on every input, sign-off that turns amber when a value changes, pings and threads, saved bids with versions, an activity log.</p></article>
+      <article class="mod"><svg viewBox="0 0 24 24" aria-hidden="true" class="ic"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z"/><path d="M9 12l2 2 4-4"/></svg><h3>Runs on your infrastructure</h3><p>Docker on any cloud or on-premises. The enterprise edition splits an intake zone (documents and cloud models) from a core zone where the bid, the costs and the model live with no cloud client. Signed patches under the AMC.</p></article>
+    </div>
+    <div class="ask">
+      <div class="ask-q"><span class="who">Bid manager</span>Can SECI award us less than we bid for?</div>
+      <div class="ask-a"><span class="who">TenderOS</span>The capacity awarded is what the CfD corpus can carry at the discovered tariff; SECI may restrict the total award <span class="cite">Amendment-04 · RfS 42.2.b (amended) · p.3</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap teams" aria-labelledby="teams-h">
+  <h2 id="teams-h">Built for the whole bid team</h2>
+  <div class="table-wrap"><table><thead><tr><th>Team</th><th>What TenderOS gives them</th></tr></thead><tbody>
+    <tr><th>Tender and legal</th><td>The tender and amendments reconciled, every condition with its page and quote, the formats and letters in the RfS's wording, a pre-bid query list</td></tr>
+    <tr><th>Projects</th><td>Capacity, dates, supply profile, sourcing and market sale in one place; the sized plant and its compliance block by block</td></tr>
+    <tr><th>Design</th><td>Solar, wind and battery studios, hourly profiles, losses to the billing meter, pooling stations, deviation settlement per CERC norms</td></tr>
+    <tr><th>Finance</th><td>Financing terms, construction and IDC, repayment methods, refinancing, working capital, DSRA, the 25-year model and its Excel twin</td></tr>
+    <tr><th>Management</th><td>The tariff for the target IRR, the levers for bid day, what wins, sign-off per input, the audit trail</td></tr>
+  </tbody></table></div>
+</section>
+
+<section id="results" class="band">
+  <div class="wrap">
+    <p class="eyebrow">Open data</p>
+    <h2>SECI's recent auction results</h2>
+    <p class="lede narrow">Eight SECI e-reverse auctions from May 2025 to August 2026, read from SECI's result notices: every bidder awarded with the capacity it bid and won at its final tariff. Open a row for the bidders. Free to reuse: <a href="/data/seci-results.csv" download>CSV</a> · <a href="/data/seci-results.json">JSON</a>.</p>
+    <div class="filters" role="group" aria-label="Filter by product"><button class="chip on" data-filter="all">All</button><button class="chip" data-filter="FDRE peak power">FDRE peak power</button><button class="chip" data-filter="FDRE-RTC">FDRE-RTC</button><button class="chip" data-filter="Wind">Wind</button><button class="chip" data-filter="Solar + ESS">Solar + ESS</button><button class="chip" data-filter="RTC (round-the-clock RE)">RTC (round-the-clock RE)</button></div>
+    <svg class="range-chart" viewBox="0 0 720 294" role="img" aria-labelledby="rc-t rc-d"><title id="rc-t">Discovered tariffs by auction</title><desc id="rc-d">Assured peak supply, 6000 MWh (1500 MW × 4 h) (SECI-FDRE-IX): ₹5.99 to ₹6.00 per kWh; 1000 MW firm and dispatchable RE, round the clock (SECI-FDRE-RTC-V): ₹5.25 to ₹5.26 per kWh; 2000 MW ISTS-connected wind (SECI-Tranche-XX): ₹3.78 to ₹3.85 per kWh; Assured peak supply, 4800 MWh (1200 MW × 4 h) (SECI-FDRE-VII): ₹6.27 to ₹6.28 per kWh; 1200 MW ISTS-connected wind (SECI-Tranche-XIX): ₹3.67 to ₹3.69 per kWh; 1200 MW ISTS solar with 600 MW / 3600 MWh ESS (SECI-ISTS-XXI): ₹3.12 to ₹3.13 per kWh; 2000 MW ISTS solar with 1000 MW / 4000 MWh ESS (SECI-ISTS-XX): ₹2.86 to ₹2.87 per kWh; 1200 MW RTC power from ISTS-connected RE projects (SECI-RTC-IV): ₹5.06 to ₹5.07 per kWh</desc>
+<line x1="301.7647058823529" x2="301.7647058823529" y1="18" y2="270" class="grid"/><text x="301.7647058823529" y="286" class="tick" text-anchor="middle">₹3</text><line x1="405.29411764705884" x2="405.29411764705884" y1="18" y2="270" class="grid"/><text x="405.29411764705884" y="286" class="tick" text-anchor="middle">₹4</text><line x1="508.8235294117647" x2="508.8235294117647" y1="18" y2="270" class="grid"/><text x="508.8235294117647" y="286" class="tick" text-anchor="middle">₹5</text><line x1="612.3529411764705" x2="612.3529411764705" y1="18" y2="270" class="grid"/><text x="612.3529411764705" y="286" class="tick" text-anchor="middle">₹6</text>
+<g class="rc-row" data-product="FDRE peak power"><text x="240" y="39" text-anchor="end" class="rc-label">SECI-FDRE-IX</text><text x="240" y="52" text-anchor="end" class="rc-sub">FDRE peak power · 21 Aug 2026</text><line x1="608.3176470588236" x2="615.3529411764705" y1="41" y2="41" class="rc-bar"/><text x="624.3529411764705" y="45" class="rc-val">₹5.99–6.00</text></g>
+<g class="rc-row" data-product="FDRE-RTC"><text x="240" y="69" text-anchor="end" class="rc-label">SECI-FDRE-RTC-V</text><text x="240" y="82" text-anchor="end" class="rc-sub">FDRE-RTC · 6 Aug 2026</text><line x1="531.7058823529412" x2="538.7411764705882" y1="71" y2="71" class="rc-bar"/><text x="547.7411764705882" y="75" class="rc-val">₹5.25–5.26</text></g>
+<g class="rc-row" data-product="Wind"><text x="240" y="99" text-anchor="end" class="rc-label">SECI-Tranche-XX</text><text x="240" y="112" text-anchor="end" class="rc-sub">Wind · 15 Jul 2026</text><line x1="379.5176470588235" x2="392.7647058823529" y1="101" y2="101" class="rc-bar"/><text x="401.7647058823529" y="105" class="rc-val">₹3.78–3.85</text></g>
+<g class="rc-row" data-product="FDRE peak power"><text x="240" y="129" text-anchor="end" class="rc-label">SECI-FDRE-VII</text><text x="240" y="142" text-anchor="end" class="rc-sub">FDRE peak power · 5 Feb 2026</text><line x1="637.3058823529411" x2="644.3411764705883" y1="131" y2="131" class="rc-bar"/><text x="653.3411764705883" y="135" class="rc-val">₹6.27–6.28</text></g>
+<g class="rc-row" data-product="Wind"><text x="240" y="159" text-anchor="end" class="rc-label">SECI-Tranche-XIX</text><text x="240" y="172" text-anchor="end" class="rc-sub">Wind · 4 Feb 2026</text><line x1="368.1294117647059" x2="376.2" y1="161" y2="161" class="rc-bar"/><text x="385.2" y="165" class="rc-val">₹3.67–3.69</text></g>
+<g class="rc-row" data-product="Solar + ESS"><text x="240" y="189" text-anchor="end" class="rc-label">SECI-ISTS-XXI</text><text x="240" y="202" text-anchor="end" class="rc-sub">Solar + ESS · 9 Jan 2026</text><line x1="311.18823529411765" x2="318.2235294117647" y1="191" y2="191" class="rc-bar"/><text x="327.2235294117647" y="195" class="rc-val">₹3.12–3.13</text></g>
+<g class="rc-row" data-product="Solar + ESS"><text x="240" y="219" text-anchor="end" class="rc-label">SECI-ISTS-XX</text><text x="240" y="232" text-anchor="end" class="rc-sub">Solar + ESS · 15 Oct 2025</text><line x1="284.2705882352941" x2="291.3058823529412" y1="221" y2="221" class="rc-bar"/><text x="300.3058823529412" y="225" class="rc-val">₹2.86–2.87</text></g>
+<g class="rc-row" data-product="RTC (round-the-clock RE)"><text x="240" y="249" text-anchor="end" class="rc-label">SECI-RTC-IV</text><text x="240" y="262" text-anchor="end" class="rc-sub">RTC (round-the-clock RE) · 26 May 2025</text><line x1="512.035294117647" x2="519.070588235294" y1="251" y2="251" class="rc-bar"/><text x="528.070588235294" y="255" class="rc-val">₹5.06–5.07</text></g>
+</svg>
+    
+<div class="table-wrap"><table class="results" id="results-table">
+<caption>SECI e-reverse auction results, latest first. Tariffs as discovered, ₹/kWh. SECI sells on to the buying utilities at the tariff plus its trading margin.</caption>
+<thead><tr><th scope="col">Auction</th><th scope="col">Product</th><th scope="col" class="num">Tendered</th><th scope="col" class="num">Awarded</th><th scope="col" class="num">Tariff range</th><th scope="col" class="num">Weighted</th><th scope="col">Auction date</th><th scope="col">Source</th></tr></thead>
+<tbody>
+<tr data-product="FDRE peak power">
+<th scope="row"><details><summary>Assured peak supply, 6000 MWh (1500 MW × 4 h) (SECI-FDRE-IX)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/13/0006/26-27 · LoA 27 Aug 2026 · A peak-power product: 4 hours of assured supply a day.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>Waaree Forever Energies Private Limited</td><td class="num">700</td><td class="num">700</td><td class="num">5.99</td></tr><tr><td>NTPC Renewable Energy Limited</td><td class="num">500</td><td class="num">500</td><td class="num">6.00</td></tr><tr><td>ACME Solar Holdings Limited</td><td class="num">750</td><td class="num">300</td><td class="num">6.00</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: JGRJ Seven Renewable Private Limited (₹6.02); SAEL Industries Limited (₹6.02); EMIF II Holding V II Coöperatief W.A. (₹6.08); Avaada BESS Private Limited (₹6.21); Rama Reflection India Private Limited (₹6.25); MB Power (Madhya Pradesh) Limited (₹6.35); Engie Energy India Private Limited (₹6.40); ReNew Solar Power Private Limited (₹6.50); Purvah Green Power Private Limited (₹6.72); ABC Solar (India) Private Limited (₹6.82); Resolven One Energy Private Limited (₹6.88); Juniper Green Energy Limited (₹6.90); NLC India Renewables Limited (₹6.98)</p>
+</div></details></th>
+<td><span class="pill p-fdre-peak-power">FDRE peak power</span></td>
+<td class="num">1,500 MW<br><span class="muted small">6,000 MWh</span></td>
+<td class="num">1,500 MW</td>
+<td class="num"><b>5.99–6.00</b></td>
+<td class="num">5.995</td>
+<td><time datetime="2026-08-21">21 Aug 2026</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-IX-_6000_MWh_result_website_upload.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/Ymd_" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+<tr data-product="FDRE-RTC">
+<th scope="row"><details><summary>1000 MW firm and dispatchable RE, round the clock (SECI-FDRE-RTC-V)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/13/0020/25-26 · LoA 14 Aug 2026 · Juniper Green Energy bid 300 MW and was awarded 230 MW, filling the tender to 1,000 MW.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>EMIF II Holding V II Coöperatief W.A.</td><td class="num">100</td><td class="num">100</td><td class="num">5.25</td></tr><tr><td>Hero Solar Energy Private Limited</td><td class="num">120</td><td class="num">120</td><td class="num">5.25</td></tr><tr><td>Purvah Green Power Private Limited</td><td class="num">70</td><td class="num">70</td><td class="num">5.25</td></tr><tr><td>Resolven Four Energy Private Limited</td><td class="num">150</td><td class="num">150</td><td class="num">5.25</td></tr><tr><td>Kengeri Prime Solar Power Private Limited</td><td class="num">180</td><td class="num">180</td><td class="num">5.25</td></tr><tr><td>Hexa Climate Solutions Private Limited</td><td class="num">150</td><td class="num">150</td><td class="num">5.26</td></tr><tr><td>Juniper Green Energy Limited</td><td class="num">300</td><td class="num">230</td><td class="num">5.26</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: ReNew Private Limited (₹5.27); Adyant Enersol Private Limited (₹5.27); ACME Solar Holdings Limited (₹5.28); Serentica Renewables India Private Limited (₹5.29); NTPC Renewable Energy Limited (₹5.39); Solarcraft Power India 4 Private Limited (₹5.68); Greenko Solar Energy Private Limited (₹5.70); Waaree Forever Energies Private Limited (₹6.08); Adani Renewable Energy Holding Nine Limited (₹6.74)</p>
+</div></details></th>
+<td><span class="pill p-fdre-rtc">FDRE-RTC</span></td>
+<td class="num">1,000 MW</td>
+<td class="num">1,000 MW</td>
+<td class="num"><b>5.25–5.26</b></td>
+<td class="num">5.254</td>
+<td><time datetime="2026-08-06">6 Aug 2026</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-RTC-V-_1000_MW_result_website_upload.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/YmZ3" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+<tr data-product="Wind">
+<th scope="row"><details><summary>2000 MW ISTS-connected wind (SECI-Tranche-XX)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/12/0003/26-27 · LoA 5 Aug 2026 · 1,885 MW was eligible for award; 1,495 MW was awarded, to the bidders who matched ₹3.85 or bid lower.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>Gentari Renewables India Castor One Private Limited</td><td class="num">200</td><td class="num">200</td><td class="num">3.78</td></tr><tr><td>Adyant Enersol Private Limited</td><td class="num">110</td><td class="num">110</td><td class="num">3.85</td></tr><tr><td>Torrent Green Energy Private Limited</td><td class="num">150</td><td class="num">150</td><td class="num">3.85</td></tr><tr><td>Opera Energy Private Limited</td><td class="num">50</td><td class="num">50</td><td class="num">3.85</td></tr><tr><td>Halvad Renewables Private Limited</td><td class="num">130</td><td class="num">130</td><td class="num">3.85</td></tr><tr><td>Ayana Renewable Power Private Limited</td><td class="num">50</td><td class="num">50</td><td class="num">3.85</td></tr><tr><td>Ganeko Four Energy Private Limited</td><td class="num">200</td><td class="num">200</td><td class="num">3.85</td></tr><tr><td>NLC India Renewables Limited</td><td class="num">200</td><td class="num">200</td><td class="num">3.85</td></tr><tr><td>Powerica Limited</td><td class="num">100</td><td class="num">100</td><td class="num">3.85</td></tr><tr><td>Refex Green Power Limited</td><td class="num">80</td><td class="num">80</td><td class="num">3.85</td></tr><tr><td>Atriwal Infrastructure Limited</td><td class="num">50</td><td class="num">50</td><td class="num">3.85</td></tr><tr><td>Purvah Green Power Private Limited</td><td class="num">175</td><td class="num">175</td><td class="num">3.85</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: ABReL SPV 2 Limited (₹3.90); Bhojraj Developers Private Limited (₹4.18); Waaree Forever Energies Private Limited (₹4.32)</p>
+</div></details></th>
+<td><span class="pill p-wind">Wind</span></td>
+<td class="num">2,000 MW</td>
+<td class="num">1,495 MW</td>
+<td class="num"><b>3.78–3.85</b></td>
+<td class="num">3.841</td>
+<td><time datetime="2026-07-15">15 Jul 2026</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_Wind-_2000_MW_(Tranche-XX)_result_website_upload.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/Ymd3" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+<tr data-product="FDRE peak power">
+<th scope="row"><details><summary>Assured peak supply, 4800 MWh (1200 MW × 4 h) (SECI-FDRE-VII)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/13/0012/25-26 · LoA 10 Feb 2026 · A peak-power product: 4 hours of assured supply a day, not 24-hour supply.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>Adyant Enersol Private Limited</td><td class="num">100</td><td class="num">100</td><td class="num">6.27</td></tr><tr><td>Serentica Renewables India Private Limited</td><td class="num">600</td><td class="num">600</td><td class="num">6.28</td></tr><tr><td>AMPIN Energy Utility Nine Private Limited</td><td class="num">199</td><td class="num">199</td><td class="num">6.28</td></tr><tr><td>ACME Solar Holdings Limited</td><td class="num">600</td><td class="num">301</td><td class="num">6.28</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: Onward Solar Power Private Limited (₹6.29); Engie Energy India Private Limited (₹6.31); Shiva Corporation (India) Limited (₹6.34); Purvah Green Power Private Limited (₹6.39); Jakson Green Limited (₹6.54); Apraava Energy Private Limited (₹6.56); MB Power (Madhya Pradesh) Limited (₹6.62); NTPC Renewable Energy Limited (₹6.66); Twishi Renewable (Nine) Private Limited (₹6.70); Chinta Green Energy Private Limited (₹6.71); Hexa Climate Solutions Private Limited (₹6.76); Rays Power Infra Limited (₹6.95); Waaree Forever Energies Private Limited (₹7.47); ReNew Solar Power Private Limited (₹7.89); Solarcraft Power India 8 Private Limited (₹7.90); Avaada Energy Private Limited (₹7.97)</p>
+</div></details></th>
+<td><span class="pill p-fdre-peak-power">FDRE peak power</span></td>
+<td class="num">1,200 MW<br><span class="muted small">4,800 MWh</span></td>
+<td class="num">1,200 MW</td>
+<td class="num"><b>6.27–6.28</b></td>
+<td class="num">6.279</td>
+<td><time datetime="2026-02-05">5 Feb 2026</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_FDRE-VII-_4800_MWh_result_website_upload.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/YmB2" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+<tr data-product="Wind">
+<th scope="row"><details><summary>1200 MW ISTS-connected wind (SECI-Tranche-XIX)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/12/0013/25-26 · LoA 10 Feb 2026 · Refex Holding bid 600 MW and was awarded 196 MW.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>K.P. Energy Limited</td><td class="num">100</td><td class="num">100</td><td class="num">3.67</td></tr><tr><td>Ganeko Three Energy Private Limited</td><td class="num">180</td><td class="num">180</td><td class="num">3.68</td></tr><tr><td>Waaree Forever Energies Private Limited</td><td class="num">300</td><td class="num">300</td><td class="num">3.68</td></tr><tr><td>Opera Energy Private Limited</td><td class="num">50</td><td class="num">50</td><td class="num">3.68</td></tr><tr><td>Purvah Green Power Private Limited</td><td class="num">250</td><td class="num">250</td><td class="num">3.69</td></tr><tr><td>Vena Energy Aura Private Limited</td><td class="num">124</td><td class="num">124</td><td class="num">3.69</td></tr><tr><td>Refex Holding Private Limited</td><td class="num">600</td><td class="num">196</td><td class="num">3.69</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: Torrent Green Energy Private Limited (₹3.70); Wyn Renewables Project 6 Private Limited (₹4.14); Gentari Renewables India Castor One Private Limited (₹4.15); ABC Cleantech Private Limited (₹4.16); Ijya Four Renewables Private Limited (₹4.19); Jindal India Power Limited (₹4.34); Prozeal Green Energy Limited (₹4.55); Solarcraft Power India 7 Private Limited (₹4.60)</p>
+</div></details></th>
+<td><span class="pill p-wind">Wind</span></td>
+<td class="num">1,200 MW</td>
+<td class="num">1,200 MW</td>
+<td class="num"><b>3.67–3.69</b></td>
+<td class="num">3.684</td>
+<td><time datetime="2026-02-04">4 Feb 2026</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_Wind-_1200_MW_(Tranche-XIX)_result_website_upload.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/YmB1" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+<tr data-product="Solar + ESS">
+<th scope="row"><details><summary>1200 MW ISTS solar with 600 MW / 3600 MWh ESS (SECI-ISTS-XXI)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/11/0006/25-26 · LoA 29 Jan 2026 · Oriana Power bid 300 MW and was awarded 100 MW.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>Engie Energy India Private Limited</td><td class="num">200</td><td class="num">200</td><td class="num">3.12</td></tr><tr><td>NLC India Renewables Limited</td><td class="num">600</td><td class="num">600</td><td class="num">3.12</td></tr><tr><td>RPIL Power Three Private Limited</td><td class="num">300</td><td class="num">300</td><td class="num">3.13</td></tr><tr><td>Oriana Power Limited</td><td class="num">300</td><td class="num">100</td><td class="num">3.13</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: Welspun Renewable Energy Private Limited (₹3.16); Apraava Energy Private Limited (₹3.18); Chinta Green Energy Private Limited (₹3.29); Ayana Renewable Power Private Limited (₹3.30); Purvah Green Power Private Limited (₹3.43); Solar91 Cleantech Limited (₹3.44); Solarcraft Power India 8 Private Limited (₹3.75); ReNew Private Limited (₹3.80); ACME Solar Holdings Limited (₹3.90); Waaree Forever Energies Private Limited (₹3.96); Serentica Renewables India Private Limited (₹3.98); Sprng Energy Private Limited (₹3.99); MB Power (Madhya Pradesh) Limited (₹3.99); Hexa Climate Solutions Private Limited (₹3.99); Vishvaraj Renewables Private Limited (₹4.01); Hero Solar Energy Private Limited (₹4.17); Greenko Energies Private Limited (₹4.35); LC Infra Projects Private Limited (₹4.95); Sangamam Power Projects Private Limited (₹5.00)</p>
+</div></details></th>
+<td><span class="pill p-solar-ess">Solar + ESS</span></td>
+<td class="num">1,200 MW<br><span class="muted small">3,600 MWh</span></td>
+<td class="num">1,200 MW</td>
+<td class="num"><b>3.12–3.13</b></td>
+<td class="num">3.123</td>
+<td><time datetime="2026-01-09">9 Jan 2026</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_Solar_1200_MW_with_ESS_(ISTS-XXI)_result_website_upload.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/YmJz" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+<tr data-product="Solar + ESS">
+<th scope="row"><details><summary>2000 MW ISTS solar with 1000 MW / 4000 MWh ESS (SECI-ISTS-XX)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/11/0004/25-26 · LoA 27 Oct 2025 · Navayuga Green Energy bid 300 MW and was awarded 120 MW.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>Welspun Renewable Energy Private Limited</td><td class="num">200</td><td class="num">200</td><td class="num">2.86</td></tr><tr><td>MB Power (Madhya Pradesh) Limited</td><td class="num">150</td><td class="num">150</td><td class="num">2.86</td></tr><tr><td>Shivalaya Construction Limited</td><td class="num">600</td><td class="num">600</td><td class="num">2.86</td></tr><tr><td>Oswal Cables Limited</td><td class="num">50</td><td class="num">50</td><td class="num">2.86</td></tr><tr><td>Purvah Green Power Private Limited</td><td class="num">300</td><td class="num">300</td><td class="num">2.86</td></tr><tr><td>Banyan Insolation Private Limited</td><td class="num">100</td><td class="num">100</td><td class="num">2.86</td></tr><tr><td>LC Infra Projects Private Limited</td><td class="num">50</td><td class="num">50</td><td class="num">2.86</td></tr><tr><td>Stockwell Solar Services Private Limited</td><td class="num">80</td><td class="num">80</td><td class="num">2.86</td></tr><tr><td>SAEL Industries Limited</td><td class="num">300</td><td class="num">300</td><td class="num">2.87</td></tr><tr><td>GH2 Solar Limited</td><td class="num">50</td><td class="num">50</td><td class="num">2.87</td></tr><tr><td>Navayuga Green Energy Private Limited</td><td class="num">300</td><td class="num">120</td><td class="num">2.87</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: Apraava Energy Private Limited (₹2.87); Solarcraft Power India 8 Private Limited (₹2.89); NTPC Renewable Energy Limited (₹3.06); Gentari Renewables India Pte. Ltd. (₹3.12); Waaree Forever Energies Private Limited (₹3.15); Bhalki Prime Solar Power Private Limited (₹3.23); Pace Digitek Limited (₹3.25); Sunsure Solar Park RJ One Private Limited (₹3.31); ReNew Solar Power Private Limited (₹3.51); ACME Solar Holdings Limited (₹3.56); Refex Holding Private Limited (₹3.59); PNC Infratech Limited (₹3.90); Adani Renewable Energy Holding Nine Limited (₹3.98); Power Mech Projects Limited (₹4.04)</p>
+</div></details></th>
+<td><span class="pill p-solar-ess">Solar + ESS</span></td>
+<td class="num">2,000 MW<br><span class="muted small">4,000 MWh</span></td>
+<td class="num">2,000 MW</td>
+<td class="num"><b>2.86–2.87</b></td>
+<td class="num">2.862</td>
+<td><time datetime="2025-10-15">15 Oct 2025</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_Solar_2000_MW_with_ESS_(ISTS-XX)_result_website_upload2.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/YmJ1" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+<tr data-product="RTC (round-the-clock RE)">
+<th scope="row"><details><summary>1200 MW RTC power from ISTS-connected RE projects (SECI-RTC-IV)</summary>
+<div class="winners"><p class="muted">RfS SECI/C&amp;P/IPP/13/0019/24-25 · LoA 11 Jun 2025 · Capacity eligible for award was 432 MW; 420 MW awarded.</p>
+<table><thead><tr><th>Awarded</th><th class="num">Bid MW</th><th class="num">Awarded MW</th><th class="num">₹/kWh</th></tr></thead><tbody>
+<tr><td>Hero Solar Energy Private Limited</td><td class="num">120</td><td class="num">120</td><td class="num">5.06</td></tr><tr><td>Hexa Climate Solutions Private Limited</td><td class="num">100</td><td class="num">100</td><td class="num">5.06</td></tr><tr><td>Sembcorp Green Infra Private Limited</td><td class="num">50</td><td class="num">50</td><td class="num">5.07</td></tr><tr><td>Jindal India Power Limited</td><td class="num">150</td><td class="num">150</td><td class="num">5.07</td></tr>
+</tbody></table>
+<p class="muted small">Not awarded: ABC Cleantech Private Limited (₹5.08)</p>
+</div></details></th>
+<td><span class="pill p-rtc-round-the-clock-re-">RTC (round-the-clock RE)</span></td>
+<td class="num">1,200 MW</td>
+<td class="num">420 MW</td>
+<td class="num"><b>5.06–5.07</b></td>
+<td class="num">5.065</td>
+<td><time datetime="2025-05-26">26 May 2025</time></td>
+<td><a href="https://www.seci.co.in/uploads/tenders/bidders/SECI_RTC-IV-_1200_MW_result_website_upload.pdf" rel="noopener" target="_blank">result notice (PDF)</a><br><a href="https://www.seci.co.in/tender-details/YWVx" rel="noopener" target="_blank">tender page</a></td>
+</tr>
+</tbody></table></div>
+    <div class="insights">
+      <div><b>Firm power carries a clear premium.</b> Wind cleared at ₹3.67–3.85 and solar with storage at ₹2.86–3.13, while four hours of assured peak supply cleared at ₹5.99–6.28 and round-the-clock FDRE at ₹5.25–5.26: storage and firmness, not energy, set the price.</div>
+      <div><b>Storage costs keep falling.</b> Assured peak supply dropped from ₹6.27–6.28 (FDRE-VII, Feb 2026) to ₹5.99–6.00 (FDRE-IX, Aug 2026) for the same four-hour product.</div>
+      <div><b>Bids cluster tightly.</b> In most auctions the awarded tariffs sit within one to seven paise of each other, because bidders match the lowest price to win capacity. Bidding the right price matters more than bidding low.</div>
+    </div>
+  </div>
+</section>
+
+<section id="open" class="wrap">
+  <p class="eyebrow">New tenders radar</p>
+  <h2>Open at SECI, scanned 16 Nov 2026</h2>
+  <p class="lede narrow">TenderOS reads SECI's tender list and each tender's details page (15 listed, 0 documents opened) and writes what each tender is, who may bid and when bids are due. In the application the scan runs on demand and marks what is new or changed.</p>
+  <div class="table-wrap"><table class="open-tenders"><thead><tr><th scope="col">Tender</th><th scope="col">What it is</th><th scope="col">Bids due</th></tr></thead><tbody>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/YmV_" rel="noopener" target="_blank">700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&amp;I-1)</a><br><span class="muted small">SECI/C&amp;P/IPP/15/0009/26-27</span></th><td>Solar power, 700 MW (C&amp;I-1); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-16">16 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ymp1" rel="noopener" target="_blank">RfS for Green Ammonia (Mode-2A-Tranche-II)</a><br><span class="muted small">SECI/C&amp;P/MI/00/06/2026-27</span></th><td>Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-17">17 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ymtx" rel="noopener" target="_blank">Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat</a><br><span class="muted small">SECI/C&amp;P/IPP/15/0013/26-27</span></th><td>Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-19">19 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/YmZ-" rel="noopener" target="_blank">RfS for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) under CfD Mechanism from ISTS-Connected RE Project…</a><br><span class="muted small">SECI/C&amp;P/IPP/13/0002/26-27</span></th><td>Contract for Difference (peak supply), 500 MW / 1,000 MWh (SECI-CfD-I); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-20">20 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/YmR0" rel="noopener" target="_blank">Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wind)</a><br><span class="muted small">SECI/C&amp;P/OP/11/0003/26-27</span></th><td>Wind power, 45.6 MW; for EPC contractors: build the plant for SECI.</td><td><time datetime="2026-11-20">20 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ymp_" rel="noopener" target="_blank">RfS for 1200 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XXI)</a><br><span class="muted small">SECI/C&amp;P/IPP/12/0011/26-27</span></th><td>Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-24">24 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ymp2" rel="noopener" target="_blank">RfS for setting up of 4083.75 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode at Constituent Co…</a><br><span class="muted small">SECI/C&amp;P/IPP/11/0008/26-27</span></th><td>Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-24">24 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ympy" rel="noopener" target="_blank">Request for Selection (RfS Document) of Solar Power Developers for Setting up of 11,159 kW Grid-Connected Ro…</a><br><span class="muted small">SECI/C&amp;P/IPP/11/0009/26-27</span></th><td>Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-24">24 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ympx" rel="noopener" target="_blank">RfS for Supply of Energy from 800 MW/ 3200 MWh Standalone Battery Energy Storage Systems in India (SECI-ESS-…</a><br><span class="muted small">SECI/C&amp;P/IPP/15/0010/26-27</span></th><td>Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-11-25">25 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ymp0" rel="noopener" target="_blank">Call for Proposals (CfP) for Selection of Executing Agency(ies) for preparation of Detailed Project Reports …</a><br><span class="muted small">SECI/C&amp;P/EOI/17/0005/26-27</span></th><td>Green hydrogen and ammonia; for consultants and service providers.</td><td><time datetime="2026-11-30">30 Nov 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ymp-" rel="noopener" target="_blank">RfS for Assured Peak Supply of 4800 MWh (1200 MW x 4 Hrs.) from ISTS-Connected RE Projects in India (SECI-FD…</a><br><span class="muted small">SECI/C&amp;P/IPP/13/0012/26-27</span></th><td>Assured peak supply (FDRE), 1,200 MW / 4,800 MWh (SECI-FDRE-X); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-12-01">1 Dec 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ympw" rel="noopener" target="_blank">Request for Selection (RfS) of Solar Power Developer for setting up of 3680 kW Grid-Connected Rooftop Solar …</a><br><span class="muted small">SECI/C&amp;P/IPP/11/0010/26-27</span></th><td>Rooftop solar (RESCO), 3,680 kW (RTSPV T-XV); for developers: a power-supply or tariff bid.</td><td><time datetime="2026-12-01">1 Dec 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ympz" rel="noopener" target="_blank">Tender for Design, Engineering, Supply, Construction, Erection, Testing, Commissioning and O&amp;M of ISTS-Conne…</a><br><span class="muted small">SECI/C&amp;P/OP/11/0007/26-27</span></th><td>Solar power, 60 MW; for EPC contractors: build the plant for SECI.</td><td><time datetime="2026-12-03">3 Dec 2026</time></td></tr>
+<tr><th scope="row"><a href="https://www.seci.co.in/tender-details/Ymty" rel="noopener" target="_blank">RfS for setting up Solar PV Power Project for NHAI (Phase-I) under Tariff-Based Competitive Bidding</a><br><span class="muted small">SECI/C&amp;P/PMC/11/07/2025-26</span></th><td>Solar power; for developers: a power-supply or tariff bid.</td><td><time datetime="2026-12-14">14 Dec 2026</time></td></tr>
+</tbody></table></div>
+</section>
+
+<section class="band" id="trust">
+  <div class="wrap three">
+    <div><h2 class="h3">Traceable, not a black box</h2><p>Every figure opens its formula and inputs in the application and in the Excel workbook, which the product's tests recalculate against the application.</p></div>
+    <div><h2 class="h3">The tender's rules, as written</h2><p>Time-block floors, sourcing limits, penalties at multiples of the tariff, storage mandates and SECI's designated hours are modelled as the tender and its amendments write them.</p></div>
+    <div><h2 class="h3">Your secrets stay inside</h2><p>Costs, bids and the model can live in a core zone on your network with no cloud client. Only the tender documents meet cloud models, in a separate intake zone.</p></div>
+  </div>
+</section>
+
+<section id="faq" class="wrap faq">
+  <h2>Questions</h2>
+  <details><summary>What is TenderOS?</summary><p>TenderOS is a bid workspace for renewable power tenders in India, made by jouleWise. It reads a tender and its amendments with every value tied to its page, sizes the plant against the tender's conditions, prices the bid for the equity return you target, and produces the bid pack: the financial model as a live Excel workbook, the tender's formats and letters, and the sensitivities for bid day.</p></details>
+  <details><summary>Which tenders does it handle?</summary><p>Firm and dispatchable renewable energy (FDRE) and round-the-clock tenders, assured peak supply, Contracts for Difference (SECI CfD-I), standalone battery storage, and solar or wind with storage, from SECI, NHPC, NTPC and state utilities. A new tender type is added as a tender pack.</p></details>
+  <details><summary>Does the AI decide the bid?</summary><p>No. Language models read documents and draft summaries; every value they read carries its document, page and quote, and a person confirms it before it reaches the bid. Sizing, dispatch and the financial model are deterministic code (HiGHS optimisation and a formula model), and the Excel twin shows every formula.</p></details>
+  <details><summary>How accurate is the financial model?</summary><p>The model is exported as a live Excel workbook in which every number is a formula on the blue input cells. The product's own tests recalculate that workbook in LibreOffice and compare it with the application's numbers, so the workbook a lender reads and the application agree.</p></details>
+  <details><summary>Where does the SECI auction data come from?</summary><p>From SECI's own result notices (https://www.seci.co.in/tenders/results), linked per auction. The dataset is free to download as CSV or JSON from this page. Tariffs are as discovered in the e-reverse auction; SECI sells on to the buying utilities at the tariff plus its trading margin.</p></details>
+  <details><summary>What did the model find for SECI CfD-I?</summary><p>With competitive inputs for a 100 MW bid, the optimiser keeps 10 MWac of own solar and buys the rest of the charging power, for a strike price of ₹8.32/kWh at a 13% equity IRR. The two dearest evening hours averaged ₹8.30/kWh in the price year, so a quote near that leaves SECI's CfD Pool about neutral, which matters because Amendment-04 lets SECI cut the award to what its ₹76 crore corpus can carry.</p></details>
+  <details><summary>Can it run on our own servers?</summary><p>Yes. TenderOS installs with Docker on any cloud or on-premises. The enterprise edition separates an intake zone (tender documents and cloud models) from a core zone on your network where bids, costs and the model live with no cloud client.</p></details>
+  <details><summary>How do we get access?</summary><p>Ask jouleWise for a walkthrough on your own tender: https://www.joulewise.tech/contact or sales@joulewise.com.</p></details>
+</section>
+
+<section class="cta-band">
+  <div class="wrap cta-inner">
+    <div><h2>See it on your next tender</h2><p>A walkthrough on a live SECI, NHPC or NTPC tender with your team's own inputs. Installed on your infrastructure, with patches and new tender packs under an annual contract.</p></div>
+    <div class="cta-row"><a class="btn" href="https://www.joulewise.tech/contact">Contact jouleWise</a><a class="btn ghost light" href="mailto:sales@joulewise.com?subject=TenderOS%20walkthrough">sales@joulewise.com</a><a class="btn ghost light" href="/TenderOS-deck.pdf" download>Deck (PDF)</a></div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap foot-site">
+  <p><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span> is a product of <a href="https://www.joulewise.tech">jouleWise</a>. Auction data from <a href="https://www.seci.co.in/tenders/results" rel="noopener">SECI's result notices</a>; tender quotes from the SECI CfD-I RfS and its amendments. Model figures from the application's own code, built 16 Nov 2026.</p>
+  <p class="small"><a href="/llms.txt">llms.txt</a> · <a href="/llms-full.txt">llms-full.txt</a> · <a href="/data/seci-results.csv">SECI results (CSV)</a> · <a href="/data/cfd-demo.json">demo data (JSON)</a> · <a href="/sitemap.xml">sitemap</a></p>
+</footer>
+<script id="demo-data" type="application/json">{"scan":[{"mw":0,"sp":9.501,"shortMwh":234595},{"mw":2,"sp":9.241,"shortMwh":185898},{"mw":4,"sp":8.984,"shortMwh":137201},{"mw":6,"sp":8.773,"shortMwh":88505},{"mw":8,"sp":8.517,"shortMwh":39808},{"mw":10,"sp":8.322,"shortMwh":0},{"mw":12,"sp":8.366,"shortMwh":0},{"mw":14,"sp":8.407,"shortMwh":0},{"mw":16,"sp":8.455,"shortMwh":0},{"mw":18,"sp":8.498,"shortMwh":0},{"mw":20,"sp":8.531,"shortMwh":0},{"mw":22,"sp":8.575,"shortMwh":0},{"mw":24,"sp":8.626,"shortMwh":0},{"mw":26,"sp":8.686,"shortMwh":0},{"mw":28,"sp":8.753,"shortMwh":0},{"mw":30,"sp":8.817,"shortMwh":0},{"mw":32,"sp":8.864,"shortMwh":0},{"mw":34,"sp":8.901,"shortMwh":0},{"mw":36,"sp":8.927,"shortMwh":0},{"mw":38,"sp":8.944,"shortMwh":0},{"mw":40,"sp":8.952,"shortMwh":0},{"mw":42,"sp":8.961,"shortMwh":0},{"mw":44,"sp":8.977,"shortMwh":0},{"mw":46,"sp":8.999,"shortMwh":0},{"mw":48,"sp":9.025,"shortMwh":0},{"mw":50,"sp":9.061,"shortMwh":0},{"mw":52,"sp":9.098,"shortMwh":0},{"mw":54,"sp":9.136,"shortMwh":0},{"mw":56,"sp":9.175,"shortMwh":0},{"mw":58,"sp":9.214,"shortMwh":0},{"mw":60,"sp":9.255,"shortMwh":0}],"day":{"date":"2031-09-29","chosen":[19,20],"solar":[0,0,0,0,0,0,0.05,2.71,4.77,7.12,8.38,9.03,9.49,9.76,8.64,6.2,4,1.47,0,0,0,0,0,0],"charge":[100,51.38,0,0,0,0,0.05,2.71,4.77,7.12,8.38,9.03,9.49,9.76,8.64,6.2,4,1.47,0,0,0,0,0,0],"own":[0,0,0,0,0,0,0.05,2.71,4.77,7.12,8.38,9.03,9.49,9.76,8.64,6.2,4,1.47,0,0,0,0,0,0],"bought":[100,51.38,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"discharge":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,97,97,0,0,0],"price":[3.65,3.18,3.06,2.69,2.38,2.03,2.22,2.08,1.83,1.81,1.8,1.78,1.8,1.35,1.83,2.28,2.87,3.57,6.24,10,10,6.56,4.54,4.36],"delivered":194,"required":200,"availability":0.97},"pool":[{"sp":5.5,"cr":-98.7,"yours":false},{"sp":6,"cr":-81.1,"yours":false},{"sp":6.5,"cr":-63.5,"yours":false},{"sp":7,"cr":-45.9,"yours":false},{"sp":7.5,"cr":-28.3,"yours":false},{"sp":8,"cr":-10.7,"yours":false},{"sp":8.32,"cr":0.7,"yours":true},{"sp":8.5,"cr":7,"yours":false},{"sp":9,"cr":24.6,"yours":false},{"sp":9.5,"cr":42.2,"yours":false},{"sp":10,"cr":59.8,"yours":false}],"best":10,"tariff":8.322,"evening":{"chosen":8.3,"all":6.73}}</script>
+<script src="/assets/app.js" defer></script>
+</body>
+</html>
