@@ -18,7 +18,20 @@ const shotsAt = process.argv.indexOf("--shots");
 const SHOTS = shotsAt > 0 ? process.argv[shotsAt + 1] : null;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
+const { record } = await import(join(PUB, "api/chat.js"));
+const chats = new Map(); // path → text, as the private store would hold them
 const server = createServer((req, res) => {
+  if (req.url === "/api/chat" && req.method === "POST") {
+    let raw = "";
+    req.on("data", (c) => { raw += c; });
+    req.on("end", () => {
+      const rec = record(JSON.parse(raw), { country: "IN" });
+      if (rec.path) chats.set(rec.path, rec.text);
+      res.writeHead(rec.error ? 400 : 200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(rec.error ? { ok: false, error: rec.error } : { ok: true }));
+    });
+    return;
+  }
   let p = decodeURIComponent(new URL(req.url, "http://x").pathname);
   if (/^\/for\/[^/]+\/?$/.test(p)) p = "/"; // a personal link is the home page (vercel.json rewrites it)
   let f = join(PUB, p);
@@ -170,6 +183,46 @@ try {
   check((await link.locator("#link-out").inputValue()).endsWith("/for/acme-renewables-bid-team"), `link maker: ${await link.locator("#link-out").inputValue()}`);
   await who.close();
 
+  // ---- the chat box: a question gets its automatic answer, and what the visitor writes is saved
+  const chatCtx = await browser.newContext({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
+  const chat = await chatCtx.newPage();
+  watch(chat, "chat");
+  await chat.goto(`${base}/for/chat-test`, { waitUntil: "networkidle" }); await chat.waitForSelector("#sim[data-ready]");
+  check(await chat.locator("#chat").isHidden() && await chat.locator("#chat-open").isVisible(), "chat: the box is open before it is asked for, or its button is missing");
+  await chat.locator("#chat-open").click();
+  check(await chat.locator("#chat").isVisible() && await chat.locator("#chat-open").isHidden() && await chat.locator("#chat .chat-chips button").count() === 5, "chat: the box did not open with its five questions");
+  await chat.locator("#chat .chat-chips button", { hasText: "premises" }).click();
+  await chat.waitForFunction(() => document.querySelectorAll("#chat .chat-line.helper").length >= 3);
+  check((await chat.locator("#chat .chat-line.helper p").nth(1).textContent()).includes("core zone") && (await chat.locator("#chat .chat-status").textContent()).includes("Saved"), "chat: the premises question was not answered from the FAQ, or not saved");
+  check(await chat.locator("#chat .chat-who").isVisible(), "chat: contact details were not asked for");
+  await chat.locator("#chat textarea").fill("We are bidding the next FDRE round. Can you show the sizing on our sites?");
+  await chat.locator("#chat textarea").press("Enter");
+  await chat.waitForFunction(() => document.querySelectorAll("#chat .chat-line.you").length === 2 && document.querySelector("#chat .chat-status").textContent.includes("Saved"));
+  await chat.locator('#chat .chat-who input[name="name"]').fill("R. Mehta");
+  await chat.locator('#chat .chat-who input[name="company"]').fill("Acme Renewables");
+  await chat.locator('#chat .chat-who input[name="reach"]').fill("r.mehta@acme.example");
+  await chat.locator("#chat .chat-who button").click();
+  await chat.waitForFunction(() => document.querySelector("#chat .chat-who").hidden);
+  const kept = [...chats.entries()];
+  check(kept.length === 1 && /^chat\/\d{4}-\d\d-\d\d\/chat-test-[a-f0-9]{16}\.txt$/.test(kept[0][0]), `chat: saved as ${kept.map((k) => k[0]).join(", ")}`);
+  check(["chat-test (came through a personal link)", "R. Mehta", "Acme Renewables", "r.mehta@acme.example", "Does our data leave our premises?", "next FDRE round", "Messages  2"].every((t) => kept[0]?.[1].includes(t)) && !kept[0][1].includes("core zone"), `chat: the saved conversation reads\n${kept[0]?.[1]}`);
+  const chatEv = await chat.evaluate(() => window.TOSTrack.log.filter((e) => e.name === "Chat").map((e) => e.data.step));
+  check(["opened", "asked a suggested question", "wrote a message", "left contact details"].every((t) => chatEv.includes(t)) && !JSON.stringify(await chat.evaluate(() => window.TOSTrack.log)).includes("FDRE round"), `chat: analytics recorded ${chatEv.join(", ")}`);
+  if (SHOTS) await chat.screenshot({ path: join(SHOTS, "chat.png") });
+  // a reload keeps the conversation; a save that fails says so
+  await chat.reload({ waitUntil: "networkidle" }); await chat.waitForSelector("#sim[data-ready]");
+  await chat.locator("#chat-open").click();
+  check(await chat.locator("#chat .chat-line.you").count() === 2, "chat: the conversation was lost on reload");
+  chat.removeAllListeners("console"); // the browser reports the request this test breaks on purpose
+  await chat.route("**/api/chat", (r) => r.abort());
+  await chat.locator("#chat textarea").fill("One more thing"); await chat.locator("#chat .chat-form button").click();
+  await chat.waitForFunction(() => document.querySelector("#chat .chat-status").classList.contains("bad"));
+  check((await chat.locator("#chat .chat-status").textContent()).includes("Not saved"), "chat: a failed save was not reported");
+  await chat.keyboard.press("Escape");
+  check(await chat.locator("#chat").isHidden() && await chat.locator("#chat-open").isVisible(), "chat: Escape did not close the box");
+  await chatCtx.close();
+  check(record({ id: "x", messages: [{ text: "a" }] }).error === "bad id" && record({ id: "ab".repeat(16), messages: [] }).error === "no message" && record({ id: "ab".repeat(16), website: "x", messages: [{ text: "a" }] }).spam === true && record({ id: "ab".repeat(16), messages: [{ text: "z".repeat(5000) }] }).text.length < 1800, "chat: the recorder accepts a bad id, an empty conversation, the spam field or an over-long message");
+
   // ---- the guided tour: the cursor drives, then the visitor takes over
   const tour = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
   watch(tour, "tour");
@@ -227,6 +280,9 @@ try {
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, colorScheme: "dark", reducedMotion: "reduce" });
   watch(phone, "phone");
   await ready(phone);
+  await phone.locator("#chat-open").click();
+  { const box = await phone.locator("#chat").boundingBox(); check(box && box.x >= 0 && box.x + box.width <= 390 && box.y >= 0 && box.y + box.height <= 844, `phone: the chat box does not fit the screen (${JSON.stringify(box)})`); if (SHOTS) await phone.screenshot({ path: join(SHOTS, "phone-chat.png") }); }
+  await phone.locator("#chat .chat-x").click();
   for (const k of [0, 2, 5, 9]) { await phone.locator(`.sim-rail button[data-stage="${k}"]`).click(); await phone.waitForTimeout(250); const o = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); check(o <= 1, `phone: screen ${k + 1} scrolls sideways by ${o}px`); if (SHOTS) await phone.locator("#sim").screenshot({ path: join(SHOTS, `phone-stage-${k + 1}.png`) }); }
   if (SHOTS) await phone.screenshot({ path: join(SHOTS, "phone-hero.png") });
   await phone.close();
@@ -235,4 +291,4 @@ try {
   server.close();
 }
 if (errors.length) { console.error("render: FAILED\n  " + errors.join("\n  ")); process.exit(1); }
-console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, visit analytics and personal links, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);
+console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, visit analytics and personal links, the chat box, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);

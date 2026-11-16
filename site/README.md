@@ -98,3 +98,20 @@ the links for the sales team. In Vercel Analytics a personal visit shows under P
 
 `/privacy` says what is counted and lets a visitor forget their label or turn counting off in
 their browser (`tos-notrack`), after which neither the script nor any event is loaded or sent.
+
+## The chat box
+
+The floating button opens a chat box (`src/chat.js`, markup and answers in `build.mjs`). A
+visitor asks a question or leaves a note; short questions get an automatic answer taken from the
+page's FAQ by the words in them (no language model), marked "Automatic reply". After the first
+message the box asks for a name and a phone number or email.
+
+Everything the visitor writes is saved by the site's one server function, `POST /api/chat`
+(`src/api/chat.js`, copied to `public/api/chat.js`; `public/package.json` gives it
+`@vercel/blob`). Each conversation is one text file in the private Vercel Blob store
+`tenderos-site-chat`, `chat/<date in India>/<personal label or visitor>-<id>.txt`, rewritten on
+every message: the time, the label, the contact details, the page, the country and the messages.
+Read them in Vercel under Storage, in that store's browser. The function takes requests from the
+site's own pages only, limits a conversation to 30 messages of 1,500 characters and drops
+anything that fills the hidden spam field. Analytics records that the chat was opened and used,
+never what was written.

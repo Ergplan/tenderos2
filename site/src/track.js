@@ -69,7 +69,7 @@
   if (ref) track("Personal link", { visit: via }, true);
 
   const start = () => {
-    const where = (el) => (el.closest(".sticker") ? "floating button" : el.closest("header") ? "header" : el.closest("footer") ? "footer" : el.closest("section[id]")?.id || el.closest("section")?.className.split(" ")[0] || "page");
+    const where = (el) => (el.closest("#chat") ? "chat box" : el.closest(".sticker") ? "floating button" : el.closest("header") ? "header" : el.closest("footer") ? "footer" : el.closest("section[id]")?.id || el.closest("section")?.className.split(" ")[0] || "page");
     const BUTTONS = { "sd-opt": ["Design studio", "optimise"], "sd-save": ["Scenario saved", "design studio"], "wi-save": ["Scenario saved", "what-if"], "theme-toggle": ["Day or night mode", "switched"] };
     // only the visitor's own clicks count: the guided tour's cursor presses buttons too
     document.addEventListener("click", (e) => {

@@ -296,6 +296,29 @@ const FAQ = [
   ["How do we get access?", `Book a TenderOS demo on this page (${SITE}/#demo): a working session on a tender of your choice. Or call ${PHONE}, or write to ${CONTACT_EMAIL}.`],
 ];
 
+// the chat box: the automatic answers are the FAQ's own, picked by the words in the question
+const faq = (q) => { const hit = FAQ.find(([x]) => x === q); if (!hit) throw new Error(`chat: no FAQ entry "${q}"`); return hit[1]; };
+const CHAT = {
+  phone: PHONE,
+  hello: "Ask a question about TenderOS or leave a note for the jouleWise team. What you write here is saved so the team can read it and reply.",
+  ask: "To hear back from a person, leave a name and a phone number or email below.",
+  noted: "Thank you. That is with the jouleWise team, who will reply to you.",
+  notedAsk: "Thank you. That is saved for the jouleWise team. To get a reply, leave a name and a phone number or email below.",
+  thanks: `Thank you. The jouleWise team will get back to you. For anything urgent, call ${PHONE}.`,
+  topics: [
+    { chip: "What is TenderOS?", keys: ["what is tenderos", "what does it do", "what do you do", "about tenderos", "overview", "what is this"], a: faq("What is TenderOS?") },
+    { chip: "Does our data leave our premises?", keys: ["our data", "my data", "data leave", "data stay", "premises", "on-prem", "on prem", "security", "secure", "confidential", "dmz", "hosted", "cloud"], a: faq("Does our bid data leave our premises?") },
+    { chip: "Which tenders does it cover?", keys: ["which tender", "what tender", "tender type", "kind of tender", "fdre", "bess", "cfd", "round the clock", "rtc", "nhpc", "ntpc", "state utilit"], a: faq("Which tenders does it handle?") },
+    { chip: "What does it cost?", keys: ["cost", "pricing", "price of", "licence", "license", "subscription", "how much", "fee", "commercial", "quote for"], a: "TenderOS is supplied under an annual contract: the application installed on your own cloud or servers, tender packs for the tenders you bid, signed patches and support. The team quotes it for your case: leave your contact details here, or book a demo." },
+    { chip: "Book a demo", keys: ["demo", "walkthrough", "walk-through", "trial", "meeting", "call me", "call back", "contact me", "talk to", "speak to"], a: "A demo is a working session with the jouleWise team on a live tender of your choice. Leave your name and a phone number or email here and the team will arrange it, or use the form at the bottom of the page." },
+    { keys: ["optimi", "highs", "sizing", "size the plant", "solver", "linear program"], a: faq("What makes the optimiser state of the art?") },
+    { keys: [" ai ", " ai?", "llm", "language model", "artificial intelligence", "hallucinat"], a: faq("Does the AI decide the bid?") },
+    { keys: ["mcp", "connector", "claude"], a: faq("Are MCP connectors available?") },
+    { keys: ["excel", "financial model", "workbook", "accura"], a: faq("How accurate is the financial model?") },
+    { keys: ["several people", "collaborat", "multiple users", "team work", "sign-off", "sign off", "roles"], a: faq("Can several people work on one bid?") },
+  ],
+};
+
 const desc = `TenderOS by jouleWise turns months of bid work into hours: it reads an Indian renewable energy tender and its amendments with page-level evidence, sizes solar, wind and battery with a HiGHS optimiser, prices the bid and builds the Excel model and bid pack, on your premises.`;
 const jsonLd = [
   { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "TenderOS", applicationCategory: "BusinessApplication", operatingSystem: "Web, Docker (any cloud or on-premises)", url: SITE, image: `${SITE}/og.jpg`, description: desc,
@@ -829,10 +852,30 @@ ${FAQ.map(([q, a]) => `  <details><summary>${esc(q)}</summary><p>${esc(a)}</p></
   <p><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span> is a product of <a href="https://www.joulewise.tech">jouleWise</a>. Call <a href="tel:${TEL}">${PHONE}</a> or write to <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Auction data from <a href="${SECI_SITE}" rel="noopener">SECI's result notices</a>; tender pages and quotes from the SECI CfD-I RfS and its amendments, SECI's documents, shown to illustrate the reading. Model figures from the application's own code, built ${dateWords(BUILT)}.</p>
   <p class="small"><a href="/llms.txt">llms.txt</a> · <a href="/llms-full.txt">llms-full.txt</a> · <a href="/data/seci-results.csv">SECI results (CSV)</a> · <a href="/data/cfd-demo.json">demo data (JSON)</a> · <a href="/sitemap.xml">sitemap</a> · <a href="/privacy">privacy</a></p>
 </footer>
-<a class="sticker" href="tel:${TEL}" aria-label="Speak to the jouleWise sales team on ${PHONE}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3h3l1.5 4.5-2 1.2a11 11 0 006.3 6.3l1.2-2L21 14.5v3A2.5 2.5 0 0118.5 20 15.5 15.5 0 013 5.5 2.5 2.5 0 015.5 3z"/></svg><span><b>Speak to the jouleWise sales team</b><small>${PHONE}</small></span></a>
+<button class="sticker" id="chat-open" type="button" aria-expanded="false" aria-controls="chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v8a2.5 2.5 0 01-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 014 13.5z"/><path d="M8 8h8M8 11.5h5"/></svg><span><b>Message the jouleWise team</b><small>Ask a question, leave a note</small></span></button>
+<div class="chat" id="chat" role="dialog" aria-label="Message the jouleWise team" hidden>
+  <header><div><b>Message the jouleWise team</b><small>Saved for the team. Quick answers are automatic.</small></div><button type="button" class="chat-x" aria-label="Close the chat">×</button></header>
+  <div class="chat-log" aria-live="polite"></div>
+  <div class="chat-chips" aria-label="Common questions"></div>
+  <form class="chat-who" hidden>
+    <input name="name" placeholder="Your name" autocomplete="name" aria-label="Your name" maxlength="160">
+    <input name="company" placeholder="Company" autocomplete="organization" aria-label="Company" maxlength="160">
+    <input class="wide" name="reach" placeholder="Phone or email, for the reply" aria-label="Phone or email" maxlength="160" required>
+    <button class="btn small wide" type="submit">Send my details</button>
+  </form>
+  <form class="chat-form">
+    <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+    <textarea rows="2" maxlength="1500" placeholder="Type your message" aria-label="Your message" required></textarea>
+    <button class="btn small" type="submit">Send</button>
+  </form>
+  <p class="chat-status" role="status"></p>
+  <p class="chat-foot">Or call <a href="tel:${TEL}">${PHONE}</a>. What you write here is kept so the team can reply: <a href="/privacy">privacy</a>.</p>
+</div>
+<script type="application/json" id="chat-data">${JSON.stringify(CHAT).replace(/</g, "\\u003c")}</script>
 <script src="/assets/track.js" defer></script>
 <script src="/assets/iso.js" defer></script>
 <script src="/assets/app.js" defer></script>
+<script src="/assets/chat.js" defer></script>
 </body>
 </html>
 `;
@@ -862,12 +905,14 @@ ${FONTS}
   <h2>Visits</h2>
   <p>Visits are counted with Vercel Web Analytics, a service of our hosting provider. It sets no cookies and keeps no advertising profile. For each page view it records the page, the site you came from, the country, and the kind of device and browser. Visitors are told apart by a hash that is reset every day, so a visit today cannot be joined to a visit tomorrow.</p>
   <p>The site also records what was used: that the guided tour was started and which screens were reached, that the deck was downloaded, that the phone number or the demo button was pressed, which sections were read and roughly how long the page stayed open. Nothing you type is recorded: not the design studio's numbers, and not the demo request, which opens in your own mail application and is sent from there.</p>
+  <h2>Messages</h2>
+  <p>The chat box in the corner of the site is for writing to the jouleWise team. What you write there, and the name, company and phone number or email you choose to leave, is saved on our hosting provider's storage so that the team can read it and reply to you. With it we keep the time, the page you were on, your country and your personal link's label if you came through one. The quick answers in the chat are automatic: they are taken from the questions and answers on the site, and no language model reads your message.</p>
   <h2>Personal links</h2>
   <p>If jouleWise sent you a link of the form <code>${SITE.replace("https://", "")}/for/a-name</code>, that name is a label for you or your company. It is kept in your browser for 90 days and attached to the events above, so that we know the person we wrote to has looked at the site and what interested them. We use it to follow up with you and for nothing else. A visit without such a link carries no label.</p>
   <h2>Your choice</h2>
   <p id="track-state" class="note" aria-live="polite"></p>
   <p class="cta-row"><button class="btn ghost" type="button" data-track="forget">Forget my personal link</button><button class="btn ghost" type="button" data-track="off">Stop counting my visits</button><button class="btn ghost" type="button" data-track="on">Count my visits again</button></p>
-  <p>These switches act on this browser only. To have what was recorded under your personal link deleted, or to ask anything else, write to <a href="mailto:${CONTACT_EMAIL}?subject=TenderOS%20privacy">${CONTACT_EMAIL}</a> or call <a href="tel:${TEL}">${PHONE}</a>.</p>
+  <p>These switches act on this browser only. To have your messages or what was recorded under your personal link deleted, or to ask anything else, write to <a href="mailto:${CONTACT_EMAIL}?subject=TenderOS%20privacy">${CONTACT_EMAIL}</a> or call <a href="tel:${TEL}">${PHONE}</a>.</p>
   <p class="small muted">jouleWise · last changed ${dateWords(BUILT)}</p>
 </main>
 <script src="/assets/track.js" defer></script>
@@ -1099,6 +1144,10 @@ write("vercel.json", JSON.stringify({
   ],
 }, null, 2));
 mkdirSync(join(OUT, "assets"), { recursive: true });
-for (const f of ["styles.css", "iso.css", "app.js", "iso.js", "track.js", "deck.css"]) copyFileSync(join(HERE, "src", f), join(OUT, "assets", f));
+for (const f of ["styles.css", "iso.css", "app.js", "iso.js", "track.js", "chat.js", "deck.css"]) copyFileSync(join(HERE, "src", f), join(OUT, "assets", f));
 copyFileSync(join(HERE, "src/favicon.svg"), join(OUT, "favicon.svg"));
+// the one server function, POST /api/chat, and the package file that gives it its storage library
+mkdirSync(join(OUT, "api"), { recursive: true });
+copyFileSync(join(HERE, "src/api/chat.js"), join(OUT, "api/chat.js"));
+write("package.json", `${JSON.stringify({ name: "tenderos-site", private: true, type: "module", dependencies: { "@vercel/blob": "^2.9.0" } }, null, 2)}\n`);
 log(`wrote ${OUT} (index.html ${Math.round(page.length / 1024)} KB, demo.json ${Math.round(JSON.stringify(demo).length / 1024)} KB)`);
