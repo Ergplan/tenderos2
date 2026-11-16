@@ -13,6 +13,8 @@ results), `web/src/cfd/pack.js` and `terms.js` (the tender set, amendment quotes
 the Pool, the bid review). The open tenders are a snapshot in `data-src/seci-open.json` from
 `engine/market/seci_tenders.py` (rules summaries, no document opened); refresh it and rebuild.
 
+Colours are jouleWise's (www.joulewise.tech): night by default where the system is dark, day mode by the system or the toggle in the header (kept in localStorage `tos-theme`).
+
 `site/public/` is committed and is what Vercel serves (project root directory `site/public`,
 no build step). SEO: canonical, Open Graph, JSON-LD (SoftwareApplication, Organization, Dataset,
 FAQPage), sitemap. LLM: `llms.txt`, `llms-full.txt`, data as JSON and CSV, AI crawlers allowed in

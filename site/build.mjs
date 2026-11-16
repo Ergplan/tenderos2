@@ -275,7 +275,11 @@ const page = `<!doctype html>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${SITE}/">
 <meta name="robots" content="index, follow, max-image-preview:large">
-<meta name="theme-color" content="#1d1705">
+<meta name="theme-color" content="#141517" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f7f5f0" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<script>try{var t=localStorage.getItem("tos-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="TenderOS by jouleWise">
 <meta property="og:title" content="TenderOS: from tender PDF to winning bid">
@@ -301,6 +305,7 @@ ${jsonLd.map((j) => `<script type="application/ld+json">${JSON.stringify(j)}</sc
     <a href="/" class="brand" aria-label="TenderOS home"><span class="w1">Tender</span><span class="w2">OS</span><span class="by">by jouleWise</span></a>
     <nav aria-label="Sections"><a href="#simulation">Demo</a><a href="#what">Modules</a><a href="#results">SECI results</a><a href="#faq">FAQ</a></nav>
     <a class="btn small" href="/TenderOS-deck.pdf" download>Deck (PDF)</a>
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to day mode" title="Day mode"><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 019.5 4a8 8 0 1010.5 10.5z"/></svg></button>
   </div>
 </header>
 
@@ -536,7 +541,7 @@ write("index.html", page);
 // ------------------------------------------------------------------ the deck (rendered to PDF by render.mjs)
 const slide = (cls, inner) => `<section class="slide ${cls}">${inner}<footer><span class="brand sm"><span class="w1">Tender</span><span class="w2">OS</span></span><span>tenderos.joulewise.tech</span></footer></section>`;
 const topResults = results.slice(0, 8);
-const deck = `<!doctype html><html lang="en-IN"><head><meta charset="utf-8"><title>TenderOS deck</title><meta name="robots" content="noindex"><link rel="stylesheet" href="/assets/deck.css"></head><body>
+const deck = `<!doctype html><html lang="en-IN"><head><meta charset="utf-8"><title>TenderOS deck</title><meta name="robots" content="noindex"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter+Tight:wght@400;500;600;700&display=swap"><link rel="stylesheet" href="/assets/deck.css"></head><body>
 ${slide("cover", `<div class="cv"><p class="eyebrow">jouleWise</p><h1><span class="w1">Tender</span><span class="w2">OS</span></h1><p class="big">From the tender PDF to a winning bid,<br>with every number traceable.</p><p class="muted">Bid workspace for renewable energy tenders in India · ${dateWords(BUILT)}</p></div>`)}
 ${slide("", `<h2>The problem</h2><div class="cols3"><div><b>Hundreds of pages, always changing</b><p>SECI CfD-I: an RfS of 129 pages, a 69-page agreement and four amendments in four months. One removed the ceiling tariff; one let SECI cut the award to its corpus.</p></div><div><b>Spreadsheets rebuilt every time</b><p>Each amendment sends the bid team back to its model. Nobody can say which page a number came from or which input moved the tariff.</p></div><div><b>Bids lost on the price</b><p>Awarded tariffs cluster within paise. An over-built battery or a high return target puts a bid out of the auction before it starts.</p></div></div>`)}
 ${slide("", `<h2>What TenderOS does</h2><ol class="flow">${STAGES.map(([, t, s]) => `<li><b>${esc(t)}</b><span>${esc(s)}</span></li>`).join("")}</ol>`)}

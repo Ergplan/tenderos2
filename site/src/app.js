@@ -7,12 +7,13 @@
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const el = (tag, attrs = {}, parent) => {
     const n = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    // colours are theme variables, set as style so the charts follow the day/night toggle
+    for (const [k, v] of Object.entries(attrs)) { if ((k === "fill" || k === "stroke") && String(v).startsWith("var(")) n.style[k] = v; else n.setAttribute(k, v); }
     if (parent) parent.appendChild(n);
     return n;
   };
   const txt = (parent, x, y, s, attrs = {}) => { const t = el("text", { x, y, ...attrs }, parent); t.textContent = s; return t; };
-  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const css = (name) => `var(${name})`;
   const rs = (v, d = 2) => `₹${v.toFixed(d)}`;
 
   // ---------------------------------------------------------------- charts
@@ -33,14 +34,14 @@
       el("rect", { x: L, y: T, width: x(firstOk.mw) - L - 4, height: H - T - B, fill: css("--short"), opacity: 0.07 }, svg);
       txt(svg, L + 8, T + 16, "days short of 2 MWh/MW", { fill: css("--short") });
     }
-    const path = el("polyline", { points: pts.map((p) => `${x(p.mw)},${y(p.sp)}`).join(" "), fill: "none", stroke: css("--gold"), "stroke-width": 3, "stroke-linejoin": "round" }, svg);
+    const path = el("polyline", { points: pts.map((p) => `${x(p.mw)},${y(p.sp)}`).join(" "), fill: "none", stroke: css("--power"), "stroke-width": 3, "stroke-linejoin": "round" }, svg);
     const len = pts.reduce((a, p, i) => (i ? a + Math.hypot(x(p.mw) - x(pts[i - 1].mw), y(p.sp) - y(pts[i - 1].sp)) : 0), 0);
     path.style.strokeDasharray = `${len}`;
     path.style.strokeDashoffset = `${len}`;
-    const dot = el("circle", { r: 6, cx: x(pts[0].mw), cy: y(pts[0].sp), fill: css("--ink"), stroke: css("--card") || "#fff", "stroke-width": 2 }, svg);
+    const dot = el("circle", { r: 6, cx: x(pts[0].mw), cy: y(pts[0].sp), fill: css("--ink"), stroke: css("--card"), "stroke-width": 2 }, svg);
     const best = pts.find((p) => p.mw === D.best) || firstOk;
     const bestG = el("g", { opacity: 0 }, svg);
-    el("circle", { r: 9, cx: x(best.mw), cy: y(best.sp), fill: css("--gold"), stroke: "#1d1705", "stroke-width": 2 }, bestG);
+    el("circle", { r: 9, cx: x(best.mw), cy: y(best.sp), fill: css("--power"), stroke: css("--bg"), "stroke-width": 3 }, bestG);
     txt(bestG, x(best.mw) + 14, y(best.sp) + 26, `${best.mw} MWac · ${rs(best.sp)}/kWh, every day met`, { fill: css("--ink"), "font-weight": 700 });
     host.replaceChildren(svg);
     const readout = document.getElementById("scan-readout");
@@ -122,7 +123,7 @@
       const x0 = L + i * bw + 5, w = bw - 10;
       const top = r.cr >= 0 ? y(r.cr) : y(0);
       const h = Math.max(1.5, Math.abs(y(r.cr) - y(0)));
-      bars.push(el("rect", { x: x0, y: top, width: w, height: h, rx: 3, fill: r.yours ? css("--gold") : r.cr >= 0 ? css("--bad") : css("--good"), opacity: r.yours ? 1 : 0.75 }, svg));
+      bars.push(el("rect", { x: x0, y: top, width: w, height: h, rx: 3, fill: r.yours ? css("--power") : r.cr >= 0 ? css("--bad") : css("--good"), opacity: r.yours ? 1 : 0.75 }, svg));
       txt(svg, x0 + w / 2, H - B + 16, rs(r.sp, r.yours ? 2 : 1), { "text-anchor": "middle", "font-weight": r.yours ? 700 : 400, fill: r.yours ? css("--ink") : css("--muted") });
       if (r.yours) txt(svg, x0 + w / 2, y(0) - 10, "your quote", { "text-anchor": "middle", fill: css("--ink"), "font-weight": 700 });
     });
@@ -209,6 +210,26 @@
       io.observe(sim);
     }
   }
+
+  // ---------------------------------------------------------------- day / night
+  // The page follows the system theme until the visitor picks one; the choice is kept in
+  // localStorage ("tos-theme") and applied before paint by the inline script in <head>.
+  const root = document.documentElement;
+  const sysLight = window.matchMedia("(prefers-color-scheme: light)");
+  const isLight = () => (root.dataset.theme ? root.dataset.theme === "light" : sysLight.matches);
+  const mark = () => {
+    root.classList.toggle("is-light", isLight());
+    const t = document.getElementById("theme-toggle");
+    if (t) { const next = isLight() ? "night" : "day"; t.setAttribute("aria-label", `Switch to ${next} mode`); t.title = `${next[0].toUpperCase()}${next.slice(1)} mode`; }
+  };
+  document.getElementById("theme-toggle")?.addEventListener("click", () => {
+    const next = isLight() ? "dark" : "light";
+    root.dataset.theme = next;
+    try { localStorage.setItem("tos-theme", next); } catch (e) { /* private mode: this visit only */ }
+    mark();
+  });
+  sysLight.addEventListener?.("change", mark);
+  mark();
 
   // ---------------------------------------------------------------- results filter
   const chips = [...document.querySelectorAll(".filters .chip")];

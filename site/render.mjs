@@ -38,20 +38,21 @@ try {
   // the share image: the cover with the demo's headline numbers
   const data = JSON.parse(readFileSync(join(PUB, "data/cfd-demo.json"), "utf8"));
   const og = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-  await og.setContent(`<!doctype html><html><head><style>
-    body{margin:0;width:1200px;height:630px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:radial-gradient(800px 420px at 90% -10%,rgba(226,181,28,.35),transparent 60%),linear-gradient(160deg,#1d1705,#3a2d06);color:#f6eed4;display:flex;flex-direction:column;justify-content:center;padding:0 80px;box-sizing:border-box}
-    .b{font-size:84px;font-weight:900;letter-spacing:-.03em}.b i{font-style:normal;color:#e2b51c}
+  await og.setContent(`<!doctype html><html><head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter+Tight:wght@400;500;700&display=swap"><style>
+    body{margin:0;width:1200px;height:630px;font-family:"Inter Tight","Helvetica Neue",Arial,sans-serif;background:#141517;background-image:linear-gradient(90deg,#1e2023 1px,transparent 1px);background-size:150px 100%;color:#efeeeb;display:flex;flex-direction:column;justify-content:center;padding:0 80px;box-sizing:border-box}
+    .b{font-size:84px;font-weight:500;letter-spacing:-.035em}.b i{font-style:normal;color:#b8962e}
     p{font-size:38px;line-height:1.25;margin:10px 0 34px;max-width:960px}
-    .k{display:flex;gap:44px}.k div{font-size:20px;color:#d9cda6}.k b{display:block;font-size:44px;color:#e2b51c}
-    .f{position:absolute;bottom:34px;left:80px;font-size:20px;color:#b9ad88}</style></head><body>
+    .k{display:flex;gap:44px}.k div{font-size:20px;color:#cbcac6}.k b{display:block;font-size:44px;font-weight:700;color:#3dd68c}
+    .f{position:absolute;bottom:34px;left:80px;font-size:18px;color:#939190;font-family:"IBM Plex Mono",monospace;letter-spacing:.12em;text-transform:uppercase}</style></head><body>
     <div class="b"><i>Tender</i>OS</div><p>From the tender PDF to a winning bid, with every number traceable.</p>
     <div class="k"><div><b>${data.tender.conditions}</b>conditions with pages</div><div><b>${data.tender.changesQuoted}</b>amendment changes quoted</div><div><b>₹${data.winning.tariff.toFixed(2)}</b>strike price, SECI CfD-I</div><div><b>8</b>SECI auctions, open data</div></div>
     <div class="f">tenderos.joulewise.tech · by jouleWise</div></body></html>`);
+  await og.waitForLoadState("networkidle"); await og.evaluate(() => document.fonts.ready);
   await og.screenshot({ path: join(PUB, "og.jpg"), type: "jpeg", quality: 86 });
   console.log("render: og.jpg 1200×630");
 
   // the page itself: no console errors, the charts drawn
-  const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "dark" });
   page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(`${base}/`, { waitUntil: "networkidle" });
@@ -68,7 +69,7 @@ try {
       await page.locator("#sim").screenshot({ path: join(SHOTS, `sim-${name}.png`) });
     }
     await page.locator("#results").screenshot({ path: join(SHOTS, "results.png") });
-    const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true });
+    const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, colorScheme: "dark" });
     phone.on("pageerror", (e) => errors.push(`phone: ${e}`));
     await phone.goto(`${base}/`, { waitUntil: "networkidle" });
     await phone.screenshot({ path: join(SHOTS, "phone-top.png") });
@@ -81,7 +82,21 @@ try {
     await ds.goto(`${base}/deck/`, { waitUntil: "networkidle" });
     const n = await ds.locator(".slide").count();
     for (let k = 0; k < n; k += 1) await ds.locator(".slide").nth(k).screenshot({ path: join(SHOTS, `slide-${String(k + 1).padStart(2, "0")}.png`) });
-    console.log(`render: screenshots in ${SHOTS}`);
+    // day mode: a visitor whose system is light, then the toggle back to night and its memory
+    const day = await browser.newPage({ viewport: { width: 1366, height: 900 }, colorScheme: "light" });
+    day.on("pageerror", (e) => errors.push(`day: ${e}`));
+    await day.goto(`${base}/`, { waitUntil: "networkidle" });
+    await day.screenshot({ path: join(SHOTS, "day-top.png") });
+    await day.locator('.sim-rail button[data-stage="8"]').click();
+    await day.waitForTimeout(2500);
+    await day.locator("#sim").screenshot({ path: join(SHOTS, "day-wins.png") });
+    await day.locator("#theme-toggle").click();
+    const after = await day.evaluate(() => [document.documentElement.dataset.theme, localStorage.getItem("tos-theme"), getComputedStyle(document.body).backgroundColor]);
+    if (after[0] !== "dark" || after[1] !== "dark" || after[2] !== "rgb(20, 21, 23)") errors.push(`toggle: ${after.join(" ")}`);
+    await day.reload({ waitUntil: "networkidle" });
+    const kept = await day.evaluate(() => document.documentElement.dataset.theme);
+    if (kept !== "dark") errors.push(`toggle not remembered: ${kept}`);
+    console.log(`render: day mode and toggle ok; screenshots in ${SHOTS}`);
   }
 } finally {
   await browser.close();
