@@ -1,0 +1,108 @@
+{
+ "made": "2026-11-17",
+ "model": "music_v2_5",
+ "dropCue": 8,
+ "lead": 8,
+ "plan": {
+  "chunks": [
+   {
+    "text": "[Intro]\n{quiet tense pulse, then a riser and snare roll, then silence}",
+    "duration_ms": 16000,
+    "positive_styles": [
+     "instrumental",
+     "cinematic electronic",
+     "120 BPM",
+     "dark and tense",
+     "quiet pulsing synth ostinato",
+     "ticking percussion",
+     "deep sub bass hits",
+     "no drum beat",
+     "rising tension through the second half",
+     "riser and snare roll into a hard stop",
+     "modern technology brand film",
+     "great production quality"
+    ],
+    "negative_styles": [
+     "vocals",
+     "singing",
+     "spoken word",
+     "lyrics"
+    ]
+   },
+   {
+    "text": "[Drop]\n{full band enters at once, loud, and keeps driving}",
+    "duration_ms": 28000,
+    "positive_styles": [
+     "the drop: full energy from the very first beat",
+     "no build-up inside this section",
+     "loud driving four-on-the-floor kick",
+     "punchy synth bass",
+     "bold confident synth stabs",
+     "energetic and uplifting",
+     "wide stereo",
+     "120 BPM",
+     "great production quality"
+    ],
+    "negative_styles": [
+     "vocals",
+     "singing",
+     "spoken word",
+     "lyrics"
+    ]
+   },
+   {
+    "text": "[Outro]\n{drums pull back, then one big hit that rings out}",
+    "duration_ms": 8000,
+    "positive_styles": [
+     "half-time breakdown for two bars",
+     "deep bass",
+     "minimal drums",
+     "then one big final impact",
+     "triumphant sustained chord",
+     "cymbal crash",
+     "rings out to silence"
+    ],
+    "negative_styles": [
+     "vocals",
+     "singing",
+     "spoken word",
+     "lyrics"
+    ]
+   }
+  ]
+ },
+ "takes": [
+  {
+   "file": "eleven-1.mp3",
+   "seed": 8919,
+   "songId": "o5juD5YpgphLjnQ63iX4",
+   "seconds": 52.03,
+   "dropAt": 16.02,
+   "introDb": -24.8,
+   "dropDb": -11.1,
+   "contrastDb": 13.7
+  },
+  {
+   "file": "eleven-2.mp3",
+   "seed": 16838,
+   "songId": "TeONza3QBMRgM1anJrnN",
+   "seconds": 52.03,
+   "dropAt": 16.01,
+   "introDb": -31,
+   "dropDb": -14.3,
+   "contrastDb": 16.6
+  },
+  {
+   "file": "eleven-3.mp3",
+   "seed": 24757,
+   "songId": "YOGi0TRAuqpps65PeTI5",
+   "seconds": 52.03,
+   "dropAt": 16.01,
+   "introDb": -33.4,
+   "dropDb": -14.3,
+   "contrastDb": 19.1
+  }
+ ],
+ "chosen": "eleven-1.mp3",
+ "dropAt": 16.02
+}

@@ -122,12 +122,28 @@ never what was written.
 
 ## The LinkedIn animation
 
-`social/linkedin.html` is a 32.5-second, 1080 × 1350 animation (opened in a browser, it plays).
-`node site/social/render.mjs` steps through it frame by frame, has `social/music.py` write the
-soundtrack to the animation's own cue points (an original synthesised track: nothing to license;
-`--music FILE` uses another track instead) and writes `public/social/tenderos-linkedin.mp4`, the
-cover `tenderos-linkedin.jpg` and the music alone as `tenderos-linkedin-music.mp3`. The figures
-in it are read from `public/data/demo.json`.
+`social/linkedin.html` is a 44-second, 1080 × 1350 animation (opened in a browser, it plays), cut
+in whole bars at 120 beats a minute. Its five steps (read, track, size, price, prove) show the
+real dashboard: `node site/social/capture.mjs` plays the tour on each screen with the page's
+clock under its control and photographs it 50 times a second of the tour's own time into
+`social/footage/` (not committed, a few hundred megabytes; `--survey DIR` saves a still every
+half second to choose cuts from). `SHOTS` in the page says, for each clip, which part of the
+screen is shown wide and which zoomed in on, and the cut as segments played fast or slow.
+
+`node site/social/music-eleven.mjs` has ElevenLabs compose the soundtrack to the picture's
+structure (the lead-in, the drop over the five steps, the close) and make three sound effects:
+a whoosh where the footage turns fast, a hit where it turns slow, and the hit the name arrives
+on. The model gives a drop an eight-bar lead-in whatever it is asked, so it is asked for one
+eight seconds longer than the picture's and the front is cut off. `measure.py` finds each
+take's drop; the takes are `social/music/eleven-<n>.mp3`, the chosen one `eleven.mp3`. It needs
+`ELEVENLABS_API_KEY` (or the session's network proxy holding the key).
+
+`node site/social/render.mjs` steps through the page frame by frame, slides the track so its
+drop is the picture's, lays the effects on the speed changes and writes
+`public/social/tenderos-linkedin.mp4`, the cover `tenderos-linkedin.jpg` and the sound alone as
+`tenderos-linkedin-music.mp3`. `--take N` uses another ElevenLabs take, `--music FILE` another
+track, `--synth` the track `music.py` synthesises from the cue points. The figures in the video
+are read from `public/data/demo.json`.
 
 ## The tour on a phone, and the time chart's labels
 

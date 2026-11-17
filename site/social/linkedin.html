@@ -1,6 +1,9 @@
 <!doctype html>
-<!-- The LinkedIn animation for TenderOS: 1080 × 1350 (4:5), 32.5 seconds, 30 frames a second, cut on a
-     120-beats-a-minute grid so that the music (site/social/music.py) hits with the picture.
+<!-- The LinkedIn animation for TenderOS: 1080 × 1350 (4:5), 44 seconds, 30 frames a second, cut in whole
+     bars at 120 beats a minute (8 s to the drop, 28 s of drop over the five steps, 8 s to close) so
+     that music composed to the same plan (site/social/music-eleven.mjs, or music.py) lands with the
+     picture. The five steps show the real dashboard, recorded by site/social/capture.mjs and played
+     fast and slow (SHOTS below); without that footage the windows stay empty.
      Every frame is a function of the time alone (window.seek(seconds)), so site/social/render.mjs
      can step through it and write an MP4; opened in a browser it simply plays. The figures are the
      site's own (site/public/data/demo.json): render.mjs passes them in and fails if one is missing. -->
@@ -11,7 +14,6 @@
 <meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter+Tight:wght@600;700;800;900&display=swap">
-<link rel="stylesheet" href="../src/iso.css">
 <style>
   :root { --bg: #141517; --bg-soft: #18191c; --panel: #1e1f22; --ink: #efeeeb; --body: #cbcac6; --dim: #939190; --line: #2e3033; --line-2: #414347;
     --power: #3dd68c; --power-ink: #06110b; --heat: #f2994a; --data: #5b8def; --accent: #5cc3b8; --gold: #b8962e; --evidence: #c9a43a; --violet: #9b87f5; --bad: #ff6b5b;
@@ -54,22 +56,23 @@
   .band { position: absolute; left: -200px; right: -200px; bottom: 190px; height: 120px; background: var(--power-ink); color: var(--power); transform: rotate(-5deg); overflow: hidden; display: flex; align-items: center; }
   .band div { white-space: nowrap; font-size: 76px; letter-spacing: -.02em; will-change: transform; }
   /* 4: the five beats */
-  .beat .idx { position: absolute; right: 50px; top: 120px; font-size: 420px; line-height: .8; color: transparent; -webkit-text-stroke: 4px var(--line-2); letter-spacing: -.05em; }
-  .beat .verb { font-size: 268px; }
-  .beat .num { font-size: 168px; margin-top: 44px; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; white-space: nowrap; }
-  .beat .num small { font-size: 46px; letter-spacing: -.02em; color: var(--body); margin-left: 20px; }
-  .beat .say { font-size: 64px; line-height: .98; margin-top: 30px; color: var(--body); max-width: 900px; letter-spacing: -.03em; }
-  .beat .rule { height: 14px; width: 940px; margin-top: 44px; transform-origin: 0 50%; }
-  .beat.c1 .verb, .beat.c1 .num b { color: var(--power); } .beat.c1 .rule { background: var(--power); }
-  .beat.c2 .verb, .beat.c2 .num b { color: var(--evidence); } .beat.c2 .rule { background: var(--evidence); }
-  .beat.c3 .verb, .beat.c3 .num b { color: var(--data); } .beat.c3 .rule { background: var(--data); }
-  .beat.c4 .verb, .beat.c4 .num b { color: var(--heat); } .beat.c4 .rule { background: var(--heat); }
-  .beat.c5 .verb, .beat.c5 .num b { color: var(--accent); } .beat.c5 .rule { background: var(--accent); }
-  .beat .num b { font-weight: 800; }
+  .scene.beat { justify-content: center; padding-top: 130px; padding-bottom: 110px; }
+  .beat .idx { position: absolute; right: 50px; top: 112px; font-size: 300px; line-height: .8; color: transparent; -webkit-text-stroke: 4px var(--line-2); letter-spacing: -.05em; }
+  .beat .verb { font-size: 204px; }
+  .beat .num { font-size: 104px; margin-top: 16px; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; white-space: nowrap; }
+  .beat .num b { font-weight: 800; } .beat .num small { font-size: 48px; letter-spacing: -.02em; color: var(--body); margin-left: 18px; }
+  .beat .say { font-size: 42px; line-height: 1.06; margin-top: 24px; color: var(--body); letter-spacing: -.03em; max-width: 940px; }
+  .beat.c1 .verb, .beat.c1 .num b { color: var(--power); } .beat.c2 .verb, .beat.c2 .num b { color: var(--evidence); } .beat.c3 .verb, .beat.c3 .num b { color: var(--data); }
+  .beat.c4 .verb, .beat.c4 .num b { color: var(--heat); } .beat.c5 .verb, .beat.c5 .num b { color: var(--accent); }
   .curtain { position: absolute; inset: 0; z-index: 10; }
   .c1 .curtain { background: var(--power); } .c2 .curtain { background: var(--evidence); } .c3 .curtain { background: var(--data); } .c4 .curtain { background: var(--heat); } .c5 .curtain { background: var(--accent); }
-  .plant { width: 1000px; margin: 26px 0 0 -30px; } .plant svg text { display: none; }
-  .beat.c3 .verb { font-size: 250px; } .beat.c3 .num { font-size: 150px; margin-top: 22px; } .beat.c3 .say { font-size: 56px; margin-top: 18px; }
+  /* the recorded dashboard: a window on the real screen, played fast and slow */
+  .shot { position: relative; width: 1000px; height: 620px; margin: 30px 0 0 -30px; overflow: hidden; border-radius: 16px; background: var(--panel); box-shadow: 0 0 0 3px var(--line-2), 0 40px 80px -30px #000; transform-origin: 50% 50%; }
+  .shot img { position: absolute; left: 0; top: 0; max-width: none; will-change: left, top, width; }
+  .shot .speed { position: absolute; left: 18px; top: 18px; font: 600 27px var(--mono); letter-spacing: .1em; padding: 9px 15px; border-radius: 9px; background: rgba(6, 17, 11, .86); color: var(--ink); border: 2px solid var(--line-2); text-transform: uppercase; }
+  .shot .speed.fast { color: var(--evidence); border-color: var(--evidence); } .shot .speed.slow { color: var(--power); border-color: var(--power); }
+  .shot .scrub { position: absolute; left: 0; bottom: 0; height: 9px; background: var(--power); }
+  .c2 .shot .scrub { background: var(--evidence); } .c3 .shot .scrub { background: var(--data); } .c4 .shot .scrub { background: var(--heat); } .c5 .shot .scrub { background: var(--accent); }
   /* 5: on your premises */
   .frame { position: absolute; inset: 150px 44px 132px; border: 12px solid var(--evidence); }
   .prem { font-size: 142px; padding: 0 36px; } .prem + .prem { margin-top: 12px; }
@@ -87,18 +90,18 @@
 <div id="stage">
   <div class="chrome top"><span class="brand"><i>Tender</i>OS</span><span>by jouleWise</span></div>
 
-  <section class="scene grid open" data-dur="1" data-cue="open" data-shake="0">
+  <section class="scene grid open" data-dur="1" data-cue="open" data-hit="0">
     <div class="opener">A tender<br><span class="green">drops.</span></div>
   </section>
 
-  <section class="scene grid" data-dur="4" data-cue="intro" data-shake="0.5,1.5,2.5">
+  <section class="scene grid" data-dur="3" data-cue="intro" data-hit="0.4,1.2,2">
     <p class="el mono" data-at="0.05" data-fx="type">SECI CfD-I. One real tender:</p>
-    <div class="drop"><span class="el n" data-at="0.5" data-fx="slam" data-count="pages">0</span><span class="el w" data-at="0.65" data-fx="rise">pages</span></div>
-    <div class="drop"><span class="el n" data-at="1.5" data-fx="slam" data-count="changes">0</span><span class="el w" data-at="1.65" data-fx="rise">amendment<br>changes</span></div>
-    <div class="drop"><span class="el n" data-at="2.5" data-fx="slam" data-count="conditions">0</span><span class="el w" data-at="2.65" data-fx="rise">conditions</span></div>
+    <div class="drop"><span class="el n" data-at="0.4" data-fx="slam" data-count="pages">0</span><span class="el w" data-at="0.55" data-fx="rise">pages</span></div>
+    <div class="drop"><span class="el n" data-at="1.2" data-fx="slam" data-count="changes">0</span><span class="el w" data-at="1.35" data-fx="rise">amendment<br>changes</span></div>
+    <div class="drop"><span class="el n" data-at="2" data-fx="slam" data-count="conditions">0</span><span class="el w" data-at="2.15" data-fx="rise">conditions</span></div>
   </section>
 
-  <section class="scene" data-dur="4" data-cue="build" data-shake="0.5,2">
+  <section class="scene" data-dur="4" data-cue="build" data-hit="0.5,2">
     <div class="cells" id="cells"></div>
     <p class="el mono" data-at="0.05" data-fx="type">For a bid team, that is</p>
     <div class="el months" data-at="0.5" data-fx="slam">Months<span class="el strike" data-at="2" data-fx="strike"></span></div>
@@ -106,58 +109,58 @@
     <p class="el mono back" data-at="2.25" data-fx="type">And one amendment sends it back to the start.</p>
   </section>
 
-  <section class="scene green-bg" data-cover="2.4" data-dur="3" data-cue="drop" data-shake="0,0.5" data-flash="1" data-on="green">
+  <section class="scene green-bg" data-cover="2.6" data-dur="4" data-cue="drop" data-hit="0,0.5" data-flash="1" data-on="green">
     <div class="el done1" data-at="0" data-fx="slam">Done in</div>
     <div class="el done2" data-at="0.5" data-fx="slam">hours.</div>
     <div class="band"><div data-marquee="230">TenderOS · read · track · size · price · prove · TenderOS · read · track · size · price · prove · TenderOS · read · track · size · price · prove ·&nbsp;</div></div>
   </section>
 
-  <section class="scene grid beat c1" data-dur="2.5" data-cue="beat" data-shake="0.5">
+  <section class="scene grid beat c1" data-dur="4" data-cue="beat" data-hit="0.4">
     <div class="curtain el" data-at="0" data-fx="sweep"></div>
     <span class="idx">01</span>
-    <div class="el verb" data-at="0.5" data-fx="slam">Read</div>
-    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="conditions">0</b><small>conditions</small></div>
-    <div class="el rule" data-at="0.85" data-fx="strike"></div>
-    <p class="el say" data-at="1" data-fx="rise">Each with its page and its quote.</p>
+    <div class="el verb" data-at="0.4" data-fx="slam">Read</div>
+    <div class="el num" data-at="0.65" data-fx="rise"><b data-count="conditions">0</b><small>conditions</small></div>
+    <div class="el shot" data-at="0.3" data-fx="rise" data-clip="read"><img alt=""><span class="speed"></span><i class="scrub"></i></div>
+    <p class="el say" data-at="0.9" data-fx="rise">Click a value: SECI's page opens at the sentence.</p>
   </section>
 
-  <section class="scene grid beat c2" data-dur="2.5" data-cue="beat" data-shake="0.5">
+  <section class="scene grid beat c2" data-dur="4" data-cue="beat" data-hit="0.4">
     <div class="curtain el" data-at="0" data-fx="sweep"></div>
     <span class="idx">02</span>
-    <div class="el verb" data-at="0.5" data-fx="slam">Track</div>
-    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="changes">0</b><small>amendment changes</small></div>
-    <div class="el rule" data-at="0.85" data-fx="strike"></div>
-    <p class="el say" data-at="1" data-fx="rise">Was and now. Word by word.</p>
+    <div class="el verb" data-at="0.4" data-fx="slam">Track</div>
+    <div class="el num" data-at="0.65" data-fx="rise"><b data-count="changes">0</b><small>amendment changes</small></div>
+    <div class="el shot" data-at="0.3" data-fx="rise" data-clip="track"><img alt=""><span class="speed"></span><i class="scrub"></i></div>
+    <p class="el say" data-at="0.9" data-fx="rise">Was and now, word by word, beside SECI's page.</p>
   </section>
 
-  <section class="scene grid beat c3" data-dur="2.5" data-cue="beat" data-shake="0.5">
+  <section class="scene grid beat c3" data-dur="8" data-cue="beat" data-hit="0.4">
     <div class="curtain el" data-at="0" data-fx="sweep"></div>
     <span class="idx">03</span>
-    <div class="el verb" data-at="0.5" data-fx="slam">Size</div>
-    <div class="el plant" id="plant" data-at="0.7" data-fx="wipe"></div>
-    <div class="el num" data-at="1" data-fx="rise"><b data-count="sims">0</b><small>simulations</small></div>
-    <p class="el say" data-at="1.2" data-fx="rise">Solar, wind and battery. Each run over 15 years.</p>
+    <div class="el verb" data-at="0.4" data-fx="slam">Size</div>
+    <div class="el num" data-at="0.65" data-fx="rise"><b data-count="sims">0</b><small>simulations</small></div>
+    <div class="el shot" data-at="0.3" data-fx="rise" data-clip="size"><img alt=""><span class="speed"></span><i class="scrub"></i></div>
+    <p class="el say" data-at="0.9" data-fx="rise">Drag the plant. The price and the conditions follow.</p>
   </section>
 
-  <section class="scene grid beat c4" data-dur="2.5" data-cue="beat" data-shake="0.5">
+  <section class="scene grid beat c4" data-dur="4" data-cue="beat" data-hit="0.4">
     <div class="curtain el" data-at="0" data-fx="sweep"></div>
     <span class="idx">04</span>
-    <div class="el verb" data-at="0.5" data-fx="slam">Price</div>
-    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="pricings">0</b><small>financial models</small></div>
-    <div class="el rule" data-at="0.85" data-fx="strike"></div>
-    <p class="el say" data-at="1" data-fx="rise">Simulated and priced in <span data-text="seconds"></span> seconds.</p>
+    <div class="el verb" data-at="0.4" data-fx="slam">Price</div>
+    <div class="el num" data-at="0.65" data-fx="rise"><b data-count="pricings">0</b><small>financial models</small></div>
+    <div class="el shot" data-at="0.3" data-fx="rise" data-clip="price"><img alt=""><span class="speed"></span><i class="scrub"></i></div>
+    <p class="el say" data-at="0.9" data-fx="rise">Simulated and priced in <span data-text="seconds"></span> seconds.</p>
   </section>
 
-  <section class="scene grid beat c5" data-dur="2.5" data-cue="beat" data-shake="0.5">
+  <section class="scene grid beat c5" data-dur="4" data-cue="beat" data-hit="0.4">
     <div class="curtain el" data-at="0" data-fx="sweep"></div>
     <span class="idx">05</span>
-    <div class="el verb" data-at="0.5" data-fx="slam">Prove</div>
-    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="blocks">0</b><small>blocks a year</small></div>
-    <div class="el rule" data-at="0.85" data-fx="strike"></div>
-    <p class="el say" data-at="1" data-fx="rise">Every condition checked, every 15 minutes.</p>
+    <div class="el verb" data-at="0.4" data-fx="slam">Prove</div>
+    <div class="el num" data-at="0.65" data-fx="rise"><b data-count="blocks">0</b><small>blocks a year</small></div>
+    <div class="el shot" data-at="0.3" data-fx="rise" data-clip="prove"><img alt=""><span class="speed"></span><i class="scrub"></i></div>
+    <p class="el say" data-at="0.9" data-fx="rise">Every condition checked, every 15 minutes.</p>
   </section>
 
-  <section class="scene" data-dur="3.5" data-cue="premises" data-shake="0.5,1,1.5">
+  <section class="scene" data-dur="4" data-cue="premises" data-hit="0.5,1,1.5">
     <div class="el frame" data-at="0" data-fx="fade"></div>
     <div class="el prem" data-at="0.5" data-fx="slam">Your bid</div>
     <div class="el prem gold" data-at="1" data-fx="slam">never leaves</div>
@@ -165,7 +168,7 @@
     <p class="el mono zones" data-at="1.8" data-fx="type">Runs on your own servers. No bid data in the cloud.</p>
   </section>
 
-  <section class="scene grid end" data-dur="4.5" data-cue="end" data-shake="0" data-flash="1" data-on="nochrome">
+  <section class="scene grid end" data-dur="4" data-cue="end" data-hit="0" data-flash="1" data-on="nochrome">
     <div class="el logo" data-at="0" data-fx="pop"><i>Tender</i>OS</div>
     <div class="el kick" data-at="0.5" data-fx="rise">The platform every IPP was waiting for</div>
     <div class="el line2" data-at="0.85" data-fx="rise">Months of bid work. <em>Done in hours.</em></div>
@@ -177,7 +180,6 @@
   <div id="bar"></div>
   <div id="flash"></div>
 </div>
-<script src="../src/iso.js"></script>
 <script>
 (() => {
   "use strict";
@@ -192,7 +194,6 @@
   const fmt = (n) => Math.round(n).toLocaleString("en-IN");
 
   document.querySelectorAll("[data-text]").forEach((n) => { n.textContent = fmt(N[n.dataset.text]); });
-  document.getElementById("plant").innerHTML = window.TOSIso.plant({ kind: "cfd", solarMw: 24, windMw: 15, bessMwh: 200, text: { title: "A hybrid plant: solar, wind and battery" } });
   // the spreadsheet behind "months": cells of the kind a bid team lives in
   const CELL = ["=SUM(F4:F368)", "0.9184", "0.1300", "=IRR(C9:AB9)", "1.20", "35,040", "=NPV(r, D4:D28)", "#REF!", "76.00", "=IF(B7<0.9, penalty, 0)", "v7_final_FINAL.xlsx", "Amendment-03", "=VLOOKUP(A2, bal, 3)", "0.85", "14.00%", "=MIN(DSCR)", "#N/A", "2028-06-30"];
   const cells = document.getElementById("cells");
@@ -201,17 +202,38 @@
 
   const scenes = [...document.querySelectorAll(".scene")].map((el) => ({
     el, len: +el.dataset.dur, from: 0, to: 0, on: el.dataset.on || "", cue: el.dataset.cue || "",
-    shakes: (el.dataset.shake || "").split(",").filter(Boolean).map(Number), flash: Boolean(el.dataset.flash),
+    // where each word lands in the scene: nothing moves for it, the music is cut to these moments
+    hits: (el.dataset.hit || "").split(",").filter(Boolean).map(Number), flash: Boolean(el.dataset.flash),
     parts: [...el.querySelectorAll(".el")].map((p) => ({ el: p, at: +p.dataset.at, fx: p.dataset.fx, text: p.dataset.fx === "type" ? p.textContent : "", count: p.dataset.count || "" })),
     counts: [...el.querySelectorAll("b[data-count]")].map((b) => ({ el: b, key: b.dataset.count, at: +b.closest(".el").dataset.at })),
     marquee: [...el.querySelectorAll("[data-marquee]")],
+    shots: [...el.querySelectorAll(".shot")].map((box) => ({ box, img: box.querySelector("img"), speed: box.querySelector(".speed"), scrub: box.querySelector(".scrub"), clip: box.dataset.clip, shown: "" })),
   }));
+  // The dashboard footage (site/social/capture.mjs → footage/<clip>/f0001.jpg …, 50 frames to the
+  // second of the tour's own time). For each clip: the part of the screen shown wide and the part
+  // zoomed in on [x, y, width, height in the screen's own pixels], and the cut as segments
+  // [seconds of video, from and to in seconds of the clip, zoom 0 wide … 1 tight]: a segment that
+  // covers more of the clip than it lasts is fast motion, less is slow motion.
+  const F = window.FOOTAGE || null, SHOT_AT = 0.5;
+  const SHOTS = {
+    read: { wide: [0, 92, 1060, 657], tight: [300, 100, 760, 471], segs: [[0.7, 0.3, 2.45, 0], [2.4, 2.45, 3.65, 1], [0.4, 3.65, 3.85, 1]] },
+    track: { wide: [0, 40, 1060, 657], tight: [200, 205, 860, 533], segs: [[0.7, 0.2, 1.75, 0], [2.4, 1.75, 2.95, 1], [0.4, 2.95, 3.15, 1]] },
+    size: { wide: [0, 92, 1060, 657], tight: [230, 150, 830, 514], segs: [[0.6, 0.2, 1.5, 0], [2.6, 1.5, 2.8, 1], [0.7, 2.8, 4.9, 0], [2.8, 4.9, 6.3, 1], [0.8, 6.3, 6.7, 1]] },
+    price: { wide: [0, 92, 1060, 657], tight: [0, 150, 760, 471], segs: [[2.2, 0.3, 1.4, 1], [0.5, 1.4, 5.0, 0], [0.8, 5.0, 5.5, 0]] },
+    prove: { wide: [0, 96, 1060, 460], tight: [0, 96, 1060, 460], segs: [[1.6, 0.4, 1.3, 0], [1.0, 1.3, 4.5, 0], [0.9, 4.5, 4.9, 0]] },
+  };
+  const speedOf = ([d, a, b]) => (b - a) / d;
+  const kindOf = (seg) => (speedOf(seg) >= 1.5 ? "fast" : speedOf(seg) <= 0.75 ? "slow" : "");
+  const pad4 = (n) => String(n).padStart(4, "0");
+  for (const sc of scenes) for (const sh of sc.shots) { const w = SHOTS[sh.clip].wide; sh.box.style.height = `${Math.round((1000 * w[3]) / w[2])}px`; if (!F) sh.box.style.visibility = "hidden"; }
   let DUR = 0, COVER = 0;
   for (const sc of scenes) { sc.from = DUR; DUR += sc.len; sc.to = DUR; if (sc.el.dataset.cover) COVER = sc.from + +sc.el.dataset.cover; }
   DUR = Math.round(DUR * 100) / 100;
   const DURS = { slam: 0.34, rise: 0.5, pop: 0.55, wipe: 0.6, strike: 0.38, sweep: 0.5, fade: 0.4 };
 
+  // moves everything to the time t; resolves when the dashboard frame it calls for is decoded
   function seek(t) {
+    const pending = [];
     t = Math.max(0, Math.min(DUR - 1 / FPS, t));
     bar.style.width = `${(t / DUR) * 100}%`;
     let fl = 0;
@@ -223,10 +245,6 @@
       stage.classList.toggle("on-green", sc.on === "green");
       stage.classList.toggle("no-chrome", sc.on === "nochrome");
       if (sc.flash) fl = Math.max(fl, 0.75 * (1 - clamp(lt / 0.16)));
-      // the hit of each slam: a short, decaying shake of the whole scene
-      let dx = 0, dy = 0;
-      for (const s of sc.shakes) { const k = (lt - s) / 0.28; if (k >= 0 && k < 1) { const a = 20 * (1 - k) * (1 - k); dx += a * Math.sin(lt * 95); dy += a * Math.cos(lt * 71); } }
-      sc.el.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`;
       for (const p of sc.parts) {
         const st = p.el.style, d = p.fx === "type" ? Math.max(0.3, p.text.length * 0.024) : DURS[p.fx] || 0.4, k = clamp((lt - p.at) / d);
         if (lt < p.at && p.fx !== "sweep") { st.opacity = 0; continue; }
@@ -242,14 +260,34 @@
         if (p.count) p.el.textContent = fmt(N[p.count] * expo(clamp((lt - p.at) / 0.6)));
       }
       for (const c of sc.counts) c.el.textContent = fmt(N[c.key] * expo(clamp((lt - c.at) / 0.9)));
+      for (const sh of sc.shots) {
+        if (!F || !F.clips[sh.clip]) continue;
+        const spec = SHOTS[sh.clip], lt2 = lt - SHOT_AT, last = spec.segs[spec.segs.length - 1];
+        let acc = 0, ct = spec.segs[0][1], z = spec.segs[0][3], zPrev = spec.segs[0][3], kind = "", speed = 0;
+        for (const seg of spec.segs) {
+          const [d, a, b, zz] = seg;
+          if (lt2 < acc + d || seg === last) { const k = clamp((lt2 - acc) / d); ct = a + (b - a) * k; z = zPrev + (zz - zPrev) * inout(clamp((lt2 - acc) / 0.55)); kind = lt2 < 0 ? "" : kindOf(seg); speed = speedOf(seg); break; }
+          acc += d; zPrev = zz;
+        }
+        const r = spec.wide.map((v, i) => v + (spec.tight[i] - v) * z), sc1 = 1000 / r[2], meta = F.clips[sh.clip];
+        const frame = Math.max(1, Math.min(meta.frames, Math.round(ct * F.fps) + 1)), src = `${F.base}${sh.clip}/f${pad4(frame)}.jpg`;
+        if (sh.shown !== src) { sh.shown = src; sh.img.src = src; pending.push(sh.img.decode().catch(() => {})); }
+        sh.img.style.width = `${(meta.width * sc1).toFixed(2)}px`; sh.img.style.left = `${(-r[0] * sc1).toFixed(2)}px`; sh.img.style.top = `${(-r[1] * sc1).toFixed(2)}px`;
+        sh.speed.className = `speed ${kind}`; sh.speed.style.display = lt2 < 0 ? "none" : "";
+        sh.speed.textContent = kind === "fast" ? `▶▶ ×${Math.round(speed)}` : kind === "slow" ? `slow ×${speed.toFixed(1).replace(/\.0$/, "")}` : "▶ ×1";
+        sh.scrub.style.width = `${(100 * (ct - spec.segs[0][1])) / (last[2] - spec.segs[0][1])}%`;
+      }
       for (const m of sc.marquee) m.style.transform = `translateX(${(-((lt * +m.dataset.marquee) % 1400)).toFixed(2)}px)`;
       if (sc.el.contains(cells)) { const beat = Math.floor(lt * 7.5); cellEls.forEach((c, i) => { const r = rnd(i, beat); c.style.opacity = r > 0.86 ? 1 : 0.34; c.style.color = r > 0.955 ? "var(--bad)" : r > 0.86 ? "var(--ink)" : ""; }); }
     }
     flash.style.opacity = fl;
+    return Promise.all(pending);
   }
   window.seek = seek; window.DURATION = DUR; window.FPS = FPS; window.COVER = COVER;
   // what the music is written to (site/social/music.py): where each scene starts and where each slam lands
-  window.CUES = { dur: DUR, bpm: 120, scenes: scenes.map((sc) => ({ cue: sc.cue, from: sc.from, to: sc.to })), hits: scenes.flatMap((sc) => sc.shakes.map((x) => +(sc.from + x).toFixed(3))) };
+  window.CUES = { dur: DUR, bpm: 120, scenes: scenes.map((sc) => ({ cue: sc.cue, from: sc.from, to: sc.to })), hits: scenes.flatMap((sc) => sc.hits.map((x) => +(sc.from + x).toFixed(3))),
+    // where the footage changes speed: the sound effects are laid on these
+    fx: scenes.flatMap((sc) => sc.shots.flatMap((sh) => { let acc = 0, was = ""; return SHOTS[sh.clip].segs.map((seg) => { const e = { t: +(sc.from + SHOT_AT + acc).toFixed(3), kind: kindOf(seg), dur: seg[0], turn: kindOf(seg) !== was }; acc += seg[0]; was = e.kind; return e; }).filter((e) => e.kind && e.turn); })) };
   seek(0);
   // opened by a person: it plays, and plays again
   if (!new URLSearchParams(window.location.search).has("still")) { const t0 = performance.now(); const loop = (now) => { seek(((now - t0) / 1000) % (DUR + 1.5)); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }

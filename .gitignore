@@ -20,3 +20,6 @@ __pycache__/
 # Database backups on a VM
 backups/
 web/data/
+
+# the dashboard frames recorded for the LinkedIn animation (node site/social/capture.mjs)
+site/social/footage/
