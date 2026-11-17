@@ -1,7 +1,7 @@
 {
  "voice": "sage",
  "model": "gpt-4o-mini-tts",
- "recordedAt": "2026-11-16",
+ "recordedAt": "2026-11-17",
  "clips": {
   "upload": {
    "file": "upload-fdb75ef1.mp3",
@@ -67,6 +67,75 @@
    "file": "pack-cd092fe3.mp3",
    "bytes": 110397,
    "seconds": 18.4
+  }
+ },
+ "hi": {
+  "clips": {
+   "upload": {
+    "file": "upload-hi-98e12a32.mp3",
+    "bytes": 118173,
+    "seconds": 19.7
+   },
+   "read": {
+    "file": "read-hi-6af61188.mp3",
+    "bytes": 103773,
+    "seconds": 17.3
+   },
+   "amend": {
+    "file": "amend-hi-63702b92.mp3",
+    "bytes": 122925,
+    "seconds": 20.4
+   },
+   "conditions": {
+    "file": "conditions-hi-f9574d4a.mp3",
+    "bytes": 102333,
+    "seconds": 17
+   },
+   "team": {
+    "file": "team-hi-a7a87ef6.mp3",
+    "bytes": 122637,
+    "seconds": 20.4
+   },
+   "studio": {
+    "file": "studio-hi-0541c78b.mp3",
+    "bytes": 126813,
+    "seconds": 21.1
+   },
+   "size": {
+    "file": "size-hi-3dd67152.mp3",
+    "bytes": 145821,
+    "seconds": 24.3
+   },
+   "dispatch": {
+    "file": "dispatch-hi-9670246e.mp3",
+    "bytes": 117597,
+    "seconds": 19.6
+   },
+   "finance": {
+    "file": "finance-hi-d32ad075.mp3",
+    "bytes": 133149,
+    "seconds": 22.2
+   },
+   "whatif": {
+    "file": "whatif-hi-9c369bd1.mp3",
+    "bytes": 137613,
+    "seconds": 22.9
+   },
+   "wins": {
+    "file": "wins-hi-eae28a52.mp3",
+    "bytes": 125373,
+    "seconds": 20.9
+   },
+   "review": {
+    "file": "review-hi-93a89c20.mp3",
+    "bytes": 120621,
+    "seconds": 20.1
+   },
+   "pack": {
+    "file": "pack-hi-99d4d33d.mp3",
+    "bytes": 114285,
+    "seconds": 19
+   }
   }
  }
 }

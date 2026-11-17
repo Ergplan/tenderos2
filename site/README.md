@@ -145,3 +145,11 @@ are `display: contents`.
 Every row of the time chart carries two labels, "Before" with the time by hand and "With
 TenderOS" with the time in the product; once the chart is in view they light in turn while the
 bar between them closes up (off under reduced motion).
+
+## The narration in Hindi
+
+`src/narration.json` holds the tour's narration in English and, under `hi`, in Hindi (`say`
+respells a name for the voice only: SECI is said "seki"). `node site/voice.mjs` records both with
+the same OpenAI voice; the Hindi clips are `public/audio/<screen>-hi-<hash>.mp3`. The demo's
+language button (`#sim-lang`) switches the voice and the captions, and the choice is kept in the
+browser (`tos-lang`).

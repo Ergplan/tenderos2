@@ -298,7 +298,7 @@ From SECI's own result notices (https://www.seci.co.in/tenders/results), linked 
 No. The tour is a worked example on illustrative inputs for a 100 MW bid on SECI CfD-I. Every bid is tender-specific: the price follows your own costs, sites, financing and return. What the example shows is the method: a little own solar beats buying all the charging power, wind raises the price on this tender, and because Amendment-04 lets SECI cut the award to what its ₹76 crore corpus can carry, the bid is tested against the Pool as well as the model.
 
 ### Does the tour have a voice-over?
-Yes. Press Play with voice and each screen is narrated while the cursor drives it; the same words appear as captions, and the Voice button turns the sound off. The narration is an AI-generated voice.
+Yes. Press Play with voice and each screen is narrated while the cursor drives it; the same words appear as captions, and the Voice button turns the sound off. The narration and its captions are in English or, with the language button, in Hindi. The narration is an AI-generated voice.
 
 ### How does it keep up with new tenders and amendments?
 Every day the tender lists of SECI and NHPC and each open tender's page are read, without opening a document, and compared with the day before: a new tender, an amendment or corrigendum, a moved deadline or a result notice is reported, and the drawing at the top of this page is redrawn from the tenders open that day.

@@ -2,7 +2,8 @@
 //
 //   node site/voice.mjs [--all]
 //
-// Text, voice and delivery are in site/src/narration.json. A clip is recorded again only when its
+// Text, voice and delivery are in site/src/narration.json: English at the top, Hindi under "hi"
+// (its clips are named <screen>-hi-<hash>.mp3). A clip is recorded again only when its
 // text, the voice, the model or the instructions change (the file name carries their hash);
 // --all records every clip. The key comes from OPENAI_API_KEY, or from the session's network
 // proxy when that holds it. The site never calls OpenAI: the MP3s are committed in public/audio.
@@ -17,13 +18,16 @@ const OUT = join(HERE, "public/audio");
 const N = JSON.parse(readFileSync(join(HERE, "src/narration.json"), "utf8"));
 const all = process.argv.includes("--all");
 mkdirSync(OUT, { recursive: true });
-const manifest = { voice: N.voice, model: N.model, recordedAt: new Date().toISOString().slice(0, 10), clips: {} };
+const manifest = { voice: N.voice, model: N.model, recordedAt: new Date().toISOString().slice(0, 10), clips: {}, hi: { clips: {} } };
 let made = 0;
-for (const [id, text] of Object.entries(N.clips)) {
-  const hash = createHash("sha1").update(`${N.model}|${N.voice}|${N.instructions}|${text}`).digest("hex").slice(0, 8);
-  const file = `${id}-${hash}.mp3`, path = join(OUT, file);
+// "say" respells a name for the voice only (the caption keeps the written form): SECI is said "seki"
+const LANGS = [["", N.instructions, N.clips, manifest.clips, {}], ["hi", N.hi?.instructions, N.hi?.clips || {}, manifest.hi.clips, N.hi?.say || {}]];
+for (const [lang, instructions, clips, into, say] of LANGS) for (const [id, written] of Object.entries(clips)) {
+  const text = Object.entries(say).reduce((t, [a, b]) => t.replaceAll(a, b), written);
+  const hash = createHash("sha1").update(`${N.model}|${N.voice}|${instructions}|${text}`).digest("hex").slice(0, 8);
+  const file = `${id}-${lang ? `${lang}-` : ""}${hash}.mp3`, path = join(OUT, file);
   if (all || !existsSync(path) || statSync(path).size < 2000) {
-    const body = JSON.stringify({ model: N.model, voice: N.voice, input: text, instructions: N.instructions, response_format: "mp3" });
+    const body = JSON.stringify({ model: N.model, voice: N.voice, input: text, instructions, response_format: "mp3" });
     execFileSync("curl", ["-sS", "--fail-with-body", "-m", "120", "https://api.openai.com/v1/audio/speech", "-H", `Authorization: Bearer ${process.env.OPENAI_API_KEY || "proxy-injected"}`, "-H", "Content-Type: application/json", "-d", body, "-o", path], { stdio: ["ignore", "inherit", "inherit"] });
     if (statSync(path).size < 2000) throw new Error(`${id}: the API did not return audio (${readFileSync(path, "utf8").slice(0, 200)})`);
     // speech needs no more than 48 kbit/s mono: a quarter of the size the API returns
@@ -33,9 +37,9 @@ for (const [id, text] of Object.entries(N.clips)) {
   }
   let seconds = null;
   try { seconds = Math.round(Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path], { encoding: "utf8" })) * 10) / 10; } catch (e) { /* no ffprobe: the player waits for the clip to end anyway */ }
-  manifest.clips[id] = { file, bytes: statSync(path).size, seconds };
+  into[id] = { file, bytes: statSync(path).size, seconds };
 }
-const keep = new Set(Object.values(manifest.clips).map((c) => c.file));
+const keep = new Set([...Object.values(manifest.clips), ...Object.values(manifest.hi.clips)].map((c) => c.file));
 for (const f of readdirSync(OUT)) if (f.endsWith(".mp3") && !keep.has(f)) rmSync(join(OUT, f));
 writeFileSync(join(HERE, "data-src/voice.json"), JSON.stringify(manifest, null, 1));
-console.log(`voice: ${Object.keys(manifest.clips).length} clips, ${made} recorded now, voice "${N.voice}" (${N.model})`);
+console.log(`voice: ${Object.keys(manifest.clips).length} English and ${Object.keys(manifest.hi.clips).length} Hindi clips, ${made} recorded now, voice "${N.voice}" (${N.model})`);

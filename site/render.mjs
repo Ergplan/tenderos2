@@ -273,6 +273,15 @@ try {
   check(await vo.locator("#sim-voice").getAttribute("aria-pressed") === "true" && asked.some((n) => n.startsWith("upload-")), `voice: not playing the first clip (${asked.join(", ") || "no clip requested"})`);
   check(await vo.locator("#sim-caption").isVisible() && (await vo.locator("#sim-caption-text").textContent()).includes("Contract for Difference"), "voice: no caption");
   if (SHOTS) await vo.locator("#sim").screenshot({ path: join(SHOTS, "voice-caption.png") });
+  // the same tour in Hindi: the button switches the narration and the captions, and the choice is kept
+  await vo.locator("#sim-lang").click();
+  await vo.waitForTimeout(900);
+  const askedHi = await vo.evaluate(() => performance.getEntriesByType("resource").filter((r) => r.name.includes("/audio/")).map((r) => r.name.split("/").pop()));
+  check(/[\u0900-\u097F]{3}/.test(await vo.locator("#sim-caption-text").textContent()) && askedHi.some((n) => n.includes("-hi-")) && (await vo.locator("#sim-lang").textContent()) === "English" && await vo.evaluate(() => localStorage.getItem("tos-lang")) === "hi", `voice: Hindi did not take (${askedHi.filter((n) => n.includes("-hi-")).join(", ") || "no Hindi clip requested"})`);
+  check(Object.values(data.narration).every((n) => n.hi && n.hi.src && n.hi.seconds > 3), "voice: a screen has no Hindi clip");
+  if (SHOTS) await vo.locator("#sim").screenshot({ path: join(SHOTS, "voice-caption-hindi.png") });
+  await vo.locator("#sim-lang").click();
+  check((await vo.locator("#sim-lang").textContent()) === "हिन्दी" && await vo.locator("#sim-caption-text").getAttribute("lang") === "en", "voice: the language did not switch back to English");
   await vo.locator("#sim-voice").click();
   check(await vo.locator("#sim-voice").getAttribute("aria-pressed") === "false", "voice: the button did not turn it off");
   await vo.close();
@@ -333,4 +342,4 @@ try {
   server.close();
 }
 if (errors.length) { console.error("render: FAILED\n  " + errors.join("\n  ")); process.exit(1); }
-console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, visit analytics and personal links, the chat box, the time chart's labels, day mode, and the phone layout (one screen, panes) all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);
+console.log(`render: 13 screens, studio, what-if, guided tour, voice-over in English and Hindi, market feed, visit analytics and personal links, the chat box, the time chart's labels, day mode, and the phone layout (one screen, panes) all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);

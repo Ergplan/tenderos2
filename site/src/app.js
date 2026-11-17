@@ -720,10 +720,25 @@
   const voiceBtn = $("#sim-voice"), capBox = $("#sim-caption"), capText = $("#sim-caption-text");
   let voice = false, voiceChosen = false, wantVoice = false, capRoll = null;
   const hasVoice = () => Object.values(D.narration || {}).some((n) => n.src);
+  // the narration and its captions in English or in Hindi; the choice is kept for the next visit
+  const langBtn = $("#sim-lang");
+  let lang = "en";
+  try { if (localStorage.getItem("tos-lang") === "hi") lang = "hi"; } catch (e) { /* private mode: English */ }
+  const narr = (id) => { const n = D.narration?.[id]; return lang === "hi" && n?.hi ? n.hi : n; };
+  const hasHindi = () => Object.values(D.narration || {}).some((n) => n.hi?.src);
+  const setLang = (to) => {
+    lang = to === "hi" && hasHindi() ? "hi" : "en";
+    capText.lang = lang === "hi" ? "hi" : "en";
+    if (!langBtn) return;
+    // the button names the language it switches to, in that language
+    langBtn.textContent = lang === "hi" ? "English" : "हिन्दी"; langBtn.lang = lang === "hi" ? "en" : "hi";
+    langBtn.title = lang === "hi" ? "Narrate in English" : "Narrate in Hindi";
+    langBtn.setAttribute("aria-label", lang === "hi" ? "Narration language: Hindi. Switch to English" : "Narration language: English. Switch to Hindi");
+  };
   const setVoice = (on) => { voice = Boolean(on) && hasVoice(); voiceBtn.setAttribute("aria-pressed", String(voice)); voiceBtn.classList.toggle("on", voice); voiceBtn.classList.remove("nudge"); voiceBtn.title = voice ? "Turn the voice-over off" : "Turn the voice-over on"; if (!voice) audio.pause(); };
   // one screen's narration: resolves when the clip ends, fails to start, or the screen is left
   const speak = (id, t) => new Promise((res) => {
-    const n = D.narration?.[id];
+    const n = narr(id);
     if (!voice || !n?.src) { res(); return; }
     const done = () => { audio.onended = null; audio.onerror = null; res(); };
     audio.onended = done; audio.onerror = done;
@@ -736,7 +751,7 @@
   function show(k, auto) {
     kill();
     cur = (k + panels.length) % panels.length;
-    const id = idOf(cur), p = panels[cur], n = D.narration?.[id];
+    const id = idOf(cur), p = panels[cur], n = D ? narr(id) : null;
     railTabs.forEach((b, i) => { b.setAttribute("aria-selected", String(i === cur)); b.classList.toggle("done", i < cur); b.tabIndex = i === cur ? 0 : -1; });
     rail.scrollTo({ left: railTabs[cur].offsetLeft - rail.clientWidth / 2 + railTabs[cur].clientWidth / 2, behavior: reduce ? "auto" : "smooth" });
     panels.forEach((x, i) => { x.hidden = i !== cur; x.classList.remove("play", "staged"); });
@@ -798,6 +813,7 @@
     show(0, false);
     setPlayLabel();
     voiceBtn.hidden = !hasVoice();
+    if (langBtn) { langBtn.hidden = !hasHindi(); setLang(lang); langBtn.addEventListener("click", () => { setLang(lang === "hi" ? "en" : "hi"); try { localStorage.setItem("tos-lang", lang); } catch (e) { /* this visit only */ } track("Narration language", { language: lang === "hi" ? "Hindi" : "English" }); if (playing) show(cur, true); }); }
     heroRotator();
     playBtn.addEventListener("click", () => { if (playing) pause(false); else { toSim(); play(true); } });
     document.querySelectorAll("#tour-routes button").forEach((b) => b.addEventListener("click", () => {

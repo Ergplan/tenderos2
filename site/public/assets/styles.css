@@ -622,3 +622,9 @@ html.snap-tour { scroll-snap-type: y proximity; scroll-padding-top: calc(var(--t
 .sim.phone .tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
 .sim.phone .sd-controls { margin-bottom: 10px; } .sim.phone .sd-read { grid-template-columns: 1fr 1fr; gap: 8px; } .sim.phone .sd-iso { height: 200px; } .sim.phone .sd-iso svg { max-height: 190px; }
 .sim.phone .pack { grid-template-columns: 1fr 1fr; gap: 8px; } .sim.phone .pack li span { display: none; } .sim.phone .stage .cta-row { margin-top: 10px; gap: 8px; } .sim.phone .stage .cta-row .btn { padding: 10px 12px; font-size: .68rem; }
+
+/* the narration's language button, and Hindi captions */
+.sim-ctl .lang { font-family: var(--sans); font-weight: 600; letter-spacing: 0; font-size: .8rem; }
+.sim-caption p:lang(hi) { font-family: "Noto Sans Devanagari", "Kohinoor Devanagari", "Nirmala UI", var(--sans); line-height: 1.6; }
+/* the caption keeps clear of the chat button in the corner */
+@media (min-width: 861px) { .sim-caption p { max-width: min(1000px, calc(100% - 360px)); } }
