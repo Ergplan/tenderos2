@@ -1,5 +1,5 @@
 {
- "scannedAt": "2026-11-16T18:23:55",
+ "scannedAt": "2026-11-17T01:49:09",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -38,7 +38,7 @@
    "firstSeen": "2026-09-02",
    "status": "open",
    "lastAmendment": "2026-10-19",
-   "daysToBid": -10
+   "daysToBid": -11
   },
   {
    "source": "SECI",
@@ -56,7 +56,7 @@
    },
    "scheme": "C&I-1",
    "ipp": true,
-   "summary": "Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 16 Nov 2026, 18:00. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 19 Nov 2026, 10:00.",
+   "summary": "Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 16 Nov 2026, 18:00, already closed. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 19 Nov 2026, 10:00.",
    "documents": 7,
    "amendments": [
     {
@@ -72,7 +72,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 0
+   "daysToBid": -1
   },
   {
    "source": "SECI",
@@ -98,7 +98,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 3
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -146,7 +146,7 @@
    "firstSeen": "2026-04-19",
    "status": "amended",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -180,7 +180,7 @@
    "firstSeen": "2026-07-16",
    "status": "open",
    "lastAmendment": "2026-09-28",
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -210,7 +210,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -235,7 +235,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -260,7 +260,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -295,7 +295,7 @@
    "firstSeen": "2026-10-01",
    "status": "amended",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 9
+   "daysToBid": 8
   },
   {
    "source": "SECI",
@@ -327,7 +327,7 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 9
+   "daysToBid": 8
   },
   {
    "source": "SECI",
@@ -350,7 +350,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 14
+   "daysToBid": 13
   },
   {
    "source": "SECI",
@@ -382,7 +382,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 15
+   "daysToBid": 14
   },
   {
    "source": "SECI",
@@ -407,7 +407,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 15
+   "daysToBid": 14
   },
   {
    "source": "SECI",
@@ -432,7 +432,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 17
+   "daysToBid": 16
   },
   {
    "source": "SECI",
@@ -455,7 +455,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 28
+   "daysToBid": 27
   },
   {
    "source": "NHPC",
@@ -480,7 +480,7 @@
    "firstSeen": "2026-11-04",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 29
+   "daysToBid": 28
   }
  ],
  "results": [
@@ -1060,6 +1060,6 @@
   "ipp": 12,
   "seci": 15,
   "nhpc": 1,
-  "newToday": 1
+  "newToday": 0
  }
 }
