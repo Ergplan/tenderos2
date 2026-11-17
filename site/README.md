@@ -119,3 +119,12 @@ that fails does not fail the save. The function takes requests from the
 site's own pages only, limits a conversation to 30 messages of 1,500 characters and drops
 anything that fills the hidden spam field. Analytics records that the chat was opened and used,
 never what was written.
+
+## The LinkedIn animation
+
+`social/linkedin.html` is a 32.5-second, 1080 × 1350 animation (opened in a browser, it plays).
+`node site/social/render.mjs` steps through it frame by frame, has `social/music.py` write the
+soundtrack to the animation's own cue points (an original synthesised track: nothing to license;
+`--music FILE` uses another track instead) and writes `public/social/tenderos-linkedin.mp4`, the
+cover `tenderos-linkedin.jpg` and the music alone as `tenderos-linkedin-music.mp3`. The figures
+in it are read from `public/data/demo.json`.

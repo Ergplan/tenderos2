@@ -1,0 +1,259 @@
+<!doctype html>
+<!-- The LinkedIn animation for TenderOS: 1080 × 1350 (4:5), 32.5 seconds, 30 frames a second, cut on a
+     120-beats-a-minute grid so that the music (site/social/music.py) hits with the picture.
+     Every frame is a function of the time alone (window.seek(seconds)), so site/social/render.mjs
+     can step through it and write an MP4; opened in a browser it simply plays. The figures are the
+     site's own (site/public/data/demo.json): render.mjs passes them in and fails if one is missing. -->
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<title>TenderOS: months of bid work, done in hours</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter+Tight:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="../src/iso.css">
+<style>
+  :root { --bg: #141517; --bg-soft: #18191c; --panel: #1e1f22; --ink: #efeeeb; --body: #cbcac6; --dim: #939190; --line: #2e3033; --line-2: #414347;
+    --power: #3dd68c; --power-ink: #06110b; --heat: #f2994a; --data: #5b8def; --accent: #5cc3b8; --gold: #b8962e; --evidence: #c9a43a; --violet: #9b87f5; --bad: #ff6b5b;
+    --sans: "Inter Tight", "Helvetica Neue", Arial, sans-serif; --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #000; }
+  #stage { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: var(--bg); color: var(--ink); font-family: var(--sans); text-transform: uppercase; font-weight: 800; letter-spacing: -.035em; line-height: .86; }
+  .scene { position: absolute; inset: 0; padding: 150px 70px 120px; display: none; flex-direction: column; justify-content: center; will-change: transform; }
+  .scene.grid { background-image: linear-gradient(90deg, #1e2023 2px, transparent 2px); background-size: 180px 100%; background-position: 70px 0; }
+  .el { will-change: transform, opacity; transform-origin: 0 60%; }
+  .mono { font: 600 30px/1.3 var(--mono); letter-spacing: .16em; color: var(--dim); }
+  .green { color: var(--power); } .gold { color: var(--evidence); } .teal { color: var(--accent); } .blue { color: var(--data); } .heat { color: var(--heat); } .dimmed { color: var(--dim); }
+
+  /* the chrome that stays: the name, the maker, the address, the time bar */
+  .chrome { position: absolute; left: 70px; right: 70px; z-index: 20; display: flex; justify-content: space-between; align-items: baseline; font: 600 26px var(--mono); letter-spacing: .14em; color: var(--dim); }
+  .chrome.top { top: 62px; } .chrome.bottom { bottom: 58px; }
+  .chrome .brand { font: 700 44px var(--sans); letter-spacing: -.035em; text-transform: none; color: var(--ink); } .chrome .brand i { font-style: normal; color: var(--evidence); }
+  #bar { position: absolute; left: 0; bottom: 0; height: 12px; background: var(--power); z-index: 21; }
+  #stage.on-green .chrome, #stage.on-green .chrome .brand, #stage.on-green .chrome .brand i { color: var(--power-ink); } #stage.on-green #bar { background: var(--power-ink); }
+  #stage.no-chrome .chrome.top { opacity: 0; }
+  #flash { position: absolute; inset: 0; background: #fff; opacity: 0; z-index: 30; pointer-events: none; }
+
+  /* 1: the tender drops */
+  .drop { display: flex; align-items: flex-end; gap: 34px; margin-top: 46px; }
+  .drop .n { font-size: 250px; color: var(--power); font-variant-numeric: tabular-nums; min-width: 450px; }
+  .drop .w { font-size: 64px; line-height: .92; padding-bottom: 26px; }
+  .opener { font-size: 236px; }
+  /* 2: months */
+  .cells { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 90px; font: 500 22px var(--mono); letter-spacing: 0; color: var(--dim); text-transform: none; }
+  .cells span { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 30px 14px; white-space: nowrap; overflow: hidden; opacity: .5; }
+  .months { position: relative; font-size: 220px; margin-top: 30px; align-self: flex-start; }
+  .months .strike { position: absolute; left: -24px; right: -24px; top: 44%; height: 34px; background: var(--bad); transform-origin: 0 50%; }
+  .big2 { font-size: 132px; margin-top: 18px; }
+  .back { margin-top: 56px; color: var(--bad); }
+  .cells ~ .mono { align-self: flex-start; background: var(--bg); padding: 6px 14px; margin-left: -14px; position: relative; }
+  .cells ~ .el { position: relative; }
+  /* 3: done in hours */
+  .scene.green-bg { background: var(--power); color: var(--power-ink); }
+  .done1 { font-size: 236px; } .done2 { font-size: 266px; margin-top: 10px; }
+  .band { position: absolute; left: -200px; right: -200px; bottom: 190px; height: 120px; background: var(--power-ink); color: var(--power); transform: rotate(-5deg); overflow: hidden; display: flex; align-items: center; }
+  .band div { white-space: nowrap; font-size: 76px; letter-spacing: -.02em; will-change: transform; }
+  /* 4: the five beats */
+  .beat .idx { position: absolute; right: 50px; top: 120px; font-size: 420px; line-height: .8; color: transparent; -webkit-text-stroke: 4px var(--line-2); letter-spacing: -.05em; }
+  .beat .verb { font-size: 268px; }
+  .beat .num { font-size: 168px; margin-top: 44px; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; white-space: nowrap; }
+  .beat .num small { font-size: 46px; letter-spacing: -.02em; color: var(--body); margin-left: 20px; }
+  .beat .say { font-size: 64px; line-height: .98; margin-top: 30px; color: var(--body); max-width: 900px; letter-spacing: -.03em; }
+  .beat .rule { height: 14px; width: 940px; margin-top: 44px; transform-origin: 0 50%; }
+  .beat.c1 .verb, .beat.c1 .num b { color: var(--power); } .beat.c1 .rule { background: var(--power); }
+  .beat.c2 .verb, .beat.c2 .num b { color: var(--evidence); } .beat.c2 .rule { background: var(--evidence); }
+  .beat.c3 .verb, .beat.c3 .num b { color: var(--data); } .beat.c3 .rule { background: var(--data); }
+  .beat.c4 .verb, .beat.c4 .num b { color: var(--heat); } .beat.c4 .rule { background: var(--heat); }
+  .beat.c5 .verb, .beat.c5 .num b { color: var(--accent); } .beat.c5 .rule { background: var(--accent); }
+  .beat .num b { font-weight: 800; }
+  .curtain { position: absolute; inset: 0; z-index: 10; }
+  .c1 .curtain { background: var(--power); } .c2 .curtain { background: var(--evidence); } .c3 .curtain { background: var(--data); } .c4 .curtain { background: var(--heat); } .c5 .curtain { background: var(--accent); }
+  .plant { width: 1000px; margin: 26px 0 0 -30px; } .plant svg text { display: none; }
+  .beat.c3 .verb { font-size: 250px; } .beat.c3 .num { font-size: 150px; margin-top: 22px; } .beat.c3 .say { font-size: 56px; margin-top: 18px; }
+  /* 5: on your premises */
+  .frame { position: absolute; inset: 150px 44px 132px; border: 12px solid var(--evidence); }
+  .prem { font-size: 142px; padding: 0 36px; } .prem + .prem { margin-top: 12px; }
+  .zones { margin: 60px 36px 0; color: var(--body); font-size: 27px; }
+  /* 6: the name */
+  .scene.end { align-items: flex-start; }
+  .logo { font: 700 212px/1 var(--sans); letter-spacing: -.045em; text-transform: none; transform-origin: 0 50%; } .logo i { font-style: normal; color: var(--evidence); }
+  .kick { font-size: 80px; line-height: .95; color: var(--evidence); margin-top: 34px; max-width: 940px; }
+  .line2 { font-size: 58px; margin-top: 30px; } .line2 em { font-style: normal; color: var(--power); }
+  .cta { margin-top: 70px; background: var(--power); color: var(--power-ink); font: 600 44px var(--mono); letter-spacing: .06em; padding: 30px 36px; }
+  .tel { margin-top: 30px; font: 600 40px var(--mono); letter-spacing: .08em; color: var(--ink); }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="chrome top"><span class="brand"><i>Tender</i>OS</span><span>by jouleWise</span></div>
+
+  <section class="scene grid open" data-dur="1" data-cue="open" data-shake="0">
+    <div class="opener">A tender<br><span class="green">drops.</span></div>
+  </section>
+
+  <section class="scene grid" data-dur="4" data-cue="intro" data-shake="0.5,1.5,2.5">
+    <p class="el mono" data-at="0.05" data-fx="type">SECI CfD-I. One real tender:</p>
+    <div class="drop"><span class="el n" data-at="0.5" data-fx="slam" data-count="pages">0</span><span class="el w" data-at="0.65" data-fx="rise">pages</span></div>
+    <div class="drop"><span class="el n" data-at="1.5" data-fx="slam" data-count="changes">0</span><span class="el w" data-at="1.65" data-fx="rise">amendment<br>changes</span></div>
+    <div class="drop"><span class="el n" data-at="2.5" data-fx="slam" data-count="conditions">0</span><span class="el w" data-at="2.65" data-fx="rise">conditions</span></div>
+  </section>
+
+  <section class="scene" data-dur="4" data-cue="build" data-shake="0.5,2">
+    <div class="cells" id="cells"></div>
+    <p class="el mono" data-at="0.05" data-fx="type">For a bid team, that is</p>
+    <div class="el months" data-at="0.5" data-fx="slam">Months<span class="el strike" data-at="2" data-fx="strike"></span></div>
+    <div class="el big2" data-at="1.0" data-fx="rise">of bid work.</div>
+    <p class="el mono back" data-at="2.25" data-fx="type">And one amendment sends it back to the start.</p>
+  </section>
+
+  <section class="scene green-bg" data-cover="2.4" data-dur="3" data-cue="drop" data-shake="0,0.5" data-flash="1" data-on="green">
+    <div class="el done1" data-at="0" data-fx="slam">Done in</div>
+    <div class="el done2" data-at="0.5" data-fx="slam">hours.</div>
+    <div class="band"><div data-marquee="230">TenderOS · read · track · size · price · prove · TenderOS · read · track · size · price · prove · TenderOS · read · track · size · price · prove ·&nbsp;</div></div>
+  </section>
+
+  <section class="scene grid beat c1" data-dur="2.5" data-cue="beat" data-shake="0.5">
+    <div class="curtain el" data-at="0" data-fx="sweep"></div>
+    <span class="idx">01</span>
+    <div class="el verb" data-at="0.5" data-fx="slam">Read</div>
+    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="conditions">0</b><small>conditions</small></div>
+    <div class="el rule" data-at="0.85" data-fx="strike"></div>
+    <p class="el say" data-at="1" data-fx="rise">Each with its page and its quote.</p>
+  </section>
+
+  <section class="scene grid beat c2" data-dur="2.5" data-cue="beat" data-shake="0.5">
+    <div class="curtain el" data-at="0" data-fx="sweep"></div>
+    <span class="idx">02</span>
+    <div class="el verb" data-at="0.5" data-fx="slam">Track</div>
+    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="changes">0</b><small>amendment changes</small></div>
+    <div class="el rule" data-at="0.85" data-fx="strike"></div>
+    <p class="el say" data-at="1" data-fx="rise">Was and now. Word by word.</p>
+  </section>
+
+  <section class="scene grid beat c3" data-dur="2.5" data-cue="beat" data-shake="0.5">
+    <div class="curtain el" data-at="0" data-fx="sweep"></div>
+    <span class="idx">03</span>
+    <div class="el verb" data-at="0.5" data-fx="slam">Size</div>
+    <div class="el plant" id="plant" data-at="0.7" data-fx="wipe"></div>
+    <div class="el num" data-at="1" data-fx="rise"><b data-count="sims">0</b><small>simulations</small></div>
+    <p class="el say" data-at="1.2" data-fx="rise">Solar, wind and battery. Each run over 15 years.</p>
+  </section>
+
+  <section class="scene grid beat c4" data-dur="2.5" data-cue="beat" data-shake="0.5">
+    <div class="curtain el" data-at="0" data-fx="sweep"></div>
+    <span class="idx">04</span>
+    <div class="el verb" data-at="0.5" data-fx="slam">Price</div>
+    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="pricings">0</b><small>financial models</small></div>
+    <div class="el rule" data-at="0.85" data-fx="strike"></div>
+    <p class="el say" data-at="1" data-fx="rise">Simulated and priced in <span data-text="seconds"></span> seconds.</p>
+  </section>
+
+  <section class="scene grid beat c5" data-dur="2.5" data-cue="beat" data-shake="0.5">
+    <div class="curtain el" data-at="0" data-fx="sweep"></div>
+    <span class="idx">05</span>
+    <div class="el verb" data-at="0.5" data-fx="slam">Prove</div>
+    <div class="el num" data-at="0.75" data-fx="rise"><b data-count="blocks">0</b><small>blocks a year</small></div>
+    <div class="el rule" data-at="0.85" data-fx="strike"></div>
+    <p class="el say" data-at="1" data-fx="rise">Every condition checked, every 15 minutes.</p>
+  </section>
+
+  <section class="scene" data-dur="3.5" data-cue="premises" data-shake="0.5,1,1.5">
+    <div class="el frame" data-at="0" data-fx="fade"></div>
+    <div class="el prem" data-at="0.5" data-fx="slam">Your bid</div>
+    <div class="el prem gold" data-at="1" data-fx="slam">never leaves</div>
+    <div class="el prem" data-at="1.5" data-fx="slam">your premises.</div>
+    <p class="el mono zones" data-at="1.8" data-fx="type">Runs on your own servers. No bid data in the cloud.</p>
+  </section>
+
+  <section class="scene grid end" data-dur="4.5" data-cue="end" data-shake="0" data-flash="1" data-on="nochrome">
+    <div class="el logo" data-at="0" data-fx="pop"><i>Tender</i>OS</div>
+    <div class="el kick" data-at="0.5" data-fx="rise">The platform every IPP was waiting for</div>
+    <div class="el line2" data-at="0.85" data-fx="rise">Months of bid work. <em>Done in hours.</em></div>
+    <div class="el cta" data-at="1.2" data-fx="wipe">tenderos.joulewise.tech</div>
+    <div class="el tel" data-at="1.5" data-fx="rise">Book a demo · +91 87967 92724</div>
+  </section>
+
+  <div class="chrome bottom"><span>tenderos.joulewise.tech</span><span>RE tenders · India</span></div>
+  <div id="bar"></div>
+  <div id="flash"></div>
+</div>
+<script src="../src/iso.js"></script>
+<script>
+(() => {
+  "use strict";
+  const FPS = 30;
+  // the site's own figures; render.mjs replaces these from demo.json before the first frame
+  const N = Object.assign({ pages: 216, changes: 40, conditions: 262, sims: 140, pricings: 1713, seconds: 101, blocks: 35040 }, window.FIGURES || {});
+  const stage = document.getElementById("stage"), bar = document.getElementById("bar"), flash = document.getElementById("flash");
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  const out = (p) => 1 - Math.pow(1 - p, 3), expo = (p) => (p >= 1 ? 1 : 1 - Math.pow(2, -10 * p)), inout = (p) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+  const back = (p) => 1 + 2.70158 * Math.pow(p - 1, 3) + 1.70158 * Math.pow(p - 1, 2);
+  const rnd = (i, k) => { const x = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return x - Math.floor(x); };
+  const fmt = (n) => Math.round(n).toLocaleString("en-IN");
+
+  document.querySelectorAll("[data-text]").forEach((n) => { n.textContent = fmt(N[n.dataset.text]); });
+  document.getElementById("plant").innerHTML = window.TOSIso.plant({ kind: "cfd", solarMw: 24, windMw: 15, bessMwh: 200, text: { title: "A hybrid plant: solar, wind and battery" } });
+  // the spreadsheet behind "months": cells of the kind a bid team lives in
+  const CELL = ["=SUM(F4:F368)", "0.9184", "0.1300", "=IRR(C9:AB9)", "1.20", "35,040", "=NPV(r, D4:D28)", "#REF!", "76.00", "=IF(B7<0.9, penalty, 0)", "v7_final_FINAL.xlsx", "Amendment-03", "=VLOOKUP(A2, bal, 3)", "0.85", "14.00%", "=MIN(DSCR)", "#N/A", "2028-06-30"];
+  const cells = document.getElementById("cells");
+  for (let i = 0; i < 90; i += 1) { const s = document.createElement("span"); s.textContent = CELL[Math.floor(rnd(i, 3) * CELL.length)]; cells.appendChild(s); }
+  const cellEls = [...cells.children];
+
+  const scenes = [...document.querySelectorAll(".scene")].map((el) => ({
+    el, len: +el.dataset.dur, from: 0, to: 0, on: el.dataset.on || "", cue: el.dataset.cue || "",
+    shakes: (el.dataset.shake || "").split(",").filter(Boolean).map(Number), flash: Boolean(el.dataset.flash),
+    parts: [...el.querySelectorAll(".el")].map((p) => ({ el: p, at: +p.dataset.at, fx: p.dataset.fx, text: p.dataset.fx === "type" ? p.textContent : "", count: p.dataset.count || "" })),
+    counts: [...el.querySelectorAll("b[data-count]")].map((b) => ({ el: b, key: b.dataset.count, at: +b.closest(".el").dataset.at })),
+    marquee: [...el.querySelectorAll("[data-marquee]")],
+  }));
+  let DUR = 0, COVER = 0;
+  for (const sc of scenes) { sc.from = DUR; DUR += sc.len; sc.to = DUR; if (sc.el.dataset.cover) COVER = sc.from + +sc.el.dataset.cover; }
+  DUR = Math.round(DUR * 100) / 100;
+  const DURS = { slam: 0.34, rise: 0.5, pop: 0.55, wipe: 0.6, strike: 0.38, sweep: 0.5, fade: 0.4 };
+
+  function seek(t) {
+    t = Math.max(0, Math.min(DUR - 1 / FPS, t));
+    bar.style.width = `${(t / DUR) * 100}%`;
+    let fl = 0;
+    for (const sc of scenes) {
+      const on = t >= sc.from && t < sc.to;
+      sc.el.style.display = on ? "flex" : "none";
+      if (!on) continue;
+      const lt = t - sc.from;
+      stage.classList.toggle("on-green", sc.on === "green");
+      stage.classList.toggle("no-chrome", sc.on === "nochrome");
+      if (sc.flash) fl = Math.max(fl, 0.75 * (1 - clamp(lt / 0.16)));
+      // the hit of each slam: a short, decaying shake of the whole scene
+      let dx = 0, dy = 0;
+      for (const s of sc.shakes) { const k = (lt - s) / 0.28; if (k >= 0 && k < 1) { const a = 20 * (1 - k) * (1 - k); dx += a * Math.sin(lt * 95); dy += a * Math.cos(lt * 71); } }
+      sc.el.style.transform = `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`;
+      for (const p of sc.parts) {
+        const st = p.el.style, d = p.fx === "type" ? Math.max(0.3, p.text.length * 0.024) : DURS[p.fx] || 0.4, k = clamp((lt - p.at) / d);
+        if (lt < p.at && p.fx !== "sweep") { st.opacity = 0; continue; }
+        st.opacity = 1;
+        if (p.fx === "slam") { st.opacity = clamp(k * 5); st.transform = `scale(${(2.3 - 1.3 * expo(k)).toFixed(4)})`; }
+        else if (p.fx === "rise") { st.opacity = out(k); st.transform = `translateY(${(70 * (1 - out(k))).toFixed(2)}px)`; }
+        else if (p.fx === "pop") { st.opacity = clamp(k * 4); st.transform = `scale(${(0.5 + 0.5 * back(k)).toFixed(4)})`; }
+        else if (p.fx === "wipe") st.clipPath = `inset(0 ${(100 * (1 - out(k))).toFixed(2)}% 0 0)`;
+        else if (p.fx === "strike") st.transform = `scaleX(${expo(k).toFixed(4)})`;
+        else if (p.fx === "sweep") st.transform = `translateY(${(-100 * inout(k)).toFixed(2)}%)`;
+        else if (p.fx === "fade") st.opacity = out(k);
+        else if (p.fx === "type") p.el.textContent = p.text.slice(0, Math.ceil(p.text.length * k));
+        if (p.count) p.el.textContent = fmt(N[p.count] * expo(clamp((lt - p.at) / 0.6)));
+      }
+      for (const c of sc.counts) c.el.textContent = fmt(N[c.key] * expo(clamp((lt - c.at) / 0.9)));
+      for (const m of sc.marquee) m.style.transform = `translateX(${(-((lt * +m.dataset.marquee) % 1400)).toFixed(2)}px)`;
+      if (sc.el.contains(cells)) { const beat = Math.floor(lt * 7.5); cellEls.forEach((c, i) => { const r = rnd(i, beat); c.style.opacity = r > 0.86 ? 1 : 0.34; c.style.color = r > 0.955 ? "var(--bad)" : r > 0.86 ? "var(--ink)" : ""; }); }
+    }
+    flash.style.opacity = fl;
+  }
+  window.seek = seek; window.DURATION = DUR; window.FPS = FPS; window.COVER = COVER;
+  // what the music is written to (site/social/music.py): where each scene starts and where each slam lands
+  window.CUES = { dur: DUR, bpm: 120, scenes: scenes.map((sc) => ({ cue: sc.cue, from: sc.from, to: sc.to })), hits: scenes.flatMap((sc) => sc.shakes.map((x) => +(sc.from + x).toFixed(3))) };
+  seek(0);
+  // opened by a person: it plays, and plays again
+  if (!new URLSearchParams(window.location.search).has("still")) { const t0 = performance.now(); const loop = (now) => { seek(((now - t0) / 1000) % (DUR + 1.5)); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+})();
+</script>
+</body>
+</html>

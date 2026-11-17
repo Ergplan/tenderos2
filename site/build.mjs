@@ -1139,6 +1139,7 @@ write("vercel.json", JSON.stringify({
     { source: "/(.*)", headers: [{ key: "X-Content-Type-Options", value: "nosniff" }, { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }] },
     { source: "/for/(.*)", headers: [{ key: "X-Robots-Tag", value: "noindex" }] },
     { source: "/links", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+    { source: "/social/(.*)", headers: [{ key: "X-Robots-Tag", value: "noindex" }] },
     { source: "/data/(.*)", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
     { source: "/TenderOS-deck.pdf", headers: [{ key: "Content-Disposition", value: "attachment; filename=\"TenderOS-deck.pdf\"" }] },
   ],
