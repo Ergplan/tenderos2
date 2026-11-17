@@ -6,7 +6,14 @@
 // to a private Vercel Blob store, chat/<date>/<label or visitor>-<id>.txt, replaced on every
 // message. Nothing else is kept: no address of the visitor's machine, only the country.
 //
-// record() is the part with no storage in it, so the tests run it as it is.
+// Each time a conversation is saved the sales team is told by email, sent through Resend
+// (resend.com) when the project has a RESEND_API_KEY: the latest message first, then the whole
+// conversation, with the visitor's own address as the reply-to if they left one. CHAT_ALERT_TO
+// (one address or several, comma-separated) and CHAT_ALERT_FROM override who it goes to and
+// from. A mail that fails never fails the save: the visitor's message is already kept.
+//
+// record() and alertMail() are the parts with no storage or network in them, so the tests run
+// them as they are.
 
 const MAX_MESSAGES = 30, MAX_TEXT = 1500, MAX_FIELD = 160, MAX_BODY = 60000, DAY = 864e5;
 const clean = (s, n) => String(s ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, n);
@@ -33,7 +40,39 @@ export function record(body, meta = {}, now = Date.now()) {
     + "\n" + messages.map((m) => `[${india(m.at, { timeStyle: "short" })}] ${m.text}`).join("\n\n") + "\n";
   // the date in India of the first message, so a day's conversations sit together
   const day = new Date(started + 5.5 * 3600e3).toISOString().slice(0, 10);
-  return { path: `chat/${day}/${who || "visitor"}-${id.slice(0, 16)}.txt`, text, messages: messages.length };
+  return { path: `chat/${day}/${who || "visitor"}-${id.slice(0, 16)}.txt`, text, messages: messages.length,
+    id, who, name: clean(c.name, MAX_FIELD), company: clean(c.company, MAX_FIELD), reach: clean(c.reach, MAX_FIELD), latest: messages[messages.length - 1].text };
+}
+
+// the alert for one saved conversation, as Resend's API takes it. The subject stays the same for
+// the whole conversation, and every mail refers to the same made-up first message, so a mail
+// program shows the conversation as one thread.
+export function alertMail(rec, env = {}) {
+  const to = String(env.CHAT_ALERT_TO || "sales@joulewise.com").split(",").map((s) => s.trim()).filter(Boolean);
+  const from = env.CHAT_ALERT_FROM || "TenderOS site <chat@tenderos.joulewise.tech>";
+  const whoLine = [rec.name, rec.company].filter(Boolean).join(", ") || (rec.who ? `personal link ${rec.who}` : "an anonymous visitor");
+  const thread = `<chat-${rec.id.slice(0, 16)}@tenderos.joulewise.tech>`;
+  const mail = (rec.reach.match(/[^\s<>,;]+@[^\s<>,;]+\.[a-z]{2,}/i) || [])[0];
+  return {
+    from, to,
+    subject: `TenderOS site chat: ${whoLine} (${rec.id.slice(0, 6)})`,
+    text: `A visitor wrote in the chat box on tenderos.joulewise.tech.\n\nLatest message (${rec.messages} so far):\n\n    ${rec.latest.replace(/\n/g, "\n    ")}\n\n`
+      + `${rec.reach ? `Reply to them at: ${rec.reach}` : "They have not left a phone number or email yet."}\n\n`
+      + `---------- the whole conversation ----------\n\n${rec.text}\nAlso kept in Vercel Storage, store tenderos-site-chat, as ${rec.path}\n`,
+    headers: { "In-Reply-To": thread, References: thread },
+    ...(mail ? { reply_to: mail } : {}),
+  };
+}
+
+async function alert(rec) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return "off";
+  try {
+    const r = await fetch("https://api.resend.com/emails", { method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" }, body: JSON.stringify(alertMail(rec, process.env)), signal: AbortSignal.timeout(6000) });
+    if (r.ok) return "sent";
+    console.error("chat: the alert was not sent:", r.status, (await r.text()).slice(0, 200));
+  } catch (e) { console.error("chat: the alert was not sent:", e?.message || e); }
+  return "failed";
 }
 
 const json = (o, status = 200) => Response.json(o, { status, headers: { "Cache-Control": "no-store" } });
@@ -62,6 +101,6 @@ export default {
       console.error("chat: the conversation was not saved:", e?.message || e);
       return json({ ok: false, error: "not saved" }, 500);
     }
-    return json({ ok: true, messages: rec.messages });
+    return json({ ok: true, messages: rec.messages, alert: await alert(rec) });
   },
 };

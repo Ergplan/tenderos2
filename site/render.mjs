@@ -18,7 +18,7 @@ const shotsAt = process.argv.indexOf("--shots");
 const SHOTS = shotsAt > 0 ? process.argv[shotsAt + 1] : null;
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
-const { record } = await import(join(PUB, "api/chat.js"));
+const { record, alertMail } = await import(join(PUB, "api/chat.js"));
 const chats = new Map(); // path → text, as the private store would hold them
 const server = createServer((req, res) => {
   if (req.url === "/api/chat" && req.method === "POST") {
@@ -221,6 +221,11 @@ try {
   await chat.keyboard.press("Escape");
   check(await chat.locator("#chat").isHidden() && await chat.locator("#chat-open").isVisible(), "chat: Escape did not close the box");
   await chatCtx.close();
+  // the email alert for that conversation: to the sales address, replies go to the visitor
+  { const rec = record({ id: "ab".repeat(16), ref: "chat-test", contact: { name: "R. Mehta", company: "Acme Renewables", reach: "r.mehta@acme.example or 98765 43210" }, messages: [{ text: "First" }, { text: "Can you show the sizing\non our sites?" }] }, { country: "IN" });
+    const m = alertMail(rec, {}), m2 = alertMail(record({ id: "cd".repeat(16), messages: [{ text: "Hello" }] }), { CHAT_ALERT_TO: "a@x.in, b@x.in", CHAT_ALERT_FROM: "Site <s@x.in>" });
+    check(m.to.join() === "sales@joulewise.com" && m.reply_to === "r.mehta@acme.example" && m.subject === "TenderOS site chat: R. Mehta, Acme Renewables (ababab)" && m.text.includes("    Can you show the sizing\n    on our sites?") && m.text.includes("Messages  2") && m.headers.References.includes("abababababababab"), `chat alert: ${JSON.stringify(m).slice(0, 400)}`);
+    check(m2.to.length === 2 && m2.from === "Site <s@x.in>" && !("reply_to" in m2) && m2.subject.includes("an anonymous visitor") && m2.text.includes("not left a phone number or email"), `chat alert without contact: ${JSON.stringify(m2).slice(0, 300)}`); }
   check(record({ id: "x", messages: [{ text: "a" }] }).error === "bad id" && record({ id: "ab".repeat(16), messages: [] }).error === "no message" && record({ id: "ab".repeat(16), website: "x", messages: [{ text: "a" }] }).spam === true && record({ id: "ab".repeat(16), messages: [{ text: "z".repeat(5000) }] }).text.length < 1800, "chat: the recorder accepts a bad id, an empty conversation, the spam field or an over-long message");
 
   // ---- the guided tour: the cursor drives, then the visitor takes over

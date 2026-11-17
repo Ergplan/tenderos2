@@ -111,7 +111,11 @@ Everything the visitor writes is saved by the site's one server function, `POST 
 `@vercel/blob`). Each conversation is one text file in the private Vercel Blob store
 `tenderos-site-chat`, `chat/<date in India>/<personal label or visitor>-<id>.txt`, rewritten on
 every message: the time, the label, the contact details, the page, the country and the messages.
-Read them in Vercel under Storage, in that store's browser. The function takes requests from the
+Read them in Vercel under Storage, in that store's browser. Each save also sends the sales
+team an email through Resend when the Vercel project has `RESEND_API_KEY` (to `CHAT_ALERT_TO`,
+default the site's sales address; from `CHAT_ALERT_FROM`): the latest message, then the whole
+conversation, one thread per conversation, with the visitor's email as the reply-to. A mail
+that fails does not fail the save. The function takes requests from the
 site's own pages only, limits a conversation to 30 messages of 1,500 characters and drops
 anything that fills the hidden spam field. Analytics records that the chat was opened and used,
 never what was written.
