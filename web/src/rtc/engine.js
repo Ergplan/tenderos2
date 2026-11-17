@@ -151,6 +151,7 @@ export const DEFAULT_FINANCE = {
   refiRepayment: null, // the method after the refinancing; null: the same
   rateStepDown: { afterYears: 0, rate: null }, // the senior rate from year afterYears + 1
   topUp: { year: 0, debtFraction: null }, // new senior debt at the end of the year up to the fraction, paid to equity
+  refiTopUpPct: 0, // top-up at the refinancing: new senior debt as a share of the balance refinanced, paid to equity
   prepaymentPct: 0, // fee on principal prepaid outside the schedule (refinancing takeout, cash sweep)
   sweep: { pct: 0, fromYear: 1, toYear: null }, // share of the free cash prepaying the debt; unpaid sweep accrues
   dsraBasis: "next", // 'next' (months of the next year's debt service) | 'peak' (of the highest year left)
@@ -173,7 +174,7 @@ export const DEFAULT_FINANCE = {
 export const FINANCE_V3_KEYS = {
   fin: ["codDate", "parts", "bridge", "generationCase", "caseFactors", "carbon", "extension", "repower",
     "solarOmEscalation", "windOmEscalation", "bessOmEscalation", "windOmComponents", "otherFixedLines",
-    "refiRepayment", "rateStepDown", "topUp", "prepaymentPct", "sweep", "dsraBasis", "dsraInterestRate",
+    "refiRepayment", "rateStepDown", "topUp", "refiTopUpPct", "prepaymentPct", "sweep", "dsraBasis", "dsraInterestRate",
     "quasi", "mezz", "guarantees", "bookDepreciation", "bookWdvRate", "lives", "thinCapPct", "lossCarryYears",
     "holdco", "lenderReinvestRate", "capexUsdShare", "fxBase"],
   costs: ["phasing", "moduleSharePct"],
@@ -1876,6 +1877,7 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
   const stepDown = fin.rateStepDown && fin.rateStepDown.afterYears > 0 ? fin.rateStepDown : null;
   const topUp = fin.topUp && fin.topUp.year > 0 && fin.topUp.year < dt.tenor ? fin.topUp : null;
   const prepayPct = Math.max(0, fin.prepaymentPct || 0);
+  const refiTopUpPct = Math.max(0, fin.refiTopUpPct || 0);
   const sweep = fin.sweep && fin.sweep.pct > 0 ? fin.sweep : null;
   const mz = mezz0 > 0 ? { ...fin.mezz, tenor: Math.min(T, Math.max(1, Math.round(fin.mezz.tenorYears || 1))), grace: Math.max(0, Math.round(fin.mezz.graceYears || 0)) } : null;
   const qs = quasi0 > 0 ? fin.quasi : null;
@@ -2149,7 +2151,10 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       }
       debt = opening - principal;
       let prepaymentFee = 0;
-      if (refiFeeOn) { refiFee = debt * dt.refiFeePct; prepaymentFee += debt * prepayPct; balloonBase = debt; }
+      // the refinancing: the fee on the new loan (the balance and its top-up), the prepayment
+      // penalty on the balance taken out
+      let refiTopUp = 0;
+      if (refiFeeOn) { refiTopUp = debt * refiTopUpPct; refiFee = (debt + refiTopUp) * dt.refiFeePct; prepaymentFee += debt * prepayPct; balloonBase = debt; }
       // the cash flow before the sweep, the mezzanine and the quasi-equity
       const t1 = taxOf(interest, refiFee + prepaymentFee, mezzInterest);
       const cfadsOf = (tax) => ebitda - tax - dWc - augCapex - wcInterest + otherIncome - guaranteeFees - extensionCapex - repowerCapex;
@@ -2165,11 +2170,18 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
         debt -= sweepCr;
         prepaymentFee += sweepCr * prepayPct;
       } else if (sweep && debt <= 1e-9) sweepAccrued = 0;
-      // the top-up: new senior debt at the end of the year up to the fraction, paid out to equity
+      // the top-up, paid out to equity: at the refinancing a share of the balance refinanced, and
+      // (in its own year) new senior debt up to a fraction of the project cost
       let topUpCr = 0;
+      if (refiTopUp > 0) {
+        topUpCr = refiTopUp;
+        debt += refiTopUp;
+        balloonBase = debt;
+      }
       if (topUp && y === topUp.year) {
-        topUpCr = Math.max(0, (topUp.debtFraction ?? fin.debtFraction) * capex.total - debt);
-        debt += topUpCr;
+        const more = Math.max(0, (topUp.debtFraction ?? fin.debtFraction) * capex.total - debt);
+        topUpCr += more;
+        debt += more;
         balloonBase = debt;
       }
       // the quasi-equity: interest due (and accrued) paid when the senior DSCR clears the lender's

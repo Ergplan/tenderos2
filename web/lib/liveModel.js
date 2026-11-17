@@ -821,6 +821,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   inp("refiRate", "Refinanced interest rate", "%/yr", { v: fi.refiRate || 0, kind: "input", fmt: "pct", source: src("fin.refiRate", "Model default") });
   inp("refiTenor", "Refinanced tenor", "years from then", { v: fi.refiTenorYears || 0, kind: "input", fmt: "int", source: src("fin.refiTenorYears", "Model default") });
   inp("refiFee", "Refinancing fee", "% of the balance", { v: fi.refiFeePct || 0, kind: "input", fmt: "pct", source: src("fin.refiFeePct", "Model default") });
+  inp("refiTopPct", "Top-up at the refinancing", "% of the balance refinanced", { v: nz(fi.refiTopUpPct), kind: "input", fmt: "pct", source: src("fin.refiTopUpPct", "Model default"), note: "New senior debt drawn with the refinancing, as a share of the balance refinanced: paid out to equity and repaid with the refinanced loan. The refinancing fee is charged on the balance and the top-up." });
   inp("refiRepay", "Repayment after the refinancing", REFI_REPAY_LIST.join(" / "), { v: REPAYMENT_LIST.includes(fi.refiRepayment) ? fi.refiRepayment : "same", kind: "input", list: REFI_REPAY_LIST, source: src("fin.refiRepayment", "Model default"), note: "same: the method above; sculpted re-sculpts the refinanced balance to the target DSCR" });
   inp("prepayPct", "Prepayment fee", "% of principal prepaid", { v: nz(fi.prepaymentPct), kind: "input", fmt: "pct", source: src("fin.prepaymentPct", "Model default"), note: "On the refinancing takeout and the cash sweep; expensed" });
   inp("topUpYear", "Top-up: at the end of year", "year (0: none)", { v: nz(fi.topUp?.year), kind: "input", fmt: "int", source: src("fin.topUp", "Model default"), note: "New senior debt up to the fraction of the project cost, paid out to equity and repaid under the method over the years left" });
@@ -1752,7 +1753,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   S.series("prepaySweep", "Prepayment fee on the sweep", "₹ cr", { v: () => null, total: true });
   S.series("prepayFee", "Prepayment fee", "₹ cr", { v: () => null, total: true, note: "On the refinancing takeout and the sweep; expensed" });
   S.series("debtAfterSweep", "Balance after the sweep", "₹ cr", { v: () => null });
-  S.series("topUp", "Top-up debt drawn (paid to equity)", "₹ cr", { v: () => null, total: true, note: "At the end of the top-up year: up to the fraction of the project cost, less the balance" });
+  S.series("topUp", "Top-up debt drawn (paid to equity)", "₹ cr", { v: () => null, total: true, note: "With the refinancing: the share of the balance refinanced. At the end of the top-up year: up to the fraction of the project cost, less the balance" });
   S.series("closeDebt", "Closing debt", "₹ cr", { v: () => null, bold: true });
   S.group("Quasi-equity (paid when the senior DSCR clears the lender's floor)");
   S.series("quasiOpen", "Quasi-equity, opening", "₹ cr", { v: () => null });
@@ -1875,7 +1876,8 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
       const debtAfterP = open - principal;
       const interest = intOpen - adj * principal;
       const refiNow = refiOn && y === S.v("refiYear");
-      const refiFeeCr = refiNow ? debtAfterP * S.v("refiFee") : 0;
+      const refiTop = refiNow ? debtAfterP * S.v("refiTopPct") : 0;
+      const refiFeeCr = refiNow ? (debtAfterP + refiTop) * S.v("refiFee") : 0;
       const prepayRefi = refiNow ? debtAfterP * S.v("prepayPct") : 0;
       // the tax before the sweep's fee and the quasi-equity's interest
       const pre1 = income - interest - wcInt - (refiFeeCr + prepayRefi + bgFeesY) - allowedShA - taxDep;
@@ -1897,7 +1899,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
       const debtAfterSweep = debtAfterP - sweep;
       // the top-up
       const topUpNow = S.v("topUpYear") > 0 && S.v("topUpYear") < tenorUsed && y === S.v("topUpYear");
-      const topUp = topUpNow ? Math.max(0, S.v("topUpFracU") * total - debtAfterSweep) : 0;
+      const topUp = refiTop + (topUpNow ? Math.max(0, S.v("topUpFracU") * total - debtAfterSweep - refiTop) : 0);
       const closeDebt = debtAfterSweep + topUp;
       // the quasi-equity
       const quasiOpen = quasiBal;
@@ -1966,7 +1968,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
         methodY: `IF(AND(${phase2F},${S.s("refiRepay")}<>"same"),${S.s("refiRepay")},${S.s("repay")})`,
         adjY: `IF(${M}="sculpted",0,${S.s("adjBase")})`,
         intOpen: `${O}*${R}`,
-        balloonBase: y === 1 ? S.s("debt") : `IF(AND(${S.s("topUpYear")}>0,${S.s("topUpYear")}<${S.s("tenorUsed")},${Y}=${S.s("topUpYear")}+1),${S.at("closeDebt", y - 1)},IF(AND(${S.s("refiOn")}=1,${Y}=${S.s("refiYear")}+1),${S.at("debtAfterP", y - 1)},${S.at("balloonBase", y - 1)}))`,
+        balloonBase: y === 1 ? S.s("debt") : `IF(AND(${S.s("topUpYear")}>0,${S.s("topUpYear")}<${S.s("tenorUsed")},${Y}=${S.s("topUpYear")}+1),${S.at("closeDebt", y - 1)},IF(AND(${S.s("refiOn")}=1,${Y}=${S.s("refiYear")}+1),IF(${S.s("refiTopPct")}>0,${S.at("closeDebt", y - 1)},${S.at("debtAfterP", y - 1)}),${S.at("balloonBase", y - 1)}))`,
         balloonAmt: `${S.at("balloonBase", y)}*${S.s("balloonShare")}`,
         mezzOpen: y === 1 ? S.s("mezz0") : S.at("mezzClose", y - 1),
         mezzInt: `${S.at("mezzOpen", y)}*IF(${S.s("mezz0")}>0,${S.s("mezzRate")},0)`,
@@ -1984,7 +1986,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
         principal: `IF(AND(${Y}>${S.s("graceUsed")},${Y}<=${S.at("endY", y)},${O}>1E-9),${method},0)`,
         debtAfterP: `${O}-${S.at("principal", y)}`,
         interest: `${IO}-${S.at("adjY", y)}*${S.at("principal", y)}`,
-        refiFeeCr: `IF(${refiNowF},${S.at("debtAfterP", y)}*${S.s("refiFee")},0)`,
+        refiFeeCr: `IF(${refiNowF},${S.at("debtAfterP", y)}*(1+${S.s("refiTopPct")})*${S.s("refiFee")},0)`,
         prepayRefi: `IF(${refiNowF},${S.at("debtAfterP", y)}*${S.s("prepayPct")},0)`,
         pre1: `${incomeF}-${S.at("interest", y)}-${S.at("wcInt", y)}-(${S.at("refiFeeCr", y)}+${S.at("prepayRefi", y)}+${S.at("bgFees", y)})-${S.at("allowedShA", y)}-${S.at("taxDep", y)}`,
         lossUsed1: s12.loss, depUsed1: s12.dep, taxable1: s12.taxable,
@@ -1998,7 +2000,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
         prepaySweep: `${S.at("sweep", y)}*${S.s("prepayPct")}`,
         prepayFee: `${S.at("prepayRefi", y)}+${S.at("prepaySweep", y)}`,
         debtAfterSweep: `${S.at("debtAfterP", y)}-${S.at("sweep", y)}`,
-        topUp: `IF(AND(${S.s("topUpYear")}>0,${S.s("topUpYear")}<${S.s("tenorUsed")},${Y}=${S.s("topUpYear")}),MAX(0,${S.s("topUpFracU")}*${S.s("total")}-${S.at("debtAfterSweep", y)}),0)`,
+        topUp: `IF(${refiNowF},${S.at("debtAfterP", y)}*${S.s("refiTopPct")},0)+IF(AND(${S.s("topUpYear")}>0,${S.s("topUpYear")}<${S.s("tenorUsed")},${Y}=${S.s("topUpYear")}),MAX(0,${S.s("topUpFracU")}*${S.s("total")}-${S.at("debtAfterSweep", y)}-IF(${refiNowF},${S.at("debtAfterP", y)}*${S.s("refiTopPct")},0)),0)`,
         closeDebt: `${S.at("debtAfterSweep", y)}+${S.at("topUp", y)}`,
         quasiOpen: y === 1 ? S.s("quasi0") : S.at("quasiClose", y - 1),
         dscr1: `IF(${S.at("debtService", y)}>1E-9,${S.at("cfads1", y)}/${S.at("debtService", y)},"")`,
@@ -2044,7 +2046,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
       const fmts = { rateY: "pct", endY: "int", methodY: "text", adjY: "factor", dscr1: "x", quasiOk: "int" };
       for (const k of Object.keys(fs)) S.fill(k, y, { f: fs[k], v: vals[k], fmt: fmts[k] || "cr", bold: k === "debtService" || k === "pbt" || k === "pat" || k === "closeDebt" });
       open = closeDebt;
-      if (topUpNow) balloonBase = closeDebt;
+      if (topUpNow || refiTop > 0) balloonBase = closeDebt;
       else if (refiNow) balloonBase = debtAfterP;
     }
     for (const k of ["mezzInt", "mezzPrin", "mezzService", "principal", "interest", "refiFeeCr", "prepayRefi", "debtService", "sweep", "prepaySweep", "prepayFee", "topUp", "terminal", "quasiInt", "quasiRepay",
@@ -2609,6 +2611,7 @@ function addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, r
     param(T, "refiRepay", "Repayment after the refinancing", "", { fmt: "text" });
     param(T, "prepayPct", "Prepayment fee", "% of principal prepaid", { fmt: "pct" });
     param(T, "sweepPct", "Cash sweep", "% of the free cash", { fmt: "pct" });
+    param(T, "refiTopPct", "Top-up at the refinancing (% of the balance refinanced)", "", { fmt: "pct" });
     param(T, "topUpYear", "Top-up at the end of year (0: none)", "year", { fmt: "int" });
     param(T, "dsraMonths", "Debt service reserve", "months", { fmt: "num" });
     param(T, "dsraBasis", "Reserve basis (next / peak)", "", { fmt: "text" });
@@ -3185,7 +3188,7 @@ export function liveModelInput(raw) {
         "tenorYears", "targetEquityIrr", "discountRate", "taxRate", "wdvRate", "bookLifeYears", "salvagePct", "receivableDays",
         "graceYears", "targetDscr", "balloonPct", "stepUpPct", "refiYear", "refiRate", "refiTenorYears", "refiFeePct", "omStockMonths", "sparesPctOm", "wcInterestRate", "dsraMonths",
         "lcCostPct", "lcDays", "cfdPenaltyMultiple", "solarDegradation",
-        "prepaymentPct", "dsraInterestRate", "thinCapPct", "capexUsdShare",
+        "prepaymentPct", "refiTopUpPct", "dsraInterestRate", "thinCapPct", "capexUsdShare",
       ]),
       lcMinPrice: finite(fin.lcMinPrice) ? fin.lcMinPrice : 10,
       paymentsPerYear: [1, 2, 4, 12].includes(fin.paymentsPerYear) ? fin.paymentsPerYear : 1,

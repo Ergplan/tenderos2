@@ -226,8 +226,14 @@ const CASES = [
     ...V3,
     bess: { augmentation: "byYear", augmentationPct: Object.assign(new Array(13).fill(0), { 4: 0.06, 8: 0.08, 12: 0.02 }), augmentationCr: Object.assign(new Array(13).fill(0), { 8: 40 }), costDeclinePct: 0.03 },
   })],
+  // the top-up at the refinancing: 5% of the balance refinanced after year 2, with a fee and a prepayment penalty
+  ["refinancing after year 2 with a 5% top-up of the balance, a 0.5% fee and a 1% prepayment penalty", bid({
+    ...V3,
+    fin: { refiYear: 2, refiRate: 0.083, refiTenorYears: 12, refiFeePct: 0.005, prepaymentPct: 0.01, refiTopUpPct: 0.05, graceYears: 1, paymentsPerYear: 4 },
+  })],
 ];
-const BY_YEAR = CASES.length - 1;
+const BY_YEAR = CASES.length - 2;
+const REFI_TOP = CASES.length - 1;
 // the second bid uses a one-time augmentation in year 10, with the battery price falling 3% a year
 {
   const c = CASES[1][1];
@@ -324,6 +330,8 @@ assert.ok(CASES[8][1].finance.rows.every((r) => r.dscr === null), "no debt: no D
 {
   const y = CASES[BY_YEAR][1].finance;
   assert.ok(y.rows.filter((r) => r.augCapex > 0).map((r) => r.year).join() === "4,8,12" && y.rows[7].augCapex === 40, "augmentation year by year: years 4, 8 and 12, the year-8 cost as entered");
+  const t = CASES[REFI_TOP][1].finance;
+  assert.ok(t.rows[1].topUpCr > 0 && Math.abs(t.rows[1].topUpCr - 0.05 * (t.rows[1].closingDebt - t.rows[1].topUpCr)) < 1e-9 && t.rows.filter((r) => r.topUpCr > 0).length === 1 && t.rows[1].refiFee > 0, "the top-up at the refinancing: 5% of the balance, in year 2 only");
 }
 {
   // the finance team's branches each case was meant to reach

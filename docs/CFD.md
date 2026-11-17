@@ -295,6 +295,12 @@ The nameplate fades from year 1 and each addition fades from its own year; the c
 above the nameplate. The same factor reaches the operation, the engine (`yearFactors`,
 `augmentationScheduleCr`) and the Live model (two input rows by year and a `byYear` branch of the
 augmentation formula); `tools/check_finance_v3.mjs` and `tools/check_live_model.mjs` cover it.
+The refinancing takes a top-up as an input (`fin.refiTopUpPct`, "Top-up at the refinancing" in the
+Debt group of the Finance inputs, 17 Nov 2026): new senior debt drawn with the refinancing as a
+share of the balance refinanced, paid out to equity and repaid with the refinanced loan. The
+refinancing fee is charged on the balance and the top-up, the prepayment penalty on the balance
+taken out. It stands beside the older top-up to a share of the project cost in a year of its own.
+
 A day is short when less than the 2 MWh per MW (at the plant's availability) reaches the meter,
 whatever the cause: charging power missing within the sourcing limits, or a battery faded below
 the need. `tools/check_live_model.mjs` rebuilds the uploaded 150 MW bid of 10 Nov 2026 from its

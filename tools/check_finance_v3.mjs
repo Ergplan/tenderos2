@@ -227,6 +227,24 @@ const ok = (name, detail) => { checks.push(name); console.log(`ok   ${name}${det
   ok("top-up", `₹${r.topUpCr.toFixed(1)} cr drawn at the end of year 2`);
 }
 
+// the top-up at the refinancing: a share of the balance refinanced, paid out to equity; the fee
+// on the new loan (the balance and the top-up), the prepayment penalty on the balance taken out
+{
+  const terms = { refiYear: 3, refiRate: 0.08, refiTenorYears: 12, refiFeePct: 0.005, prepaymentPct: 0.01 };
+  const plain = run(terms);
+  const f = run({ ...terms, refiTopUpPct: 0.05 });
+  const p = plain.rows[2], r = f.rows[2];
+  assert.ok(close(r.topUpCr, 0.05 * p.closingDebt, 1e-9) && close(r.closingDebt, 1.05 * p.closingDebt, 1e-9), "5% of the balance refinanced is drawn");
+  assert.ok(close(r.refiFee, 1.05 * p.refiFee, 1e-9) && close(r.prepaymentFee, p.prepaymentFee, 1e-9), "the fee on the new loan, the penalty on the old balance");
+  assert.ok(r.fcfe > p.fcfe + 0.9 * r.topUpCr, "paid out to equity");
+  assert.ok(f.rows[3].openingDebt === r.closingDebt && Math.abs(f.rows[f.rows.length - 1].closingDebt) < 1e-6 && f.rows.slice(0, 2).every((x) => x.topUpCr === 0), "repaid with the refinanced loan");
+  assert.ok(f.equityIrr > plain.equityIrr, "the equity IRR rises");
+  assert.ok(run({ refiTopUpPct: 0.05 }).rows.every((x) => x.topUpCr === 0), "no refinancing: no top-up");
+  const both = run({ ...terms, refiTopUpPct: 0.05, topUp: { year: 3, debtFraction: 0.75 } });
+  assert.ok(close(both.rows[2].closingDebt, Math.max(0.75 * both.capex.total, 1.05 * p.closingDebt), 1e-9), "with a top-up to a share of the project cost in the same year, the larger of the two");
+  ok("top-up at the refinancing", `5% of ₹${p.closingDebt.toFixed(1)} cr: ₹${r.topUpCr.toFixed(1)} cr to equity at the end of year 3; equity IRR ${(plain.equityIrr * 100).toFixed(2)}% → ${(f.equityIrr * 100).toFixed(2)}%`);
+}
+
 // 5d. cash sweep (with accrual) and the prepayment fee
 {
   const f = run({ sweep: { pct: 0.5, fromYear: 2, toYear: 10 }, prepaymentPct: 0.01 });
