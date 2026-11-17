@@ -7,7 +7,9 @@
 // first, so its PDF page is the printed page + 1 (pdfOffset).
 // Where an amendment changed a term, the amended term is the one used and the original is kept,
 // marked "replaced" (with `by`: the document that replaced it). Where the documents still differ,
-// the term is marked "conflict" and the model follows the CfDA, which prevails (CfDA 1.2.18).
+// the term is marked "conflict" and the model follows the CfDA, which prevails (CfDA 1.2.18). A
+// "conflict" of another kind (the RfS against an amendment, or a reference in the RfS that leads
+// nowhere) says so in its own `flag`, and may carry its own `badge`.
 // The PDFs are served from web/public/tenders/seci-cfd-i/ (the standard CfDA is not provided with
 // this build; its quotes were read in an earlier session and are kept as they were).
 
@@ -106,8 +108,8 @@ export const TERMS = [
     "rfs", "2.7", 14, "No separate Central Financial Assistance is envisaged for implementation of the Projects selected under this RfS."),
   T("fiscal", "Scheme and bid", "Tax incentives", "Yours to claim; they do not change the tariff and give no claim on SECI",
     "rfs", "2.5", 13, "No claim shall arise on SECI for any liability if Bidders are unable to avail fiscal incentives and this will not have any bearing on the applicable Tariff."),
-  T("existingProjects", "Scheme and bid", "Existing RE projects", "May bid untied capacity for a longer CfDA, but Clause 11, which this refers to, reads “Not used” (p. 27): the longer term is not defined. Not modelled; ask SECI",
-    "rfs", "2.6", 13, "they will be given the benefit of a longer period of CfDA, commensurate to the duration between the Commercial Operation Date (COD) and Scheduled Commissioning Date (SCD), pursuant to Clause 11 of the RfS.", { status: "conflict" }),
+  T("existingProjects", "Scheme and bid", "Existing RE projects", "May bid untied capacity. The longer CfDA this promises cites Clause 11, which reads “Not used” (p. 27); Clause 12, Early Commissioning (p. 27), is probably the clause meant: settlement from an early COD, on top of the term that runs from the SCD. Not modelled; confirm with SECI",
+    "rfs", "2.6", 13, "they will be given the benefit of a longer period of CfDA, commensurate to the duration between the Commercial Operation Date (COD) and Scheduled Commissioning Date (SCD), pursuant to Clause 11 of the RfS.", { status: "conflict", badge: "Unclear", flag: "The RfS points to a clause that is not used; the CfDA is not in question here. Raise it with SECI." }),
 
   // ---- the e-Reverse Auction
   T("se", "Auction", "Capacity awarded (SE)", "80% of the qualified bid capacity, at most 500 MW: the full 500 MW is awarded only if at least 625 MW is bid",
@@ -544,7 +546,7 @@ export const TERMS = [
   T("codDefinition", "Plant", "COD", "The first day of commercial sale through the exchanges; a NOC/CfDA Compliance Certificate from SECI comes first, and SECI only verifies the installed capacity",
     "rfs", "10", 26, "The date of onset of commercial sale of power from the Project through the Power Exchanges under this RfS/ CfDA shall be considered as the “Commercial Operation Date (COD)” under the RfS/CfDA."),
   T("essRecognised", "Plant", "Battery without RE", "The RfS recognises a battery only once its RE component is installed; Amendment-02 commissions the battery at month 15 and the RE by month 36. Ask SECI",
-    "rfs", "12.2", 28, "If the RPD installs any ESS component(s) at its own risk and cost without the corresponding RE Generating component (wind, solar PV or any other RE source), such ESS component shall be recognized by SECI only after the corresponding RE Generating component has been installed.", { status: "conflict" }),
+    "rfs", "12.2", 28, "If the RPD installs any ESS component(s) at its own risk and cost without the corresponding RE Generating component (wind, solar PV or any other RE source), such ESS component shall be recognized by SECI only after the corresponding RE Generating component has been installed.", { status: "conflict", flag: "The RfS and Amendment-02 differ here. Raise it with SECI." }),
   T("earlyNotice", "Plant", "Early commissioning", "15 days' notice; needs connectivity and GNA; settlement starts with the supply",
     "rfs", "12.1", 27, "In cases of early part or full commissioning of the Project, the RPD shall give fifteen (15) days advance notice to SECI regarding the advance commissioning of full or part capacity."),
   T("noticeBoard", "Plant", "Site notice board", "At least 180 cm × 120 cm at the main entrance, naming the RPD and the RfS, before COD",

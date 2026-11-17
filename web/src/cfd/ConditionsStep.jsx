@@ -15,7 +15,7 @@ const clauseOf = (t) => t.clause.replace(/ \((amended|original.*|addendum.*)\)$/
 
 function badge(t) {
   if (t.status === "replaced") return { cls: "replaced", text: `Replaced${t.by ? ` · ${docById[t.by].short}` : ""}` };
-  if (t.status === "conflict") return { cls: "conflict", text: "Documents differ" };
+  if (t.status === "conflict") return { cls: "conflict", text: t.badge || "Documents differ" };
   if (AMENDMENTS.has(t.doc)) return { cls: "amended", text: `Amended · ${docById[t.doc].short}` };
   if (t.doc === "cfda") return { cls: "cfda", text: "CfDA" };
   return { cls: "unchanged", text: "As issued" };
@@ -54,7 +54,7 @@ export default function ConditionsStep({ state = null }) {
         </div>
       )}>
       <p className="rtc-note" data-testid="cfd-cond-summary">
-        {TERMS.length} conditions: {count((t) => AMENDMENTS.has(t.doc))} from the amendments, {count((t) => t.status === "replaced")} replaced, {count((t) => t.status === "conflict")} where the documents differ. Each is quoted word for word with its page; the quotes from the {provided} link to the PDF page. Under a rule an amendment changed, “As issued” shows the original wording.
+        {TERMS.length} conditions: {count((t) => AMENDMENTS.has(t.doc))} from the amendments, {count((t) => t.status === "replaced")} replaced, {count((t) => t.status === "conflict")} where the documents differ or are unclear. Each is quoted word for word with its page; the quotes from the {provided} link to the PDF page. Under a rule an amendment changed, “As issued” shows the original wording.
       </p>
       {groups.map((g) => {
         const terms = TERMS.filter((t) => t.group === g && shown(t));
@@ -72,7 +72,7 @@ export default function ConditionsStep({ state = null }) {
                     <strong>{t.label}</strong>
                     <div className="seci-cond-body">
                       <b>{t.display}</b>
-                      {t.status === "conflict" && <span className="seci-flag"><TriangleAlert size={12} /> The RfS and the CfDA differ here; the CfDA prevails. Raise it with SECI.</span>}
+                      {t.status === "conflict" && <span className="seci-flag"><TriangleAlert size={12} /> {t.flag || "The RfS and the CfDA differ here; the CfDA prevails. Raise it with SECI."}</span>}
                       <span className="seci-quote-link"><q>{t.quote}</q> <TermCite id={t.id} /></span>
                       {reading && (
                         <div className="team-clarified" data-testid={`cfd-term-clarified-${t.id}`}>

@@ -145,8 +145,9 @@ for existing projects that points to a clause reading "Not used"; and others).
 Auction, Daily supply, CfD settlement, Plant, Energy sourcing, Dates, Bid security and charges,
 Penalties and security, Eligibility): the rule in one line, the quote word for word, the document,
 clause and page link. Badges: *As issued*, *Amended · Amd-0x*, *Replaced · Amd-0x* (the original
-is kept with **As issued** under it), *Documents differ* (three: the RfS and the CfDA disagree;
-the model follows the CfDA, which prevails). Filter **All / Amended / Differ / RfS / CfDA**.
+is kept with **As issued** under it), *Documents differ* or *Unclear* (three: one where the RfS
+and the CfDA disagree and the model follows the CfDA, which prevails; one where the RfS and
+Amendment-02 disagree; one where the RfS refers to a clause that is not used). Each says which. Filter **All / Amended / Differ / RfS / CfDA**.
 **Assign** hands a condition to Legal; their reading comes back through the Team panel and shows
 under the condition.
 

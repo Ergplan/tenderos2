@@ -84,7 +84,9 @@ Where the documents still differ (marked "documents differ"; the model follows t
 
 * RfS 7.1 lets the battery sit away from the RE; the CfDA's RE Power Project says co-located.
 * RfS 2.6 offers existing projects a longer CfDA "pursuant to Clause 11", and Clause 11 reads "Not
-  used". The longer term is not defined and not modelled.
+  used". Clause 12 (Early Commissioning) is probably the clause meant: settlement from an early COD
+  on top of the term from the SCD. This is a reference inside the RfS that leads nowhere, not a
+  difference between the RfS and the CfDA; it is not modelled and is a point to raise with SECI.
 
 Replaced and marked: the ₹5.80 ceiling and the slab sharing (Amd-03); RfS 4.4's third-party battery
 (Amd-02, which numbers the clause 4.3); the RfS's 12-year term (Amd-03, RfS 2.3, 21.2, 21.7).
