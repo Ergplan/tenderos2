@@ -1081,7 +1081,7 @@ function crf(rate, n) {
   return (rate * f) / (f - 1);
 }
 
-function augmentationScheduleCr(sizes, costs, bess, years) {
+export function augmentationScheduleCr(sizes, costs, bess, years) {
   const out = new Array(years + 1).fill(0);
   const deg = bess.annualDegradation || 0;
   const priceAt = (y) => costs.bessCrPerMwh * (1 - (bess.costDeclinePct || 0)) ** (y - 1);

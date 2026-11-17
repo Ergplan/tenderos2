@@ -9,6 +9,7 @@
     "check:rtc": "node ../tools/check_rtc_engine.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.9.0",
     "echarts": "^6.1.0",
     "energy-flow-chart": "file:vendor/energy-flow-chart",
     "exceljs": "^4.4.0",

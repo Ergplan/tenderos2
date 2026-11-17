@@ -18,6 +18,7 @@ an administrator grants it like the other tabs.
 | 09 What-if | Finance | Returns at a tried strike price; the track to the quote (which levers, how far, in what order, the chance of each move and of the whole track; out of reach when no lever can get there) with a waterfall and a story; every input one step up and down with the price it gives and how far it must move, a reading guide and a plain-words note per lever; Apply; **Not for us** on a move turns the lever down (`state.rejected`, the track plotted again without it); a frozen value better than the suggestion is priced through the full model and the dialog gives the bands' chance of it; the bid size is not a lever | `levers.js`, `leverNotes.js` (notes, plausibility bands, `leverChance`), `track.js` (`planTrack`, frozen levers left alone), `TrackView.jsx`, `Freeze.jsx` (freeze with evidence into `state.frozen` and the evidence register, unfreeze), the What-if workbook (`cfdModelExport` + a `whatIf` block → the "What-if track" sheet of `lib/modelWorkbook.js`), `WhatIfStep.jsx` |
 | 10 Bid forms | Tender / Legal | The RfS's 17 formats with their 224 blanks beside the RfS page, the particulars asked once, the letters in the RfS wording, eleven checks, Word and PDF | `forms.js`, `formats.js`, `letters/`, `BidForms.jsx`, `POST /api/cfd/forms`, `/api/cfd/letters` |
 | 11 Reference bids | Projects | No CfD-I result yet: SECI's eight results that compare, the gap to the lowest peak-power award, why a strike price sits where it does; 11.1 What wins: the evening price of the chosen hours, the Pool's net flow at strike prices around it and at the quote (your MW and the full 500 MW against the ₹76 cr corpus), the verdict under Amendment-04's award test, the bidding logic; 11.2 the risks that are yours (DSM sized by the CERC-style model, availability per point, SECI-designated hours, fees, the weekly penalty, fade, a part award; the evening price as the Pool's) | `ReferenceBids.jsx`, `winning.js`, `web/src/market/seed.js` |
+| 12 Upside | Finance | What more own solar and battery behind the bid's connection would do to the equity IRR at the bid's strike price: a sweep of additions, the stresses of the best plan, the bid lowered instead, suggestions in sentences with the tender's clauses; the bid analyst (Claude) that runs the same cases as tools | `upside.js`, `UpsideStep.jsx`, `web/lib/cfdAgent.js` |
 
 Across the steps: Save / Open (library module `cfd`), the Team panel with assignments on boxes, formats and conditions, pings and evidence on every box, feedback, and the voice bid agent (GPT-Live) with sixteen tools (`agent.js`, `voice.js`; the session from `POST /api/seci/live` with `tab: "cfd"`).
 
@@ -251,6 +252,65 @@ the model's. `POST /api/cfd/dispatch15` (`web/lib/cfdDispatch.js`) runs the same
 bid state and answers with the ZIP (`format: "zip"`: one CSV per Contract Year, the two
 summaries, the inputs, a README) or the workbook (`format: "xlsx"`, written with ExcelJS's
 streaming writer: About, Summary, Monthly, one sheet per Contract Year).
+
+## The Upside step
+
+Once the bid's plant is built, its line, bay and connectivity are paid for. Step 12 asks what
+capacity added behind them would earn (`web/src/cfd/upside.js`, checked by
+`tools/check_cfd_upside.mjs`). A plan is `{ solarMw, battery: [{ year, mwh }] }`: own solar added
+to the bid's, and battery tranches by operating year (year 1 is the SCD). Every case is the bid's
+own model run again at the bid's strike price:
+
+* **The operation.** `simulate` takes the larger solar and, through `inputs.extraEssByYear`, the
+  battery added at the start of an operating year: each tranche fades from its own year (not
+  augmented), is charged after the day's commitment (own RE first, then the green market within
+  what is left of its limit) and sells in the evening hours outside the two peak hours, within the
+  contracted capacity, only on days the peak supply is met (CfDA 4.4.1.v, RfS 9.2.c (e)).
+  `inputs.dayInjection = false` sells no surplus from 06:00 to 18:00: connectivity with injection
+  rights in non-solar hours only (RfS 8.2).
+* **The financial model.** The shared engine at the bid's price: the solar and a tranche at the
+  SCD are project cost (no line cost on them), with debt on the addition at the bid's debt share
+  or the share set (`debtShare`; 0 is equity). A tranche of a later year is capital spend in
+  operation in its year, at the battery price fallen by `batteryDecline` a year, paid from the
+  project's cash like an augmentation; its O&M and insurance run from that year.
+* **What is reported.** The equity IRR of the whole bid and its change; the addition's own return
+  (the IRR of the difference of the two runs' cash flows, before debt and on equity); for a battery
+  tranche, what that tranche alone returns on the cash it takes; the value added (equity NPV at the
+  target IRR); energy sold in the day and from the battery with its average price, charging power
+  bought, days short, minimum DSCR.
+
+`upsideSweep` walks the solar sizes in steps (stopping once the IRR has fallen twice), tries a
+tranche in years 1, 3, 5, 7 and 9 on the best solar, builds a ladder of yearly tranches from the
+first year one returns more than the target IRR on its own cash, stresses the best plan (no
+injection in solar hours, midday prices moving, the addition paid from equity) and solves the
+strike price the best solar would allow at the bid's target IRR: the same gain taken as a lower bid.
+`suggestionsOf` turns the result into sentences, the tender's rules cited by term. **Make it the
+bid's plant** (`applyPlan`) writes the solar and a tranche at the SCD into the bid; tranches of
+later years stay with the step. `POST /api/cfd/upside` (`web/lib/cfdUpside.js`) runs the sweep, or
+one plan with stresses, on a saved bid state.
+
+Limits, stated on the screen: one IEX price year held flat (the midday stress is the test of
+that); a later tranche brings no power conversion of its own (it shares the bid's) and carries no
+debt; own solar is added at the bid's RE commissioning date, not staged.
+
+## The bid analyst
+
+The Upside step's **Ask the analyst** is Claude with the bid's model as its tools
+(`web/lib/cfdAgent.js`, `POST /api/cfd/agent`, checked by `tools/check_cfd_analyst.mjs` against a
+stand-in for the model). The loop runs on the application's server through the Messages API
+(`@anthropic-ai/sdk`): the browser sends the bid state and the conversation; the server asks the
+model, runs the simulations it requests on that state, returns the numbers, and streams the answer
+and each simulation to the screen as JSON lines. Four tools: `get_bid`, `run_upside_sweep`,
+`evaluate_plan` (one plan, with stresses and the lower bid), `tender_lookup` (terms with document,
+clause and page). The analyst proposes; it changes nothing: the plans it priced are offered under
+its answer, where **Check it here** runs the same case in the browser.
+
+It uses the Anthropic key of the API keys screen (or `ANTHROPIC_API_KEY`), which never reaches the
+browser; `CFD_AGENT_MODEL` (default `claude-opus-5-5`) and `CFD_AGENT_EFFORT` (default `medium`)
+set the model and its effort. A safety decline is re-run on the fallback model the API chooses.
+The bid's inputs and results go to the model's service to answer, so the route refuses to run in
+the core zone (`TENDEROS_ZONE=core`), where the sweep still runs in the browser; nothing is stored
+by the application beyond the activity log's line (model, tools, tokens).
 
 ## The financial model with the 15-minute dispatch behind it
 

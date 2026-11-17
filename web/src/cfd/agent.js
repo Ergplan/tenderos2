@@ -15,7 +15,7 @@ import { buildScript, explainCfd, explainFinance, explainResults, tenderBrief } 
 
 export { readValue };
 export const LIVE_MODEL = "gpt-live-1";
-export const STEPS = ["explain", "documents", "conditions", "bid", "design", "financeInputs", "size", "finance", "whatif", "forms", "reference"];
+export const STEPS = ["explain", "documents", "conditions", "bid", "design", "financeInputs", "size", "finance", "whatif", "forms", "reference", "upside"];
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const r = (v, d = 2) => (isNum(v) ? Number(v.toFixed(d)) : null);
 const STEP_OF = { project: "design", resource: "design", sourcing: "bid", costs: "financeInputs", fin: "financeInputs" };

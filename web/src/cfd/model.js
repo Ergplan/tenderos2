@@ -639,6 +639,17 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
   const win = socWindow(inputs); // the usable share of the nameplate
   const capNominal = X * inputs.essMwhPerMw * win;
   const extraNominal = X * (inputs.extraEssMwhPerMw || 0) * win; // the extra battery for evening sale
+  // merchant battery added in later years (the Upside step, upside.js): MWh per contracted MW added
+  // at the start of an operating year (index = the year), each tranche fading from its own year
+  const tranches = Array.isArray(inputs.extraEssByYear) ? inputs.extraEssByYear : null;
+  const trancheCapOf = (year) => {
+    if (!tranches) return 0;
+    const deg = inputs.essDegradation || 0;
+    let s = 0;
+    for (let a = 1; a <= year && a < tranches.length; a += 1) if (isNum(tranches[a]) && tranches[a] > 0) s += tranches[a] * Math.max(0.4, 1 - deg * (year - a));
+    return X * s * win;
+  };
+  const trancheCaps = [];
   const S = inputs.solarMw || 0;
   const W = inputs.windMw || 0;
   // the losses to the billing meter (inputs.loss, none: every factor 1): generation reaches the 33 kV
@@ -807,7 +818,8 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
     const mktX = new Float64Array(TENDER.peakStart);
     let extraCost = 0;
     let extraLeft = 0;
-    const extraCap = extraNominal > 0 ? extraNominal * (cap / Math.max(1e-9, capNominal)) : 0;
+    if (trancheCaps[year] === undefined) trancheCaps[year] = trancheCapOf(year);
+    const extraCap = (extraNominal > 0 ? extraNominal * (cap / Math.max(1e-9, capNominal)) : 0) + trancheCaps[year];
     if (extraCap > 0 && met) {
       extraLeft = extraCap / rte;
       for (const h of book.chargeOrder[d]) {
@@ -856,7 +868,9 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
       const spare = Math.max(0, gen - used);
       if (spare <= 0) continue;
       const injected = h < TENDER.peakStart ? 0 : (direct[h] || 0) + (chosen.includes(h) ? (essOut * meter) / chosen.length : 0) + extraOut[h] * meter; // at the meter
-      const sMeter = inputs.merchant && met ? Math.min(spare * meter, Math.max(0, X - injected)) : 0;
+      // without injection rights in solar hours (RfS 8.2 gives them for non-solar hours), nothing is sold from 06:00 to 18:00
+      const mayInject = inputs.dayInjection !== false || h < 6 || h >= TENDER.peakStart;
+      const sMeter = inputs.merchant && met && mayInject ? Math.min(spare * meter, Math.max(0, X - injected)) : 0;
       const s = sMeter / meter;
       sale[h] = s;
       merchantMwh += sMeter;

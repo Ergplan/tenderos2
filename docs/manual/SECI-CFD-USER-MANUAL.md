@@ -711,6 +711,55 @@ operational, and Amendment-04 spells it out. Each is sized from your bid where t
   gap in every block; a softening market raises the Pool's cost, not your revenue, and reaches you
   only through the award test and the Pool's replenishment, which SECI undertakes.
 
+## Step 12 · Upside *(Finance)*
+
+Once the bid's plant is built, its line, bay and connectivity are paid for. This step asks what
+more the same connection could earn: more own solar, and battery added now or in later years at a
+lower price, sold on the exchange. Nothing in the bid changes until you apply a plan.
+
+**12 · Upside behind the same connection.** Six settings: **Battery price fall** (10% a year by
+default: a tranche bought in year 5 costs today's price × 0.9⁴), **Debt on the addition** (the
+bid's debt share until you set it; 0 means the addition is paid from equity), **One battery
+tranche** (MWh), **Largest solar addition** (MWac), **Sale in solar hours** (allowed, or not
+allowed when the connectivity carries injection rights for non-solar hours only, RfS 8.2), and the
+**Midday price stress**. **Find the upside** runs about thirty cases; each is the bid's own model
+run again, every day of the term and the full financial model, at the bid's strike price.
+
+**12.1 · What the model suggests.** Four tiles: the bid's equity IRR as it stands, the best plan
+and its IRR, what it costs (at the SCD and in later years), and **Or bid lower**: the strike price
+the same solar would allow at your target IRR. A higher return at your price and a lower price at
+your return are the same gain; you choose which to take. Below, the findings in sentences:
+
+* *Worth doing*: the solar size with the highest equity IRR, how much of it is bought charging
+  power replaced and how much is day sale; battery tranches from the first year one returns more
+  than your target on its own cash.
+* *Does not pay*: for example a battery bought at today's price.
+* *Risk*: the same plan paid from equity, without injection in solar hours, and with midday prices
+  falling. Read these before acting: the gain usually needs debt on the addition and the right to
+  inject in the day.
+* *Tender*: what allows it (other use of the battery once the day's peak supply is met, CfDA
+  4.4.1.v) and what bounds it (never more than the contracted MW in a time block, RfS 9.2.c (e)).
+
+**Make it the bid's plant** writes a plan's solar, and a battery tranche at the SCD, into the bid
+(Design step). Battery tranches of later years stay with this step: the bid's plant is what is
+built for the SCD.
+
+**12.2 · Every case.** One row a case: the equity IRR of the whole bid and its change, the cost at
+the SCD and in later years, what the addition returns on its own equity, what the last battery
+tranche returns on the cash it takes, the energy sold in the day and from the battery with its
+average price, the charging power bought, the value added at your target IRR, and the minimum
+DSCR with its year. A late, small tranche can return well on its own cash and still barely move
+the IRR of the whole bid: both columns are there for that reason. The second table is the stresses.
+
+**12.3 · Ask the analyst.** A conversation with Claude, which runs these cases for you. Ask an
+open question ("what is the best way to raise the equity IRR of this bid?") or propose a plan
+("60 MWac more solar and 50 MWh of battery every year from year 5, with no day injection"). You
+see each simulation as it runs; the answer quotes only numbers from those runs and cites the
+tender by clause and page. Under the answer, the plans it priced: **Check it here** runs the same
+case in your browser, **Make it the bid's plant** applies it. The analyst needs the Anthropic key
+(an administrator adds it under API keys); the bid's inputs and results are sent to the model's
+service to answer. In an installation's core zone it is off, and the sweep above still runs.
+
 ## The bid agent
 
 ![The bid agent](img/cfd-agent.jpg)

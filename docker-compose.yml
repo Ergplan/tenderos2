@@ -52,6 +52,10 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
       ENGINE_URL: http://engine:8000
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # the CfD bid analyst (Claude, web/lib/cfdAgent.js); the key stays on the server
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CFD_AGENT_MODEL: ${CFD_AGENT_MODEL:-}
+      CFD_AGENT_EFFORT: ${CFD_AGENT_EFFORT:-}
       # the SECI RTC bid agent (GPT-Live); the key stays on the server
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_LIVE_BACKEND_MODEL: ${OPENAI_LIVE_BACKEND_MODEL:-}

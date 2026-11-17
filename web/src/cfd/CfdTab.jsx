@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, BookOpen, ChevronLeft, CircleDollarSign, ClipboardCheck, Factory, FileStack, FlaskConical, FolderOpen, Landmark, ListChecks, RotateCcw, Save, Scale, Trophy, Users, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronLeft, CircleDollarSign, ClipboardCheck, Factory, FileStack, FlaskConical, FolderOpen, Landmark, ListChecks, RotateCcw, Save, Scale, TrendingUp, Trophy, Users, Zap } from "lucide-react";
 import SaveDialog from "../scenarios/SaveDialog";
 import { scenarioApi } from "../scenarios/client";
 import useTeam, { TeamContext } from "../team/useTeam";
@@ -25,6 +25,7 @@ import FinanceInputsStep from "./FinanceInputsStep.jsx";
 import SizeStep from "./SizeStep.jsx";
 import FinanceModelStep from "./FinanceModelStep.jsx";
 import WhatIfStep from "./WhatIfStep.jsx";
+import UpsideStep from "./UpsideStep.jsx";
 import BidForms from "./BidForms.jsx";
 import ReferenceBids from "./ReferenceBids.jsx";
 
@@ -43,6 +44,7 @@ export const CFD_STEPS = [
   { id: "whatif", title: "What-if", icon: FlaskConical, color: "#ff9fd0", team: "Finance" },
   { id: "forms", title: "Bid forms", icon: ClipboardCheck, color: "#a98bff", team: "Tender / Legal" },
   { id: "reference", title: "Reference bids", icon: Trophy, color: "#ffd166", team: "Projects" },
+  { id: "upside", title: "Upside", icon: TrendingUp, color: "#5fe0b7", team: "Finance" },
 ];
 const STEP_IDS = CFD_STEPS.map((s) => s.id);
 // the steps of the tab as it was (seven steps): where each one's state goes now
@@ -303,6 +305,7 @@ export default function CfdTab({ initialScenario = null }) {
     size: sized,
     finance: sized,
     whatif: sized,
+    upside: sized,
     forms: sized && Boolean(state.forms?.bidder),
     reference: true,
   };
@@ -316,6 +319,7 @@ export default function CfdTab({ initialScenario = null }) {
     size: optimising ? `Optimising ${optimising.done}/${optimising.total}` : sized ? `₹${nf(model.sp, 3)}/kWh` : "Not sized",
     finance: sized ? "Strike price and returns" : "After sizing",
     whatif: sized ? "Strike price levers" : "After sizing",
+    upside: sized ? "More solar and battery, sold on the exchange" : "After sizing",
     forms: state.forms?.bidder ? "Particulars in" : "RfS formats to fill",
     reference: "SECI's auction results",
   };
@@ -384,6 +388,7 @@ export default function CfdTab({ initialScenario = null }) {
         {step.id === "size" && <SizeStep {...props} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} />}
         {step.id === "finance" && <FinanceModelStep {...props} traceRequest={traceAsk} quoteTariff={state.quoteTariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, quoteTariff: v, forms: { ...(s.forms || {}), tariff: v } }))} />}
         {step.id === "whatif" && <WhatIfStep {...props} />}
+        {step.id === "upside" && <UpsideStep {...props} />}
         {step.id === "forms" && <BidForms {...props} />}
         {step.id === "reference" && <ReferenceBids state={state} model={model} />}
       </div>

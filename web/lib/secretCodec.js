@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 
 /** The keys the application can hold, in the order the screen shows them. */
 export const API_KEYS = [
-  { name: "ANTHROPIC_API_KEY", label: "Anthropic", what: "Reads tender documents with the model (Tender to Bid, BESS Tender, the CERC order reader). Without it the engine reads tenders with the rule-based reader.", usedBy: "engine", prefix: "sk-ant-", check: "anthropic", zone: "intake" },
+  { name: "ANTHROPIC_API_KEY", label: "Anthropic", what: "Reads tender documents with the model (Tender to Bid, BESS Tender, the CERC order reader), and runs the CfD tab's bid analyst on the Upside step. Without it the engine reads tenders with the rule-based reader and the analyst is off.", usedBy: "engine and web", prefix: "sk-ant-", check: "anthropic", zone: "intake" },
   { name: "OPENAI_API_KEY", label: "OpenAI", what: "The SECI RTC tab's voice bid agent (GPT-Live). Without it the tab offers only the browser-voice guide.", usedBy: "web", prefix: "sk-", check: "openai", zone: "intake" },
   { name: "LLAMA_CLOUD_API_KEY", label: "LlamaParse (LlamaIndex cloud)", what: "Reads scanned pages that have no text layer when a tender set is read. Optional.", usedBy: "engine", prefix: "llx-", check: null, zone: "intake" },
 ];
