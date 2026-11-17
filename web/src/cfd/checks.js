@@ -2,7 +2,7 @@
 // reads them, the Bid review and the Node checks use them. Plain JavaScript (no React): the
 // formatters are the same as ../rtc/ui's.
 import { TENDER } from "./terms.js";
-import { essRequiredPerMw, fmtDate, penaltyCr, socWindow } from "./model.js";
+import { bessCapFactor, essRequiredPerMw, fmtDate, penaltyCr, socWindow } from "./model.js";
 
 const nf = (v, d = 0) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? "–" : new Intl.NumberFormat("en-IN", { minimumFractionDigits: d, maximumFractionDigits: d }).format(Number(v)));
 const pf = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : "–");
@@ -11,6 +11,46 @@ const pf = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : "–
  * The tender's conditions on the sized plant: { id, label, status: met | failed | info, detail,
  * cite }. Plain data, so the agent reads the same list the screen shows.
  */
+/**
+ * What a fading battery means, in the two measures the tab shows: the tender's 2 MWh per MW (the
+ * battery condition) and the daily supply at the plant's availability (when days start to count
+ * as short, which is later when the availability is under 100%).
+ */
+/**
+ * Why days fall short, from the model's operating years: in a year the battery (faded, where it is
+ * not augmented) cannot carry the daily supply every day is short for that reason; the other short
+ * days are for lack of charging power within the sourcing limits. Returns the two counts, the first
+ * such year, and the sentence the tab shows.
+ */
+export function shortfallCauses(model) {
+  const i = model.inputs;
+  const X = i.contractedMw;
+  const meter = i.loss?.meter ?? 1;
+  const need = X * TENDER.mwhPerMwDay * i.availability;
+  const can = (y) => X * i.essMwhPerMw * socWindow(i) * bessCapFactor(i, y) * meter + (i.windMw > 0 ? Infinity : 0); // wind in the peak hours adds to it
+  let fadeDays = 0;
+  let limitDays = 0;
+  let fadeFrom = null;
+  for (const y of model.opYears || []) {
+    if (!y.shortDays) continue;
+    if (can(y.index) < need - 1e-6) { fadeDays += y.shortDays; if (fadeFrom === null) fadeFrom = y.index; } else limitDays += y.shortDays;
+  }
+  const n = (v) => Math.round(v).toLocaleString("en-IN");
+  const parts = [];
+  if (fadeDays) parts.push(`from year ${fadeFrom} the battery has faded below the daily supply (${n(fadeDays)} days; augment it, or add capacity year by year)`);
+  if (limitDays) parts.push(`on ${n(limitDays)} days the sourcing limits leave too little charging power (more own RE)`);
+  return { fadeDays, limitDays, fadeFrom, text: parts.join("; ") };
+}
+
+export function fadeNote(need, availability) {
+  if (!need?.shortYear) return null;
+  const pc = Number.isFinite(availability) && availability < 1 ? `${+(availability * 100).toFixed(1)}%` : null;
+  const supply = need.supplyShortYear
+    ? need.supplyShortYear === need.shortYear ? "; days fall short from that year" : `, and below the daily supply${pc ? ` at your ${pc} availability` : ""} from year ${need.supplyShortYear}, when days start to fall short`
+    : pc ? `; at your ${pc} availability the daily supply is still met to the end of the term` : "";
+  return `as the battery fades the usable energy falls below 2 MWh per MW from year ${need.shortYear}${supply}`;
+}
+
 export function sizingChecks(model, state = { inputs: model.inputs, losses: null }) {
   if (!model) return [];
   const i = model.inputs;
@@ -40,7 +80,7 @@ export function sizingChecks(model, state = { inputs: model.inputs, losses: null
     win < 1 ? `${nf(X * usable)} MWh usable within the state-of-charge window` : null,
     need.meter < 1 ? `${((1 - need.meter) * 100).toFixed(1)}% lost from the battery to the meter` : null,
     essOk ? null : `${nf(need.energy, 2)} MWh and ${nf(need.power, 2)} MW per MW nameplate needed`,
-    need.shortYear ? `without augmentation the usable energy falls below the need from year ${need.shortYear}` : i.augmentation === "annual" ? "augmentation keeps the usable energy every year" : null,
+    need.shortYear ? fadeNote(need, i.availability) : i.augmentation === "annual" ? "augmentation keeps the usable energy every year" : null,
   ].filter(Boolean).join("; ");
   const pay = i.shortfallPolicy === "pay";
   const penaltyTerm = model.sp ? years.reduce((a, y) => a + penaltyCr(y, model.sp), 0) : null;

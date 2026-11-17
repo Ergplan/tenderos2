@@ -14,6 +14,7 @@ import { useTeamContext } from "../team/useTeam";
 import Cite from "./Cite.jsx";
 import { designProfiles, essRequiredPerMw, lossFactorsOfCfd, missingInputs, socWindow, socWindowWarning } from "./model.js";
 import { Choice, Fields, FillBar } from "./inputs.jsx";
+import { fadeNote } from "./checks.js";
 
 const COLORS = { solar: DATA_COLORS.solar, wind: DATA_COLORS.wind, bess: DATA_COLORS.bess };
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -195,7 +196,7 @@ export default function DesignStep({ state, setState, setInput, set, lockProps, 
                   Battery {nf(X * (i.essMwPerMw || 1))} MW / {nf(X * nameplate)} MWh nameplate for {nf(X)} MW contracted{duration !== null ? `; discharge duration ${nf(duration, 2)} h` : ""}{win < 1 ? `; usable ${nf(X * usable)} MWh within the ${pf(i.essSocMin || 0, 0)}–${pf(i.essSocMax ?? 1, 0)} state-of-charge window` : ""} <Cite id="ess" /> <Cite id="essOwned" /> <Cite id="colocated" />
                   {i.extraEssMwhPerMw > 0 && <>, plus {nf(X * i.extraEssMwhPerMw)} MWh for evening sale outside the peak hours, once the day's supply is met <Cite id="essOtherUse" /></>}.
                   {nameplate !== null && (nameplate < need.energy - 1e-9 || (i.essMwPerMw || 0) < need.power - 1e-9) && <strong> The tender's 2 MWh per MW must reach the meter: {nf(need.energy, 2)} MWh and {nf(need.power, 2)} MW per MW nameplate{win < 1 ? " within this window" : ""}{need.meter < 1 ? ` after the ${((1 - need.meter) * 100).toFixed(1)}% lost to the meter` : ""}; "Fill up for me please" sets it.</strong>}
-                  {need.shortYear && <strong> Without augmentation the usable energy falls below the need from year {need.shortYear}; pick annual augmentation or more nameplate.</strong>}
+                  {need.shortYear && <strong> {(() => { const t = fadeNote(need, i.availability); return t[0].toUpperCase() + t.slice(1); })()}. Pick annual augmentation, add capacity year by year on the finance inputs, or more nameplate.</strong>}
                 </p>
               )}
             </div>

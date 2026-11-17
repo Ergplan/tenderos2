@@ -1,6 +1,7 @@
 import { currentUserWithAccess, handler, HttpError } from "@/lib/auth";
 import { logEvent } from "@/lib/activity";
 import { buildModelWorkbook, workbookResponse } from "@/lib/modelWorkbook";
+import { cfdBlockData } from "@/lib/cfdBlockSheets";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,9 @@ export const dynamic = "force-dynamic";
 // Balance sheet, Debt schedule, Depreciation and tax, Working capital, Sensitivity, then the
 // inputs, plant and capex, and the model's years. The browser builds the request
 // (web/src/cfd/finance.js cfdModelExport).
+// With `blocks15` and the saved bid `state` in the body it is the second version: the Live model's
+// contracted, supplied and sold energy are formulas on the 15-minute dispatch of every day of the
+// term, on sheets at the end of the workbook (web/lib/cfdBlockSheets.js).
 export const POST = handler(async (req) => {
   const user = await currentUserWithAccess();
   if (!user) throw new HttpError(401, "Sign in required.");
@@ -17,11 +21,12 @@ export const POST = handler(async (req) => {
   const body = await req.json();
   let out;
   try {
-    out = await buildModelWorkbook(body, { preparedBy: user.name || user.email, product: "CfD bid" });
+    const blockData = body?.blocks15 ? cfdBlockData(body.state) : null;
+    out = await buildModelWorkbook(body, { preparedBy: user.name || user.email, product: "CfD bid", blockData });
   } catch (err) {
     if (err.status) throw new HttpError(err.status, err.message);
     throw err;
   }
-  await logEvent({ user, kind: "export", detail: { what: "cfd-bid-model.xlsx" }, req });
+  await logEvent({ user, kind: "export", detail: { what: body?.blocks15 ? "cfd-bid-model-15min.xlsx" : "cfd-bid-model.xlsx" }, req });
   return workbookResponse(out);
 });

@@ -67,6 +67,11 @@ export const DEFAULT_BESS = {
   augmentation: "annual", // 'annual' | 'none' | 'oneTime'
   augmentationYear: 12,
   augmentationYears: [6, 12, 18], // 'schedule': the years the capacity lost since the last augmentation is replaced
+  // 'byYear': capacity added at the start of each operating year as a share of the nameplate
+  // (index = the year; year 1 is the plant itself), and that year's cost in ₹ cr where it is known
+  // (blank: the MWh added at that year's battery price)
+  augmentationPct: [],
+  augmentationCr: [],
   costDeclinePct: 0.03,
   durationH: 4, // discharge duration chosen by the user: 2 or 4 hours (MWh = MW x hours); null = free
   minDurationH: 1,
@@ -172,7 +177,7 @@ export const FINANCE_V3_KEYS = {
     "quasi", "mezz", "guarantees", "bookDepreciation", "bookWdvRate", "lives", "thinCapPct", "lossCarryYears",
     "holdco", "lenderReinvestRate", "capexUsdShare", "fxBase"],
   costs: ["phasing", "moduleSharePct"],
-  bess: ["augmentationYears"],
+  bess: ["augmentationYears", "augmentationPct", "augmentationCr"],
 };
 
 // ---------------------------------------------------------------- helpers
@@ -906,6 +911,11 @@ export function yearFactors(year, fin, bess) {
     // finance v3: the capacity fades from the last augmentation year on or before this year
     const last = (bess.augmentationYears || []).map((v) => Math.round(v)).filter((v) => v > 1 && v <= year).reduce((a, b) => Math.max(a, b), 1);
     bessFactor = Math.max(0.4, 1 - deg * (year - last));
+  } else if (bess.augmentation === "byYear") {
+    // year by year: the nameplate fades from year 1; each year's addition fades from the year it is added
+    bessFactor = Math.max(0.4, 1 - deg * (year - 1));
+    const add = bess.augmentationPct || [];
+    for (let a = 2; a <= year; a += 1) if (Number.isFinite(add[a]) && add[a] > 0) bessFactor += add[a] * Math.max(0.4, 1 - deg * (year - a));
   }
   return { solarFactor, windFactor, bessFactor, demandFactor };
 }
@@ -1074,6 +1084,17 @@ function augmentationScheduleCr(sizes, costs, bess, years) {
   const out = new Array(years + 1).fill(0);
   const deg = bess.annualDegradation || 0;
   const priceAt = (y) => costs.bessCrPerMwh * (1 - (bess.costDeclinePct || 0)) ** (y - 1);
+  if (bess.augmentation === "byYear") {
+    // year by year: the cost entered for the year, or the MWh added at that year's battery price
+    if (!sizes.bessMwh) return out;
+    const add = bess.augmentationPct || [];
+    const cr = bess.augmentationCr || [];
+    for (let y = 2; y <= years; y += 1) {
+      const pct = Number.isFinite(add[y]) && add[y] > 0 ? add[y] : 0;
+      out[y] = Number.isFinite(cr[y]) && cr[y] > 0 ? cr[y] : sizes.bessMwh * pct * priceAt(y);
+    }
+    return out;
+  }
   if (!sizes.bessMwh || !deg) return out;
   if (bess.augmentation === "annual") {
     for (let y = 2; y <= years; y += 1) out[y] = sizes.bessMwh * deg * priceAt(y);

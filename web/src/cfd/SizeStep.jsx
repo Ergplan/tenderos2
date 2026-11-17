@@ -5,7 +5,7 @@ import { LiveChart } from "../rtc/charts";
 import Cite from "./Cite.jsx";
 import { TENDER } from "./terms.js";
 import { capShortfall, fmtDate, missingInputs, ownReCostRsPerKwh, penaltyCr, rfsAmounts, simulate } from "./model.js";
-import { sizingChecks } from "./checks.js";
+import { shortfallCauses, sizingChecks } from "./checks.js";
 import BidReview from "./BidReview.jsx";
 import { BLOCKS_PER_DAY, blockContext, blockTime, dayBlocks, dispatch15 } from "./dispatch15.js";
 import { downloadFile } from "./finance.js";
@@ -203,7 +203,7 @@ export default function SizeStep({ state, model, prices, optimise, optimising, s
           <Stat label="Own solar" value={`${nf(i.solarMw || 0)} MWac`} detail={`${nf((i.solarMw || 0) / X, 2)} × contracted; CUF ${pf(i.solarCuf, 1)}`} />
           <Stat label="Own wind" value={`${nf(i.windMw || 0)} MW`} detail={i.windMw ? `${nf(i.windMw / X, 2)} × contracted; CUF ${pf(i.windCuf, 1)}` : "none"} />
           <Stat label="Strike price to bid" value={sp ? `₹${nf(sp, 3)}/kWh` : "–"} detail={sp ? `quote ₹${nf(model.bid, 2)} (rounded up to the paisa); equity IRR ${pf(i.targetEquityIrr, 1)}${model.finance ? ` · the full financial model, as on step 08 and in the workbook${model.screening?.sp ? `; fast screening ₹${nf(model.screening.sp, 3)}` : ""}` : ""}` : model.reason || ""} tone={sp ? undefined : "bad"} />
-          <Stat label="Days short of the daily supply" value={nf(years.reduce((s, y) => s + y.shortDays, 0))} detail={shortMwh > 1e-3 * X ? `${nf(shortMwh, 0)} MWh over the term: the sourcing limits bind, or the battery has faded below the need` : "none"} tone={shortMwh > 1e-3 * X ? "bad" : undefined} />
+          <Stat label="Days short of the daily supply" value={nf(years.reduce((s, y) => s + y.shortDays, 0))} detail={shortMwh > 1e-3 * X ? `${nf(shortMwh, 0)} MWh over the term: ${shortfallCauses(model).text || "the sourcing limits bind, or the battery has faded below the need"}` : "none"} tone={shortMwh > 1e-3 * X ? "bad" : undefined} />
           <Stat label="Weekly penalties" value={`₹${nf(penalty, 2)} cr`} detail={penalty > 0 ? `over the term at SP ₹${nf(sp, 2)}` : "no week below 90% of the mandate"} tone={penalty > 0 ? "bad" : undefined} />
           <Stat label="EMD and PBG" value={`₹${nf(a.emdCr, 2)} cr / ₹${nf(a.pbgCr, 2)} cr`} detail={`net worth ₹${nf(a.netWorthCr, 1)} cr`} />
         </div>

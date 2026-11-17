@@ -12,7 +12,7 @@ import * as E from "../rtc/engine.js";
 import { genSource } from "../model/generation.js";
 import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
 import { reviewBid } from "./review.js";
-import { BENCHMARK_NOTE, WINNING_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, ownReSource, CHOICES, FIELDS, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
+import { BENCHMARK_NOTE, WINNING_NOTE, BG_YEARS, CFD_FIN_DEFAULTS, ownReSource, CHOICES, FIELDS, augmentationText, essTotalMwhPerMw, fmtDate, keyDates, lcCr, poolFlows, rfsAmounts } from "./model.js";
 import { TENDER } from "./terms.js";
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
@@ -77,6 +77,7 @@ export function cfdEngineInputs(state, model) {
     ...E.DEFAULT_BESS,
     rte: i.rte, annualDegradation: i.essDegradation || 0,
     augmentation: state.bess?.augmentation || (i.augmentation === "annual" ? "annual" : "none"), augmentationYears: state.bess?.augmentationYears || undefined, augmentationYear: state.bess?.augmentationYear, costDeclinePct: i.augDecline || 0,
+    augmentationPct: state.bess?.augmentationPct || [], augmentationCr: state.bess?.augmentationCr || [],
     durationH: i.essMwPerMw > 0 ? essTotalMwhPerMw(i) / i.essMwPerMw : 2,
   };
   const recShare = 1 - TENDER.recPoolShare; // the bidder keeps 50% of the REC proceeds (CfDA 9.2.vi)
@@ -160,7 +161,7 @@ function liveSources(state) {
     ...fin,
     "solar.capex": s("solarCrPerMw"), "wind.capex": s("windCrPerMw"), "bess.capex": s("essCrPerMwh"), "costs.evacuationCr": s("evacuationCrPerMw"), "costs.preopPct": s("preopPct"),
     "solar.om": s("solarOmLakhPerMw"), "wind.om": s("windOmLakhPerMw"), "bess.om": s("essOmLakhPerMwh"), "fin.omEscalation": s("omEscalation"), "fin.insurancePct": s("insurancePct"), "fin.otherFixedCr": s("otherFixedLakhPerMw"),
-    "market.sell": s("merchant"), "bess.augmentation": s("augmentation"), "bess.degradation": s("essDegradation"), "bess.costDeclinePct": s("augDecline"),
+    "market.sell": s("merchant"), "bess.augmentation": state.bess?.augmentation ? "Your input (Finance inputs)" : s("augmentation"), "bess.degradation": s("essDegradation"), "bess.costDeclinePct": s("augDecline"),
     "fin.debtFraction": s("debtFraction"), "fin.interestRate": s("interestRate"), "fin.tenorYears": s("tenorYears"), "fin.targetEquityIrr": s("targetEquityIrr"), "fin.discountRate": s("discountRate"), "fin.taxRate": s("taxRate"),
     "solar.degradation": s("solarDegradation"), "fin.lcCostPct": s("lcCostPct"), "fin.tariffEscalation": "Tender: the strike price is fixed for the term",
     "costs.otherCapexCr": "RfS: the cost of the RfS, the bid fee and the Contract Administration Charges with GST, and the EMD and PBG guarantees' cost",
@@ -253,7 +254,8 @@ export function cfdModelExport({ state, model, finance, review = null }) {
   const notes = [...MODEL_NOTES, `Inputs marked "Industry benchmark" are ${BENCHMARK_NOTE.charAt(0).toLowerCase()}${BENCHMARK_NOTE.slice(1)}; those marked "Competitive-bidder value" are what a bidder who wins SECI's 2026 auctions shows a lender; the rest are the bidder's own (sheet Inputs).`];
   const inputs = FIELDS.map((f) => ({ group: f.section, input: f.label, value: i[f.key], unit: f.pct ? "%" : f.unit, source: sourceOf(state, f.key) }));
   for (const k of ["effectiveDate", "sellMarket", "useMarket", "useGroup", "merchant", "augmentation", "afterTerm"]) {
-    inputs.push({ group: "choice", input: CHOICES[k].label, value: String(i[k]), unit: "", source: sourceOf(state, k) });
+    // the augmentation as the model runs it: the finance team's schedule or year-by-year table over the Design step's choice
+    inputs.push({ group: "choice", input: CHOICES[k].label, value: k === "augmentation" ? augmentationText(state) : String(i[k]), unit: "", source: k === "augmentation" && state.bess?.augmentation ? "Your input" : sourceOf(state, k) });
   }
   for (const [label, value, unit] of [["Repayment", eng.fin.repayment], ["Principal moratorium", eng.fin.graceYears, "years"], ["Instalments a year", eng.fin.paymentsPerYear], ["Refinance at the end of year", eng.fin.refiYear, "year"], ["Receivable days", eng.fin.receivableDays, "days"], ["O&M in hand", eng.fin.omStockMonths, "months"], ["Maintenance spares", eng.fin.sparesPctOm, "%"], ["Debt service reserve", eng.fin.dsraMonths, "months"], ["Tax depreciation", eng.fin.taxDepreciation], ["WDV rate", eng.fin.wdvRate, "%"], ["Book life", eng.fin.bookLifeYears, "years"], ["Salvage value", eng.fin.salvagePct, "%"], ["Construction", eng.costs.constructionMonths, "months"]]) {
     inputs.push({ group: "Financing terms", input: label, value, unit: unit || "", source: "Finance inputs (editable on the Financial model)" });
@@ -304,6 +306,15 @@ export function cfdModelExport({ state, model, finance, review = null }) {
 /** POST the request and save the workbook (the browser). */
 export function downloadCfdModel(payload) {
   return downloadFile("/api/cfd/model", payload, `${payload.fileName}.xlsx`);
+}
+
+/**
+ * The second version of the workbook: the same model with the 15-minute dispatch of every day of
+ * the term behind the Live model's energy (web/lib/cfdBlockSheets.js). The server runs the
+ * dispatch on the saved bid `state`.
+ */
+export function downloadCfdModel15(payload, state) {
+  return downloadFile("/api/cfd/model", { ...payload, blocks15: true, state }, `${payload.fileName}_15min.xlsx`);
 }
 
 /** POST a request and save the file it answers with (the workbooks, the 15-minute dispatch). */

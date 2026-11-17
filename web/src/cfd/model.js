@@ -156,8 +156,9 @@ export function defaultCfdState() {
 
 /**
  * The battery augmentation choice for the finance team's inputs: "annual" and "none" are the
- * tender input (inputs.augmentation); "oneTime" and "schedule" (with augmentationYears) live in
- * state.bess, which the shared model reads first.
+ * tender input (inputs.augmentation); "oneTime", "schedule" (with augmentationYears) and "byYear"
+ * (augmentationPct and augmentationCr, one entry per operating year) live in state.bess, which the
+ * shared model reads first.
  */
 export function patchCfdBess(s, values) {
   const bess = { ...(s.bess || {}), ...values };
@@ -170,7 +171,7 @@ export function patchCfdBess(s, values) {
 }
 
 /** The augmentation choice shown on the finance team's inputs. */
-export const cfdBessAug = (s) => ({ augmentation: s.bess?.augmentation || s.inputs?.augmentation || "none", augmentationYears: s.bess?.augmentationYears || [] });
+export const cfdBessAug = (s) => ({ augmentation: s.bess?.augmentation || s.inputs?.augmentation || "none", augmentationYears: s.bess?.augmentationYears || [], augmentationPct: s.bess?.augmentationPct || [], augmentationCr: s.bess?.augmentationCr || [] });
 
 export function mergeCfdState(saved) {
   const base = defaultCfdState();
@@ -491,6 +492,31 @@ export function socWindowWarning(inputs) {
   };
 }
 
+/** The augmentation choice as the day-by-day operation reads it: the finance team's (state.bess) over the tender input's. */
+export function modelAugmentation(state) {
+  const b = state?.bess || {};
+  const mode = b.augmentation || state?.inputs?.augmentation || "none";
+  return {
+    augmentation: mode === "annual" ? "annual" : "none", augmentationMode: mode,
+    augmentationYears: Array.isArray(b.augmentationYears) ? b.augmentationYears.filter(isNum) : [],
+    augmentationYear: isNum(b.augmentationYear) ? b.augmentationYear : undefined,
+    augmentationPct: Array.isArray(b.augmentationPct) ? b.augmentationPct.map((v) => (isNum(v) && v > 0 ? v : 0)) : [],
+  };
+}
+
+/** The augmentation of the bid in words (the finance team's choice over the Design step's), for the workbook and the review. */
+export function augmentationText(state) {
+  const a = modelAugmentation(state);
+  const pc = (v) => `${(v * 100).toFixed(1).replace(/\.0$/, "")}%`;
+  if (a.augmentationMode === "byYear") {
+    const years = a.augmentationPct.map((v, y) => (v > 0 && y >= 2 ? `${pc(v)} in year ${y}` : null)).filter(Boolean);
+    return years.length ? `year by year: ${years.join(", ")} of the nameplate added` : "year by year, with no capacity entered";
+  }
+  if (a.augmentationMode === "schedule") return a.augmentationYears.length ? `on a schedule, in year${a.augmentationYears.length > 1 ? "s" : ""} ${a.augmentationYears.join(", ")}` : "on a schedule, with no year entered";
+  if (a.augmentationMode === "oneTime") return `once, in year ${a.augmentationYear ?? "?"}`;
+  return a.augmentationMode === "annual" ? "every year" : "none";
+}
+
 /**
  * The battery the tender's 2 MWh per MW needs as nameplate, once the state-of-charge window and the
  * losses from the battery to the billing meter are in: energy 2 ÷ (window × to-meter factor) and
@@ -506,14 +532,23 @@ export function essRequiredPerMw(state) {
   const up = (v) => Math.ceil(v * 20 - 1e-9) / 20;
   const energy = up(TENDER.essHoursMin / (window * meter));
   const power = up(1 / meter);
+  // the first year the usable energy is below the tender's 2 MWh per MW (shortYear), and the first
+  // year it is below the daily supply at the plant's availability (supplyShortYear): days count as
+  // short from the second, which is later when the availability is under 100%
   let shortYear = null;
-  if (i.augmentation === "none" && isNum(i.essDegradation) && i.essDegradation > 0 && isNum(i.essMwhPerMw)) {
+  let supplyShortYear = null;
+  const aug = modelAugmentation(state);
+  if ((state?.bess?.augmentation || i.augmentation) && aug.augmentation !== "annual" && isNum(i.essDegradation) && i.essDegradation > 0 && isNum(i.essMwhPerMw)) {
     const need = TENDER.essHoursMin / meter; // usable energy at the bus
+    const avail = isNum(i.availability) ? i.availability : 1;
+    const fi = { essDegradation: i.essDegradation, ...aug };
     for (let y = 1; y <= TENDER.termYears; y += 1) {
-      if (i.essMwhPerMw * window * Math.max(0.4, 1 - i.essDegradation * (y - 1)) < need - 1e-9) { shortYear = y; break; }
+      const usable = i.essMwhPerMw * window * bessCapFactor(fi, y);
+      if (shortYear === null && usable < need - 1e-9) shortYear = y;
+      if (supplyShortYear === null && usable < need * avail - 1e-9) supplyShortYear = y;
     }
   }
-  return { energy, power, window, meter, shortYear };
+  return { energy, power, window, meter, shortYear, supplyShortYear };
 }
 
 /**
@@ -566,12 +601,22 @@ export function lossFactorsOfCfd(state, rte = state?.inputs?.rte) {
  * The battery's usable capacity in an operating year as a share of nameplate: 1 with annual
  * augmentation; faded by the degradation since the last augmentation with a one-time year or a
  * schedule (the finance team's choice, inputs.augmentationMode / augmentationYears, the same
- * convention as the shared financial engine); faded from year 1 with none. Never below 40%.
+ * convention as the shared financial engine); year by year, the nameplate's fade plus each year's
+ * addition (inputs.augmentationPct[year], a share of the nameplate); faded from year 1 with none.
+ * Never below 40% of what was installed.
  */
 export function bessCapFactor(inputs, year) {
   const deg = isNum(inputs.essDegradation) ? inputs.essDegradation : 0;
   const mode = inputs.augmentationMode || inputs.augmentation;
   if (mode === "annual") return 1;
+  if (mode === "byYear") {
+    // year by year: the nameplate fades from year 1, and each year's addition (a share of the
+    // nameplate, in place from the start of that year) fades from the year it is added
+    let f = Math.max(0.4, 1 - deg * (year - 1));
+    const add = inputs.augmentationPct || [];
+    for (let a = 2; a <= year; a += 1) if (isNum(add[a]) && add[a] > 0) f += add[a] * Math.max(0.4, 1 - deg * (year - a));
+    return f;
+  }
   if (mode === "oneTime" && isNum(inputs.augmentationYear) && inputs.augmentationYear > 1) {
     const since = year >= inputs.augmentationYear ? year - inputs.augmentationYear : year - 1;
     return Math.max(0.4, 1 - deg * since);
@@ -629,23 +674,45 @@ export function simulate(inputs, book, prof, { record = [], onDay = null } = {})
     const d = Math.round((end - start) / DAY_MS);
     return { index: i + 1, start, end, days: d, requiredMwh: X * TENDER.mwhPerMwDay * d, ...blank() };
   });
+  // What a day can supply at the meter: the mandate at the plant's availability, or less when the
+  // battery (faded, where it is not augmented) and the wind in the two peak hours cannot reach it.
+  // The same arithmetic as the day's own (below), before any charging is decided.
+  const canSupply = (t) => {
+    const k = Math.round((t - dates.scd) / DAY_MS);
+    const year = Math.floor(k / 365) + 1;
+    const cap = capNominal * bessCapFactor(inputs, year);
+    const perHour = X * avail;
+    const d = priceDay(t);
+    const windOn = W > 0 && t >= reCod;
+    const windF = (1 - windDeg) ** (year - 1);
+    let direct = 0;
+    let need = 0;
+    for (const h of book.peakOrder[d].slice(0, TENDER.peakHours)) {
+      const w = windOn ? Math.min(W * prof.wind[d * 24 + h] * windF * fW * meter, perHour) : 0;
+      direct += w;
+      need += Math.min(P, (perHour - w) / meter);
+    }
+    return direct + Math.min(need, cap) * meter;
+  };
   const out = cys.map((cy) => {
-    // the Contract Year's sourcing limits, in MWh supplied (Amd-02: on the energy discharged)
-    let extraDays = 0;
-    let groupDays = 0;
+    // The Contract Year's sourcing limits, in MWh supplied (Amd-02: on the energy discharged). They
+    // are shares of the energy supplied, so they are set on what the plant can supply each day: the
+    // mandate at the plant's availability while the battery can carry it, less in a year a faded
+    // battery cannot. Measured against the supply they then sit at 25% and 50%, not above: a bid
+    // that pays the penalty on a faded battery still buys within the limits.
+    let marketBase = 0;
+    let groupBase = 0;
     for (let t = cy.start; t < cy.end; t += DAY_MS) {
-      if (t < dates.extraUntil) extraDays += 1; else groupDays += 1;
+      const s = canSupply(t);
+      if (t < dates.extraUntil) marketBase += s * (TENDER.marketShare + TENDER.extraMarketShare);
+      else { marketBase += s * TENDER.marketShare; groupBase += s * TENDER.groupShare; }
     }
     const daily = X * TENDER.mwhPerMwDay;
-    // the sourcing limits are shares of the energy supplied (Amendment-02: on the energy
-    // discharged), so they are set on the mandate at the plant's availability, which is what the
-    // plant supplies; measured against the supply they then sit at 25% and 50%, not above
-    const supplied = daily * avail;
     return {
       ...cy,
       requiredMwh: daily * cy.days,
-      marketCapMwh: inputs.useMarket ? supplied * (TENDER.marketShare * cy.days + TENDER.extraMarketShare * extraDays) : 0,
-      groupCapMwh: inputs.useGroup ? supplied * TENDER.groupShare * groupDays : 0,
+      marketCapMwh: inputs.useMarket ? marketBase : 0,
+      groupCapMwh: inputs.useGroup ? groupBase : 0,
       ...blank(),
     };
   });
@@ -1114,11 +1181,12 @@ export function modelInputs(state) {
   if (ps) i.profileSources = ps;
   const loss = lossFactorsOfCfd(state, i.rte);
   if (loss) i.loss = loss;
-  // the finance team's augmentation choice (one-time or a schedule) reaches the day-by-day operation
+  // the finance team's augmentation choice (one-time, a schedule or year by year) reaches the day-by-day operation
   if (state.bess?.augmentation) {
     i.augmentationMode = state.bess.augmentation;
     if (Array.isArray(state.bess.augmentationYears)) i.augmentationYears = state.bess.augmentationYears.filter(isNum);
     if (isNum(state.bess.augmentationYear)) i.augmentationYear = state.bess.augmentationYear;
+    if (Array.isArray(state.bess.augmentationPct)) i.augmentationPct = state.bess.augmentationPct.map((v) => (isNum(v) && v > 0 ? v : 0));
   }
   return i;
 }

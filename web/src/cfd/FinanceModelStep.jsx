@@ -8,7 +8,7 @@ import Cite from "./Cite.jsx";
 import MarketPrices from "./MarketPrices.jsx";
 import { TENDER } from "./terms.js";
 import { cfdBessAug, fmtDate, keyDates, lcCr, patchCfdBess, poolFlows, rfsAmounts } from "./model.js";
-import { MODEL_NOTES, cfdLiveRequest, cfdModelExport, downloadCfdModel, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
+import { MODEL_NOTES, cfdLiveRequest, cfdModelExport, downloadCfdModel, downloadCfdModel15, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
 import "./finance.css";
 
 // the CfD lines the shared financial view adds after "Other fixed" in the year-by-year table
@@ -171,6 +171,13 @@ export default function FinanceModelStep({ state, setState, setInput, patch, set
               }}>
               {saving ? <Loader2 className="spin" size={14} /> : <Download size={14} />} Download financial model (Excel)
             </button>
+            <button type="button" disabled={saving} data-testid="cfd-download-15min" title="The same financial model with the 15-minute dispatch of every day of the term behind the contracted, supplied and sold energy (a larger file)"
+              onClick={async () => {
+                setSaving(true); setSaveError("");
+                try { await downloadCfdModel15(cfdModelExport({ state, model, finance }), state); } catch (err) { setSaveError(err.message); } finally { setSaving(false); }
+              }}>
+              {saving ? <Loader2 className="spin" size={14} /> : <Download size={14} />} With the 15-minute dispatch (Excel)
+            </button>
           </>
         )}>
         {saveError && <div className="alert"><TriangleAlert size={14} /> {saveError}</div>}
@@ -234,7 +241,7 @@ export default function FinanceModelStep({ state, setState, setInput, patch, set
 
       <div className="story-divider"><span>Financial model · {finance.rows.length} years</span></div>
       <FinanceView state={viewState} patch={viewPatch} set={setFn} lockProps={locks} finance={finance} sizes={eng.sizes} extraLines={EXTRA_LINES}
-        codDefault={i.effectiveDate ? keyDates(i.effectiveDate).scd : null} bessAug={cfdBessAug(state)} patchBess={(values) => setAll((s) => patchCfdBess(s, values))}
+        codDefault={i.effectiveDate ? keyDates(i.effectiveDate).scd : null} bessAug={cfdBessAug(state)} augYears={TENDER.termYears} patchBess={(values) => setAll((s) => patchCfdBess(s, values))}
         modelArgs={{ ctx: null, sizes: eng.sizes, args: { costs: eng.costs, fin: eng.fin, bess: eng.bess, dfrTarget: 0, tariffLocked: false, ops: eng.ops, solveBy: "npv" } }} />
       {setInput && <MarketPrices state={state} setInput={setInput} prices={prices} model={model} />}
     </TraceProvider>

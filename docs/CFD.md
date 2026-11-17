@@ -252,6 +252,32 @@ bid state and answers with the ZIP (`format: "zip"`: one CSV per Contract Year, 
 summaries, the inputs, a README) or the workbook (`format: "xlsx"`, written with ExcelJS's
 streaming writer: About, Summary, Monthly, one sheet per Contract Year).
 
+## The financial model with the 15-minute dispatch behind it
+
+The financial model workbook comes in two versions. The first (`POST /api/cfd/model`) carries each
+operating year's energy as values from the day-by-day model. The second (the same route with
+`blocks15: true` and the saved bid `state`; the button **With the 15-minute dispatch (Excel)**)
+puts the dispatch in the workbook: the Live model's "Contracted energy", "Delivered to the
+procurer" and "Sold in the market" rows are formulas, and `web/lib/cfdBlockSheets.js` adds eight
+sheets at the end:
+
+| Sheet | Holds |
+|---|---|
+| 15-min by year | One row per operating year: `SUMIFS` over the days. The Live model reads this sheet (÷ 1000 for MU). |
+| 15-min by day | One row per day of the term (5,478): each energy is the `SUM` of the same row on its block sheet. |
+| 15-min supply due | Day rows × 96 block columns: contracted MW × ¼ h in the day's 8 peak blocks, as formulas on the contracted capacity of the Inputs sheet. |
+| 15-min supplied, sold, charge own RE, charge market, charge group RE | Day rows × 96 block columns: the dispatch's MWh in each block, as values (green). Only blocks with energy are written. |
+
+A day has the same row number on every sheet. The blocks come from `dispatch15` on the model of the
+saved state, held to 0.01 kWh; the request's yearly energy is replaced by the sheets' sums
+(`opsFromBlocks`), which must equal the browser's model to that rounding or the request is refused
+with a 409 (a bid changed since it was saved). Market years after the term keep their values.
+`tools/check_cfd_blocks.mjs` recalculates the workbook with LibreOffice (about 97,000 formulas to
+the values the cells carry, no error) and doubles the contracted capacity on the Inputs sheet to
+see the supply due double in every peak block, by day, by year and in the Live model. The file is
+about 3 MB for a 15-year term. The solar output, the stored energy, the state of charge and the
+prices of each block stay in the 15-minute dispatch export above.
+
 ## Battery augmentation in the operation
 
 The finance team's augmentation choice (annual, none, one-time year, or a schedule of years on the
@@ -261,6 +287,14 @@ share of nameplate by the shared engine's convention (restored in an augmentatio
 the degradation since the last one, never below 40%), and `simulate` sizes each day's charging to
 it. Before 10 Nov 2026 the operation faded the battery from year 1 whenever the choice was not
 annual, while the financial model paid for the scheduled augmentation: the two now agree.
+A fifth choice, **year by year** (`state.bess.augmentation = "byYear"`, 17 Nov 2026), takes a table
+of the Finance inputs step: for each operating year from the second, the capacity added at the
+start of the year as a share of the nameplate (`augmentationPct[year]`) and, where it is known, the
+year's cost in ₹ crore (`augmentationCr[year]`; blank: the MWh added at that year's battery price).
+The nameplate fades from year 1 and each addition fades from its own year; the capacity can stand
+above the nameplate. The same factor reaches the operation, the engine (`yearFactors`,
+`augmentationScheduleCr`) and the Live model (two input rows by year and a `byYear` branch of the
+augmentation formula); `tools/check_finance_v3.mjs` and `tools/check_live_model.mjs` cover it.
 A day is short when less than the 2 MWh per MW (at the plant's availability) reaches the meter,
 whatever the cause: charging power missing within the sourcing limits, or a battery faded below
 the need. `tools/check_live_model.mjs` rebuilds the uploaded 150 MW bid of 10 Nov 2026 from its
@@ -337,11 +371,19 @@ the optimiser chose is never labelled as the bidder's own.
 ## The sourcing limits' basis
 
 The green-market and group-RE limits are shares of the energy supplied (Amendment-02), so
-`simulate` budgets them on the planned supply, the daily mandate at the plant's availability, not
-on the mandate itself: a plant at 97% availability that used 25% of the mandate would show 25.8%
-of its supply. Measured ex post against the energy actually supplied, a year with short days can
-sit a few tenths of a point over the budget; the Size step's checks allow half a point for that
-before calling it a breach (`checks.js`, 10 Nov 2026).
+`simulate` budgets them for each Contract Year on what the plant can supply in that year: each
+day's mandate at the plant's availability, or less when the faded battery cannot hold it
+(`canSupply`: the wind supplied directly plus the battery's usable energy of the year at the
+meter). Until 17 Nov 2026 the budget was the planned supply whatever the battery could hold, so a
+bid with no augmentation bought up to 25% of a supply it no longer made: its green-market share
+read well above 25% of the energy actually supplied in the last years. Measured ex post, a year with short
+days for other reasons can still sit a few tenths of a point over the budget; the Size step's
+checks allow half a point for that before calling it a breach (`checks.js`).
+
+The Size step and the Design step say which cause a shortfall has (`shortfallCauses`, `fadeNote` in
+`checks.js`): days short because the battery has faded, with the year the usable energy falls
+below 2 MWh per MW and the year it falls below the daily supply at the plant's availability (when
+days start to fall short), apart from days short of charging power within the limits.
 
 ## The state-of-charge window warning
 

@@ -221,7 +221,13 @@ const CASES = [
     ...V3,
     costs: { constructionMonths: 0, drawdown: "linear", phasing: { solar: { start: 45, months: 51 }, bess: { start: 7, months: 15 }, evacuation: { start: 3, months: 14 } } },
   })],
+  // the battery's augmentation typed year by year: capacity added in years 4, 8 and 12, the year-8 cost entered
+  ["battery augmentation year by year: 6% of the nameplate in year 4, 8% in year 8 at an entered cost, 2% in year 12", bid({
+    ...V3,
+    bess: { augmentation: "byYear", augmentationPct: Object.assign(new Array(13).fill(0), { 4: 0.06, 8: 0.08, 12: 0.02 }), augmentationCr: Object.assign(new Array(13).fill(0), { 8: 40 }), costDeclinePct: 0.03 },
+  })],
 ];
+const BY_YEAR = CASES.length - 1;
 // the second bid uses a one-time augmentation in year 10, with the battery price falling 3% a year
 {
   const c = CASES[1][1];
@@ -315,6 +321,10 @@ assert.ok(CASES[1][1].finance.rows.some((r) => r.penalty > 0), "a shortfall pena
 assert.ok(CASES[1][1].finance.rows[0].tax === 0 && CASES[1][1].finance.rows.some((r) => r.tax > 0), "tax losses carried, then tax");
 assert.ok(CASES[1][1].finance.rows[0].surplusRevenue > 0);
 assert.ok(CASES[8][1].finance.rows.every((r) => r.dscr === null), "no debt: no DSCR");
+{
+  const y = CASES[BY_YEAR][1].finance;
+  assert.ok(y.rows.filter((r) => r.augCapex > 0).map((r) => r.year).join() === "4,8,12" && y.rows[7].augCapex === 40, "augmentation year by year: years 4, 8 and 12, the year-8 cost as entered");
+}
 {
   // the finance team's branches each case was meant to reach
   const a = CASES[9][1].finance;
@@ -485,7 +495,10 @@ const numberAt = (ws, addr) => {
   console.log(`ok   values  the uploaded 150 MW CfD bid rebuilt: strike price ₹${f.tariff.toFixed(4)}/kWh (file ₹25.5339), project cost ₹${f.capex.total.toFixed(1)} cr (file ₹1,262.5 cr), equity IRR ${(f.equityIrr * 100).toFixed(2)}%`);
 }
 
+// LIVE_MODEL_ONLY=<part of a case's name> recalculates those cases alone (a quick look at one case; not the whole check)
+const ONLY = process.env.LIVE_MODEL_ONLY || "";
 for (const [name, c] of CASES) {
+  if (ONLY && !name.includes(ONLY)) continue;
   const { wb, live } = await build(c);
   const bare = await recalcBook((await build(c, { bare: true })).buffer, mkdtempSync(path.join(tmpdir(), "live-model-")));
   const ws = bare.getWorksheet(LIVE_SHEET);
@@ -514,6 +527,11 @@ for (const [name, c] of CASES) {
     assert.ok(close(numberAt(ws, live.cells[key]), app, /Irr|Xirr|Mirr/.test(key) ? 1e-6 : 1e-7), `${name}: ${key} recalculated: ${JSON.stringify(numberAt(ws, live.cells[key]))} vs ${app} at ${live.cells[key]}`);
   }
   console.log(`ok   recalc  ${name}: ${formulas} formulas: LibreOffice works each one out, from no value, to the value the cell carries`);
+}
+
+if (ONLY) {
+  console.log(`PARTIAL  only the cases named "${ONLY}" were recalculated; run without LIVE_MODEL_ONLY for the whole check`);
+  process.exit(0);
 }
 
 // a changed input moves the whole model: tariff + ₹0.25/kWh on the first bid, battery capex

@@ -6,7 +6,7 @@
 //   block  the bid fails the tender or cannot win as it stands
 //   warn   the price carries a cost the bidder can take out
 //   note   worth knowing before bid day; not a defect by itself
-import { BENCHMARKS, FIELDS, essRequiredPerMw, poolFlows, runModel, socWindow, socWindowWarning } from "./model.js";
+import { BENCHMARKS, FIELDS, augmentationText, essRequiredPerMw, poolFlows, runModel, socWindow, socWindowWarning } from "./model.js";
 import { TENDER } from "./terms.js";
 import { sizingChecks } from "./checks.js";
 import { SECI_RESULTS, tariffRange } from "../market/seed.js";
@@ -138,7 +138,7 @@ export function reviewBid({ state, model, finance = null, prices = null }) {
   const faded = last && last.supplyShare < 0.9 && last.shortDays > 0;
   if (faded) {
     const firstShort = ops.find((o) => o.shortDays > 0 && o.reDays >= 0);
-    add({ id: "battery-fade", severity: "warn", title: `The battery fades below the need: the last year supplies ${pf(last.supplyShare, 1)} of the mandate`, detail: `Augmentation is "${state.bess?.augmentation || i.augmentation}"${state.bess?.augmentationYears?.length ? ` in year${state.bess.augmentationYears.length > 1 ? "s" : ""} ${state.bess.augmentationYears.join(", ")}` : ""} with ${pf(i.essDegradation || 0, 1)} a year of fade; from operating year ${firstShort?.index ?? "?"} the usable energy no longer covers 2 MWh per MW. Augment every year, add years to the schedule, or size the nameplate for the last year. At a strike price above the evening market the weekly penalty is nil, but the energy not supplied earns nothing and the price must rise to pay the plant.`, step: "financeInputs" });
+    add({ id: "battery-fade", severity: "warn", title: `The battery fades below the need: the last year supplies ${pf(last.supplyShare, 1)} of the mandate`, detail: `Augmentation is ${augmentationText(state)}, with ${pf(i.essDegradation || 0, 1)} a year of fade; from operating year ${firstShort?.index ?? "?"} the usable energy no longer covers the daily supply. Augment every year, add years to the schedule or capacity to the year-by-year table, or size the nameplate for the last year. At a strike price above the evening market the weekly penalty is nil, but the energy not supplied earns nothing and the price must rise to pay the plant.`, step: "financeInputs" });
   }
 
   // ---- 6. charging within the limits

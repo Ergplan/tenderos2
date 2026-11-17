@@ -112,7 +112,7 @@ export function sensitivityTables(m) {
 }
 export const REPAYMENT_LIST = ["equal", "annuity", "sculpted", "balloon", "bullet", "stepUp"];
 export const DRAWDOWN_LIST = ["linear", "sCurve", "front", "back"];
-export const AUGMENTATION_LIST = ["annual", "oneTime", "schedule", "none"];
+export const AUGMENTATION_LIST = ["annual", "oneTime", "schedule", "byYear", "none"];
 export const CASE_LIST = ["p50", "p75", "p90"];
 export const DSRA_BASIS_LIST = ["next", "peak"];
 export const BOOK_LIST = ["slm", "wdv"];
@@ -515,7 +515,7 @@ function addConstructionSheet(wb, sheets, S, { base, months, profile, order, deb
  * by liveModelInput. Returns { sheet, cells, values, rows, addr, dispatch } where cells maps the
  * key results (tariff, equityIrr, ...) to their 'Live model'!C.. addresses for other sheets.
  */
-export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } = {}) {
+export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, blocks = null } = {}) {
   const NP = m.ops.length; // the PPA years (the energy given year by year)
   const fi = m.fin;
   const EXT = Math.max(0, Math.round(fi.extension?.years || 0));
@@ -761,6 +761,11 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
 
   // the hour-by-hour dispatch sheets (dispatchSheets.js) read these
   const dsp = m.dispatch && (m.dispatch.solar ? m.gen?.solar : true) && (m.dispatch.wind ? m.gen?.wind : true) ? m.dispatch : null;
+  // the CfD bid's 15-minute backup sheets (cfdBlockSheets.js): the supply due there is a formula on this cell
+  if (blocks && !dsp) {
+    I.section("Dispatch in 15-minute blocks (sheets 15-min …)");
+    inp("contract", "Contracted capacity", "MW", { v: blocks.contractedMw, kind: "opt", fmt: "mw", source: "The bid", note: "The supply due on the 15-minute sheets is this capacity × ¼ h in every peak block. The supplied energy is the dispatch of this capacity: to bid another capacity, change it in TenderOS and download again." });
+  }
   if (dsp) {
     I.section("Dispatch, hour by hour (sheets Dispatch Y…)");
     inp("contract", "Contracted capacity", "MW", { v: dsp.contract, kind: "input", fmt: "mw", source: "The bid" });
@@ -908,6 +913,8 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   r = S.next();
   r.getCell(1).value = sim
     ? "The energy comes from the Round the clock tab's hourly simulation of every year; changing a plant size here moves its cost, not its energy (change it in the tab for that)."
+    : blocks
+      ? `Each year's contracted, supplied and sold energy is the sum of the 15-minute dispatch of every day of the term: the sheets "${blocks.sheets.years}" and "${blocks.sheets.days}" add up the block sheets (one row a day, one column a 15-minute block). Changing a plant size here moves its cost, not its energy (change it in TenderOS and download again for that).`
     : m.dispatch
       ? `Each year's energy is worked out hour by hour on the sheets ${m.dispatch.byYear.map((y) => `"Dispatch Y${y.year}"`).join(" and ")} from the optimiser's choices (green) and the inputs; years between them are interpolated as the optimiser does. Changing a plant size moves its output there, but not the optimiser's choices: size the plant again in TenderOS for a new dispatch.`
       : "The optimiser's energy comes from the hourly HiGHS dispatch of every year; changing a plant size here moves its cost, not its energy (size the plant again in TenderOS for that). Size the plant again to include the hour-by-hour sheets.";
@@ -1220,22 +1227,25 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
   };
 
   // ---- energy from the optimiser: the dispatch's figures (green), then the model's energy after the operating factors
-  S.section(sim ? "Energy (the hourly simulation of each year, summed)" : "Energy (the optimiser's hourly dispatch, summed by year)");
+  S.section(blocks ? "Energy (the 15-minute dispatch of every day, summed by year)" : sim ? "Energy (the hourly simulation of each year, summed)" : "Energy (the optimiser's hourly dispatch, summed by year)");
+  // a year's energy from the 15-minute backup sheets (the years of the term; null beyond them)
+  const backed = (key, y) => (blocks && key ? blocks.ref(key, y) : null);
   const op = (y) => m.ops[y - 1];
   const mu = (x) => (x || 0) / 1000;
   // a dispatch row: the optimiser's value in the PPA years, the last PPA year's beyond them (the
   // extension re-uses that year's energy, faded); zero beyond the PPA for what the PPA alone has
-  const optRow = (key, text, unit, valueOf, { total = true, note, fmt = "mu", zeroBeyond = false, dispatchKey = null } = {}) => S.series(key, text, unit, {
-    f: (y) => (inPpa(y) ? (dispatchKey && dsp ? fromDispatch(dispatchKey, y).f : null) : zeroBeyond ? "0" : S.at(key, NP)),
-    v: (y) => (inPpa(y) ? (dispatchKey && dsp ? fromDispatch(dispatchKey, y).v : valueOf(op(y))) : zeroBeyond ? 0 : S.v(key, NP)),
-    kind: "opt", kindOf: (y) => (inPpa(y) && !(dispatchKey && dsp) ? "opt" : "calc"), fmt, total, note,
+  const optRow = (key, text, unit, valueOf, { total = true, note, fmt = "mu", zeroBeyond = false, dispatchKey = null, blockKey = null } = {}) => S.series(key, text, unit, {
+    f: (y) => (inPpa(y) ? (dispatchKey && dsp ? fromDispatch(dispatchKey, y).f : backed(blockKey, y)?.f ?? null) : zeroBeyond ? "0" : S.at(key, NP)),
+    v: (y) => (inPpa(y) ? (dispatchKey && dsp ? fromDispatch(dispatchKey, y).v : backed(blockKey, y)?.v ?? valueOf(op(y))) : zeroBeyond ? 0 : S.v(key, NP)),
+    kind: "opt", kindOf: (y) => (inPpa(y) && !(dispatchKey && dsp) && !backed(blockKey, y) ? "opt" : "calc"), fmt, total, note,
   });
+  const blockNote = (what) => (blocks ? `${what}: the year's row on the sheet "${blocks.sheets.years}", which sums the days ("${blocks.sheets.days}"), each the sum of its 96 blocks` : undefined);
   S.group("The dispatch's energy (before the operating factors)");
   if (dsp) S.series("demandRaw", "Contracted energy (the dispatch)", "MU", { f: () => `${S.s("contract")}*8760/1000`, v: () => (dsp.contract * 8760) / 1000, fmt: "mu", total: true });
-  else optRow("demandRaw", "Contracted energy (the dispatch)", "MU", (o) => mu(o.demandMWh));
-  optRow("deliveredRaw", "Delivered to the procurer (the dispatch)", "MU", (o) => mu(o.deliveredMWh), { dispatchKey: "delivered", note: dsp ? "The modelled years' hour-by-hour sheets (Dispatch Y…), summed; years between them interpolated as the sizing does" : undefined });
+  else optRow("demandRaw", "Contracted energy (the dispatch)", "MU", (o) => mu(o.demandMWh), { blockKey: "due", note: blocks ? blockNote(`The supply due in every 15-minute block ("${blocks.sheets.due}": contracted MW × ¼ h in the day's peak blocks)`) : undefined });
+  optRow("deliveredRaw", "Delivered to the procurer (the dispatch)", "MU", (o) => mu(o.deliveredMWh), { dispatchKey: "delivered", blockKey: "supplied", note: dsp ? "The modelled years' hour-by-hour sheets (Dispatch Y…), summed; years between them interpolated as the sizing does" : blocks ? blockNote(`The energy supplied in every 15-minute block ("${blocks.sheets.supplied}")`) : undefined });
   const soldText = buyer ? "Sold, in the market and to the buyer" : "Sold in the market";
-  optRow("excessRaw", `${soldText} (the dispatch)`, "MU", (o) => mu(o.excessMWh + (o.buyerExcessMWh || 0)), { dispatchKey: dsp?.sell ? "soldMeter" : null });
+  optRow("excessRaw", `${soldText} (the dispatch)`, "MU", (o) => mu(o.excessMWh + (o.buyerExcessMWh || 0)), { dispatchKey: dsp?.sell ? "soldMeter" : null, blockKey: buyer ? null : "sold", note: blocks && !buyer ? blockNote(`The surplus sold in every 15-minute block ("${blocks.sheets.sold}")`) : undefined });
   if (buyer) optRow("buyerMuRaw", "Of which the buyer takes (Solar Hours excess; the dispatch)", "MU", (o) => mu(o.buyerExcessMWh), { note: "The Solar Hours above 60% sold in hours where the market pays more than the buyer's share of the tariff: the buyer takes those" });
   S.group("The model's energy (after the operating factors)");
   S.series("demand", "Contracted energy", "MU", { f: (y) => `${S.at("demandRaw", y)}*${S.at("opFactor", y)}`, v: (y) => S.v("demandRaw", y) * opFactorV(y), fmt: "mu", total: true });
@@ -1517,21 +1527,31 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true } 
       f: (y) => `IF(OR(${Array.from({ length: SLOTS }, (_, i) => `AND(${slotY(i + 1)}>1,${slotY(i + 1)}<=${S.s("ppaYears")},${slotY(i + 1)}=${S.yr(y)})`).join(",")}),1,0)`,
       v: (y) => (isAugV(y) ? 1 : 0), fmt: "int",
     });
+    // year by year (byYear): the capacity added at the start of each year as a share of the
+    // nameplate, and the year's cost where the finance team has one (blank: the MWh at that
+    // year's battery price). Inputs, one cell a year
+    const addPct = bs.augmentationPct || [];
+    const addCr = bs.augmentationCr || [];
+    S.series("augAdd", "Battery capacity added at the start of the year (byYear)", "% of nameplate", { v: (y) => (y >= 2 && finite(addPct[y]) && addPct[y] > 0 ? addPct[y] : 0), kind: "input", fmt: "pct",
+      note: "Used when Augmentation is byYear. The capacity added fades from the year it is added, like the nameplate; the day-by-day operation in TenderOS runs on the same additions" });
+    S.series("augCost", "Augmentation cost entered for the year (byYear)", "₹ cr", { v: (y) => (y >= 2 && finite(addCr[y]) && addCr[y] > 0 ? addCr[y] : 0), kind: "input", fmt: "cr", total: true,
+      note: "Used when Augmentation is byYear. Leave a year at 0 to cost its addition at that year's battery price (MWh × % added × price)" });
     const augV = (y) => {
       if (!inPpa(y)) return 0;
       const price = S.v("bessCapex") * S.v("bessF", y);
+      if (S.v("augMethod") === "byYear") return y >= 2 ? (S.v("augCost", y) > 0 ? S.v("augCost", y) : S.v("bessMwh") * S.v("augAdd", y) * price) : 0;
       if (S.v("augMethod") === "annual") return y >= 2 ? S.v("bessMwh") * S.v("deg") * price : 0;
       if (S.v("augMethod") === "oneTime" && y === S.v("augYear") && S.v("augYear") > 1 && S.v("augYear") <= NP) return S.v("bessMwh") * Math.min(0.6, S.v("deg") * (y - 1)) * price;
       if (S.v("augMethod") === "schedule" && isAugV(y)) return S.v("bessMwh") * Math.min(0.6, S.v("deg") * (y - lastAugV(y))) * price;
       return 0;
     };
     S.series("aug", "Battery augmentation", "₹ cr", {
-      f: (y) => `IF(${S.yr(y)}>${S.s("ppaYears")},0,IF(${S.s("augMethod")}="annual",IF(${S.yr(y)}>=2,${S.s("bessMwh")}*${S.s("deg")}*${S.s("bessCapex")}*${S.at("bessF", y)},0),`
+      f: (y) => `IF(${S.yr(y)}>${S.s("ppaYears")},0,IF(${S.s("augMethod")}="byYear",IF(${S.yr(y)}>=2,IF(N(${S.at("augCost", y)})>0,${S.at("augCost", y)},${S.s("bessMwh")}*N(${S.at("augAdd", y)})*${S.s("bessCapex")}*${S.at("bessF", y)}),0),IF(${S.s("augMethod")}="annual",IF(${S.yr(y)}>=2,${S.s("bessMwh")}*${S.s("deg")}*${S.s("bessCapex")}*${S.at("bessF", y)},0),`
         + `IF(AND(${S.s("augMethod")}="oneTime",${S.yr(y)}=${S.s("augYear")},${S.s("augYear")}>1,${S.s("augYear")}<=${S.s("ppaYears")}),`
         + `${S.s("bessMwh")}*MIN(0.6,${S.s("deg")}*(${S.yr(y)}-1))*${S.s("bessCapex")}*${S.at("bessF", y)},`
-        + `IF(AND(${S.s("augMethod")}="schedule",${S.at("isAug", y)}=1),${S.s("bessMwh")}*MIN(0.6,${S.s("deg")}*(${S.yr(y)}-${S.at("lastAug", y)}))*${S.s("bessCapex")}*${S.at("bessF", y)},0))))`,
+        + `IF(AND(${S.s("augMethod")}="schedule",${S.at("isAug", y)}=1),${S.s("bessMwh")}*MIN(0.6,${S.s("deg")}*(${S.yr(y)}-${S.at("lastAug", y)}))*${S.s("bessCapex")}*${S.at("bessF", y)},0)))))`,
       v: augV, total: true,
-      note: "annual: each year from year 2 replaces the year's fade (MWh × fade × the year's battery price); oneTime: the fade to that year (at most 60%), once; schedule: in each listed year the fade since the last augmentation. Within the PPA years",
+      note: "annual: each year from year 2 replaces the year's fade (MWh × fade × the year's battery price); oneTime: the fade to that year (at most 60%), once; schedule: in each listed year the fade since the last augmentation; byYear: the cost entered for the year, or the capacity added that year at its battery price. Within the PPA years",
     });
   } else {
     S.series("aug", "Battery augmentation (no battery)", "₹ cr", { v: () => 0, total: true });
@@ -3204,8 +3224,11 @@ export function liveModelInput(raw) {
     },
     bess: {
       ...nums(bess, ["annualDegradation", "augmentationYear", "costDeclinePct"]),
-      augmentation: ["annual", "oneTime", "schedule"].includes(bess.augmentation) ? bess.augmentation : "none",
+      augmentation: ["annual", "oneTime", "schedule", "byYear"].includes(bess.augmentation) ? bess.augmentation : "none",
       augmentationYears: (Array.isArray(bess.augmentationYears) ? bess.augmentationYears : []).filter(finite).slice(0, SLOTS).map((y) => Math.round(y)),
+      // year by year (index = the operating year): the share of the nameplate added, and the year's cost where it is known
+      augmentationPct: (Array.isArray(bess.augmentationPct) ? bess.augmentationPct : []).slice(0, 61).map((v) => (finite(v) && v > 0 ? Math.min(2, v) : 0)),
+      augmentationCr: (Array.isArray(bess.augmentationCr) ? bess.augmentationCr : []).slice(0, 61).map((v) => (finite(v) && v > 0 ? v : 0)),
     },
     ops: raw.ops.slice(0, 60).map((o) => ({
       ...nums(o, ["demandMWh", "deliveredMWh", "excessMWh", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "genBusMWh", "injectedMWh", "trafoLossMWh", "lineLossMWh", "meterMWh", "dsmA", "dsmB", "chargingCostCr", "pxFeesCr", "lcMw", "solarGenMWh", "windGenMWh"]),

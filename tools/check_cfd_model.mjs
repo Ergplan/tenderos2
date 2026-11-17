@@ -399,3 +399,39 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.equal(socWindowWarning({ essSocMin: 0.15, essSocMax: 0.85 }), null, "15–85%: a plain 70% window passes");
   console.log("state-of-charge window warning: ok");
 }
+
+// ---- a battery that fades (no augmentation, pay the penalty): the purchases stay within the limits
+// measured on the energy actually supplied, the note gives both years, the headline names the cause,
+// and capacity added year by year keeps the supply
+{
+  const { bessCapFactor, essRequiredPerMw, modelAugmentation } = await import("../web/src/cfd/model.js");
+  const { fadeNote, shortfallCauses } = await import("../web/src/cfd/checks.js");
+  const real = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
+  const st = fillBenchmarks(defaultCfdState());
+  Object.assign(st.inputs, { contractedMw: 150, essMwhPerMw: 2.25, essMwPerMw: 1.05, solarMw: 13, windMw: 0, reCodMonths: 5, availability: 0.97, solarCuf: 0.28, solarDcAc: 1.2, rte: 0.88, essSocMin: 0.05, essSocMax: 1, essDegradation: 0.02,
+    effectiveDate: "2027-02-01", sellMarket: "DAM", useMarket: true, useGroup: true, merchant: true, augmentation: "none", shortfallPolicy: "pay" });
+  const faded = runModel(st, real);
+  const shortDays = (m) => m.opYears.reduce((a, y) => a + y.shortDays, 0);
+  const after36 = faded.sim.years.filter((y) => y.start >= faded.sim.dates.extraUntil);
+  assert.ok(shortDays(faded) > 3000, `the faded battery falls short for years (${shortDays(faded)} days)`);
+  assert.ok(Math.max(...after36.map((y) => y.shareMarket)) <= TENDER.marketShare + 0.004, `green market within 25% of the energy supplied in the faded years (${Math.max(...after36.map((y) => y.shareMarket)).toFixed(4)})`);
+  assert.ok(Math.max(...after36.map((y) => y.shareGroup)) <= TENDER.groupShare + 0.004, `group RE within 50% of the energy supplied (${Math.max(...after36.map((y) => y.shareGroup)).toFixed(4)})`);
+  const need = essRequiredPerMw(st);
+  assert.deepEqual([need.shortYear, need.supplyShortYear], [5, 6], "below 2 MWh per MW from year 5 (no losses to the meter here), below the daily supply at 97% availability from year 6");
+  assert.ok(/from year 5/.test(fadeNote(need, 0.97)) && /97% availability from year 6/.test(fadeNote(need, 0.97)), fadeNote(need, 0.97));
+  const why = shortfallCauses(faded);
+  assert.ok(why.fadeFrom === 6 && why.fadeDays === shortDays(faded) && why.limitDays === 0 && /from year 6 the battery has faded/.test(why.text), JSON.stringify(why));
+  assert.equal(faded.opYears.find((y) => y.shortDays > 0).index, 6, "the first short year is the one the note names");
+  // capacity added year by year: 2% of the nameplate at the start of every year from year 2 keeps it at least at nameplate
+  const pct = [0, 0, ...new Array(TENDER.termYears - 1).fill(0.021)];
+  const byYear = { ...st, bess: { augmentation: "byYear", augmentationPct: pct } };
+  assert.ok(Math.abs(bessCapFactor({ essDegradation: 0.02, ...modelAugmentation(byYear) }, 2) - (0.98 + 0.021)) < 1e-12, "year 2: the nameplate's fade plus the year's addition");
+  assert.ok(bessCapFactor({ essDegradation: 0.02, ...modelAugmentation(byYear) }, 15) >= 1 - 0.05, "the additions fade too, from the year they are added");
+  const kept = runModel(byYear, real);
+  assert.ok(shortDays(kept) <= 5 && essRequiredPerMw(byYear).supplyShortYear === null, `with capacity added every year the supply holds (${shortDays(kept)} days short)`);
+  // two additions only (years 4 and 8), as a finance team plans them: short days fall, and only after the additions run out
+  const two = [0, 0, 0, 0, 0.08, 0, 0, 0, 0.1];
+  const stepped = runModel({ ...st, bess: { augmentation: "byYear", augmentationPct: two } }, real);
+  assert.ok(shortDays(stepped) < shortDays(faded) / 2, `two additions halve the short days at least (${shortDays(stepped)} against ${shortDays(faded)})`);
+  console.log(`CfD faded battery: ${shortDays(faded)} days short, green market ${(100 * Math.max(...after36.map((y) => y.shareMarket))).toFixed(1)}% and group RE ${(100 * Math.max(...after36.map((y) => y.shareGroup))).toFixed(1)}% of the supply at most; added every year ${shortDays(kept)} days, in years 4 and 8 ${shortDays(stepped)} days`);
+}

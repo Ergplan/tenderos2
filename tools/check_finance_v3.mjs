@@ -152,6 +152,28 @@ const ok = (name, detail) => { checks.push(name); console.log(`ok   ${name}${det
   ok("augmentation schedule", `years ${yrs.join(", ")}: ₹${sched.rows[5].augCapex.toFixed(1)}, ₹${sched.rows[11].augCapex.toFixed(1)}, ₹${sched.rows[17].augCapex.toFixed(1)} cr`);
 }
 
+// 3f. battery augmentation year by year: the capacity added at the start of a year (a share of the
+// nameplate) and, where it is known, the year's cost
+{
+  const pct = []; pct[4] = 0.06; pct[8] = 0.08; pct[12] = 0.02;
+  const cr = []; cr[8] = 40;
+  const bess = { augmentation: "byYear", augmentationPct: pct, augmentationCr: cr };
+  const by = run({}, {}, bess);
+  assert.deepEqual(by.rows.filter((r) => r.augCapex > 0).map((r) => r.year), [4, 8, 12]);
+  const deg = E.DEFAULT_BESS.annualDegradation;
+  const price = (y) => E.DEFAULT_COSTS.bessCrPerMwh * (1 - E.DEFAULT_BESS.costDeclinePct) ** (y - 1);
+  assert.ok(close(by.rows[3].augCapex, sizes.bessMwh * 0.06 * price(4), 1e-9), "year 4: the MWh added at the year's battery price");
+  assert.equal(by.rows[7].augCapex, 40, "year 8: the cost entered");
+  const factor = (y) => E.yearFactors(y, baseFin, { ...E.DEFAULT_BESS, ...bess }).bessFactor;
+  assert.ok(close(factor(3), 1 - 2 * deg, 1e-12), "the nameplate fades until the first addition");
+  assert.ok(close(factor(4), 1 - 3 * deg + 0.06, 1e-12), "year 4: the faded nameplate plus the new 6%");
+  assert.ok(close(factor(9), 1 - 8 * deg + 0.06 * (1 - 5 * deg) + 0.08 * (1 - deg), 1e-12), "each addition fades from its own year");
+  const costOnly = run({}, {}, { augmentation: "byYear", augmentationPct: [], augmentationCr: cr });
+  assert.ok(costOnly.rows[7].augCapex === 40 && close(E.yearFactors(8, baseFin, { ...E.DEFAULT_BESS, augmentation: "byYear", augmentationCr: cr }).bessFactor, 1 - 7 * deg, 1e-12), "a cost without a capacity is paid and adds no capacity");
+  assert.ok(run({}, {}, { augmentation: "byYear" }).rows.every((r) => r.augCapex === 0), "an empty table: no augmentation");
+  ok("augmentation year by year", `years 4, 8, 12: ₹${by.rows[3].augCapex.toFixed(1)}, ₹${by.rows[7].augCapex.toFixed(2)} (entered), ₹${by.rows[11].augCapex.toFixed(1)} cr; capacity ${(factor(9) * 100).toFixed(1)}% of nameplate in year 9`);
+}
+
 // 4. O&M by source and wind components, other fixed lines
 {
   const r0 = base.rows[0];

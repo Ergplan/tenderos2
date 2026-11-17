@@ -9,11 +9,22 @@ import { GUARANTEE_PRESETS, PHASING_COMPONENTS, V3_COST_DEFAULTS, isoDateOf, lon
  * cases and other revenue, operating-cost splits, the debt features, quasi-equity and mezzanine,
  * the guarantees, tax, returns and the reverse-auction sensitivity inputs.
  *
- * Props: fin, costs, bessAug ({ augmentation, augmentationYears }, the tab's battery augmentation
- * choice), patchFin(values), patchCosts(values), patchBess(values), codDefault (the tender's COD,
- * shown when fin.codDate is empty), lockProps(key) (optional), index (the section number shown).
+ * Props: fin, costs, bessAug ({ augmentation, augmentationYears, augmentationPct, augmentationCr },
+ * the tab's battery augmentation choice), patchFin(values), patchCosts(values), patchBess(values),
+ * codDefault (the tender's COD, shown when fin.codDate is empty), lockProps(key) (optional), index
+ * (the section number shown), augYears (the operating years the year-by-year table covers).
  */
-export default function FinanceInputsV3({ fin: rawFin, costs: rawCosts, bessAug = null, patchFin, patchCosts, patchBess = null, codDefault = null, lockProps = null, index = null }) {
+export default function FinanceInputsV3({ fin: rawFin, costs: rawCosts, bessAug = null, patchFin, patchCosts, patchBess = null, codDefault = null, lockProps = null, index = null, augYears = 25 }) {
+  // year by year: one entry per operating year (index = the year); a blank or zero box is no addition
+  const setAugYear = (key, y, raw, scale) => {
+    const arr = [...((bessAug && bessAug[key]) || [])];
+    while (arr.length <= y) arr.push(0);
+    const v = Number(raw);
+    arr[y] = raw === "" || !Number.isFinite(v) || v <= 0 ? 0 : v * scale;
+    patchBess({ [key]: arr });
+  };
+  const augShown = (key, y, scale) => { const v = bessAug?.[key]?.[y]; return Number.isFinite(v) && v > 0 ? +(v / scale).toFixed(4) : ""; };
+  const augYearList = Array.from({ length: Math.max(0, augYears - 1) }, (_, k) => k + 2);
   const fin = v3Fin(rawFin);
   const costs = { ...V3_COST_DEFAULTS, ...(rawCosts || {}) };
   const lp = (key) => (lockProps ? lockProps(key) : {});
@@ -118,9 +129,9 @@ export default function FinanceInputsV3({ fin: rawFin, costs: rawCosts, bessAug 
         </div>
         {bessAug && patchBess && (
           <>
-            <div className="rtc-subhead">Battery augmentation on a schedule</div>
+            <div className="rtc-subhead">Battery augmentation: on a schedule, or year by year</div>
             <div className="rtc-grid rtc-grid-4">
-              <SelectBox label="Augmentation" value={bessAug.augmentation || "none"} onChange={(v) => patchBess({ augmentation: v })} {...lp("bess.augmentation")} options={[["annual", "Every year to nameplate"], ["oneTime", "One-time restore"], ["schedule", "On a schedule (years below)"], ["none", "None"]]} />
+              <SelectBox label="Augmentation" value={bessAug.augmentation || "none"} onChange={(v) => patchBess({ augmentation: v })} {...lp("bess.augmentation")} options={[["annual", "Every year to nameplate"], ["oneTime", "One-time restore"], ["schedule", "On a schedule (years below)"], ["byYear", "Year by year (table below)"], ["none", "None"]]} />
               <label className="rtc-field">
                 <div className="rtc-field-top"><span>Augmentation years</span></div>
                 <input type="text" value={(bessAug.augmentationYears || []).join(", ")} disabled={bessAug.augmentation !== "schedule"} data-testid="fin-v3-aug-years" placeholder="6, 12, 18"
@@ -128,6 +139,20 @@ export default function FinanceInputsV3({ fin: rawFin, costs: rawCosts, bessAug 
                 <small>In each year the capacity lost since the last augmentation is replaced at that year's battery price</small>
               </label>
             </div>
+            {bessAug.augmentation === "byYear" && (
+              <div data-testid="fin-v3-aug-by-year" style={{ overflowX: "auto", margin: "6px 0 10px" }}>
+                <table className="rtc-table" style={{ minWidth: 60 * augYearList.length + 260 }}>
+                  <thead><tr><th style={{ textAlign: "left" }}>Operating year</th>{augYearList.map((y) => <th key={y}>{y}</th>)}</tr></thead>
+                  <tbody>
+                    <tr><th style={{ textAlign: "left", fontWeight: 500 }}>Capacity added at the start of the year, % of nameplate</th>
+                      {augYearList.map((y) => <td key={y}><input type="number" min="0" step="0.5" style={{ width: 58 }} value={augShown("augmentationPct", y, 0.01)} data-testid={`fin-v3-aug-pct-${y}`} onChange={(e) => setAugYear("augmentationPct", y, e.target.value, 0.01)} /></td>)}</tr>
+                    <tr><th style={{ textAlign: "left", fontWeight: 500 }}>Cost of that addition, ₹ cr (blank: at that year's battery price)</th>
+                      {augYearList.map((y) => <td key={y}><input type="number" min="0" step="0.1" style={{ width: 58 }} value={augShown("augmentationCr", y, 1)} data-testid={`fin-v3-aug-cr-${y}`} onChange={(e) => setAugYear("augmentationCr", y, e.target.value, 1)} /></td>)}</tr>
+                  </tbody>
+                </table>
+                <small>The capacity added fades from the year it is added, like the nameplate. The day-by-day operation and the financial model both run on these additions; a cost entered without a capacity is spent but adds no MWh.</small>
+              </div>
+            )}
           </>
         )}
       </Group>

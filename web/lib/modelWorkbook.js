@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ExcelJS from "exceljs";
 import { addLiveModel, liveModelInput } from "./liveModel.js";
+import { addBlockSheets, blockBackup, opsFromBlocks } from "./cfdBlockSheets.js";
 
 const FMT = { cr: "#,##0.00", mu: "#,##0", tariff: "0.000", pct: "0.00%", x: "0.00", mw: "#,##0", int: "0", text: "@" };
 const INK = "FF111111";
@@ -49,8 +50,12 @@ function pairs(ws, items, links = {}) {
   }
 }
 
-/** The workbook for a request body; throws a 400-style Error(message) with .status when empty. */
-export async function buildModelWorkbook(body, { preparedBy, product }) {
+/**
+ * The workbook for a request body; throws a 400-style Error(message) with .status when empty.
+ * `blockData` (the CfD bid: cfdBlockSheets.js cfdBlockData) makes the second version: the Live
+ * model's energy rows are then formulas on the 15-minute dispatch sheets added at the end.
+ */
+export async function buildModelWorkbook(body, { preparedBy, product, blockData = null }) {
   const rows = Array.isArray(body?.rows) ? body.rows.slice(0, 60) : [];
   if (!rows.length) throw Object.assign(new Error("The financial model has no years."), { status: 400 });
   const years = rows.map((r) => r.year);
@@ -64,13 +69,17 @@ export async function buildModelWorkbook(body, { preparedBy, product }) {
   // ---- cover page: what is bid, the key results and the key inputs
   const cover = wb.addWorksheet("Cover", { properties: { tabColor: { argb: ACCENT } } });
   // ---- the live model: every number a formula (second tab)
-  const liveInput = liveModelInput(body.live);
-  const live = liveInput ? addLiveModel(wb, { ...liveInput, title: str(body.title, 200) }) : null;
+  let liveInput = liveModelInput(body.live);
+  if (blockData && !liveInput) throw Object.assign(new Error("The financial model has no Live model to put the 15-minute dispatch behind."), { status: 400 });
+  // the years' energy as the 15-minute sheets hold it (the same bid, to the sheets' rounding)
+  if (blockData) liveInput = { ...liveInput, ops: opsFromBlocks(liveInput.ops, blockData) };
+  const live = liveInput ? addLiveModel(wb, { ...liveInput, title: str(body.title, 200) }, blockData ? { blocks: blockBackup(blockData) } : {}) : null;
   addLogo(wb, cover);
   cover.addRow([str(body.title, 200) || "Bid financial model"]).font = { bold: true, size: 16 };
   cover.addRow([str(body.subtitle, 300)]).font = { color: { argb: "FF555555" } };
   cover.addRow([`Prepared ${new Date().toISOString().slice(0, 10)} by ${preparedBy} · ${product} (TenderOS)`]).font = { italic: true, color: { argb: "FF777777" } };
   if (live) cover.addRow(["The key results below are linked to the Live model tab: change an input there (blue cells) and they follow."]).font = { italic: true, color: { argb: "FF0000FF" } };
+  if (blockData) cover.addRow([`With the 15-minute dispatch: the Live model's contracted, supplied and sold energy are the sums of the sheets "15-min …" at the end (${blockData.days.length.toLocaleString("en-IN")} days × 96 blocks).`]).font = { italic: true, color: { argb: "FF555555" } };
   cover.addRow([]);
   band(cover.addRow([]), "Key results");
   pairs(cover, body.cover?.outputs, live?.cells);
@@ -206,8 +215,11 @@ export async function buildModelWorkbook(body, { preparedBy, product }) {
     ws.views = [{ state: "frozen", ySplit: 0 }];
   }
 
+  // ---- the 15-minute dispatch behind the Live model's energy (the CfD bid's second version)
+  if (blockData) addBlockSheets(wb, blockData, { contractRef: live.addr.contract });
+
   const buffer = await wb.xlsx.writeBuffer();
-  const file = `${str(body.fileName, 80).replace(/[^\w.-]+/g, "_") || "bid_financial_model"}.xlsx`;
+  const file = `${str(body.fileName, 80).replace(/[^\w.-]+/g, "_") || "bid_financial_model"}${blockData ? "_15min" : ""}.xlsx`;
   return { buffer, file };
 }
 

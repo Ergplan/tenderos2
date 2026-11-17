@@ -5,6 +5,7 @@ import * as E from "../rtc/engine";
 import Cite from "./Cite.jsx";
 import { cfdBessAug, fillWinning, keyDates, missingInputs, patchCfdBess } from "./model.js";
 import FinanceInputsV3 from "../rtc/FinanceInputsV3";
+import { TENDER } from "./terms.js";
 import { Fields, FillBar } from "./inputs.jsx";
 
 /**
@@ -73,7 +74,7 @@ export default function FinanceInputsStep({ state, setState, setInput, lockProps
 
       <Section index={`${index}.4a`} title="Finance team's inputs" note="Timeline, phasing and part commissioning, generation cases and carbon, O&M splits, debt features, quasi-equity and mezzanine, guarantees, tax, returns and the auction sensitivities; every group off until filled">
         <FinanceInputsV3 fin={fin} costs={costs} bessAug={cfdBessAug(state)} patchFin={setFin} patchCosts={setCosts} patchBess={(values) => setState((s) => patchCfdBess(s, values))}
-          codDefault={state.inputs?.effectiveDate ? keyDates(state.inputs.effectiveDate).scd : null} lockProps={lockProps} />
+          codDefault={state.inputs?.effectiveDate ? keyDates(state.inputs.effectiveDate).scd : null} lockProps={lockProps} augYears={TENDER.termYears} />
         <p className="rtc-note">The commercial operation date defaults to the battery's SCD, 15 months from the Effective Date <Cite id="essScd" />.</p>
       </Section>
 

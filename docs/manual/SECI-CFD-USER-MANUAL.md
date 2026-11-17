@@ -287,8 +287,11 @@ power = 1 ÷ that share, rounded up to 0.05: with a 10–100% window 2.25 MWh pe
 the losses to the meter are modelled. **Fill up for me please** sets both when yours are below.
 The round-trip efficiency does not change the size: it changes the charging power bought (1 ÷
 efficiency units in for every unit out). Degradation is met by augmentation (annual, the default:
-the faded MWh are replaced each year and costed; or on a schedule); with no augmentation the
-Size check names the year the usable energy falls below the need.
+the faded MWh are replaced each year and costed; on a schedule of years; or year by year, from a
+table on the Finance inputs: the capacity added at the start of each year as a percentage of the
+nameplate and, where you know it, that year's cost in ₹ crore); with no augmentation the Size
+check names the year the usable energy falls below 2 MWh per MW and the year it falls below the
+daily supply at your availability, which is when days start to fall short.
 
 ## Step 06 · Finance inputs *(Finance)*
 
@@ -430,7 +433,12 @@ O&M), **Letter of Credit to SECI** (nil when the strike price is above ₹10), *
 **Equity payback**. Σ on a tile opens the traceable model at that number. **Trace the model**
 opens the explorer; **Download financial model (Excel)** builds the workbook with Cover, Live
 model, Construction, Profit and loss, Cash flow, Balance sheet, Debt schedule, Depreciation and
-tax, Working capital and Sensitivity, every number a formula on the blue inputs.
+tax, Working capital and Sensitivity, every number a formula on the blue inputs. **With the
+15-minute dispatch (Excel)** builds the same workbook with the dispatch behind the energy: the
+Live model's contracted, supplied and sold energy of each year are then formulas on eight sheets
+at the end ("15-min by year", "15-min by day", and one row a day by 96 blocks for the supply due,
+the energy supplied, the surplus sold and the charging from own RE, the green market and group
+RE). The file is about 3 MB and takes some seconds longer to build.
 
 ![The traceable model](img/cfd-08-trace.jpg)
 

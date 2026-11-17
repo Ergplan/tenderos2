@@ -136,7 +136,7 @@ const FIN_LINES = [
  * modelArgs: { ctx, sizes, args } as given to runFinancialModel, for the F.8 sensitivities;
  * bessAug / patchBess: the tab's battery augmentation choice for the schedule option.
  */
-export default function FinanceView({ state, patch, set, lockProps, finance, sizes, extraLines = null, energyLines = null, actions = null, codDefault = null, modelArgs = null, bessAug = null, patchBess = null }) {
+export default function FinanceView({ state, patch, set, lockProps, finance, sizes, extraLines = null, energyLines = null, actions = null, codDefault = null, modelArgs = null, bessAug = null, patchBess = null, augYears = 25 }) {
   const { fin } = state;
   const finV3 = useMemo(() => v3Fin(fin), [fin]);
   const [moreInputs, setMoreInputs] = useState(false);
@@ -308,7 +308,7 @@ export default function FinanceView({ state, patch, set, lockProps, finance, siz
         </div>
         {moreInputs && (
           <FinanceInputsV3 fin={fin} costs={state.costs} bessAug={bessAug} patchFin={(values) => patch("fin", values)} patchCosts={(values) => patch("costs", values)} patchBess={patchBess}
-            codDefault={codDefault} lockProps={lockProps} />
+            codDefault={codDefault} lockProps={lockProps} augYears={augYears} />
         )}
       </Section>
 

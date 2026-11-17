@@ -34,10 +34,19 @@ const sev = (out, id) => out.findings.find((f) => f.id === id)?.severity;
   const award = peakAward();
   assert.ok(award && award.hi > 0 && award.hi < 12, "a peak-power award to compare with");
   assert.equal(sev(out, "price-market"), "block", "₹26 is far above every peak-power award");
-  // more own solar raises this bid's price (group RE at ₹2.5 beats solar at ₹4 cr/MWac), so the
+  // the sourcing limits are shares of the energy supplied (Amendment-02): with the battery fading
+  // after its one augmentation, 14 MWac leaves the last years short of own RE, so the review asks
+  // for more solar
+  assert.equal(sev(out, "solar-not-optimised"), "warn", "14 MWac is short of the own RE the faded years need");
+  // at 29 MWac more own solar raises the price (group RE at ₹2.5 beats solar at ₹4 cr/MWac): the
   // review says buying is right rather than asking for solar
-  assert.ok(!ids(out).includes("solar-not-optimised") && !ids(out).includes("little-own-re"), "the solar is not the lever of this bid");
-  assert.equal(sev(out, "bought-charging-is-right"), "note");
+  {
+    const s29 = { ...s, inputs: { ...s.inputs, solarMw: 29 } };
+    const m29 = runModel(s29, prices, { price: pricerOf(s29) });
+    const out29 = reviewBid({ state: s29, model: m29, finance: runCfdFinance(s29, m29), prices });
+    assert.ok(!ids(out29).includes("solar-not-optimised") && !ids(out29).includes("little-own-re"), `at 29 MWac the solar is not the lever: ${ids(out29)}`);
+    assert.equal(sev(out29, "bought-charging-is-right"), "note");
+  }
   const drivers = out.findings.find((f) => f.id === "price-drivers");
   assert.ok(drivers && /battery's capex ₹\d/.test(drivers.title), `the battery's capex named first: ${drivers?.title}`);
   assert.equal(sev(out, "extra-battery"), "warn", "the extra battery does not pay");
