@@ -541,6 +541,11 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   const meter = m.ops.some((o) => finite(o.meterMWh) && o.meterMWh > 0);
   const blocky = m.ops.some((o) => finite(o.blockShortfallMWh) && o.blockShortfallMWh > 0) || (fi.blockPenaltyMultiple || 0) > 0;
   const cfd = m.ops.some((o) => (o.lcMw || 0) > 0 || (o.penaltyWeeks || []).length > 0 || (o.chargingCostCr || 0) !== 0 || (o.pxFeesCr || 0) !== 0);
+  // the Letter of Credit and the weekly penalty are SECI CfD-I's alone: a bid that only buys charging
+  // power and pays fees (SECI-FDRE-X) has the bought-power rows without them
+  const cfdLc = cfd && m.ops.some((o) => (o.lcMw || 0) > 0 || (o.penaltyWeeks || []).length > 0);
+  // a row's name where the request gives its own (m.labels, set per tender), else the default
+  const L = (key, dflt) => (m.labels && typeof m.labels[key] === "string" && m.labels[key] ? m.labels[key] : dflt);
   const penK = cfd ? Math.max(...m.ops.map((o) => (o.penaltyWeeks || []).length)) : 0;
   const tariffText = m.tariffLabel || (sim ? "Tariff" : "Bid tariff");
   const inPpa = (y) => y <= NP;
@@ -754,8 +759,8 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   inp("flatPrice", hourly ? "Market sale price (flat; the PPA years use the hourly prices)" : "Market sale price", "₹/kWh", { v: fi.surplusPrice || 0, kind: "input", fmt: "tariff", source: hourly ? "Used beyond the PPA when no price is set above" : fi.sellSurplus ? "Your input (flat price)" : "Not used: no market sale" });
   inp("target", "Annual supply floor", "% of contracted", { v: m.dfrTarget || 0, kind: "input", fmt: "pct", source: src("target", "Tender") });
   inp("penalty", "Shortfall penalty", "₹/kWh short", { v: fi.shortfallPenalty || 0, kind: "input", fmt: "tariff", source: src("fin.shortfallPenalty", "Model default") });
-  if (blocky) inp("blockMult", "Time-block shortfall penalty", "× tariff", { v: fi.blockPenaltyMultiple || 0, kind: "input", fmt: "x", source: src("fin.blockPenaltyMultiple", "Tender"), note: "On the energy short of each time-block's floor, at this multiple of the year's tariff (SECI RTC-TM: 1.5)" });
-  if (cfd) {
+  if (blocky) inp("blockMult", L("blockMult", "Time-block shortfall penalty"), "× tariff", { v: fi.blockPenaltyMultiple || 0, kind: "input", fmt: "x", source: src("fin.blockPenaltyMultiple", "Tender"), note: L("blockMultNote", "On the energy short of each time-block's floor, at this multiple of the year's tariff (SECI RTC-TM: 1.5)") });
+  if (cfdLc) {
     I.group("Letter of Credit and weekly shortfall penalty (SECI CfD-I)");
     inp("lcPct", "Letter of Credit cost", "% of the LC a year", { v: fi.lcCostPct || 0, kind: "input", fmt: "pct", source: src("fin.lcCostPct") });
     inp("lcC", "LC reference price (C)", "₹/kWh", { v: fi.lcMinPrice ?? 10, kind: "input", fmt: "tariff", source: "Tender (CfDA 10.4.2)", note: "LC = 2000 kWh × contracted MW × (C − strike price) × days; nothing when the strike price is above C" });
@@ -1274,7 +1279,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
     v: (y) => (inPpa(y) ? Math.max(0, S.v("target") * S.v("demand", y) - S.v("delivered", y)) : 0), fmt: "mu", total: true,
   });
   if (blocky && dsp?.blocks) S.series("blockShort", "Short of the time-block floors", "MU", { f: (y) => (inPpa(y) ? fromDispatch("short", y).f : "0"), v: (y) => (inPpa(y) ? fromDispatch("short", y).v : 0), fmt: "mu", total: true, note: "Each hour's energy below its floor, summed from the hour-by-hour sheets" });
-  else if (blocky) optRow("blockShort", "Short of the time-block floors", "MU", (o) => mu(o.blockShortfallMWh), { zeroBeyond: true, note: "Each hour's energy below its floor (peak and off-peak blocks), from the dispatch" });
+  else if (blocky) optRow("blockShort", L("blockShort", "Short of the time-block floors"), "MU", (o) => mu(o.blockShortfallMWh), { zeroBeyond: true, note: m.labels?.blockShortNote || "Each hour's energy below its floor (peak and off-peak blocks), from the dispatch" });
   if (hourly) {
     optRow("price", `Realised market price${m.market ? ` (IEX ${m.market}, hourly)` : " (hourly)"}`, "₹/kWh", (o) => (o.excessMWh > 0 && finite(o.surplusRevenueCr) ? ((o.surplusRevenueCr - (finite(o.recRevenueCr) ? o.recRevenueCr : 0)) * 1e4) / o.excessMWh : 0), { total: false, fmt: "tariff", note: "Market revenue of the year ÷ energy sold, at the hourly prices the optimiser dispatched against (REC proceeds apart)" });
     // income not tied to the energy sold (SECI CfD-I: the bidder's share of the RECs on own RE supplied
@@ -1284,10 +1289,10 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
     S.series("price", "Market sale price", "₹/kWh", { f: () => S.s("flatPrice"), v: () => S.v("flatPrice"), fmt: "tariff" });
   }
   if (cfd) {
-    S.group("Bought and owed by year (SECI CfD-I, from the day-by-day operation)");
-    optRow("chargingCr", "Charging power bought (green market, group RE)", "₹ cr", (o) => o.chargingCostCr || 0, { fmt: "cr", zeroBeyond: true, note: "The power bought to charge the battery, at the hourly GDAM price plus charges and the group RE price plus charges, within each Contract Year's sourcing limits" });
-    optRow("pxFeesCr", "Exchange fees on the energy sold", "₹ cr", (o) => o.pxFeesCr || 0, { fmt: "cr", zeroBeyond: true });
-    optRow("lcMw", "Contracted capacity under the Letter of Credit", "MW", (o) => o.lcMw || 0, { fmt: "mw", total: false, zeroBeyond: true, note: "The contracted MW during the term; 0 in any market years after it" });
+    S.group(L("boughtGroup", "Bought and owed by year (SECI CfD-I, from the day-by-day operation)"));
+    optRow("chargingCr", L("charging", "Charging power bought (green market, group RE)"), "₹ cr", (o) => o.chargingCostCr || 0, { fmt: "cr", zeroBeyond: true, note: m.labels?.chargingNote || "The power bought to charge the battery, at the hourly GDAM price plus charges and the group RE price plus charges, within each Contract Year's sourcing limits" });
+    optRow("pxFeesCr", L("pxFees", "Exchange fees on the energy sold"), "₹ cr", (o) => o.pxFeesCr || 0, { fmt: "cr", zeroBeyond: true, ...(m.labels?.pxFeesNote ? { note: m.labels.pxFeesNote } : {}) });
+    if (cfdLc) optRow("lcMw", "Contracted capacity under the Letter of Credit", "MW", (o) => o.lcMw || 0, { fmt: "mw", total: false, zeroBeyond: true, note: "The contracted MW during the term; 0 in any market years after it" });
     for (let k = 1; k <= penK; k += 1) optRow(`penRef${k}`, `Penalised week ${k}: reference price`, "₹/kWh", (o) => o.penaltyWeeks?.[k - 1]?.ref || 0, { fmt: "tariff", total: false, zeroBeyond: true, note: k === 1 ? "The week's highest evening price across the exchanges and markets (CfDA 4.4.3.i); the weeks whose supply fell short beyond the tolerance, in order" : undefined });
     for (let k = 1; k <= penK; k += 1) optRow(`penMwh${k}`, `Penalised week ${k}: energy short beyond the tolerance`, "MWh", (o) => o.penaltyWeeks?.[k - 1]?.beyondMwh || 0, { fmt: "num", total: false, zeroBeyond: true, note: k === 1 ? "The shortfall beyond 10% of the Contract Week's 14 MWh/MW (CfDA 4.4.3.ii)" : undefined });
   }
@@ -1375,13 +1380,13 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   }
   S.series("penaltyCr", "Shortfall penalty", "₹ cr", { f: (y) => `${S.at("shortfall", y)}*${S.s("penalty")}/10`, v: (y) => (S.v("shortfall", y) * S.v("penalty")) / 10, total: true });
   if (blocky) {
-    S.series("blockPenCr", "Time-block shortfall penalty", "₹ cr", {
+    S.series("blockPenCr", L("blockPen", "Time-block shortfall penalty"), "₹ cr", {
       f: (y) => `${S.at("blockShort", y)}*${S.s("blockMult")}*${S.at("trf", y)}/10`,
       v: (y) => (S.v("blockShort", y) * S.v("blockMult") * S.v("trf", y)) / 10, total: true,
-      note: "Energy short of the block floors × multiple × the year's tariff",
+      note: L("blockPenNote", "Energy short of the block floors × multiple × the year's tariff"),
     });
   }
-  if (cfd) {
+  if (cfdLc) {
     const refs = (y) => (penK ? `${S.at("penRef1", y)}:${S.at(`penRef${penK}`, y)}` : null);
     const mwhs = (y) => (penK ? `${S.at("penMwh1", y)}:${S.at(`penMwh${penK}`, y)}` : null);
     S.series("cfdPenCr", "Weekly shortfall penalty (SECI CfD-I)", "₹ cr", {
@@ -1396,10 +1401,10 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
     v: (y) => (S.v("carbonOn") === "Yes" && y <= S.v("carbonYears") ? (carbonMu(y) * 1000 * S.v("carbonT") * S.v("carbonPrice") * S.v("carbonF", y)) / 1e7 : 0), total: true,
     note: "MWh generated for the grid × t CO₂/MWh × ₹/t (escalated) ÷ 1e7 = ₹ crore, for the first years",
   });
-  const minusPenalties = (y) => `-${S.at("penaltyCr", y)}${blocky ? `-${S.at("blockPenCr", y)}` : ""}${cfd ? `-${S.at("cfdPenCr", y)}` : ""}`;
+  const minusPenalties = (y) => `-${S.at("penaltyCr", y)}${blocky ? `-${S.at("blockPenCr", y)}` : ""}${cfdLc ? `-${S.at("cfdPenCr", y)}` : ""}`;
   S.series("revenue", "Total revenue", "₹ cr", {
     f: (y) => `${S.at("ppaRev", y)}+${S.at("mktRev", y)}${buyer ? `+${S.at("buyerRev", y)}` : ""}${minusPenalties(y)}+${S.at("carbonRev", y)}`,
-    v: (y) => S.v("ppaRev", y) + S.v("mktRev", y) + (buyer ? S.v("buyerRev", y) : 0) - S.v("penaltyCr", y) - (blocky ? S.v("blockPenCr", y) : 0) - (cfd ? S.v("cfdPenCr", y) : 0) + S.v("carbonRev", y), total: true, bold: true,
+    v: (y) => S.v("ppaRev", y) + S.v("mktRev", y) + (buyer ? S.v("buyerRev", y) : 0) - S.v("penaltyCr", y) - (blocky ? S.v("blockPenCr", y) : 0) - (cfdLc ? S.v("cfdPenCr", y) : 0) + S.v("carbonRev", y), total: true, bold: true,
   });
 
   // ---- operating costs
@@ -1469,14 +1474,14 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
     opexKeys.push("dsmCr");
   }
   if (cfd) {
-    S.series("chargingCostCr", "Charging power (green market, group RE)", "₹ cr", { f: (y) => S.at("chargingCr", y), v: (y) => S.v("chargingCr", y), total: true });
-    S.series("pxFeeCostCr", "Exchange fees", "₹ cr", { f: (y) => S.at("pxFeesCr", y), v: (y) => S.v("pxFeesCr", y), total: true });
-    S.series("lcCostCr", "Letter of Credit to SECI", "₹ cr", {
+    S.series("chargingCostCr", L("chargingCost", "Charging power (green market, group RE)"), "₹ cr", { f: (y) => S.at("chargingCr", y), v: (y) => S.v("chargingCr", y), total: true });
+    S.series("pxFeeCostCr", L("pxFeeCost", "Exchange fees"), "₹ cr", { f: (y) => S.at("pxFeesCr", y), v: (y) => S.v("pxFeesCr", y), total: true });
+    if (cfdLc) S.series("lcCostCr", "Letter of Credit to SECI", "₹ cr", {
       f: (y) => `${S.s("lcPct")}*2000*${S.at("lcMw", y)}*MAX(0,${S.s("lcC")}-${S.at("trf", y)})*${S.s("lcDays")}/10000000`,
       v: (y) => (S.v("lcPct") * 2000 * S.v("lcMw", y) * Math.max(0, S.v("lcC") - S.v("trf", y)) * S.v("lcDays")) / 1e7, total: true,
       note: "The LC's cost a year: cost % × 2000 kWh × MW × (C − strike price) × days ÷ 1e7 = ₹ crore",
     });
-    opexKeys.push("chargingCostCr", "pxFeeCostCr", "lcCostCr");
+    opexKeys.push("chargingCostCr", "pxFeeCostCr", ...(cfdLc ? ["lcCostCr"] : []));
   }
   if (on.biomass) {
     S.series("fuelCr", "Biomass fuel", "₹ cr", { f: (y) => `${S.at("biomassMu", y)}*${S.s("fuel")}*${S.at("fuelF", y)}/10`, v: (y) => (S.v("biomassMu", y) * S.v("fuel") * S.v("fuelF", y)) / 10, total: true });
@@ -2280,7 +2285,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   out.checks = [`IF(AND(${checks.map((c) => `${c}="OK"`).join(",")}),"OK","CHECK")`, checks.length && [true, S.v("topUpYear") >= refiEnd || Math.abs(closeAtTenor) < 0.01, consOk, balanced, lossesOk, !partsOn || Math.abs(partsSum - 1) < 0.001].every(Boolean) ? "OK" : "CHECK"];
 
   // ---- the schedule sheets (the Tax schedule's pools give the Live model its losses available), then the key results
-  const sched = addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER, rpName });
+  const sched = addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER, rpName, L });
   out.lenderXirr[0] = out.lenderXirr[0].replace("__LENDER_XIRR__", sched.lenderXirrCell);
 
   // ---- key results (top of the sheet), against the app's numbers
@@ -2367,7 +2372,7 @@ function taxLayout(N) {
  * and Goal Seek keep working) or on the sheet's own rows; each carries its value for viewers that
  * do not recalculate. Returns the address of the lender's XIRR on the Returns sheet.
  */
-function addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER: REG, rpName = "Solar repowering" }) {
+function addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER: REG, rpName = "Solar repowering", L: label = (key, dflt) => dflt }) {
   const L = `'${LIVE_SHEET}'!`;
   const link = (key, y) => `${L}${S.at(key, y)}`; // a year cell of the Live model
   const one = (key) => (String(S.s(key)).includes("!") ? S.s(key) : `${L}${S.s(key)}`); // a single value of the Live model or an input
@@ -2448,14 +2453,14 @@ function addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, r
     linked(T, "mktRev", "Market sale revenue", "₹ cr");
     if (has("buyerRev")) linked(T, "buyerRev", "Solar Hours excess sold to the buyer", "₹ cr");
     linked(T, "penaltyCr", "Less: shortfall penalty", "₹ cr");
-    if (has("blockPenCr")) linked(T, "blockPenCr", "Less: time-block shortfall penalty", "₹ cr");
+    if (has("blockPenCr")) linked(T, "blockPenCr", `Less: ${label("blockPen", "time-block shortfall penalty").replace(/^./, (c) => c.toLowerCase())}`, "₹ cr");
     if (has("cfdPenCr")) linked(T, "cfdPenCr", "Less: weekly shortfall penalty (SECI CfD-I)", "₹ cr");
     linked(T, "carbonRev", "Carbon credit revenue", "₹ cr");
     linked(T, "revenue", "Total revenue", "₹ cr", { bold: true });
     T.section("Operating costs");
     const opexLines = [["solarOmCr", "Solar O&M"], ["windOmCr", "Wind O&M"], ["bessOmCr", "Battery O&M"], ["biomassOmCr", "Biomass O&M"], ["insuranceCr", "Insurance"], ["otherCr", "Other fixed cost"],
       ["fuelCr", "Biomass fuel"], ["hydroFixedCr", "Hydro capacity charge"], ["hydroEnergyCr", "Hydro energy charge"], ["thermalFixedCr", "Thermal capacity charge"], ["thermalEnergyCr", "Thermal energy charge and RECs"], ["dsmCr", "Deviation settlement charges (CERC DSM)"],
-      ["chargingCostCr", "Charging power (SECI CfD-I)"], ["pxFeeCostCr", "Exchange fees (SECI CfD-I)"], ["lcCostCr", "Letter of Credit to SECI"]];
+      ["chargingCostCr", label("chargingCost", "Charging power (SECI CfD-I)")], ["pxFeeCostCr", label("pxFeeCost", "Exchange fees (SECI CfD-I)")], ["lcCostCr", "Letter of Credit to SECI"]];
     for (const [key, text] of opexLines) if (has(key)) linked(T, key, text, "₹ cr");
     for (let i = 1; i <= SLOTS; i += 1) if (n0(S.v(`otherL${i}_cr`)) > 0) linked(T, `otherL${i}`, `  of which other fixed cost line ${i}: ${S.v(`otherL${i}_label`) || ""}`, "₹ cr");
     for (let i = 1; i <= SLOTS; i += 1) if (has(`windOmC${i}`) && n0(S.v(`windC${i}_lakh`)) > 0) linked(T, `windOmC${i}`, `  of which wind O&M component ${i}: ${S.v(`windC${i}_label`) || ""}`, "₹ cr");
@@ -3148,6 +3153,9 @@ function dispatchInput(d, years) {
  * at most 60 years; the finance team's inputs (FINANCE_V3_KEYS) each in its shape, off when absent.
  * Returns null when there is no year to model.
  */
+/** The rows a request may name for its tender (m.labels). */
+const LABEL_KEYS = ["boughtGroup", "charging", "chargingNote", "chargingCost", "pxFees", "pxFeesNote", "pxFeeCost", "blockShort", "blockShortNote", "blockMult", "blockMultNote", "blockPen", "blockPenNote"];
+
 export function liveModelInput(raw) {
   if (!raw || typeof raw !== "object" || !Array.isArray(raw.ops) || !raw.ops.length) return null;
   const n = (v) => (finite(v) ? v : 0);
@@ -3173,6 +3181,8 @@ export function liveModelInput(raw) {
     tariffLabel: typeof raw.tariffLabel === "string" ? raw.tariffLabel.replace(/[^\w ()·,.%/-]/g, "").slice(0, 40) : null,
     otherCapexLabel: typeof raw.otherCapexLabel === "string" ? raw.otherCapexLabel.replace(/[^\w ()·,.%/'-]/g, "").slice(0, 80) : null,
     repowerLabel: typeof raw.repowerLabel === "string" && raw.repowerLabel.trim() ? raw.repowerLabel.replace(/[^\w ()·,.%/'-]/g, "").slice(0, 60) : null,
+    // a tender's own names for the bought-power, fee and penalty rows (SECI-FDRE-X): plain text only
+    labels: raw.labels && typeof raw.labels === "object" ? Object.fromEntries(LABEL_KEYS.filter((k) => typeof raw.labels[k] === "string" && raw.labels[k].trim()).map((k) => [k, raw.labels[k].replace(/[^\w ()·,.%/'×₹:;-]/g, "").slice(0, 200)])) : null,
     engine: raw.engine === "simulation" ? "simulation" : "highs",
     bessNote: typeof raw.bessNote === "string" ? raw.bessNote.slice(0, 120) : null,
     sourceAll: typeof raw.sourceAll === "string" ? raw.sourceAll.slice(0, 80) : null,

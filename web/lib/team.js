@@ -37,7 +37,7 @@ export function assertUuid(id, what = "Not found.") {
 // delivered) so the demo outbox shows who would be emailed
 const DEMO_SEATS = [
   { name: "Tender manager", team: "management", super_admin: true, email: "tender.manager@arkaja-renewables.example", title: "Head of bids", tabs: ALL_TAB_IDS },
-  { name: "Finance desk", team: "finance", email: "finance@arkaja-renewables.example", title: "CFO's office", tabs: ["tenderBid", "rtc", "seciRtc", "cfd", "cfdOwnSolar", "whatIf"] },
+  { name: "Finance desk", team: "finance", email: "finance@arkaja-renewables.example", title: "CFO's office", tabs: ["tenderBid", "rtc", "seciRtc", "cfd", "cfdOwnSolar", "fdrex", "whatIf"] },
   { name: "Procurement desk", team: "procurement", email: "procurement@arkaja-renewables.example", title: "EPC and equipment costs", tabs: ["tenderBid", "rtc", "seciRtc", "bessTender", "whatIf"] },
   { name: "Legal desk", team: "legal", email: "legal@arkaja-renewables.example", title: "Contracts and tender conditions", tabs: ["tenderBid", "seciRtc", "bessTender", "recentTenders"] },
   { name: "Technical desk", team: "technical", email: "technical@arkaja-renewables.example", title: "Resource, design and grid", tabs: ["tenderBid", "rtc", "seciRtc", "bessTender", "whatIf"] },

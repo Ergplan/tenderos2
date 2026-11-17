@@ -31,6 +31,8 @@ import { defaultLosses } from "../web/src/bid/model.js";
 import { rtcModelExport } from "../web/src/rtc/exportModel.js";
 import { defaultCfdState, fillBenchmarks, runModel as runCfdModel } from "../web/src/cfd/model.js";
 import { cfdLiveRequest, runCfdFinance, withLateRe } from "../web/src/cfd/finance.js";
+import { defaultCfdState as fdrexState, fillWinning as fdrexFill, penaltyMwh as fdrexPenaltyMwh, runModel as runFdrexModel } from "../web/src/fdrex/model.js";
+import { cfdLiveRequest as fdrexLiveRequest, cfdModelExport as fdrexModelExport, runCfdFinance as runFdrexFinance } from "../web/src/fdrex/finance.js";
 
 const require = createRequire(new URL("../web/package.json", import.meta.url));
 const ExcelJS = require("exceljs");
@@ -222,6 +224,20 @@ const CASES = [
     costs: { constructionMonths: 0, drawdown: "linear", phasing: { solar: { start: 45, months: 51 }, bess: { start: 7, months: 15 }, evacuation: { start: 3, months: 14 } } },
   })],
   // the battery's augmentation typed year by year: capacity added in years 4, 8 and 12, the year-8 cost entered
+  // SECI-FDRE-X (web/src/fdrex): a 25-year PPA at a fixed tariff; the plant is left short on purpose
+  // (little solar, the penalty paid) so that the monthly penalty row carries energy in every year
+  ["SECI-FDRE-X: charging power within 5%, the PSM discount and exchange fees, the monthly shortfall penalty at 1.5 x the tariff", (() => {
+    const prices = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
+    const s = fdrexFill(fdrexState());
+    s.inputs = { ...s.inputs, contractedMw: 100, solarMw: 80, shortfallPolicy: "pay" };
+    s.filled = { ...s.filled, solarMw: false };
+    s.fin = { ...s.fin, repayment: "annuity", graceYears: 1, dsraMonths: 3 };
+    const model = runFdrexModel(s, prices);
+    const finance = runFdrexFinance(s, model);
+    const req = fdrexLiveRequest({ state: s, model, finance });
+    const run = (over = {}) => runFdrexFinance({ ...s, fin: over.fin ? { ...s.fin, ...over.fin } : s.fin }, model, { tariffLocked: over.tariffLocked ?? false });
+    return { name: "", s, model, m: { fin: finance.engine.fin, costs: finance.engine.costs, bess: finance.engine.bess }, lp: { sizes: finance.engine.sizes }, ops: finance.engine.ops, finance, req, run, dfrTarget: 0 };
+  })()],
   ["battery augmentation year by year: 6% of the nameplate in year 4, 8% in year 8 at an entered cost, 2% in year 12", bid({
     ...V3,
     bess: { augmentation: "byYear", augmentationPct: Object.assign(new Array(13).fill(0), { 4: 0.06, 8: 0.08, 12: 0.02 }), augmentationCr: Object.assign(new Array(13).fill(0), { 8: 40 }), costDeclinePct: 0.03 },
@@ -244,6 +260,7 @@ const CASES = [
     return c;
   })()],
 ];
+const FDREX = CASES.length - 4;
 const BY_YEAR = CASES.length - 3;
 const REFI_TOP = CASES.length - 2;
 const LATE_RE = CASES.length - 1;
@@ -348,6 +365,14 @@ assert.ok(CASES[8][1].finance.rows.every((r) => r.dscr === null), "no debt: no D
     const r = l.rows[1];
     assert.ok(r.fundedCapex === 900 && Math.abs(r.topUpCr - 630) < 1e-3 && r.dscr > 1 && Math.abs(r.cfads - r.debtService - 270 - r.fcfe) < 1e-3 && l.rows.every((x, k) => k === 1 || !(x.fundedCapex > 0)),
       `own RE in year 2: outside the CFADS, 70% of it drawn as debt, the other ₹270 cr from equity's cash (top-up ${r.topUpCr}, DSCR ${r.dscr}, FCFE ${r.fcfe})`);
+  }
+  {
+    // SECI-FDRE-X: the penalty is the engine's tariff-multiple one on the months' energy short; no Letter of Credit, no weekly penalty
+    const x = CASES[FDREX][1];
+    const k = x.model.opYears.findIndex((y) => fdrexPenaltyMwh(y) > 0);
+    assert.ok(k >= 0 && x.finance.rows.length === 25 && Math.abs(x.finance.rows[k].blockPenalty - 1.5 * x.finance.tariff * fdrexPenaltyMwh(x.model.opYears[k]) * 1e-4) < 1e-9 && x.finance.rows.every((r) => !(r.lcCost > 0) && !(r.cfdPenalty > 0)) && x.finance.rows[0].pxFees > 0 && x.finance.rows[0].charging > 0,
+      "SECI-FDRE-X: the monthly penalty at 1.5 x the tariff, bought charging power, the PSM discount, no Letter of Credit");
+    assert.ok(x.req.labels?.blockPen === "Monthly shortfall penalty" && !/CfD|strike|Letter of Credit|weekly/i.test(JSON.stringify({ ...x.req, app: null })), "the request names its rows for this tender");
   }
   const t = CASES[REFI_TOP][1].finance;
   assert.ok(t.rows[1].topUpCr > 0 && Math.abs(t.rows[1].topUpCr - 0.05 * (t.rows[1].closingDebt - t.rows[1].topUpCr)) < 1e-9 && t.rows.filter((r) => r.topUpCr > 0).length === 1 && t.rows[1].refiFee > 0, "the top-up at the refinancing: 5% of the balance, in year 2 only");
@@ -634,6 +659,11 @@ assert.ok(WORKBOOKS[0][1].finance.rows[0].trafoLossMu > 0, "losses to the 220 kV
     ["Bid tariff (₹/kWh)", c.finance.tariff, "tariff", "", "tariff"], ["Equity IRR", c.finance.equityIrr, "pct", "", "equityIrr"], ["Minimum DSCR", c.finance.minDscr, "x", "", "minDscr"],
   ] }, live: c.req } }, "Tender to Bid"]);
 }
+{
+  // the SECI-FDRE-X bid's whole workbook, as its route sends it (web/src/fdrex/finance.js cfdModelExport)
+  const x = CASES[FDREX][1];
+  WORKBOOKS.push(["SECI-FDRE-X bid", { finance: x.finance, body: fdrexModelExport({ state: x.s, model: x.model, finance: x.finance }) }, "FDRE-X bid"]);
+}
 for (const [name, { finance, body }, product] of WORKBOOKS) {
   const req = JSON.parse(JSON.stringify(body));
   const { buffer } = await buildModelWorkbook(req, { preparedBy: "check", product });
@@ -670,7 +700,7 @@ for (const [name, { finance, body }, product] of WORKBOOKS) {
       if (!cell.formula) return;
       formulas += 1;
       const got = resultOf(ws.getCell(cell.address));
-      const want = cell.result;
+      const want = asSerial(cell.result); // a date the sheet works out (a bid with a COD date) is compared as its serial
       assert.ok(!(got && typeof got === "object" && "error" in got), `${name}: ${cell.address} ${cell.formula} → ${JSON.stringify(got)}`);
       if (typeof want === "number") assert.ok(typeof got === "number" && close(got, want, 1e-6), `${name}: ${cell.address} ${cell.formula}: ${got} vs ${want}`);
       else if (want !== undefined) assert.equal(got ?? "", want, `${name}: ${cell.address}`);

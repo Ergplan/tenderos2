@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ExcelJS from "exceljs";
 import { addLiveModel, liveModelInput } from "./liveModel.js";
-import { addBlockSheets, blockBackup, opsFromBlocks } from "./cfdBlockSheets.js";
+import * as cfdBlocks from "./cfdBlockSheets.js";
 
 const FMT = { cr: "#,##0.00", mu: "#,##0", tariff: "0.000", pct: "0.00%", x: "0.00", mw: "#,##0", int: "0", text: "@" };
 const INK = "FF111111";
@@ -55,7 +55,9 @@ function pairs(ws, items, links = {}) {
  * `blockData` (the CfD bid: cfdBlockSheets.js cfdBlockData) makes the second version: the Live
  * model's energy rows are then formulas on the 15-minute dispatch sheets added at the end.
  */
-export async function buildModelWorkbook(body, { preparedBy, product, blockData = null }) {
+export async function buildModelWorkbook(body, { preparedBy, product, blockData = null, blockLib = cfdBlocks }) {
+  // the 15-minute sheets' builder: the CfD bid's by default; another tender passes its own (web/lib/fdrexBlockSheets.js)
+  const { addBlockSheets, blockBackup, opsFromBlocks } = blockLib;
   const rows = Array.isArray(body?.rows) ? body.rows.slice(0, 60) : [];
   if (!rows.length) throw Object.assign(new Error("The financial model has no years."), { status: 400 });
   const years = rows.map((r) => r.year);

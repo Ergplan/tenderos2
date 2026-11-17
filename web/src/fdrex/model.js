@@ -1,0 +1,1381 @@
+// SECI-FDRE-X bid model: the plant's day-by-day operation over the PPA term and the financial model
+// that solves the tariff for the bidder's target equity IRR. Forked from the CfD-I bid model
+// (web/src/cfd/model.js), whose function names it keeps so the two stay comparable; the tender's
+// numbers come from ./tender.js (each quoted from the RfS or the standard PPA in ./terms.js);
+// everything else is the bidder's input.
+//
+// Operation, every day from the SCSD to the end of the term:
+//   * the Buying Entity chooses 4 hours of the day from the non-solar hours (RfS 8.1.a); the model
+//     takes them to be the four highest-priced hours of 18:00-24:00 in the exchange chosen for
+//     market prices (a buyer schedules where power is dearest; a choice in the morning non-solar
+//     hours needs the same stored energy);
+//   * the day's supply is Contracted MW x 4 h x availability, 1 MWh per MW in an hour, from wind
+//     output in those hours (own RE) and the battery;
+//   * the battery is charged before 18:00 from own solar and wind first (cheapest hours of the
+//     merchant market first), then from the green market (GDAM, hourly price + charges), cheapest
+//     first, within the Contract Year's limit (RfS 8.1.e: 5% of the annual energy, measured on the
+//     energy discharged); grid charging beyond that is not allowed (PPA 4.4.1.a.vii);
+//   * own RE not needed for charging is sold in the market (within the connection's Contracted
+//     MW) on days the supply is met, or curtailed (PPA 9.3: SECI has the first right to it). The
+//     tender asks for connectivity with non-solar-hour access (RfS 7.2), so nothing is injected
+//     from 06:00 to 18:00 unless the bid says it holds solar-hour connectivity too
+//     (inputs.dayInjection): without it the day's surplus solar is curtailed;
+//   * a billing month's shortfall beyond 10% of the month's 4 MWh/MW a day is penalised at 1.5 x
+//     the PPA tariff (RfS 8.2, PPA 4.4.1.b).
+// Payment: the RPD is paid the tariff for every kWh supplied in the Peak Hours, fixed for 25 years
+// (PPA 9.1), less Rs 0.02/kWh when it opts for cover under the Payment Security Mechanism.
+import * as E from "../rtc/engine.js";
+import { scaleToCuf } from "../bid/model.js";
+import { TENDER } from "./tender.js";
+
+export const BENCHMARK_NOTE = "Industry benchmark (2025–26 Indian prices and norms), not from the tender";
+const pct = true;
+
+/** Every input, by section. The tender fixes none of these; each starts empty unless noted. */
+export const FIELDS = [
+  // ---- the project
+  { section: "project", key: "contractedMw", label: "Contracted capacity you bid", unit: "MW", min: TENDER.bidMinMw, max: TENDER.bidMaxMw, step: 1, hint: "50 to 600 MW in whole MW, one bid for your group (RfS 5.1)" },
+  { section: "project", key: "essMwhPerMw", label: "Battery energy", unit: "MWh per contracted MW", min: 4, max: 12, step: 0.05, hint: "At least 4: the four hours the buyer names each morning (RfS 8.1)" },
+  { section: "project", key: "extraEssMwhPerMw", label: "Extra battery for evening sale", unit: "MWh per contracted MW", min: 0, max: 8, step: 0.05, hint: "Beyond the four hours' battery: discharged in the dearest evening hours outside the buyer's four hours, within the connection, once the day's supply is met (PPA 4.4.1.a.iv), at the exchange's price; charged from own RE first, then the green market within its limit. 0 = none" },
+  { section: "project", key: "essMwPerMw", label: "Battery power", unit: "MW per contracted MW", min: 1, max: 3, step: 0.05, hint: "At least 1: 1 MWh per MW in an hour (RfS 8.1.c)" },
+  { section: "project", key: "solarMw", label: "Own solar", unit: "MWac", min: 0, max: 5000, step: 5, hint: "Co-located; “Optimise own RE” finds the least-tariff size" },
+  { section: "project", key: "windMw", label: "Own wind", unit: "MW", min: 0, max: 5000, step: 5, hint: "0 for none" },
+  { section: "project", key: "availability", label: "Plant availability", unit: "%", pct, min: 50, max: 100, step: 0.5, hint: "Share of the daily 4 MWh/MW actually delivered" },
+  // ---- resource and battery
+  { section: "resource", key: "solarCuf", label: "Solar CUF (AC)", unit: "%", pct, min: 5, max: 40, step: 0.1, hint: "Annual energy ÷ (MWac × 8,760 h)" },
+  { section: "resource", key: "solarDcAc", label: "DC:AC ratio", unit: "MWp/MWac", min: 1, max: 2.5, step: 0.05, hint: "MWp = MWac × DC:AC, so capex per MWac ÷ DC:AC is the capex per MWp; at a given AC CUF the hourly shape is pinned by the CUF, so the ratio changes the cost and the studio's design, not the typical profile" },
+  { section: "resource", key: "solarDegradation", label: "Solar degradation", unit: "%/yr", pct, min: 0, max: 3, step: 0.05 },
+  { section: "resource", key: "windCuf", label: "Wind CUF", unit: "%", pct, min: 5, max: 60, step: 0.1, hint: "Needed only with own wind" },
+  { section: "resource", key: "windDegradation", label: "Wind degradation", unit: "%/yr", pct, min: 0, max: 3, step: 0.05, hint: "0 for none" },
+  { section: "resource", key: "rte", label: "Battery round-trip efficiency (AC)", unit: "%", pct, min: 60, max: 100, step: 0.5, hint: "Where it is quoted is set under Losses (the PCS output unless you change it)" },
+  { section: "resource", key: "essSocMin", label: "Minimum state of charge", unit: "%", pct, min: 0, max: 50, step: 1, optional: true, hint: "Leave empty for a quote in usable energy; else the supplier's window in percent (10 for 10%). Usable energy = (maximum − minimum) × nameplate" },
+  { section: "resource", key: "essSocMax", label: "Maximum state of charge", unit: "%", pct, min: 50, max: 100, step: 1, optional: true, hint: "Leave empty for a quote in usable energy; else the supplier's window in percent (90 for 90%)" },
+  { section: "resource", key: "essDegradation", label: "Battery degradation", unit: "%/yr", pct, min: 0, max: 5, step: 0.1 },
+  // ---- sourcing and markets
+  { section: "sourcing", key: "marketCharges", label: "Charges on green-market power", unit: "₹/kWh", min: 0, max: 3, step: 0.01, hint: "Exchange fee, transmission charges and losses on power bought in the GDAM" },
+  { section: "sourcing", key: "priceEscalation", label: "Market price escalation", unit: "%/yr", pct, min: -5, max: 10, step: 0.1, hint: "Applied to the 2025–26 IEX prices; the price scenario on the Financial model step can split it into a midday and an evening path" },
+  { section: "sourcing", key: "gdamShareCap", label: "Share of the GDAM you can buy in an hour", unit: "%", pct, min: 0, max: 100, step: 1, hint: "Cap on market charging each hour: that share of the hour's cleared GDAM volume (IEX MCV); 0 = no cap. Midday GDAM clears about 1.2–1.8 GW on thin days" },
+  // ---- costs
+  { section: "costs", key: "essCrPerMwh", label: "Battery capex (all-in)", unit: "₹ cr/MWh", min: 0, max: 5, step: 0.01 },
+  { section: "costs", key: "solarCrPerMw", label: "Solar capex", unit: "₹ cr/MWac", min: 0, max: 10, step: 0.05 },
+  { section: "costs", key: "windCrPerMw", label: "Wind capex", unit: "₹ cr/MW", min: 0, max: 15, step: 0.05 },
+  { section: "costs", key: "evacuationCrPerMw", label: "Transmission to the ISTS substation", unit: "₹ cr per contracted MW", min: 0, max: 3, step: 0.01, hint: "Line and bay at 220 kV or above, to the Delivery Point (RfS 7)" },
+  { section: "costs", key: "preopPct", label: "Pre-operative & IDC", unit: "% of hard cost", pct, min: 0, max: 30, step: 0.5 },
+  { section: "costs", key: "augDecline", label: "Battery price fall (augmentation)", unit: "%/yr", pct, min: 0, max: 20, step: 0.5, hint: "Augmentation keeps the usable MWh: degraded MWh replaced each year" },
+  { section: "costs", key: "essOmLakhPerMwh", label: "Battery O&M", unit: "₹ lakh/MWh/yr", min: 0, max: 10, step: 0.05 },
+  { section: "costs", key: "solarOmLakhPerMw", label: "Solar O&M", unit: "₹ lakh/MW/yr", min: 0, max: 20, step: 0.1 },
+  { section: "costs", key: "windOmLakhPerMw", label: "Wind O&M", unit: "₹ lakh/MW/yr", min: 0, max: 30, step: 0.1 },
+  { section: "costs", key: "otherFixedLakhPerMw", label: "Scheduling, forecasting, fees, admin", unit: "₹ lakh per contracted MW/yr", min: 0, max: 20, step: 0.1 },
+  { section: "costs", key: "insurancePct", label: "Insurance", unit: "% of capex/yr", pct, min: 0, max: 3, step: 0.05 },
+  { section: "costs", key: "omEscalation", label: "O&M escalation", unit: "%/yr", pct, min: 0, max: 15, step: 0.25 },
+  { section: "costs", key: "pxFee", label: "Exchange fee on energy sold in the market", unit: "₹/kWh", min: 0, max: 0.5, step: 0.005, hint: "On the surplus and the extra battery's sales; the PPA supply is not sold on an exchange" },
+  { section: "costs", key: "pbgCostPct", label: "Bank guarantee cost (EMD, PBG)", unit: "% of the guarantee/yr", pct, min: 0, max: 5, step: 0.05, hint: "Amounts and validity from the RfS (16, 17.1)" },
+  { section: "costs", key: "gstRate", label: "GST on SECI's charges", unit: "%", pct, min: 0, max: 28, step: 1, hint: "On the RfS cost, the bid processing fee and the Success Charges; a cost if you cannot set it off" },
+  // ---- finance
+  { section: "fin", key: "targetEquityIrr", label: "Target equity IRR", unit: "%", pct, min: 0, max: 40, step: 0.25 },
+  { section: "fin", key: "debtFraction", label: "Debt share", unit: "% of capex", pct, min: 0, max: 95, step: 1 },
+  { section: "fin", key: "interestRate", label: "Interest rate", unit: "%", pct, min: 0, max: 25, step: 0.05 },
+  { section: "fin", key: "tenorYears", label: "Loan tenor", unit: "years", min: 1, max: 25, step: 1, hint: "Within the 25-year term" },
+  { section: "fin", key: "taxRate", label: "Corporate tax", unit: "%", pct, min: 0, max: 50, step: 0.01, hint: "Sec. 115BAA: 25.17%" },
+  { section: "fin", key: "essLifeYears", label: "Battery depreciation life", unit: "years", min: 5, max: 30, step: 1 },
+  { section: "fin", key: "reLifeYears", label: "RE depreciation life", unit: "years", min: 5, max: 35, step: 1 },
+  { section: "fin", key: "discountRate", label: "Discount rate (levelised cost)", unit: "%", pct, min: 0, max: 25, step: 0.25 },
+];
+
+export const CHOICES = {
+  effectiveDate: { label: "Effective Date of the PPA", hint: "The SCSD is 18 months later (RfS 9.2); the PPA runs 25 years from the SCSD (RfS 20.2)" },
+  sellMarket: { label: "Exchange for market prices", options: [["DAM", "DAM"], ["GDAM", "GDAM (green)"], ["RTM", "RTM"]], hint: "The buyer is taken to choose its four dearest evening hours in this market; the extra battery's evening sale is priced in it" },
+  useMarket: { label: "Buy green-market power to charge the battery", hint: "Up to 5% of each year's energy (RfS 8.1.e)" },
+  merchant: { label: "Sell surplus own RE in the market", hint: "Once SECI and the buyer have refused it (PPA 9.3): in the GDAM, within the connection, on days the supply is met" },
+  dayInjection: { label: "Connectivity in the solar hours too", hint: "The tender asks for connectivity with non-solar-hour access (RfS 7.2). No: nothing is injected from 06:00 to 18:00 and the day's surplus solar is curtailed. Yes: you hold connectivity for the solar hours as well, and the surplus is sold" },
+  psm: { label: "Cover under SECI's Payment Security Mechanism", hint: "A discount of ₹0.02/kWh on every bill for the whole term; chosen in the Covering Letter and not changed after (RfS 18.4)" },
+  augmentation: { label: "Battery capacity over the term", options: [["annual", "Augment every year (keep the MWh)"], ["none", "No augmentation (capacity fades)"]] },
+  shortfallPolicy: { label: "Shortfall policy", options: [["meet", "Meet every day: no shortfall on any day of any Contract Year"], ["pay", "Pay the penalty: a day may fall short when that is cheaper than more plant"]], hint: "Beyond 10% of a billing month's requirement the shortfall costs 1.5 × the tariff, and its revenue is lost (RfS 8.2, PPA 4.4.1.b)" },
+  afterTerm: { label: "After the 25-year term", options: [["none", "Nothing (value ends with the term)"], ["merchant", "Keep selling at market prices"]] },
+};
+
+export const BENCHMARKS = {
+  effectiveDate: "2027-06-01",
+  essMwhPerMw: 4, extraEssMwhPerMw: 0, essMwPerMw: 1, solarMw: null, windMw: 0, availability: 0.97,
+  solarCuf: 0.25, solarDcAc: 1.4, solarDegradation: 0.005, windCuf: 0.33, windDegradation: 0, rte: 0.87, essDegradation: 0.02,
+  // the state-of-charge window is not benchmarked: the 4 MWh per MW is read as usable energy
+  // (a supplier's usable rating) unless the bidder enters the window, which then grows the nameplate
+  essSocMin: null, essSocMax: null,
+  marketCharges: 0.3, priceEscalation: 0, gdamShareCap: 0.2,
+  essCrPerMwh: 1.0, solarCrPerMw: 4.0, windCrPerMw: 6.5, evacuationCrPerMw: 0.3, preopPct: 0.05, augDecline: 0.05,
+  essOmLakhPerMwh: 1.2, solarOmLakhPerMw: 4, windOmLakhPerMw: 9, otherFixedLakhPerMw: 2, insurancePct: 0.003, omEscalation: 0.05,
+  pxFee: 0.02, pbgCostPct: 0.01, gstRate: 0.18,
+  targetEquityIrr: 0.14, debtFraction: 0.75, interestRate: 0.09, tenorYears: 18, taxRate: 0.2517, essLifeYears: 25, reLifeYears: 25, discountRate: 0.1,
+  sellMarket: "DAM", useMarket: true, merchant: true, dayInjection: false, psm: true, augmentation: "annual", afterTerm: "none", merchantYears: 0,
+  priceScenario: "flat", pricePath: null, shortfallPolicy: "meet",
+};
+
+export const DEFAULT_CONTRACTED_MW = 100;
+export const STORAGE_KEY = "fdre.fdrex.v1";
+
+/**
+ * The Finance team's terms the shared financial model prices beside the inputs above (the same
+ * keys and defaults as the RTC engine's DEFAULT_FINANCE): how the debt is repaid and refinanced,
+ * the working capital and reserves, tax depreciation, book life and salvage; `tariff` is the
+ * tariff when it is locked (state.tariffLocked), else the model solves it.
+ */
+export const CFD_FIN_DEFAULTS = {
+  tariff: null,
+  repayment: E.DEFAULT_FINANCE.repayment, graceYears: E.DEFAULT_FINANCE.graceYears, paymentsPerYear: E.DEFAULT_FINANCE.paymentsPerYear,
+  targetDscr: E.DEFAULT_FINANCE.targetDscr, lenderMinDscr: E.DEFAULT_FINANCE.lenderMinDscr, balloonPct: E.DEFAULT_FINANCE.balloonPct, stepUpPct: E.DEFAULT_FINANCE.stepUpPct,
+  refiYear: E.DEFAULT_FINANCE.refiYear, refiRate: E.DEFAULT_FINANCE.refiRate, refiTenorYears: E.DEFAULT_FINANCE.refiTenorYears, refiFeePct: E.DEFAULT_FINANCE.refiFeePct,
+  omStockMonths: E.DEFAULT_FINANCE.omStockMonths, sparesPctOm: E.DEFAULT_FINANCE.sparesPctOm, wcInterestRate: E.DEFAULT_FINANCE.wcInterestRate, dsraMonths: E.DEFAULT_FINANCE.dsraMonths,
+  receivableDays: E.DEFAULT_FINANCE.receivableDays, taxDepreciation: E.DEFAULT_FINANCE.taxDepreciation, wdvRate: E.DEFAULT_FINANCE.wdvRate,
+  bookLifeYears: 25, salvagePct: E.DEFAULT_FINANCE.salvagePct,
+};
+/** The construction schedule (the IDC month by month when months are set; else inside the pre-operative share). */
+export const CFD_COST_DEFAULTS = { constructionMonths: 0, drawdown: "linear", drawOrder: "proRata" };
+
+export function defaultCfdState() {
+  const inputs = Object.fromEntries(FIELDS.map((f) => [f.key, null]));
+  return {
+    version: 1,
+    step: "model",
+    inputs: { ...inputs, contractedMw: DEFAULT_CONTRACTED_MW, effectiveDate: null, sellMarket: null, useMarket: null, merchant: null, dayInjection: null, psm: null, augmentation: null, afterTerm: null, merchantYears: null, shortfallPolicy: "meet" },
+    filled: {}, // key -> true while the value is a benchmark
+    // the design detail of the SECI tab: the plant studios, the hourly profiles (an upload or a library
+    // pick, with the monthly redraw) and the losses to the billing meter (null: none modelled)
+    studio: {},
+    solarUpload: null,
+    windUpload: null,
+    solarMonthScale: new Array(12).fill(1),
+    windMonthScale: new Array(12).fill(1),
+    losses: null,
+    fin: { ...CFD_FIN_DEFAULTS },
+    costs: { ...CFD_COST_DEFAULTS },
+    locks: {}, // "fin.repayment" -> true: the box is frozen (no refill overwrites it)
+    tariffLocked: false, // true: the financial model computes the returns at fin.tariff instead of solving it
+  };
+}
+
+/**
+ * The battery augmentation choice for the finance team's inputs: "annual" and "none" are the
+ * tender input (inputs.augmentation); "oneTime", "schedule" (with augmentationYears) and "byYear"
+ * (augmentationPct and augmentationCr, one entry per operating year) live in state.bess, which the
+ * shared model reads first.
+ */
+export function patchCfdBess(s, values) {
+  const bess = { ...(s.bess || {}), ...values };
+  const inputs = { ...s.inputs };
+  const filled = { ...(s.filled || {}) };
+  if (values.augmentation === "annual" || values.augmentation === "none") {
+    inputs.augmentation = values.augmentation;
+    bess.augmentation = null;
+  } else if (values.augmentation && !inputs.augmentation) inputs.augmentation = "none"; // the tender input stays answered
+  if ("augmentation" in values) delete filled.augmentation; // chosen, no longer a benchmark
+  return { ...s, inputs, bess, filled };
+}
+
+/** The augmentation choice shown on the finance team's inputs. */
+export const cfdBessAug = (s) => ({ augmentation: s.bess?.augmentation || s.inputs?.augmentation || "none", augmentationYears: s.bess?.augmentationYears || [], augmentationPct: s.bess?.augmentationPct || [], augmentationCr: s.bess?.augmentationCr || [] });
+
+export function mergeCfdState(saved) {
+  const base = defaultCfdState();
+  if (!saved || saved.version !== 1) return base;
+  return {
+    ...base, ...saved,
+    inputs: { ...base.inputs, ...(saved.inputs || {}) }, filled: { ...(saved.filled || {}) },
+    fin: { ...base.fin, ...(saved.fin || {}) }, costs: { ...base.costs, ...(saved.costs || {}) }, bess: { ...(saved.bess || {}) }, locks: { ...(saved.locks || {}) },
+    frozen: { ...(saved.frozen || {}) }, frozenBaseline: saved.frozenBaseline || null, rejected: { ...(saved.rejected || {}) },
+    sized: saved.sized && typeof saved.sized === "object" ? saved.sized : null, // the optimiser's last result (solarMw, windMw, sp, at)
+    studio: { ...(saved.studio || {}) }, solarUpload: saved.solarUpload || null, windUpload: saved.windUpload || null,
+    solarMonthScale: Array.isArray(saved.solarMonthScale) && saved.solarMonthScale.length === 12 ? saved.solarMonthScale : new Array(12).fill(1),
+    windMonthScale: Array.isArray(saved.windMonthScale) && saved.windMonthScale.length === 12 ? saved.windMonthScale : new Array(12).fill(1),
+    losses: saved.losses && typeof saved.losses === "object" ? saved.losses : null,
+    tariffLocked: Boolean(saved.tariffLocked),
+  };
+}
+
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+
+export const WINNING_NOTE = "Competitive-bidder value (what a bidder who wins SECI's 2026 auctions shows a lender), not from the tender";
+
+/**
+ * What a competitive bidder shows in 2026, on top of the industry benchmarks: the values behind
+ * the tariffs SECI's recent firm and peak-power auctions closed at, each one a lender has seen in
+ * a recent award. "Fill up for me please" puts them in every empty box and sizes the own RE; the
+ * Reference bids step says why they win.
+ */
+export const WINNING = {
+  essCrPerMwh: 0.85, // LFP cells at 2026 prices: all-in quotes of ₹0.8–0.9 cr/MWh
+  solarCrPerMw: 3.6, // ISTS solar at ₹3.5–3.7 cr/MWac behind SECI's ₹2.86–3.13 solar-plus-battery awards
+  targetEquityIrr: 0.13, // the equity return behind SECI's 2026 awards: 13–14%
+  interestRate: 0.0875, // project debt for contracted RE with battery, 2026
+  tenorYears: 20, // 20 years on a 25-year PPA: what lenders give contracted RE with battery
+  extraEssMwhPerMw: 0, // none in the bid as filled: the Upside step sizes an evening-sale battery for the bid's own connectivity
+  essSocMin: null, essSocMax: null, // the 4 MWh per MW read as usable energy (a supplier's rating)
+  augmentation: "annual", // the usable MWh kept every year: no faded last years, no silent shortfall
+};
+export const WINNING_WHY = {
+  essCrPerMwh: "LFP cells at 2026 prices: all-in quotes of ₹0.8–0.9 cr/MWh",
+  solarCrPerMw: "ISTS solar at ₹3.5–3.7 cr/MWac, the capex behind SECI's ₹2.86–3.13 solar-plus-battery awards",
+  targetEquityIrr: "the equity return behind SECI's 2026 awards, 13–14%",
+  interestRate: "project debt for contracted RE with battery in 2026",
+  tenorYears: "a 20-year loan on a 25-year PPA",
+  extraEssMwhPerMw: "none to start with: the Upside step says what an evening-sale battery earns on this bid (it can charge from solar the connection would otherwise curtail)",
+  essSocMin: "the 4 MWh per MW read as usable energy, as suppliers rate it",
+  essSocMax: "the 4 MWh per MW read as usable energy, as suppliers rate it",
+  augmentation: "the usable MWh kept every year: no faded last years",
+};
+/** The finance team's inputs a competitive bidder shows: debt sculpted to the lender's DSCR. */
+export const WINNING_FIN = { repayment: "sculpted", targetDscr: 1.2 };
+
+/**
+ * "Fill up for me please": every empty input gets the competitive bidder's value where there is
+ * one (marked "winning") and the industry benchmark otherwise (marked "benchmark"); the finance
+ * team's repayment is sculpted to the lender's DSCR when it is still at the default; the own
+ * solar gets a first guess for the optimiser to refine. Typed values are never touched.
+ */
+export function fillWinning(state) {
+  const filled = { ...state.filled };
+  const base = fillBenchmarks({ ...state, inputs: { ...state.inputs }, filled });
+  const inputs = { ...base.inputs };
+  const empty = (k) => state.inputs[k] === null || state.inputs[k] === undefined || state.inputs[k] === "";
+  for (const [key, value] of Object.entries(WINNING)) {
+    if (!empty(key)) continue;
+    inputs[key] = value;
+    base.filled[key] = value === null ? undefined : "winning";
+  }
+  // the battery the tender needs, once more with the winning window (none) in
+  const need = essRequiredPerMw({ ...state, inputs });
+  if (isNum(inputs.essMwhPerMw) && base.filled.essMwhPerMw && inputs.essMwhPerMw > need.energy + 1e-9) inputs.essMwhPerMw = need.energy;
+  if (isNum(inputs.essMwPerMw) && base.filled.essMwPerMw && inputs.essMwPerMw > need.power + 1e-9) inputs.essMwPerMw = need.power;
+  const fin = { ...(state.fin || {}) };
+  for (const [key, value] of Object.entries(WINNING_FIN)) {
+    if (fin[key] === undefined || fin[key] === null || fin[key] === CFD_FIN_DEFAULTS[key]) fin[key] = value;
+  }
+  return { ...base, inputs, fin };
+}
+
+/** Fill every empty input with its benchmark; the solar size stays empty (the optimiser sets it). */
+export function fillBenchmarks(state) {
+  const inputs = { ...state.inputs };
+  const filled = { ...state.filled };
+  for (const [key, value] of Object.entries(BENCHMARKS)) {
+    if (value === null) continue;
+    if (inputs[key] === null || inputs[key] === undefined || inputs[key] === "") {
+      inputs[key] = value;
+      filled[key] = true;
+    }
+  }
+  if (!isNum(inputs.solarMw) && isNum(inputs.contractedMw)) {
+    inputs.solarMw = inputs.contractedMw; // a first guess; "Optimise own RE" refines it
+    filled.solarMw = true;
+  }
+  // the battery the tender's 4 MWh per MW needs once the state-of-charge window and the losses are in
+  const need = essRequiredPerMw({ ...state, inputs });
+  if (isNum(inputs.essMwhPerMw) && inputs.essMwhPerMw < need.energy - 1e-9) { inputs.essMwhPerMw = need.energy; filled.essMwhPerMw = true; }
+  if (isNum(inputs.essMwPerMw) && inputs.essMwPerMw < need.power - 1e-9) { inputs.essMwPerMw = need.power; filled.essMwPerMw = true; }
+  return { ...state, inputs, filled };
+}
+
+/** How the own RE size came about: the optimiser's (and when), a first guess from the fill, or typed. */
+export function ownReSource(state) {
+  const i = state?.inputs || {};
+  const z = state?.sized;
+  if (z && isNum(z.solarMw) && z.solarMw === i.solarMw && (z.windMw || 0) === (i.windMw || 0)) return { kind: "optimised", at: z.at || null, label: `sized by the optimiser${z.at ? ` on ${new Date(z.at).toISOString().slice(0, 10)}` : ""} for the least tariff${z.policy === "pay" ? " (policy: pay the penalty)" : " with every day met"}` };
+  if (state?.filled?.solarMw) return { kind: "guess", at: null, label: "a first guess; Optimise own RE refines it" };
+  return { kind: "typed", at: null, label: z ? "your size (the optimiser's result was changed since)" : "your size" };
+}
+
+/** The inputs still needed, as readable lines (the model runs once this is empty). */
+export function missingInputs(state) {
+  const i = state.inputs;
+  const out = [];
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(i.effectiveDate || "")) out.push("Effective Date of the PPA");
+  if (isNum(i.contractedMw) && (!Number.isInteger(i.contractedMw) || i.contractedMw < TENDER.bidMinMw || i.contractedMw > TENDER.bidMaxMw)) {
+    out.push("Contracted capacity: 50 to 600 MW in whole MW (RfS 5.1)");
+  }
+  for (const key of ["sellMarket", "useMarket", "merchant", "dayInjection", "psm", "augmentation", "afterTerm"]) {
+    if (i[key] === null || i[key] === undefined) out.push(CHOICES[key].label);
+  }
+  const optional = new Set(["windCuf", "windCrPerMw", "windOmLakhPerMw", "gdamShareCap", "extraEssMwhPerMw", "solarDcAc", "windDegradation", "essSocMin", "essSocMax"]);
+  for (const f of FIELDS) {
+    if (optional.has(f.key)) continue;
+    if (!isNum(i[f.key])) out.push(f.label);
+  }
+  if (isNum(i.windMw) && i.windMw > 0) for (const key of ["windCuf", "windCrPerMw", "windOmLakhPerMw"]) if (!isNum(i[key])) out.push(FIELDS.find((f) => f.key === key).label);
+  if (i.afterTerm === "merchant" && !isNum(i.merchantYears)) out.push("Years of market sales after the term");
+  if (isNum(i.essMwhPerMw) && i.essMwhPerMw < TENDER.essHoursMin) out.push("Battery energy: at least 4 MWh per contracted MW");
+  const need = essRequiredPerMw(state);
+  if (isNum(i.essMwhPerMw) && i.essMwhPerMw >= TENDER.essHoursMin && i.essMwhPerMw < need.energy - 1e-9) out.push(`Battery energy: ${need.energy.toFixed(2)} MWh per MW nameplate for 4 MWh usable at the meter${need.window < 1 ? ` (state-of-charge window ${Math.round(need.window * 100)}%)` : ""}${need.meter < 1 ? ` (${((1 - need.meter) * 100).toFixed(1)}% lost to the meter)` : ""}; "Fill up for me please" sets it`);
+  if (isNum(i.essMwPerMw) && i.essMwPerMw < 1) out.push("Battery power: at least 1 MW per contracted MW");
+  else if (isNum(i.essMwPerMw) && i.essMwPerMw < need.power - 1e-9) out.push(`Battery power: ${need.power.toFixed(2)} MW per MW nameplate for 1 MW at the meter (${((1 - need.meter) * 100).toFixed(1)}% lost to the meter); "Fill up for me please" sets it`);
+  return out;
+}
+
+// ---------------------------------------------------------------- dates
+
+const DAY_MS = 86400000;
+export const parseDate = (iso) => { const [y, m, d] = iso.split("-").map(Number); return Date.UTC(y, m - 1, d); };
+export const fmtDate = (t) => new Date(t).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+export const addDays = (t, n) => t + n * DAY_MS;
+export function addMonths(t, n) {
+  const d = new Date(t);
+  const y = d.getUTCFullYear();
+  const m = d.getUTCMonth() + n;
+  const last = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return Date.UTC(y, m, Math.min(d.getUTCDate(), last));
+}
+
+/** The tender's dates for an Effective Date (each from a quoted term). */
+export function keyDates(effectiveDate) {
+  const ed = parseDate(effectiveDate);
+  const scd = addMonths(ed, TENDER.essScdMonths);
+  const loa = addDays(ed, -TENDER.loaToEdDays); // SECI's intimation to sign the PPA: the Effective Date is 15 days after it (RfS 20.4.ii)
+  return {
+    loa,
+    docsDue: addDays(loa, TENDER.docsDueDays), // PBG, the 2nd instalment of the Success Charges, documents (RfS 20.4.i)
+    ed,
+    finClose: addMonths(scd, -TENDER.finCloseMonthsBeforeScd),
+    scd,
+    lastWithPenalty: addMonths(scd, TENDER.delayMonthsMax),
+    pbgUntil: addMonths(scd, TENDER.pbgAfterScdMonths), // PBG validity (RfS 17.1)
+    reDeadline: addMonths(ed, TENDER.reCodMonths),
+    extraUntil: addMonths(ed, TENDER.extraMarketMonths),
+    end: addMonths(scd, TENDER.termYears * 12),
+  };
+}
+
+/** Contract Years of the supply: the SCSD to the next 31 March, then April-March, the last ending with the term (RfS 43.12). */
+export function contractYears(scd, end) {
+  const out = [];
+  let start = scd;
+  while (start < end) {
+    const d = new Date(start);
+    const fyEnd = Date.UTC(d.getUTCMonth() >= 3 ? d.getUTCFullYear() + 1 : d.getUTCFullYear(), 3, 1);
+    const stop = Math.min(fyEnd, end);
+    out.push({ index: out.length + 1, start, end: stop, days: Math.round((stop - start) / DAY_MS) });
+    start = stop;
+  }
+  return out;
+}
+
+/** Day of the 365-day price year (0 = 1 Jan); 29 February uses 28 February's prices. */
+function priceDay(t) {
+  const d = new Date(t);
+  const y = d.getUTCFullYear();
+  let doy = Math.round((t - Date.UTC(y, 0, 1)) / DAY_MS);
+  const leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+  if (leap && doy >= 59) doy -= 1;
+  return Math.min(364, doy);
+}
+
+// ---------------------------------------------------------------- inputs for the simulation
+
+/**
+ * Market price scenarios: how the midday (charging) and evening (selling, penalty reference) prices
+ * move over the term, as a multiplier on the IEX price year per model year. The single
+ * "Market price escalation" input is the common drift; a scenario adds its own slope to each band.
+ * The bidder's own path (dragged on the Financial model step) is kept in inputs.pricePath.
+ */
+export const PRICE_SCENARIOS = {
+  flat: { label: "Flat", note: "Today's shape, both bands escalated at the market price escalation", midday: 0, evening: 0 },
+  batteryFlood: { label: "Battery flood", note: "Battery build-out lifts midday prices 3% a year and pulls the evening down 3% a year, on top of the escalation", midday: 0.03, evening: -0.03 },
+  tightGrid: { label: "Tight grid", note: "Demand outruns supply: the evening rises 3% a year, midday follows the escalation", midday: 0, evening: 0.03 },
+  custom: { label: "Your own path", note: "The dots you dragged on the Financial model step", midday: 0, evening: 0 },
+};
+
+/** The price path of the term: { midday[], evening[] } multipliers on the IEX year, one per model year. */
+export function pricePathOf(inputs, years = TENDER.termYears + 1) {
+  const esc = inputs.priceEscalation || 0;
+  const key = PRICE_SCENARIOS[inputs.priceScenario] ? inputs.priceScenario : "flat";
+  const sc = PRICE_SCENARIOS[key];
+  const gen = (slope) => Array.from({ length: years }, (_, k) => (1 + esc + slope) ** k);
+  const own = key === "custom" && inputs.pricePath && Array.isArray(inputs.pricePath.midday) && Array.isArray(inputs.pricePath.evening) ? inputs.pricePath : null;
+  const pad = (arr, fallback) => Array.from({ length: years }, (_, k) => {
+    const v = arr?.[Math.min(k, arr.length - 1)];
+    return Number.isFinite(v) && v > 0 ? v : fallback[k];
+  });
+  return own ? { midday: pad(own.midday, gen(0)), evening: pad(own.evening, gen(0)), scenario: key } : { midday: gen(sc.midday), evening: gen(sc.evening), scenario: key };
+}
+
+/** Smooth a path of dots: two passes of a 3-point average, the ends kept. */
+export function smoothPath(values) {
+  let v = values.slice();
+  for (let pass = 0; pass < 2; pass += 1) {
+    v = v.map((x, k) => (k === 0 || k === v.length - 1 ? x : (v[k - 1] + x + v[k + 1]) / 3));
+  }
+  return v.map((x) => Math.round(x * 1000) / 1000);
+}
+
+/** The IEX year's price levels the path multiplies: the cheapest three charging hours and the four dearest evening hours, ₹/kWh. */
+export function priceBands(book) {
+  let mid = 0;
+  let eve = 0;
+  for (let d = 0; d < 365; d += 1) {
+    const b = d * 24;
+    const cheap = book.buyOrder[d].slice(0, 3);
+    mid += cheap.reduce((a, h) => a + book.buy[b + h], 0) / cheap.length;
+    const top = book.peakOrder[d].slice(0, TENDER.peakHours);
+    eve += top.reduce((a, h) => a + book.sell[b + h], 0) / top.length;
+  }
+  return { midday: mid / 365, evening: eve / 365 };
+}
+
+/** Hourly prices in ₹/kWh from the IEX price year, and each day's hour orderings (fixed for the year). */
+export function priceBook(prices, sellMarket) {
+  const series = (m) => Float64Array.from(prices.markets[m].hourlyRsPerMwh, (v) => v / 1000);
+  const sell = series(sellMarket);
+  const buy = series("GDAM");
+  const merchant = series("GDAM");
+  const mcvRaw = prices.markets.GDAM?.hourlyMcvMw;
+  const mcv = Array.isArray(mcvRaw) && mcvRaw.length >= E.HOURS ? Float64Array.from(mcvRaw) : null; // cleared volume, MW, for the depth cap
+  const all = ["DAM", "GDAM", "RTM"].filter((m) => prices.markets[m]).map(series);
+  const maxAll = new Float64Array(E.HOURS);
+  for (let t = 0; t < E.HOURS; t += 1) maxAll[t] = Math.max(...all.map((s) => s[t]));
+  const peakOrder = []; // per day: the 18:00-24:00 hours, highest sell price first
+  const chargeOrder = []; // per day: hours 0-17, cheapest merchant price first (own RE charges first there)
+  const buyOrder = []; // per day: hours 0-17, cheapest GDAM price first
+  const peakRef = new Float64Array(365); // per day: highest evening price across markets (the reference of the third-party-sale penalty, RfS 8.1.f)
+  for (let d = 0; d < 365; d += 1) {
+    const b = d * 24;
+    const peak = [];
+    for (let h = TENDER.peakStart; h < TENDER.peakEnd; h += 1) peak.push(h);
+    peakOrder.push(peak.sort((x, y) => sell[b + y] - sell[b + x] || x - y));
+    const day = Array.from({ length: TENDER.peakStart }, (_, h) => h);
+    chargeOrder.push([...day].sort((x, y) => merchant[b + x] - merchant[b + y] || x - y));
+    buyOrder.push([...day].sort((x, y) => buy[b + x] - buy[b + y] || x - y));
+    let ref = 0;
+    for (let h = TENDER.peakStart; h < TENDER.peakEnd; h += 1) ref = Math.max(ref, maxAll[b + h]);
+    peakRef[d] = ref;
+  }
+  return { sell, buy, merchant, mcv, maxAll, peakOrder, chargeOrder, buyOrder, peakRef, sellMarket };
+}
+
+/** Hourly own-RE output per MW (year 1) at the bidder's CUFs. */
+/** The usable share of the battery's nameplate: the state-of-charge window (1 when none is set). */
+export const socWindow = (i) => {
+  const lo = isNum(i?.essSocMin) ? i.essSocMin : 0;
+  const hi = isNum(i?.essSocMax) ? i.essSocMax : 1;
+  return Math.max(0.05, Math.min(1, hi - lo));
+};
+
+/**
+ * A state-of-charge window that looks mistyped or is far from how batteries are run, as a warning
+ * the Design step shows beside the boxes (null when the window is fine or empty). The usual
+ * operating window of an LFP battery is 5–95% or 10–90%; suppliers quote usable energy with the
+ * window already inside the rating, so the boxes are normally left empty.
+ */
+export function socWindowWarning(inputs) {
+  const lo = inputs?.essSocMin;
+  const hi = inputs?.essSocMax;
+  if (!isNum(lo) && !isNum(hi)) return null;
+  const min = isNum(lo) ? lo : 0;
+  const max = isNum(hi) ? hi : 1;
+  const win = max - min;
+  const need = Math.ceil((TENDER.essHoursMin / Math.max(0.05, win)) * 20 - 1e-9) / 20;
+  const problems = [];
+  if (isNum(lo) && lo > 0 && lo < 0.01) problems.push(`a minimum of ${(lo * 100).toFixed(2)}% reads like a fraction typed into a percent box (0.05 for 5%): enter 5 for 5%`);
+  if (isNum(hi) && hi < 0.8) problems.push(`a maximum of ${(hi * 100).toFixed(0)}% leaves ${((1 - hi) * 100).toFixed(0)}% of the cells never charged; batteries are run to 90–100%, so this is probably a depth-of-discharge figure or a window width, not the top of the window`);
+  if (isNum(lo) && lo > 0.3) problems.push(`a minimum of ${(lo * 100).toFixed(0)}% keeps a third of the cells idle; the usual floor is 5–10%`);
+  if (win < 0.6 && !problems.length) problems.push(`a window of ${(win * 100).toFixed(0)}% is far narrower than the 80–90% batteries are run in`);
+  if (!problems.length) return null;
+  return {
+    problems,
+    window: win,
+    nameplatePerMw: need,
+    text: `${problems.join("; ")}. As entered, the tender's ${TENDER.essHoursMin} MWh usable per MW needs ${need.toFixed(2)} MWh of nameplate per MW (${Math.round((need / TENDER.essHoursMin - 1) * 100)}% more cells to buy). Leave both boxes empty when the supplier's quote is in usable energy, or enter the supplier's rated window, typically 10 to 90.`,
+  };
+}
+
+/** The augmentation choice as the day-by-day operation reads it: the finance team's (state.bess) over the tender input's. */
+export function modelAugmentation(state) {
+  const b = state?.bess || {};
+  const mode = b.augmentation || state?.inputs?.augmentation || "none";
+  return {
+    augmentation: mode === "annual" ? "annual" : "none", augmentationMode: mode,
+    augmentationYears: Array.isArray(b.augmentationYears) ? b.augmentationYears.filter(isNum) : [],
+    augmentationYear: isNum(b.augmentationYear) ? b.augmentationYear : undefined,
+    augmentationPct: Array.isArray(b.augmentationPct) ? b.augmentationPct.map((v) => (isNum(v) && v > 0 ? v : 0)) : [],
+  };
+}
+
+/** The augmentation of the bid in words (the finance team's choice over the Design step's), for the workbook and the review. */
+export function augmentationText(state) {
+  const a = modelAugmentation(state);
+  const pc = (v) => `${(v * 100).toFixed(1).replace(/\.0$/, "")}%`;
+  if (a.augmentationMode === "byYear") {
+    const years = a.augmentationPct.map((v, y) => (v > 0 && y >= 2 ? `${pc(v)} in year ${y}` : null)).filter(Boolean);
+    return years.length ? `year by year: ${years.join(", ")} of the nameplate added` : "year by year, with no capacity entered";
+  }
+  if (a.augmentationMode === "schedule") return a.augmentationYears.length ? `on a schedule, in year${a.augmentationYears.length > 1 ? "s" : ""} ${a.augmentationYears.join(", ")}` : "on a schedule, with no year entered";
+  if (a.augmentationMode === "oneTime") return `once, in year ${a.augmentationYear ?? "?"}`;
+  return a.augmentationMode === "annual" ? "every year" : "none";
+}
+
+/**
+ * The additions (share of the nameplate, index = the operating year) that give the capacity the
+ * bid's present augmentation choice keeps: what "year by year" starts from when a year is typed
+ * over another choice. Each addition fades from its own year, so keeping the capacity takes a
+ * little more each year than the year's fade.
+ */
+export function impliedAugmentation(state, years = TENDER.termYears) {
+  const deg = state?.inputs?.essDegradation || 0;
+  const a = { essDegradation: deg, ...modelAugmentation(state) };
+  const add = new Array(years + 1).fill(0);
+  if (a.augmentationMode === "byYear") {
+    for (let y = 2; y <= years; y += 1) add[y] = a.augmentationPct[y] || 0;
+    return add;
+  }
+  for (let y = 2; y <= years; y += 1) {
+    let have = Math.max(0.4, 1 - deg * (y - 1));
+    for (let k = 2; k < y; k += 1) have += add[k] * Math.max(0.4, 1 - deg * (y - k));
+    add[y] = Math.max(0, Math.round((bessCapFactor(a, y) - have) * 1e5) / 1e5);
+  }
+  return add;
+}
+
+/**
+ * The battery's augmentation year by year as the bid has it, for the table of the Design step:
+ * [{ year, pct, mwh, costCr, entered, factor, short }] for every operating year. `pct` is the
+ * share of the nameplate added at the start of the year (what the financial model pays for),
+ * `costCr` its cost (the one entered, else the MWh at that year's battery price), `factor` the
+ * usable capacity of the year as a share of the nameplate, `short` whether that is below the
+ * daily supply at the plant's availability.
+ */
+export function augmentationByYear(state, years = TENDER.termYears) {
+  const i = state?.inputs || {};
+  const X = i.contractedMw || 0;
+  const deg = i.essDegradation || 0;
+  const a = modelAugmentation(state);
+  const mwh = X * essTotalMwhPerMw(i);
+  const byYear = a.augmentationMode === "byYear";
+  const entered = Array.isArray(state?.bess?.augmentationCr) ? state.bess.augmentationCr : [];
+  const cost = E.augmentationScheduleCr({ bessMwh: mwh }, { bessCrPerMwh: i.essCrPerMwh || 0 }, {
+    annualDegradation: deg, costDeclinePct: i.augDecline || 0, augmentation: a.augmentationMode, augmentationYears: a.augmentationYears, augmentationYear: a.augmentationYear,
+    augmentationPct: a.augmentationPct, augmentationCr: entered,
+  }, years);
+  const priceAt = (y) => (i.essCrPerMwh || 0) * (1 - (i.augDecline || 0)) ** (y - 1);
+  const need = essRequiredPerMw(state);
+  const floor = isNum(i.essMwhPerMw) && i.essMwhPerMw > 0 ? ((TENDER.essHoursMin / need.meter) * (isNum(i.availability) ? i.availability : 1)) / (i.essMwhPerMw * need.window) : null;
+  const fi = { essDegradation: deg, ...a };
+  const out = [];
+  for (let y = 1; y <= years; y += 1) {
+    const costCr = cost[y] || 0;
+    const pct = y < 2 ? 0 : byYear ? (a.augmentationPct[y] || 0) : (mwh > 0 && priceAt(y) > 0 ? costCr / (mwh * priceAt(y)) : 0);
+    const factor = bessCapFactor(fi, y);
+    out.push({ year: y, pct, mwh: mwh * pct, costCr, entered: byYear && isNum(entered[y]) && entered[y] > 0, factor, short: floor !== null && factor < floor - 1e-9 });
+  }
+  return out;
+}
+
+/**
+ * The battery the tender's 4 MWh per MW needs as nameplate, once the state-of-charge window and the
+ * losses from the battery to the billing meter are in: energy 4 ÷ (window × to-meter factor) and
+ * power 1 ÷ to-meter factor per contracted MW, rounded up to 0.05. The round-trip efficiency does
+ * not change the size (it changes the charging bought); degradation is met by augmentation, or
+ * reported as the year the usable energy falls below the need when there is none.
+ */
+export function essRequiredPerMw(state) {
+  const i = state?.inputs || {};
+  const window = socWindow(i);
+  const lf = lossFactorsOfCfd(state, i.rte);
+  const meter = lf?.meter ?? 1;
+  const up = (v) => Math.ceil(v * 20 - 1e-9) / 20;
+  const energy = up(TENDER.essHoursMin / (window * meter));
+  const power = up(1 / meter);
+  // the first year the usable energy is below the tender's 4 MWh per MW (shortYear), and the first
+  // year it is below the daily supply at the plant's availability (supplyShortYear): days count as
+  // short from the second, which is later when the availability is under 100%
+  let shortYear = null;
+  let supplyShortYear = null;
+  const aug = modelAugmentation(state);
+  if ((state?.bess?.augmentation || i.augmentation) && aug.augmentation !== "annual" && isNum(i.essDegradation) && i.essDegradation > 0 && isNum(i.essMwhPerMw)) {
+    const need = TENDER.essHoursMin / meter; // usable energy at the bus
+    const avail = isNum(i.availability) ? i.availability : 1;
+    const fi = { essDegradation: i.essDegradation, ...aug };
+    for (let y = 1; y <= TENDER.termYears; y += 1) {
+      const usable = i.essMwhPerMw * window * bessCapFactor(fi, y);
+      if (shortYear === null && usable < need - 1e-9) shortYear = y;
+      if (supplyShortYear === null && usable < need * avail - 1e-9) supplyShortYear = y;
+    }
+  }
+  return { energy, power, window, meter, shortYear, supplyShortYear };
+}
+
+/**
+ * Hourly solar and wind capacity factors at the bidder's CUFs: the uploaded or library profile's
+ * shape when `inputs.profileSources` carries one (modelInputs puts the bid's there, with the monthly
+ * redraw), else the typical shape at the DC:AC ratio.
+ */
+export function profiles(inputs) {
+  const flat = () => new Float64Array(E.HOURS);
+  const src = inputs.profileSources || {};
+  const dcAc = isNum(inputs.solarDcAc) && inputs.solarDcAc > 0 ? inputs.solarDcAc : 1.4;
+  const solarShape = Array.isArray(src.solarShape) && src.solarShape.length >= E.HOURS ? Float64Array.from(src.solarShape) : (isNum(inputs.solarCuf) ? E.synthSolarCf({ targetCuf: inputs.solarCuf, dcAc }) : null);
+  const windShape = Array.isArray(src.windShape) && src.windShape.length >= E.HOURS ? Float64Array.from(src.windShape) : (isNum(inputs.windCuf) ? E.synthWindCf({ targetCuf: inputs.windCuf }) : null);
+  const redraw = (shape, scale) => (Array.isArray(scale) && scale.length === 12 ? E.applyMonthlyScale(shape, scale) : shape);
+  return {
+    solar: isNum(inputs.solarCuf) && solarShape ? scaleToCuf(redraw(solarShape, src.solarMonthScale), inputs.solarCuf) : flat(),
+    wind: isNum(inputs.windCuf) && isNum(inputs.windMw) && inputs.windMw > 0 && windShape ? scaleToCuf(redraw(windShape, src.windMonthScale), inputs.windCuf) : flat(),
+  };
+}
+
+/** The bid's chosen hourly profiles (an upload or a library pick) and the monthly redraw, for profiles(); null when it uses the typical shapes. */
+export function profileSourcesOf(state) {
+  const ps = {
+    solarShape: state?.solarUpload?.values || null, windShape: state?.windUpload?.values || null,
+    solarMonthScale: Array.isArray(state?.solarMonthScale) ? state.solarMonthScale : null, windMonthScale: Array.isArray(state?.windMonthScale) ? state.windMonthScale : null,
+  };
+  const redrawn = (sc) => sc && sc.some((v) => v !== 1);
+  return ps.solarShape || ps.windShape || redrawn(ps.solarMonthScale) || redrawn(ps.windMonthScale) ? ps : null;
+}
+
+/** The hourly profiles the Design step shows: the bid's inputs with its profile sources (no sizing needed). */
+export function designProfiles(state) {
+  const i = { ...state.inputs, windMw: isNum(state.inputs?.windMw) ? state.inputs.windMw : 0 };
+  const ps = profileSourcesOf(state);
+  if (ps) i.profileSources = ps;
+  return profiles(i);
+}
+
+/** The bid's losses to the billing meter as factors (null when none are modelled): solar and wind to the 33 kV bus, the battery's round trip at the bus, bus to meter. */
+export function lossFactorsOfCfd(state, rte = state?.inputs?.rte) {
+  const l = state?.losses;
+  if (!l || typeof l !== "object") return null;
+  const f = E.lossFactors(l, isNum(rte) ? rte : E.DEFAULT_BESS.rte);
+  return { solar: f.solar, wind: f.wind, rteBus: f.rteBus, meter: f.meter, trafo: l.trafoLossPct || 0, line: l.lineLossPct || 0 };
+}
+
+// ---------------------------------------------------------------- operations
+
+/**
+ * The battery's usable capacity in an operating year as a share of nameplate: 1 with annual
+ * augmentation; faded by the degradation since the last augmentation with a one-time year or a
+ * schedule (the finance team's choice, inputs.augmentationMode / augmentationYears, the same
+ * convention as the shared financial engine); year by year, the nameplate's fade plus each year's
+ * addition (inputs.augmentationPct[year], a share of the nameplate); faded from year 1 with none.
+ * Never below 40% of what was installed.
+ */
+export function bessCapFactor(inputs, year) {
+  const deg = isNum(inputs.essDegradation) ? inputs.essDegradation : 0;
+  const mode = inputs.augmentationMode || inputs.augmentation;
+  if (mode === "annual") return 1;
+  if (mode === "byYear") {
+    // year by year: the nameplate fades from year 1, and each year's addition (a share of the
+    // nameplate, in place from the start of that year) fades from the year it is added
+    let f = Math.max(0.4, 1 - deg * (year - 1));
+    const add = inputs.augmentationPct || [];
+    for (let a = 2; a <= year; a += 1) if (isNum(add[a]) && add[a] > 0) f += add[a] * Math.max(0.4, 1 - deg * (year - a));
+    return f;
+  }
+  if (mode === "oneTime" && isNum(inputs.augmentationYear) && inputs.augmentationYear > 1) {
+    const since = year >= inputs.augmentationYear ? year - inputs.augmentationYear : year - 1;
+    return Math.max(0.4, 1 - deg * since);
+  }
+  if (mode === "schedule") {
+    const last = (inputs.augmentationYears || []).map((v) => Math.round(v)).filter((v) => v > 1 && v <= year).reduce((a, b) => Math.max(a, b), 1);
+    return Math.max(0.4, 1 - deg * (year - last));
+  }
+  return Math.max(0.4, 1 - deg * (year - 1));
+}
+
+/**
+ * Every day of the term. Returns totals per Contract Year (and the billing months for the penalty), plus
+ * the hourly flows of the days asked for in `record` (day numbers from the SCD). `onDay(k, day)`
+ * receives every day's hourly flows as they are computed (the 15-minute dispatch reads them).
+ */
+export function simulate(inputs, book, prof, { record = [], onDay = null } = {}) {
+  const X = inputs.contractedMw;
+  const P = X * inputs.essMwPerMw;
+  const win = socWindow(inputs); // the usable share of the nameplate
+  const capNominal = X * inputs.essMwhPerMw * win;
+  const extraNominal = X * (inputs.extraEssMwhPerMw || 0) * win; // the extra battery for evening sale
+  // merchant battery added in later years (the Upside step, upside.js): MWh per contracted MW added
+  // at the start of an operating year (index = the year), each tranche fading from its own year
+  const tranches = Array.isArray(inputs.extraEssByYear) ? inputs.extraEssByYear : null;
+  const trancheCapOf = (year) => {
+    if (!tranches) return 0;
+    const deg = inputs.essDegradation || 0;
+    let s = 0;
+    for (let a = 1; a <= year && a < tranches.length; a += 1) if (isNum(tranches[a]) && tranches[a] > 0) s += tranches[a] * Math.max(0.4, 1 - deg * (year - a));
+    return X * s * win;
+  };
+  const trancheCaps = [];
+  const S = inputs.solarMw || 0;
+  const W = inputs.windMw || 0;
+  // the losses to the billing meter (inputs.loss, none: every factor 1): generation reaches the 33 kV
+  // bus at fS / fW of its output, the battery's round trip at the bus is rteB, and `meter` of what is
+  // injected at the bus reaches the meter, where the supply is measured; bought power is at the meter
+  const lf = inputs.loss || null;
+  const fS = lf?.solar ?? 1;
+  const fW = lf?.wind ?? 1;
+  const meter = lf?.meter ?? 1;
+  const rte = lf ? lf.rteBus : inputs.rte;
+  const windDeg = isNum(inputs.windDegradation) ? inputs.windDegradation : 0;
+  const avail = inputs.availability;
+  const dates = keyDates(inputs.effectiveDate);
+  const reCod = addMonths(dates.scd, inputs.reCodMonths);
+  // an existing RE plant's power under a bilateral agreement: a fixed price (with its charges) for
+  // the first months from the SCD, in solar hours, up to the plant's MW along the solar shape when
+  // a MW is given. It is part of the green-market / bilateral allowance of the tender (5% here),
+  // so it shares that budget and is counted with it in every total. No screen of this tab sets it.
+  const bilMonths = isNum(inputs.bilateralMonths) && inputs.bilateralMonths > 0 && isNum(inputs.bilateralPrice) && inputs.bilateralPrice >= 0 ? inputs.bilateralMonths : 0;
+  const bilUntil = bilMonths > 0 ? addMonths(dates.scd, bilMonths) : 0;
+  const bilPrice = (inputs.bilateralPrice || 0) + (inputs.bilateralCharges || 0);
+  const bilMw = isNum(inputs.bilateralMw) && inputs.bilateralMw > 0 ? inputs.bilateralMw : null;
+  const bilFirst = inputs.bilateralUse !== "cheapest"; // taken before the market (a firm supply), or only where it is the cheaper
+  const cys = contractYears(dates.scd, dates.end);
+  const brown = false; // the supply goes to the Buying Entity under the PPA, not to an exchange: no RECs
+  const keep = new Set(record);
+  const days = {};
+  // the same totals per operating year: 365-day periods from the SCD (the last takes the term's
+  // few extra days), the shape the shared financial model prices year by year
+  const totalDays = Math.round((dates.end - dates.scd) / DAY_MS);
+  const nOp = Math.max(1, Math.floor(totalDays / 365));
+  const opIndex = (k) => Math.min(nOp - 1, Math.floor(k / 365));
+  const blank = () => ({
+    deliveredMwh: 0, windDirectMwh: 0, essOutMwh: 0, chargeOwnMwh: 0, chargeMarketMwh: 0, chargeGroupMwh: 0,
+    marketCostCr: 0, groupCostCr: 0, merchantMwh: 0, merchantRevCr: 0, curtailedMwh: 0, shortMwh: 0, shortDays: 0,
+    mcpDeliveredCr: 0, ownSuppliedMwh: 0, recMwh: 0, reDays: 0, solarMwh: 0, windMwh: 0, months: [],
+    chargeBilateralMwh: 0, bilateralCostCr: 0, // of the green-market figures: the bilateral plant's share
+    extraSoldMwh: 0, extraRevCr: 0, extraChargeOwnMwh: 0, extraChargeMarketMwh: 0, extraMarketCostCr: 0,
+  });
+  const opYears = Array.from({ length: nOp }, (_, i) => {
+    const start = addDays(dates.scd, i * 365);
+    const end = i === nOp - 1 ? dates.end : addDays(dates.scd, (i + 1) * 365);
+    const d = Math.round((end - start) / DAY_MS);
+    return { index: i + 1, start, end, days: d, requiredMwh: X * TENDER.mwhPerMwDay * d, ...blank() };
+  });
+  const out = cys.map((cy) => {
+    // The Contract Year's sourcing limit, in MWh supplied: 5% "of the total annual energy required
+    // to be supplied" (RfS 8.1.e), counted on the energy discharged. The base is the requirement
+    // (4 MWh per MW a day), not what the plant manages to supply, so a short year buys no less.
+    const daily = X * TENDER.mwhPerMwDay;
+    const marketBase = daily * cy.days * TENDER.marketShare;
+    const groupBase = 0; // no group-company RE in this tender
+    return {
+      ...cy,
+      requiredMwh: daily * cy.days,
+      marketCapMwh: inputs.useMarket || bilMonths > 0 ? marketBase : 0,
+      groupCapMwh: inputs.useGroup ? groupBase : 0,
+      ...blank(),
+    };
+  });
+  const months = new Map(); // billing month (calendar month) -> { required, supplied, ref, cy, oy }
+  let cyIdx = 0;
+  let marketUsed = 0;
+  let groupUsed = 0;
+  const path = pricePathOf(inputs, Math.ceil((dates.end - dates.scd) / DAY_MS / 365) + 1);
+  const shareCap = isNum(inputs.gdamShareCap) && inputs.gdamShareCap > 0 ? inputs.gdamShareCap : null;
+  for (let t = dates.scd, k = 0; t < dates.end; t += DAY_MS, k += 1) {
+    while (cyIdx < out.length - 1 && t >= out[cyIdx].end) { cyIdx += 1; marketUsed = 0; groupUsed = 0; }
+    const cy = out[cyIdx];
+    const oy = opYears[opIndex(k)];
+    const year = Math.floor(k / 365) + 1;
+    const escM = path.midday[year - 1]; // the charging band (hours before 18:00)
+    const escE = path.evening[year - 1]; // the evening band (the peak hours)
+    const escOf = (h) => (h < TENDER.peakStart ? escM : escE);
+    const solarF = (1 - inputs.solarDegradation) ** (year - 1);
+    const cap = capNominal * bessCapFactor(inputs, year);
+    const reOn = t >= reCod;
+    const extra = t < dates.extraUntil;
+    const d = priceDay(t);
+    const b = d * 24;
+    const sol = new Float64Array(24);
+    const wnd = new Float64Array(24);
+    if (reOn) {
+      const windF = (1 - windDeg) ** (year - 1);
+      for (let h = 0; h < 24; h += 1) {
+        sol[h] = S * prof.solar[b + h] * solarF * fS;
+        wnd[h] = W * prof.wind[b + h] * windF * fW;
+      }
+      cy.reDays += 1;
+      oy.reDays += 1;
+    }
+    // the day's four peak hours and what each must supply
+    const chosen = book.peakOrder[d].slice(0, TENDER.peakHours);
+    const perHour = X * avail; // at the meter
+    let windDirect = 0; // at the meter
+    let essNeed = 0; // at the bus
+    const direct = {}; // wind supplied directly in a peak hour, at the meter
+    for (const h of chosen) {
+      direct[h] = Math.min(wnd[h] * meter, perHour);
+      windDirect += direct[h];
+      essNeed += Math.min(P, (perHour - direct[h]) / meter);
+    }
+    essNeed = Math.min(essNeed, cap);
+    let chargeLeft = essNeed / rte;
+    const cyMarketCost = cy.marketCostCr;
+    const cyGroupCost = cy.groupCostCr;
+    const cyBilCost = cy.bilateralCostCr;
+    const bilOn = t < bilUntil;
+    const bil = new Float64Array(TENDER.peakStart);
+    const room = new Float64Array(TENDER.peakStart).fill(P);
+    const own = new Float64Array(TENDER.peakStart);
+    const mkt = new Float64Array(TENDER.peakStart);
+    const grp = new Float64Array(TENDER.peakStart);
+    // own RE charges first, in the hours its market value is lowest
+    for (const h of book.chargeOrder[d]) {
+      if (chargeLeft <= 1e-9) break;
+      const c = Math.min(sol[h] + wnd[h], room[h], chargeLeft);
+      own[h] = c; room[h] -= c; chargeLeft -= c;
+    }
+    // then bought power, cheapest first, within the Contract Year's limits (MWh supplied): the
+    // year's budget on the planned supply, open from the first day as an operator working to an
+    // annual limit on a forecast would (a budget that follows the supply to date spirals: one short
+    // day shrinks the next day's budget); on a year with short days the share measured on the
+    // energy actually supplied sits a few tenths of a point over, which the checks allow for
+    if (chargeLeft > 1e-9 && (inputs.useMarket || (inputs.useGroup && !extra) || bilOn)) {
+      const offers = [];
+      if (bilOn) for (let h = 6; h < TENDER.peakStart; h += 1) offers.push({ h, src: "x", price: bilPrice, rank: bilFirst ? -1 : bilPrice });
+      if (inputs.useMarket) for (const h of book.buyOrder[d]) offers.push({ h, src: "m", price: book.buy[b + h] * escM + inputs.marketCharges });
+      if (inputs.useGroup && !extra) for (let h = 0; h < TENDER.peakStart; h += 1) offers.push({ h, src: "g", price: inputs.groupPrice + inputs.groupCharges });
+      offers.sort((x, y) => (x.rank ?? x.price) - (y.rank ?? y.price) || x.h - y.h);
+      for (const o of offers) {
+        if (chargeLeft <= 1e-9) break;
+        const budget = o.src === "g" ? (cy.groupCapMwh - groupUsed) / (rte * meter) : (cy.marketCapMwh - marketUsed) / (rte * meter);
+        const depth = o.src === "m" && shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + o.h] * meter - mkt[o.h]) // the GDAM depth cap, MWh in the hour
+          : o.src === "x" && bilMw ? Math.max(0, bilMw * prof.solar[b + o.h] * meter - bil[o.h]) : Infinity; // the bilateral plant's output in the hour
+        const c = Math.min(room[o.h], chargeLeft, Math.max(0, budget), depth); // at the bus; bought at the meter is c / meter
+        if (c <= 1e-9) continue;
+        room[o.h] -= c; chargeLeft -= c;
+        if (o.src === "m") { mkt[o.h] += c; marketUsed += c * rte * meter; cy.marketCostCr += (c / meter) * o.price * 1e-4; }
+        else if (o.src === "x") { bil[o.h] += c; marketUsed += c * rte * meter; cy.marketCostCr += (c / meter) * o.price * 1e-4; cy.bilateralCostCr += (c / meter) * o.price * 1e-4; }
+        else { grp[o.h] += c; groupUsed += c * rte * meter; cy.groupCostCr += (c / meter) * o.price * 1e-4; }
+      }
+    }
+    const charged = essNeed / rte - Math.max(0, chargeLeft);
+    const essOut = charged * rte; // at the bus
+    const delivered = windDirect + essOut * meter; // at the meter
+    // the day is short when less than the 4 MWh per MW (at the plant's availability) reaches the meter:
+    // for lack of charging power within the sourcing limit, or of battery capacity (a faded battery)
+    const shortDay = Math.max(0, X * TENDER.mwhPerMwDay * avail - delivered);
+    const met = shortDay <= 1e-6;
+    // the extra battery for evening sale: charged after the day's commitment, own RE first (the spare
+    // generation, in the cheapest hours), then the green market within what is left of its limit and
+    // the depth cap; discharged only when the day's supply is met (PPA 4.4.1.a.iv: the PPA first), in
+    // the dearest evening hours outside the four peak hours, within the connection, at the exchange's price
+    const ownX = new Float64Array(TENDER.peakStart);
+    const mktX = new Float64Array(TENDER.peakStart);
+    let extraCost = 0;
+    let extraLeft = 0;
+    if (trancheCaps[year] === undefined) trancheCaps[year] = trancheCapOf(year);
+    const extraCap = (extraNominal > 0 ? extraNominal * (cap / Math.max(1e-9, capNominal)) : 0) + trancheCaps[year];
+    if (extraCap > 0 && met) {
+      extraLeft = extraCap / rte;
+      for (const h of book.chargeOrder[d]) {
+        if (extraLeft <= 1e-9) break;
+        const c = Math.min(Math.max(0, sol[h] + wnd[h] - own[h]), room[h], extraLeft);
+        ownX[h] = c; room[h] -= c; extraLeft -= c;
+      }
+      if (extraLeft > 1e-9 && inputs.useMarket) {
+        // the green-market limit is the commitment's first: the extra may buy only what the rest of
+        // the Contract Year's commitment will not need
+        const daysLeft = Math.max(0, Math.round((cy.end - t) / DAY_MS) - 1);
+        const reserved = daysLeft * X * TENDER.mwhPerMwDay * avail;
+        for (const h of book.buyOrder[d]) {
+          if (extraLeft <= 1e-9) break;
+          const budget = (cy.marketCapMwh - marketUsed - reserved) / (rte * meter);
+          const depth = shareCap && book.mcv ? Math.max(0, shareCap * book.mcv[b + h] * meter - mkt[h] - mktX[h]) : Infinity;
+          const c = Math.min(room[h], extraLeft, Math.max(0, budget), depth);
+          if (c <= 1e-9) continue;
+          room[h] -= c; extraLeft -= c; mktX[h] += c; marketUsed += c * rte * meter;
+          extraCost += (c / meter) * (book.buy[b + h] * escM + inputs.marketCharges) * 1e-4;
+        }
+      }
+    }
+    const extraOut = new Float64Array(24);
+    let extraSold = 0;
+    let extraRev = 0;
+    if (extraCap > 0 && met) {
+      let left = (extraCap / rte - Math.max(0, extraLeft)) * rte;
+      for (const h of book.peakOrder[d]) {
+        if (left <= 1e-9) break;
+        if (chosen.includes(h)) continue;
+        const o = Math.min(left, P, Math.max(0, (X - (direct[h] || 0)) / meter)); // at the bus
+        if (o <= 1e-9) continue;
+        extraOut[h] = o; left -= o; extraSold += o * meter;
+        extraRev += o * meter * book.sell[b + h] * escE * 1e-4;
+      }
+    }
+    // own RE not used: sold (within the connection, once the day's supply is met) or curtailed
+    let merchantMwh = 0;
+    let merchantRev = 0;
+    let curtailed = 0;
+    const sale = new Float64Array(24);
+    for (let h = 0; h < 24; h += 1) {
+      const gen = sol[h] + wnd[h]; // at the bus
+      const used = h < TENDER.peakStart ? own[h] + ownX[h] : (direct[h] || 0) / meter;
+      const spare = Math.max(0, gen - used);
+      if (spare <= 0) continue;
+      const injected = h < TENDER.peakStart ? 0 : (direct[h] || 0) + (chosen.includes(h) ? (essOut * meter) / chosen.length : 0) + extraOut[h] * meter; // at the meter
+      // without injection rights in solar hours (connectivity with non-solar-hour access, RfS 7.2), nothing is sold from 06:00 to 18:00
+      const mayInject = inputs.dayInjection !== false || h < 6 || h >= TENDER.peakStart;
+      const sMeter = inputs.merchant && met && mayInject ? Math.min(spare * meter, Math.max(0, X - injected)) : 0;
+      const s = sMeter / meter;
+      sale[h] = s;
+      merchantMwh += sMeter;
+      merchantRev += sMeter * book.merchant[b + h] * escOf(h) * 1e-4;
+      curtailed += spare - s;
+    }
+    let ownCharged = 0;
+    let solarDay = 0;
+    let windDay = 0;
+    for (let h = 0; h < 24; h += 1) { solarDay += sol[h]; windDay += wnd[h]; }
+    for (let h = 0; h < TENDER.peakStart; h += 1) ownCharged += own[h];
+    const ownSupplied = windDirect + ownCharged * rte * meter * (charged > 0 ? Math.min(1, essOut / (charged * rte)) : 0);
+    let mcp = 0;
+    for (const h of chosen) mcp += book.sell[b + h] * escE * (direct[h] + (essOut * meter) / chosen.length);
+    const marketDay = mkt.reduce((a, v) => a + v, 0);
+    const groupDay = grp.reduce((a, v) => a + v, 0);
+    const ownXDay = ownX.reduce((a, v) => a + v, 0);
+    const mktXDay = mktX.reduce((a, v) => a + v, 0);
+    cy.marketCostCr += extraCost;
+    const marketCostDay = cy.marketCostCr - cyMarketCost;
+    const groupCostDay = cy.groupCostCr - cyGroupCost;
+    const bilDay = bil.reduce((a, v) => a + v, 0);
+    for (const row of [cy, oy]) {
+      Object.assign(row, {
+        deliveredMwh: row.deliveredMwh + delivered, windDirectMwh: row.windDirectMwh + windDirect, essOutMwh: row.essOutMwh + essOut * meter,
+        chargeOwnMwh: row.chargeOwnMwh + ownCharged + ownXDay, chargeMarketMwh: row.chargeMarketMwh + (marketDay + mktXDay + bilDay) / meter, chargeGroupMwh: row.chargeGroupMwh + groupDay / meter, chargeBilateralMwh: row.chargeBilateralMwh + bilDay / meter,
+        merchantMwh: row.merchantMwh + merchantMwh + extraSold, merchantRevCr: row.merchantRevCr + merchantRev + extraRev, curtailedMwh: row.curtailedMwh + curtailed,
+        extraSoldMwh: row.extraSoldMwh + extraSold, extraRevCr: row.extraRevCr + extraRev, extraChargeOwnMwh: row.extraChargeOwnMwh + ownXDay, extraChargeMarketMwh: row.extraChargeMarketMwh + mktXDay, extraMarketCostCr: row.extraMarketCostCr + extraCost,
+        shortMwh: row.shortMwh + shortDay, shortDays: row.shortDays + (met ? 0 : 1),
+        mcpDeliveredCr: row.mcpDeliveredCr + mcp * 1e-4, ownSuppliedMwh: row.ownSuppliedMwh + ownSupplied,
+        recMwh: row.recMwh + (brown ? ownSupplied : 0), solarMwh: row.solarMwh + solarDay, windMwh: row.windMwh + windDay,
+      });
+    }
+    oy.marketCostCr += marketCostDay;
+    oy.groupCostCr += groupCostDay;
+    oy.bilateralCostCr += cy.bilateralCostCr - cyBilCost;
+    // the billing month (the calendar month) for the monthly shortfall (RfS 8.2.a)
+    const dt = new Date(t);
+    const mk = Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), 1);
+    const w = months.get(mk) || { start: mk, required: 0, supplied: 0, ref: 0, cy: cyIdx, oy: opIndex(k) };
+    w.required += X * TENDER.mwhPerMwDay;
+    w.supplied += delivered;
+    w.ref = Math.max(w.ref, book.peakRef[d] * escE);
+    w.cy = cyIdx;
+    w.oy = opIndex(k);
+    months.set(mk, w);
+    if (keep.has(k) || onDay) {
+      const rec = { date: t, k, year, cy: cy.index, capFactor: cap / Math.max(1e-9, capNominal), chosen, solar: Array.from(sol), wind: Array.from(wnd), own: [...Array.from(own, (v, h) => v + ownX[h]), ...new Array(6).fill(0)], market: [...Array.from(mkt, (v, h) => v + mktX[h] + bil[h]), ...new Array(6).fill(0)], group: [...grp, ...new Array(6).fill(0)],
+        sale: Array.from(sale, (v, h) => v + extraOut[h]), extraOut: Array.from(extraOut), essOut, windDirect: direct, delivered, required: X * TENDER.mwhPerMwDay, price: Array.from({ length: 24 }, (_, h) => book.sell[b + h] * escOf(h)), buyPrice: Array.from({ length: 24 }, (_, h) => book.buy[b + h] * escOf(h)) };
+      if (keep.has(k)) days[k] = rec;
+      if (onDay) onDay(k, rec);
+    }
+  }
+  // a month's shortfall beyond the 10% allowed: 90% of the month's requirement less what was supplied
+  // (PPA 4.4.1.b: "(0.90 x 3 - 2)" of its example); a month is counted in the year its last day falls in
+  for (const w of months.values()) {
+    const beyond = Math.max(0, w.required * (1 - TENDER.shortfallTolerance) - w.supplied);
+    const month = { start: w.start, required: w.required, supplied: w.supplied, beyondMwh: beyond, ref: w.ref };
+    out[w.cy].months.push(month);
+    opYears[w.oy].months.push(month);
+  }
+  for (const cy of [...out, ...opYears]) {
+    const supplied = Math.max(1e-9, cy.deliveredMwh);
+    cy.shareOwn = cy.ownSuppliedMwh / supplied;
+    cy.shareMarket = (cy.chargeMarketMwh * meter * rte * meter) / supplied; // bought at the meter, round trip at the bus, back to the meter
+    cy.shareGroup = (cy.chargeGroupMwh * meter * rte * meter) / supplied;
+    // the bought energy against the tender's own base, the energy required to be supplied (RfS 8.1.e)
+    cy.marketOfRequired = (cy.chargeMarketMwh * meter * rte * meter) / Math.max(1e-9, cy.requiredMwh);
+    cy.supplyShare = cy.deliveredMwh / cy.requiredMwh;
+  }
+  return { years: out, opYears, dates: { ...dates, reCod }, days, loss: lf, socWindow: win };
+}
+
+// ---------------------------------------------------------------- finance
+
+const yearsBetween = (a, b) => (b - a) / (365.25 * DAY_MS);
+
+/** Monthly shortfall penalty in a Contract Year at tariff sp (₹ cr): 1.5 × the tariff on the energy short beyond 10% of each billing month. */
+export const penaltyCr = (cy, sp) => cy.months.reduce((a, w) => a + TENDER.penaltyMultiple * sp * w.beyondMwh * 1e-4, 0);
+/** The energy the monthly penalty is charged on in a year, MWh. */
+export const penaltyMwh = (cy) => cy.months.reduce((a, w) => a + w.beyondMwh, 0);
+
+/** No Letter of Credit is asked of the developer in this tender (the CfD-I model's, kept at zero for the shared screens). */
+export const lcCr = () => 0;
+
+/** The discount for cover under the Payment Security Mechanism, ₹/kWh on every unit billed (RfS 18.4), when the bid opts for it. */
+export const psmDiscount = (inputs) => (inputs?.psm ? TENDER.psmChargeRsPerKwh : 0);
+
+/**
+ * What the RfS asks of a bid for this plant (₹ crore): the bid securities and SECI's charges, from the
+ * installed AC capacities (solar and wind MW, battery MWh), and the eligibility thresholds.
+ */
+export function rfsAmounts(inputs) {
+  const X = isNum(inputs.contractedMw) ? inputs.contractedMw : 0;
+  const cap = { solarMw: inputs.solarMw || 0, windMw: inputs.windMw || 0, essMwh: X * ((inputs.essMwhPerMw || TENDER.essHoursMin) + (inputs.extraEssMwhPerMw || 0)) };
+  // the Installed Capacity the Success Charges are charged on: the RE generating components in MW
+  // and the battery's rated capacity in MWh, as committed in the PPA (RfS 18.1: "shall include the
+  // rated capacity of the ESS component (in MWh)"). The RfS's own illustration works the charge on
+  // the awarded capacity instead; the clause's reading, the larger, is the one budgeted.
+  const installedMw = cap.solarMw + cap.windMw + cap.essMwh;
+  const lakh = (rates) => Object.keys(rates).reduce((a, k) => a + rates[k] * cap[k], 0);
+  const gst = isNum(inputs.gstRate) ? inputs.gstRate : 0;
+  const rfsCost = TENDER.rfsCostLakh / 100;
+  const bidFee = Math.min(TENDER.bidFeeLakhPerMw * X, TENDER.bidFeeMaxLakh) / 100;
+  const cac = (TENDER.cacLakhPerMw * installedMw) / 100; // the Success Charges (the CfD model's "cac")
+  return {
+    ...cap, installedMw,
+    emdCr: lakh(TENDER.emdLakh) / 100,
+    pbgCr: lakh(TENDER.pbgLakh) / 100,
+    rfsCostCr: rfsCost, bidFeeCr: bidFee, cacCr: cac, gst,
+    seciChargesCr: (rfsCost + bidFee + cac) * (1 + gst), // not refunded; with GST
+    netWorthCr: lakh(TENDER.netWorthLakh) / 100,
+    turnoverCr: (TENDER.turnoverLakhPerMw * X) / 100,
+    pbditCr: (TENDER.pbditLakhPerMw * X) / 100,
+    lineOfCreditCr: (TENDER.lineOfCreditLakhPerMw * X) / 100,
+  };
+}
+
+/** Years each bank guarantee is held: the EMD for its validity, the PBG from 30 days after SECI's intimation to 9 months after the SCSD; each + the 30-day claim period. */
+export const BG_YEARS = {
+  emd: TENDER.emdValidityMonths / 12 + TENDER.bgClaimDays / 365,
+  pbg: (TENDER.essScdMonths + TENDER.pbgAfterScdMonths) / 12 + (TENDER.loaToEdDays - TENDER.docsDueDays + TENDER.bgClaimDays) / 365,
+};
+
+/**
+ * What a unit of the bidder's own RE costs to make, ₹/kWh: the capex annualised at the discount
+ * rate over the RE life, plus the O&M (escalating, levelised at the same rate), over the energy
+ * generated per MW. Solar and wind weighted by their generation. Shown beside the exchange bill so
+ * that charging from own RE is not read as free.
+ */
+/** The whole battery per contracted MW: the four hours' (at least 4 MWh) plus the extra for evening sale. */
+export const essTotalMwhPerMw = (inputs) => (inputs.essMwhPerMw || 0) + (inputs.extraEssMwhPerMw || 0);
+
+export function ownReCostRsPerKwh(inputs) {
+  const r = inputs.discountRate || 0;
+  const n = Math.max(1, inputs.reLifeYears || 25);
+  const annuity = r > 0 ? (1 - (1 + r) ** -n) / r : n;
+  const g = inputs.omEscalation || 0;
+  // the levelised O&M: PV of an escalating stream over PV of a flat one
+  const omLevel = r > 0 && Math.abs(r - g) > 1e-9 ? ((1 - ((1 + g) / (1 + r)) ** n) / (r - g)) / annuity : 1;
+  const part = (mw, crPerMw, omLakh, cuf) => {
+    if (!(mw > 0) || !(cuf > 0)) return null;
+    const mwh = mw * E.HOURS * cuf;
+    const crPerYear = (mw * (crPerMw || 0)) / annuity + (mw * (omLakh || 0) * omLevel) / 100;
+    return { mwh, cr: crPerYear };
+  };
+  const parts = [part(inputs.solarMw, inputs.solarCrPerMw, inputs.solarOmLakhPerMw, inputs.solarCuf), part(inputs.windMw, inputs.windCrPerMw, inputs.windOmLakhPerMw, inputs.windCuf)].filter(Boolean);
+  const mwh = parts.reduce((a, x) => a + x.mwh, 0);
+  const cr = parts.reduce((a, x) => a + x.cr, 0);
+  return mwh > 0 ? (cr * 1e7) / (mwh * 1000) : null;
+}
+
+export function capex(inputs) {
+  const X = inputs.contractedMw;
+  const pre = 1 + inputs.preopPct;
+  const ess = X * essTotalMwhPerMw(inputs) * inputs.essCrPerMwh;
+  const evac = X * inputs.evacuationCrPerMw;
+  const solar = (inputs.solarMw || 0) * inputs.solarCrPerMw;
+  const wind = (inputs.windMw || 0) * (inputs.windCrPerMw || 0);
+  const seci = rfsAmounts(inputs).seciChargesCr; // RfS cost, bid processing fee, Success Charges, with GST
+  return { ess, evac, solar, wind, seci, preopEss: (ess + evac) * inputs.preopPct, preopRe: (solar + wind) * inputs.preopPct,
+    atScd: (ess + evac) * pre + seci, atRe: (solar + wind) * pre, total: (ess + evac + solar + wind) * pre + seci };
+}
+
+/** Rate r at which the dated flows' NPV is zero (bisection), or NaN. */
+export function xirr(flows) {
+  const npv = (r) => flows.reduce((a, f) => a + f.cf / (1 + r) ** f.t, 0);
+  let lo = -0.95;
+  let hi = 2;
+  let fLo = npv(lo);
+  if (!Number.isFinite(fLo) || fLo * npv(hi) > 0) return NaN;
+  for (let i = 0; i < 200; i += 1) {
+    const mid = (lo + hi) / 2;
+    const fm = npv(mid);
+    if (fm * fLo > 0) { lo = mid; fLo = fm; } else hi = mid;
+    if (hi - lo < 1e-10) break;
+  }
+  return (lo + hi) / 2;
+}
+const npvDated = (rate, flows) => flows.reduce((a, f) => a + f.cf / (1 + rate) ** f.t, 0);
+
+/**
+ * The screening financial model at tariff sp: one row per period (construction, then each Contract
+ * Year, then any market years after the term), in ₹ crore.
+ */
+export function financials(inputs, sim, sp) {
+  const X = inputs.contractedMw;
+  const cx = capex(inputs);
+  const { scd, reCod } = sim.dates;
+  const tScd = 0.6; // equity and debt for the battery are spent on average ~7 months before the SCD
+  const reCy = sim.years.findIndex((cy) => reCod < cy.end);
+  const essMwh = X * essTotalMwhPerMw(inputs);
+  const lc = lcCr(X, sp);
+  const rfs = rfsAmounts(inputs);
+  const rows = [];
+  // construction (battery, transmission and SECI's charges; the RE comes in the Contract Year of its
+  // commissioning), with the cost of the EMD and PBG bank guarantees over their validity
+  const reAtStart = reCy === 0 && reCod <= scd;
+  const emdCost = rfs.emdCr * inputs.pbgCostPct * BG_YEARS.emd;
+  const pbgCost = rfs.pbgCr * inputs.pbgCostPct * BG_YEARS.pbg;
+  rows.push({ period: "Construction", year: 0, t: 0, days: 0, capex: cx.atScd + (reAtStart ? cx.atRe : 0), emdCost, pbgCost, bgCost: emdCost + pbgCost });
+  const tail = inputs.afterTerm === "merchant" ? Math.max(0, Math.round(inputs.merchantYears || 0)) : 0;
+  const last = sim.years[sim.years.length - 1];
+  const fullYears = sim.years.filter((cy) => cy.days >= 360);
+  const ref = fullYears[fullYears.length - 1] || last;
+  const periods = [...sim.years.map((cy) => ({ cy, merchant: false })), ...Array.from({ length: tail }, (_, i) => ({ cy: ref, merchant: true, extraYear: i + 1 }))];
+  let t = tScd;
+  periods.forEach(({ cy, merchant, extraYear }, i) => {
+    const f = merchant ? 1 : cy.days / 365;
+    const opYear = merchant ? sim.years.length + extraYear : cy.index;
+    const om = (1 + inputs.omEscalation) ** (opYear - 1);
+    const scale = merchant ? (1 + inputs.priceEscalation) ** (extraYear) : 1;
+    const reShare = merchant ? 1 : cy.reDays / Math.max(1, cy.days);
+    const cfd = merchant ? 0 : (sp - psmDiscount(inputs)) * cy.deliveredMwh * 1e-4; // the PPA tariff on the energy supplied, less the PSM discount
+    const marketSale = merchant ? cy.mcpDeliveredCr * scale * (365 / Math.max(1, cy.days)) : 0;
+    const k = merchant ? (365 / Math.max(1, cy.days)) * scale : 1;
+    const rec = ((inputs.recPrice || 0) * cy.recMwh * (merchant ? 1 : 1 - TENDER.recPoolShare)) / 1e7 * (merchant ? 365 / Math.max(1, cy.days) : 1);
+    const row = {
+      period: merchant ? `After term ${extraYear}` : `CY ${cy.index}`,
+      year: i + 1, days: merchant ? 365 : cy.days, start: merchant ? null : cy.start, end: merchant ? null : cy.end, merchant,
+      cfdRevenue: cfd,
+      marketSales: marketSale,
+      merchantRevenue: cy.merchantRevCr * k,
+      recRevenue: rec,
+      essOm: (inputs.essOmLakhPerMwh * essMwh * f * om) / 100,
+      reOm: (((inputs.solarMw || 0) * inputs.solarOmLakhPerMw + (inputs.windMw || 0) * (inputs.windOmLakhPerMw || 0)) * f * reShare * om) / 100,
+      otherFixed: (inputs.otherFixedLakhPerMw * X * f * om) / 100,
+      insurance: inputs.insurancePct * (cx.atScd + cx.atRe * reShare) * f,
+      pxFees: inputs.pxFee * ((merchant ? cy.deliveredMwh : 0) + cy.merchantMwh) * 1e-4 * (merchant ? 365 / Math.max(1, cy.days) : 1), // on what is sold on the exchange only
+      chargingMarket: cy.marketCostCr * k,
+      chargingGroup: cy.groupCostCr * k,
+      augmentation: inputs.augmentation === "annual" && opYear >= 2 ? essMwh * inputs.essDegradation * inputs.essCrPerMwh * (1 - inputs.augDecline) ** opYear * f : 0,
+      lcCost: 0,
+      penalty: merchant ? 0 : penaltyCr(cy, sp),
+      capex: !merchant && i === reCy && !reAtStart ? cx.atRe : 0,
+      t: t + f,
+    };
+    t += f;
+    row.revenue = row.cfdRevenue + row.marketSales + row.merchantRevenue + row.recRevenue;
+    row.opex = row.essOm + row.reOm + row.otherFixed + row.insurance + row.pxFees + row.chargingMarket + row.chargingGroup + row.augmentation + row.lcCost + row.penalty;
+    row.ebitda = row.revenue - row.opex;
+    rows.push(row);
+  });
+  // capex timing: the RE tranche is spent around its commissioning
+  const reT = tScd + yearsBetween(scd, reCod);
+  // depreciation (straight line), debt (equal principal over the tenor, each tranche from its
+  // draw), tax with losses carried forward (Sec. 115BAA: no MAT)
+  const drawEss = inputs.debtFraction * cx.atScd;
+  const drawRe = inputs.debtFraction * cx.atRe;
+  rows[0].debtDraw = drawEss + (reAtStart ? drawRe : 0);
+  rows[0].equityIn = rows[0].capex - rows[0].debtDraw + rows[0].bgCost;
+  let balEss = drawEss;
+  let balRe = reAtStart ? drawRe : 0;
+  let usedEss = 0;
+  let usedRe = 0;
+  let lossPool = 0;
+  for (let i = 1; i < rows.length; i += 1) {
+    const r = rows[i];
+    const f = r.days / 365;
+    const cy = periods[i - 1].cy;
+    const reShare = r.merchant ? 1 : cy.reDays / Math.max(1, cy.days); // share of the period the RE runs
+    const commissioning = r.capex > 0;
+    if (commissioning) balRe += drawRe;
+    r.debtDraw = commissioning ? drawRe : 0;
+    r.equityIn = r.capex - r.debtDraw;
+    const depEss = usedEss < inputs.essLifeYears ? (cx.atScd / inputs.essLifeYears) * Math.min(f, inputs.essLifeYears - usedEss) : 0;
+    usedEss += f;
+    const reF = f * reShare;
+    const depRe = reF > 0 && usedRe < inputs.reLifeYears ? (cx.atRe / inputs.reLifeYears) * Math.min(reF, inputs.reLifeYears - usedRe) : 0;
+    usedRe += reF;
+    r.depreciation = depEss + depRe;
+    r.interest = (balEss + (commissioning ? balRe * reShare : balRe)) * inputs.interestRate * f;
+    const pEss = Math.min(balEss, (drawEss / inputs.tenorYears) * f);
+    const pRe = commissioning ? 0 : Math.min(balRe, (drawRe / inputs.tenorYears) * f);
+    balEss -= pEss;
+    balRe -= pRe;
+    r.principal = pEss + pRe;
+    r.debtClosing = balEss + balRe;
+    r.pbt = r.ebitda - r.depreciation - r.interest;
+    const taxable = r.pbt - lossPool;
+    if (taxable > 0) { r.tax = taxable * inputs.taxRate; lossPool = 0; } else { r.tax = 0; lossPool = -taxable; }
+    r.pat = r.pbt - r.tax;
+    r.cfads = r.ebitda - r.tax;
+    r.debtService = r.interest + r.principal;
+    r.dscr = r.debtService > 1e-9 ? r.cfads / r.debtService : null;
+    r.equityCf = r.cfads - r.debtService - r.equityIn;
+    r.projectCf = r.cfads - r.capex;
+  }
+  rows[0].equityCf = -rows[0].equityIn;
+  rows[0].projectCf = -rows[0].capex - rows[0].bgCost;
+  // dated flows: construction at t = 0, each period's flows at its end; the RE spend at its commissioning
+  const equityFlows = rows.map((r, i) => ({ t: i === 0 ? 0 : r.t, cf: i === 0 ? r.equityCf : r.equityCf + r.equityIn }));
+  const projectFlows = rows.map((r, i) => ({ t: i === 0 ? 0 : r.t, cf: i === 0 ? r.projectCf : r.projectCf + r.capex }));
+  const reRow = rows.findIndex((r, i) => i > 0 && r.capex > 0);
+  if (reRow > 0) {
+    equityFlows.push({ t: reT, cf: -rows[reRow].equityIn });
+    projectFlows.push({ t: reT, cf: -rows[reRow].capex });
+  }
+  const dscrs = rows.map((r) => r.dscr).filter((v) => v !== null && v !== undefined && Number.isFinite(v));
+  // levelised cost of the peak supply over the term: PV of capex, costs and tax net of other income,
+  // over PV of the energy supplied (₹/kWh); the break-even tariff before the equity return
+  const termRows = rows.filter((r, i) => i === 0 || !r.merchant);
+  const pvEnergy = npvDated(inputs.discountRate, termRows.slice(1).map((r, i) => ({ t: r.t, cf: sim.years[i].deliveredMwh })));
+  const costFlows = termRows.map((r, i) => ({ t: i === 0 ? 0 : r.t, cf: i === 0 ? r.capex + r.bgCost : r.opex + r.capex + r.tax - r.merchantRevenue - r.recRevenue }));
+  return {
+    sp, rows, capex: cx, lcCr: lc, pbgCr: rfs.pbgCr, emdCr: rfs.emdCr, rfs,
+    equityIrr: xirr(equityFlows), projectIrr: xirr(projectFlows),
+    equityNpv: npvDated(inputs.targetEquityIrr, equityFlows),
+    minDscr: dscrs.length ? Math.min(...dscrs) : null, avgDscr: dscrs.length ? dscrs.reduce((a, v) => a + v, 0) / dscrs.length : null,
+    levelisedCost: pvEnergy > 0 ? (npvDated(inputs.discountRate, costFlows) / pvEnergy) * 1e4 : null, // ₹/kWh, net of other revenue
+    equityFlows, projectFlows,
+  };
+}
+
+/** The tariff at which the equity IRR equals the target (bisection on the equity NPV). */
+export function solveStrikePrice(inputs, sim) {
+  let lo = 0;
+  let hi = 40;
+  const f = (sp) => financials(inputs, sim, sp).equityNpv;
+  if (f(hi) < 0) return { sp: null, reason: "Even ₹40/kWh does not reach the target IRR" };
+  for (let i = 0; i < 60; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (f(mid) < 0) lo = mid; else hi = mid;
+    if (hi - lo < 1e-6) break;
+  }
+  const sp = hi;
+  return { sp, bid: Math.ceil(sp * 100 - 1e-9) / 100, fin: financials(inputs, sim, sp) };
+}
+
+/** Numbers for the model: the inputs with derived values, or null when something is missing. */
+export function modelInputs(state) {
+  if (missingInputs(state).length) return null;
+  const i = { ...state.inputs };
+  if (!isNum(i.windMw)) i.windMw = 0;
+  // what this tender does not have, at the values that switch it off in the shared arithmetic: no
+  // separate RE commissioning date, no group-company RE, no RECs, no Letter of Credit
+  i.reCodMonths = 0;
+  i.useGroup = false;
+  i.groupPrice = 0;
+  i.groupCharges = 0;
+  i.recPrice = 0;
+  i.lcCostPct = 0;
+  i.psm = Boolean(i.psm);
+  i.dayInjection = Boolean(i.dayInjection); // false: connectivity with non-solar-hour access only (RfS 7.2)
+  if (!i.shortfallPolicy) i.shortfallPolicy = "meet";
+  // the design detail: the chosen hourly profiles and the losses to the billing meter ride with the inputs
+  const ps = profileSourcesOf(state);
+  if (ps) i.profileSources = ps;
+  const loss = lossFactorsOfCfd(state, i.rte);
+  if (loss) i.loss = loss;
+  // the finance team's augmentation choice (one-time, a schedule or year by year) reaches the day-by-day operation
+  if (state.bess?.augmentation) {
+    i.augmentationMode = state.bess.augmentation;
+    if (Array.isArray(state.bess.augmentationYears)) i.augmentationYears = state.bess.augmentationYears.filter(isNum);
+    if (isNum(state.bess.augmentationYear)) i.augmentationYear = state.bess.augmentationYear;
+    if (Array.isArray(state.bess.augmentationPct)) i.augmentationPct = state.bess.augmentationPct.map((v) => (isNum(v) && v > 0 ? v : 0));
+  }
+  return i;
+}
+
+/** Simulate and solve: operations by Contract Year and the bid. */
+export function runModel(state, prices, opts = {}) {
+  const inputs = modelInputs(state);
+  if (!inputs || !prices) return null;
+  const book = priceBook(prices, inputs.sellMarket);
+  const prof = profiles(inputs);
+  const sim = simulate(inputs, book, prof, opts);
+  const solved = solveStrikePrice(inputs, sim);
+  const out = { inputs, sim, opYears: sim.opYears, ...solved, screening: { sp: solved.sp ?? null, bid: solved.bid ?? null }, book, prof };
+  // opts.price(inputs, sim): the full financial model (web/src/cfd/finance.js runCfdFinance), so
+  // that the tariff on every step, in the chip, the agent, the forms and the workbook is the
+  // same one; the fast screening model above then only reports beside it
+  if (typeof opts.price === "function") {
+    const finance = opts.price(inputs, sim);
+    if (finance && isNum(finance.tariff)) {
+      out.finance = finance;
+      out.sp = finance.tariff;
+      out.bid = Math.ceil(finance.tariff * 100 - 1e-9) / 100;
+      out.reason = undefined;
+      out.fin = {
+        ...(solved.fin || {}),
+        sp: finance.tariff, equityIrr: finance.equityIrr, projectIrr: finance.projectIrr, minDscr: finance.minDscr, avgDscr: finance.avgDscr,
+        capex: { ...(solved.fin?.capex || {}), total: finance.capex.total }, lcCr: lcCr(inputs.contractedMw, finance.tariff),
+      };
+    }
+  }
+  return out;
+}
+
+/** The energy short of the daily 4 MWh per MW over the term (charging power or battery capacity), MWh. */
+export const capShortfall = (sim) => sim.years.reduce((a, cy) => a + cy.shortMwh, 0);
+
+/**
+ * The own solar (and wind, if any) that gives the lowest tariff with every day's supply met:
+ * a coarse grid then a finer one around the best, on solar; then the same on wind when wind is in
+ * the bid. Calls onProgress(done, total) between evaluations; resolves to { solarMw, windMw, sp }.
+ */
+export async function optimiseOwnRe(state, prices, { onProgress, signal, price = null } = {}) {
+  const base = modelInputs(state);
+  if (!base) throw new Error("Fill in the inputs first.");
+  const book = priceBook(prices, base.sellMarket);
+  const X = base.contractedMw;
+  // price(inputs, sim): the full financial model's tariff (the one shown everywhere); without
+  // it the fast screening model prices each candidate
+  const priceOf = (inputs, sim) => {
+    if (typeof price === "function") {
+      const f = price(inputs, sim);
+      if (f && isNum(f.tariff)) return f.tariff;
+    }
+    return solveStrikePrice(inputs, sim).sp ?? Infinity;
+  };
+  const evaluate = (solarMw, windMw) => {
+    const inputs = { ...base, solarMw, windMw };
+    const sim = simulate(inputs, book, profiles(inputs));
+    const short = capShortfall(sim);
+    return { solarMw, windMw, sp: priceOf(inputs, sim), short, ok: short < 1e-3 * X };
+  };
+  // "meet": a plant that meets every day beats one that does not, then the price; when none meets
+  // every day, the least short (then the price). "pay": the price alone, which already carries the
+  // monthly penalty and the lost revenue of the short days
+  const policy = base.shortfallPolicy === "pay" ? "pay" : "meet";
+  const better = (a, b) => {
+    if (policy === "meet") {
+      if (a.ok !== b.ok) return a.ok;
+      if (!a.ok && Math.abs(a.short - b.short) > 1e-6) return a.short < b.short;
+    }
+    return a.sp < b.sp;
+  };
+  const tick = () => new Promise((r) => { setTimeout(r, 0); });
+  let best = evaluate(base.solarMw || 0, base.windMw || 0);
+  best.policy = policy;
+  const scan = async (key, values, total, done0) => {
+    let done = done0;
+    for (const v of values) {
+      if (signal?.aborted) throw new Error("Stopped.");
+      const cand = key === "solar" ? evaluate(v, best.windMw) : evaluate(best.solarMw, v);
+      if (better(cand, best)) best = cand;
+      done += 1;
+      if (done % 4 === 0) { onProgress?.(done, total); await tick(); }
+    }
+    return done;
+  };
+  const coarse = (maxMul) => Array.from({ length: 41 }, (_, i) => Math.round((i / 40) * maxMul * X));
+  const fine = (center) => Array.from({ length: 21 }, (_, i) => Math.max(0, Math.round(center + (i - 10) * 0.01 * X)));
+  const hasWind = (base.windMw || 0) > 0 && isNum(base.windCuf);
+  // a locked size is the bidder's decision (the lock on the Bid inputs step): the optimiser keeps it
+  const solarLocked = Boolean(state.locks?.solarMw);
+  const windLocked = Boolean(state.locks?.windMw);
+  const total = (solarLocked ? 0 : 62) + (hasWind && !windLocked ? 62 : 0);
+  let done = 0;
+  if (!solarLocked) {
+    done = await scan("solar", coarse(3), total, 0);
+    done = await scan("solar", fine(best.solarMw), total, done);
+  }
+  if (hasWind && !windLocked) {
+    done = await scan("wind", coarse(2), total, done);
+    await scan("wind", fine(best.windMw), total, done);
+  }
+  onProgress?.(total, total);
+  return { ...best, policy };
+}
+
+/**
+ * What the supply is worth on the exchange against the tariff, each Contract Year: netCr = the
+ * exchange value of the energy supplied less the tariff paid for it (₹ cr, + = the buyer pays less
+ * than the exchange would have cost it), and the average exchange price of the hours supplied.
+ */
+export function exchangeValue(sim, sp) {
+  return sim.years.map((cy) => ({ cy: cy.index, netCr: cy.mcpDeliveredCr - sp * cy.deliveredMwh * 1e-4, mcpAvg: cy.deliveredMwh > 0 ? (cy.mcpDeliveredCr * 1e4) / cy.deliveredMwh : 0 }));
+}
