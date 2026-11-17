@@ -312,6 +312,50 @@ The bid's inputs and results go to the model's service to answer, so the route r
 the core zone (`TENDEROS_ZONE=core`), where the sweep still runs in the browser; nothing is stored
 by the application beyond the activity log's line (model, tools, tokens).
 
+## The CfD Own Solar tab
+
+A second tab, **CfD Own Solar**, is the same CfD bid modelled as a bidder with solar of their own
+builds it (`CfdTab` with `variant="ownSolar"`, `web/src/cfd/ownSolar.js`, `OwnSolar.jsx`, checked
+by `tools/check_cfd_own_solar.mjs`). Every step, check, workbook, form and agent is the CfD Bid
+tab's; each tab keeps its own bid (this browser: `fdre.cfd.v1` and `fdre.cfd.v1:own-solar`; the
+library: modules `cfd` and `cfdOwnSolar`), so both can be run and compared. Two things differ,
+both switched by the bid's inputs (section 3.4 of the Bid inputs step on this tab):
+
+* **An existing plant charges the battery for the first months** (`inputs.bilateralMonths`,
+  `bilateralPrice`, `bilateralCharges`, `bilateralMw`, `bilateralUse`; `simulate`). From the SCD
+  for the months given, a plant under a bilateral agreement supplies in the solar hours (06:00 to
+  18:00) at its fixed price plus the charges on it. It is bought power: it counts in the
+  green-market and bilateral allowance of CfDA 4.4.1.iv as amended (25% of the year's energy for
+  the term, and 75% more until month 36 from the Effective Date), and the allowance is open to it
+  whether or not the green market is switched on. `bilateralUse: "first"` takes it before the
+  green market (a firm supply, the default); `"cheapest"` takes it only in the hours it is the
+  cheaper. A size in MW limits each hour to the plant's output along the bid's solar shape; blank
+  means as much as the battery takes. The year's rows carry `chargeBilateralMwh` and
+  `bilateralCostCr` (both inside `chargeMarketMwh` and `marketCostCr`).
+* **Own RE's cost is spent when it is commissioned** (`inputs.reCostAtCod`, on by default on this
+  tab; `cfdEngineInputs`, `withLateRe`). When the RE is commissioned after the SCD (`reCodMonths`,
+  at most 21), the battery, the line and SECI's charges are the project cost at the SCD; the RE's
+  cost, with its share of the pre-operative cost, is put in in the operating year it is
+  commissioned: the engine's funded capital spend (`fin.repower` with `funded: true`, outside the
+  CFADS and paid by equity, row field `fundedCapex`) with the bid's debt share of it drawn that
+  year (`fin.topUp`, found by `withLateRe` so that exactly that amount is drawn) and repaid over
+  the tenor left. It is depreciated from that year. With the RE at the SCD nothing is late and the
+  tab's bid is the CfD Bid tab's bid to the paisa. The CfD Bid tab carries the RE's cost from the
+  SCD even when it is commissioned later (conservative).
+
+The Financial model step of this tab compares the two (section 5.0c, `bidSummary`,
+`compareBids`): the CfD Bid tab's bid as this browser holds it, priced by its model, beside this
+tab's: strike price, returns, the cost at the SCD and when the RE is built, equity, the first
+year's bought power and its price, short days and DSCR. "Start from the CfD Bid tab's bid"
+(`copyBid`) brings that bid's inputs, finance terms, costs and battery into this tab and keeps
+this tab's own inputs; forms, letters and the team's answers stay with each tab.
+
+Simplifications, stated in the workbook's notes (`modelNotesOf`): own RE's O&M runs from the SCD;
+the insurance on the late RE is a fixed cost line from year 1; a top-up to a share of project
+cost entered on the Finance inputs is replaced by the RE's debt when the RE is late; the workbook
+shows that debt as the top-up of the year (a share of the project cost at the SCD, which excludes
+the RE, so it can read above 100%).
+
 ## The financial model with the 15-minute dispatch behind it
 
 The financial model workbook comes in two versions. The first (`POST /api/cfd/model`) carries each

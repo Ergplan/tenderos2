@@ -6,6 +6,7 @@ export const TAB_CATALOG = [
   { id: "seciRtc", label: "SECI RTC tender", engine: ["rtc", "bid"] },
   { id: "bessTender", label: "BESS Tender", engine: ["bess"] },
   { id: "cfd", label: "CfD Bid", engine: [] },
+  { id: "cfdOwnSolar", label: "CfD Own Solar", engine: [] },
   { id: "whatIf", label: "What-if analysis", engine: [] },
   { id: "newTenders", label: "New tenders", engine: [] },
   { id: "recentTenders", label: "Recent tenders", engine: [] },
@@ -31,3 +32,7 @@ export function mayCallEngine(tabIds, family) {
   if (family === "health") return tabIds.length > 0;
   return TAB_CATALOG.some((t) => tabIds.includes(t.id) && t.engine.includes(family));
 }
+
+/** The CfD bid's routes serve both of its tabs: the CfD Bid and CfD Own Solar. */
+export const mayUseCfd = (user) => user?.role === "admin" || ["cfd", "cfdOwnSolar"].some((t) => user?.allowedTabs?.includes(t));
+

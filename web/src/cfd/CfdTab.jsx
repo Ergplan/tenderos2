@@ -26,10 +26,22 @@ import SizeStep from "./SizeStep.jsx";
 import FinanceModelStep from "./FinanceModelStep.jsx";
 import WhatIfStep from "./WhatIfStep.jsx";
 import UpsideStep from "./UpsideStep.jsx";
+import { OWN_SOLAR_DEFAULTS, OwnSolarCompare, OwnSolarInputs } from "./OwnSolar.jsx";
 import BidForms from "./BidForms.jsx";
 import ReferenceBids from "./ReferenceBids.jsx";
 
 export const CFD_MODULE = "cfd";
+/**
+ * The two tabs on this model. "CfD Own Solar" is the same bid and the same steps with two things
+ * modelled as an own-solar bidder builds: own RE's cost is spent in the year it is commissioned
+ * (not carried from the SCD), and an existing plant can charge the battery at a fixed price for
+ * the first months (web/src/cfd/OwnSolar.jsx). Each tab keeps its own bid, in this browser and in
+ * the library, so the two can be run side by side and compared.
+ */
+export const CFD_VARIANTS = {
+  cfd: { id: "cfd", module: CFD_MODULE, storageKey: STORAGE_KEY, title: "CfD bid · SECI" },
+  ownSolar: { id: "ownSolar", module: "cfdOwnSolar", storageKey: `${STORAGE_KEY}:own-solar`, title: "CfD bid · own solar · SECI" },
+};
 
 // the steps, each with the team that owns it (docs/enterprise/ARCHITECTURE.md, section 3)
 export const CFD_STEPS = [
@@ -57,8 +69,9 @@ export const FIN_DEFAULTS = M.CFD_FIN_DEFAULTS || Object.fromEntries(FIN_KEYS.ma
 export const COST_DEFAULTS = M.CFD_COST_DEFAULTS || { constructionMonths: 0, drawdown: "linear", drawOrder: "proRata" };
 
 /** The tab's state when nothing is entered: the model's inputs plus everything the steps keep. */
-export function defaultTabState() {
+export function defaultTabState(variant = "cfd") {
   const base = defaultCfdState();
+  if (variant === "ownSolar") base.inputs = { ...base.inputs, ...OWN_SOLAR_DEFAULTS };
   return {
     ...base,
     step: "explain",
@@ -76,9 +89,10 @@ export function defaultTabState() {
 }
 
 /** A saved bid (this browser's, or one opened from the library) as the tab's state. */
-export function fromSaved(saved) {
-  const base = defaultTabState();
+export function fromSaved(saved, variant = "cfd") {
+  const base = defaultTabState(variant);
   const merged = mergeCfdState(saved);
+  if (variant === "ownSolar") merged.inputs = { ...OWN_SOLAR_DEFAULTS, ...merged.inputs };
   const step = STEP_IDS.includes(saved?.step) ? saved.step : OLD_STEPS[saved?.step] || "explain";
   return {
     ...base,
@@ -97,12 +111,12 @@ export function fromSaved(saved) {
   };
 }
 
-function loadState() {
+function loadState(variant = "cfd") {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? fromSaved(JSON.parse(raw)) : defaultTabState();
+    const raw = window.localStorage.getItem(CFD_VARIANTS[variant].storageKey);
+    return raw ? fromSaved(JSON.parse(raw), variant) : defaultTabState(variant);
   } catch {
-    return defaultTabState();
+    return defaultTabState(variant);
   }
 }
 
@@ -129,9 +143,8 @@ export function acceptIntoState(state, a) {
   return next;
 }
 
-// survive switching dashboard tabs
-let sessionState = null;
-let sessionLinked = null;
+// survive switching dashboard tabs (each tab its own bid)
+const session = { cfd: { state: null, linked: null }, ownSolar: { state: null, linked: null } };
 
 /**
  * SECI CfD-I: what a Contract for Difference is, the tender and its amendments, the conditions in
@@ -139,13 +152,15 @@ let sessionLinked = null;
  * strike price, the full financial model, the what-ifs, the RfS's bid formats and the auctions that
  * say what a strike price should be. A bid agent works through it by voice.
  */
-export default function CfdTab({ initialScenario = null }) {
+export default function CfdTab({ initialScenario = null, variant = "cfd" }) {
+  const V = CFD_VARIANTS[variant] || CFD_VARIANTS.cfd;
+  const own = V.id === "ownSolar";
   const opened = initialScenario?.current?.inputs?.state;
-  const [state, setState] = useState(() => (opened ? fromSaved(opened) : sessionState || loadState()));
-  const [linked, setLinked] = useState(() => (opened ? { id: initialScenario.scenario.id, name: initialScenario.scenario.name, version: initialScenario.current.version } : sessionLinked));
+  const [state, setState] = useState(() => (opened ? fromSaved(opened, V.id) : session[V.id].state || loadState(V.id)));
+  const [linked, setLinked] = useState(() => (opened ? { id: initialScenario.scenario.id, name: initialScenario.scenario.name, version: initialScenario.current.version } : session[V.id].linked));
   const [showSave, setShowSave] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
-  useEffect(() => { sessionLinked = linked; }, [linked]);
+  useEffect(() => { session[V.id].linked = linked; }, [linked]); // eslint-disable-line react-hooks/exhaustive-deps
   const [prices, setPrices] = useState(null);
   const [priceError, setPriceError] = useState("");
   const [optimising, setOptimising] = useState(null);
@@ -156,12 +171,12 @@ export default function CfdTab({ initialScenario = null }) {
 
   useEffect(() => { loadMarketPrices().then(setPrices).catch((err) => setPriceError(err.message)); }, []);
   useEffect(() => {
-    sessionState = state;
-    const id = setTimeout(() => { try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* storage blocked */ } }, 400);
+    session[V.id].state = state;
+    const id = setTimeout(() => { try { window.localStorage.setItem(V.storageKey, JSON.stringify(state)); } catch { /* storage blocked */ } }, 400);
     return () => clearTimeout(id);
-  }, [state]);
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    const flush = () => { try { if (sessionState) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionState)); } catch { /* storage blocked */ } };
+    const flush = () => { try { if (session[V.id].state) window.localStorage.setItem(V.storageKey, JSON.stringify(session[V.id].state)); } catch { /* storage blocked */ } };
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
   }, []);
@@ -224,7 +239,7 @@ export default function CfdTab({ initialScenario = null }) {
     setMessage(null);
     try {
       const best = await optimiseOwnRe(s, prices, { signal: abort.signal, price: pricer, onProgress: (done, total) => setOptimising({ done, total }) });
-      trackEvent("optimize", { module: CFD_MODULE, contractedMw: s.inputs.contractedMw });
+      trackEvent("optimize", { module: V.module, contractedMw: s.inputs.contractedMw });
       setState((st) => {
         const filled = { ...st.filled };
         delete filled.solarMw;
@@ -287,7 +302,7 @@ export default function CfdTab({ initialScenario = null }) {
   function resetAll() {
     if (!window.confirm("Clear your CfD bid: inputs, finance terms, forms and letters in this tab?")) return;
     stopOptimise();
-    setState(defaultTabState());
+    setState(defaultTabState(V.id));
     setMessage(null);
   }
 
@@ -340,7 +355,7 @@ export default function CfdTab({ initialScenario = null }) {
       <section className="story-hero">
         <div>
           <div className="eyebrow"><Scale size={13} /> SECI CfD-I · RfS No. {RFS.number}</div>
-          <h1>CfD bid · SECI</h1>
+          <h1 data-testid="cfd-title">{V.title}</h1>
           <p>Assured peak supply of 1,000 MWh a day (500 MW × 2 hours) through the power exchanges under a Contract for Difference. What a CfD is, the tender and its amendments, the conditions in force, what you bid, your plant and finance terms, the own RE sized for the lowest strike price, the full financial model, the what-ifs, the RfS's formats and the auctions that say what a strike price should be. Talk to the bid agent to go through it by voice.</p>
         </div>
         <div className="story-hero-tools">
@@ -351,7 +366,7 @@ export default function CfdTab({ initialScenario = null }) {
               <Users size={13} /> Team{teamCount ? <b data-testid="cfd-team-count">{teamCount}</b> : null}
             </button>
           )}
-          <a className="rtc-reset" href={`/scenarios?module=${CFD_MODULE}`}><FolderOpen size={13} /> Open</a>
+          <a className="rtc-reset" href={`/scenarios?module=${V.module}`}><FolderOpen size={13} /> Open</a>
           <button type="button" className="rtc-reset" onClick={resetAll} data-testid="cfd-reset"><RotateCcw size={13} /> Reset inputs</button>
         </div>
       </section>
@@ -383,6 +398,8 @@ export default function CfdTab({ initialScenario = null }) {
         {step.id === "documents" && <DocumentsStep />}
         {step.id === "conditions" && <ConditionsStep state={state} />}
         {step.id === "bid" && <BidInputsStep {...props} />}
+        {step.id === "bid" && own && <OwnSolarInputs state={state} setState={setState} otherKey={CFD_VARIANTS.cfd.storageKey} fromSaved={(saved) => fromSaved(saved, "ownSolar")} />}
+        {step.id === "finance" && own && model?.sim && <OwnSolarCompare state={state} model={model} prices={prices} otherKey={CFD_VARIANTS.cfd.storageKey} fromSaved={(saved) => fromSaved(saved, "cfd")} goto={goto} />}
         {step.id === "design" && <DesignStep {...props} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} model={model} />}
         {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={optimise} />}
         {step.id === "size" && <SizeStep {...props} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} />}
@@ -400,7 +417,7 @@ export default function CfdTab({ initialScenario = null }) {
 
       {showSave && (
         <SaveDialog
-          module={CFD_MODULE}
+          module={V.module}
           linked={linked}
           defaultName={`SECI CfD-I · ${state.forms?.bidder || "Bid"} · ${nf(i.contractedMw || 0)} MW`}
           build={buildSave}

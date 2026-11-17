@@ -23,6 +23,16 @@ export const MODEL_NOTES = [
   "The strike price is fixed for the term (no escalation); the Letter of Credit and the weekly penalty move with it in every year.",
 ];
 
+/** The notes for a bid: the first one says when own RE's cost is spent (at the SCD, or when it is commissioned). */
+export function modelNotesOf(inputs) {
+  if (!(inputs?.reCostAtCod && (inputs.reCodMonths || 0) > 0)) return MODEL_NOTES;
+  const year = Math.max(1, Math.ceil(inputs.reCodMonths / 12));
+  return [
+    `The battery, the line and SECI's charges are spent before the SCD. Own RE is commissioned ${inputs.reCodMonths} months after it and paid for then: its cost (with its share of the pre-operative cost and its interest during construction) is put in by lenders and equity in operating year ${year}, at the bid's debt share, and repaid over the years left.`,
+    ...MODEL_NOTES.slice(1),
+  ];
+}
+
 /** Where an input came from, for the workbook: typed, or filled as a benchmark. */
 const sourceOf = (state, key) => (state.filled?.[key] === "winning" ? WINNING_NOTE : state.filled?.[key] ? BENCHMARK_NOTE : "Your input");
 
@@ -53,6 +63,23 @@ export function cfdEngineInputs(state, model) {
   const tail = i.afterTerm === "merchant" ? Math.max(0, Math.round(i.merchantYears || 0)) : 0;
   const years = model.opYears.length + tail;
   const sf = state.fin || {};
+  // Own RE commissioned after the SCD, with its cost spent when it is built (inputs.reCostAtCod,
+  // the CfD Own Solar tab): the RE's cost leaves the project cost at the SCD and is put in by
+  // lenders and equity in the operating year it is commissioned, at the bid's debt share (the
+  // engine's funded capital spend with a top-up of the same year, see runCfdFinance). Its share of
+  // the pre-operative cost goes with it, and its interest during construction when the bid has a
+  // construction schedule; its insurance is a fixed cost line.
+  const reHard = sizes.solarMw * costs.solarCrPerMw + sizes.windMw * costs.windCrPerMw;
+  const lateYear = i.reCostAtCod && (i.reCodMonths || 0) > 0 && reHard > 0 ? Math.min(years, Math.max(1, Math.ceil(i.reCodMonths / 12))) : 0;
+  let lateRe = null;
+  if (lateYear) {
+    const build = Math.min(costs.constructionMonths, 12);
+    const withPreop = reHard * (1 + costs.preopPct);
+    const idc = build > 0 ? (i.debtFraction * withPreop * i.interestRate * (build / 12)) / 2 : 0;
+    lateRe = { year: lateYear, hardCr: reHard, preopCr: reHard * costs.preopPct, idcCr: idc, capexCr: withPreop + idc, debtShare: i.debtFraction, solarCrPerMw: costs.solarCrPerMw, windCrPerMw: costs.windCrPerMw };
+    costs.solarCrPerMw = 0;
+    costs.windCrPerMw = 0;
+  }
   const fin = {
     ...E.DEFAULT_FINANCE,
     ...sf,
@@ -73,6 +100,12 @@ export function cfdEngineInputs(state, model) {
     // the Letter of Credit (CfDA 10.4.2) and the weekly shortfall penalty (CfDA 4.4.3)
     lcCostPct: i.lcCostPct || 0, lcMinPrice: TENDER.lcMinPrice, lcDays: TENDER.lcDays, cfdPenaltyMultiple: TENDER.penaltyMultiple,
   };
+  if (lateRe) {
+    fin.repower = { year: lateRe.year, capexCr: lateRe.capexCr, upliftPct: 0, funded: true };
+    fin.topUp = { year: 0, debtFraction: null }; // set by runCfdFinance: the RE's debt, drawn in its year
+    const lines = (fin.otherFixedLines || []).filter((l) => (l.crPerYear || 0) > 0);
+    fin.otherFixedLines = [...(lines.length ? lines : fin.otherFixedCr > 0 ? [{ label: "Scheduling, forecasting, fees, admin", crPerYear: fin.otherFixedCr, escalation: null }] : []), { label: "Insurance on own RE", crPerYear: (i.insurancePct || 0) * reHard, escalation: 0 }];
+  }
   const bess = {
     ...E.DEFAULT_BESS,
     rte: i.rte, annualDegradation: i.essDegradation || 0,
@@ -113,7 +146,34 @@ export function cfdEngineInputs(state, model) {
       days,
     });
   }
-  return { sizes, costs, fin, bess, ops, dfrTarget: 0, rfs, bgCostCr };
+  return { sizes, costs, fin, bess, ops, dfrTarget: 0, rfs, bgCostCr, lateRe };
+}
+
+/**
+ * Run the engine on a CfD bid's inputs. When own RE is paid for in the year it is commissioned
+ * (eng.lateRe), its debt is the engine's top-up of that year: the top-up takes the debt to a share
+ * of the project cost, so the share is set to what leaves the RE's debt drawn (the debt at the end
+ * of that year without it, plus the bid's debt share of the RE's cost). With a sculpted repayment
+ * that debt moves with the strike price, so the share is found again until it holds.
+ * `run(fin)` is the engine call for a `fin`; returns its result and the `fin` used.
+ */
+export function withLateRe(eng, run) {
+  const late = eng.lateRe;
+  if (!late) return { result: run(eng.fin), fin: eng.fin };
+  let fin = { ...eng.fin, topUp: { year: 0, debtFraction: null } };
+  let result = run(fin);
+  const draw = late.debtShare * late.capexCr;
+  if (!(draw > 0) || !(result.capex.total > 0)) return { result, fin };
+  let before = result.rows[late.year - 1].closingDebt; // the debt at the end of the year without the RE's
+  for (let k = 0; k < 6; k += 1) {
+    fin = { ...eng.fin, topUp: { year: late.year, debtFraction: (before + draw) / result.capex.total } };
+    result = run(fin);
+    const row = result.rows[late.year - 1];
+    const now = row.closingDebt - (row.topUpCr - (row.refiTopUpCr || 0)); // the same figure in this run
+    if (Math.abs(now - before) < 1e-6) break;
+    before = now;
+  }
+  return { result, fin };
 }
 
 /**
@@ -123,8 +183,8 @@ export function cfdEngineInputs(state, model) {
  */
 export function runCfdFinance(state, model, { tariffLocked = state.tariffLocked, tariff = null } = {}) {
   const eng = cfdEngineInputs(state, model);
-  const fin = isNum(tariff) ? { ...eng.fin, tariff } : eng.fin;
-  const finance = E.runFinancialModel(null, eng.sizes, { costs: eng.costs, fin, bess: eng.bess, dfrTarget: 0, tariffLocked: Boolean(tariffLocked), ops: eng.ops, solveBy: "npv" });
+  if (isNum(tariff)) eng.fin = { ...eng.fin, tariff };
+  const { result: finance, fin } = withLateRe(eng, (f) => E.runFinancialModel(null, eng.sizes, { costs: eng.costs, fin: f, bess: eng.bess, dfrTarget: 0, tariffLocked: Boolean(tariffLocked), ops: eng.ops, solveBy: "npv" }));
   return { ...finance, engine: { ...eng, fin } };
 }
 
@@ -191,12 +251,14 @@ export function cfdLiveRequest({ state, model, finance }) {
     sizes: pick(eng.sizes, ["solarMw", "windMw", "bessMw", "bessMwh"]),
     costs: { ...pick(eng.costs, [...LIVE_COST_KEYS, "otherCapexCr"]), plants: [] },
     otherCapexLabel: "SECI's charges and the bank guarantees' cost",
+    // own RE paid for in the year it is commissioned: the engine's funded capital spend, named for what it is
+    ...(eng.lateRe ? { repowerLabel: "Own RE commissioned after the SCD" } : {}),
     fin: pick(eng.fin, [...LIVE_FIN_KEYS, "lcCostPct", "lcMinPrice", "lcDays", "cfdPenaltyMultiple"]),
     bess: pick(eng.bess, LIVE_BESS_KEYS),
     ops: eng.ops.map((o) => ({ ...pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "recRevenueCr", "chargingCostCr", "pxFeesCr", "lcMw", "solarGenMWh", "windGenMWh"]), penaltyWeeks: o.penaltyWeeks })),
     gen,
     dispatch: null,
-    sources: liveSources(state),
+    sources: { ...liveSources(state), ...(eng.lateRe ? { "fin.repower": "The bid: own RE's cost, spent in the year it is commissioned", "fin.topUp": "The bid's debt share of own RE's cost, drawn that year", "solar.capex": "Spent when commissioned (below), not at the SCD", "wind.capex": "Spent when commissioned (below), not at the SCD" } : {}) },
     app: liveResults(finance, eng.fin),
   };
 }
@@ -211,6 +273,7 @@ export function cfdModelExport({ state, model, finance, review = null }) {
   const quote = quoteOf(finance.tariff);
   const pool = poolFlows(model.sim, finance.tariff);
   const poolYear = pool.find((p) => p.cy === 2) || pool[0];
+  const late = eng.lateRe || null;
   const outputs = [
     ["Strike price to bid (₹/kWh, two decimals)", quote, "tariff", `the solved price rounded up; digits after two decimals are ignored (RfS 40.3)`],
     [finance.tariffLocked ? "Strike price (fixed by you, ₹/kWh)" : "Strike price for the target IRR (₹/kWh)", finance.tariff, "tariff", `${finance.tariffLocked ? "the returns below are at this price" : `for a ${(eng.fin.targetEquityIrr * 100).toFixed(2)}% equity IRR`}; fast screening ₹${(model.screening?.sp ?? model.sp)?.toFixed(4) ?? "–"}`, "tariff"],
@@ -220,7 +283,7 @@ export function cfdModelExport({ state, model, finance, review = null }) {
     ["Minimum DSCR", finance.minDscr, "x", "", "minDscr"],
     ["Average DSCR", finance.avgDscr, "x", "", "avgDscr"],
     ["Equity payback (year)", finance.payback ?? "beyond the term", "int", "", "payback"],
-    ["Project cost (₹ cr)", finance.capex.total, "cr", `₹${(finance.capex.total / X).toFixed(2)} cr per contracted MW`, "capexTotal"],
+    ["Project cost (₹ cr)", finance.capex.total, "cr", late ? `at the SCD; own RE adds ₹${late.capexCr.toFixed(1)} cr in operating year ${late.year}, when it is commissioned: ₹${((finance.capex.total + late.capexCr) / X).toFixed(2)} cr per contracted MW in all` : `₹${(finance.capex.total / X).toFixed(2)} cr per contracted MW`, "capexTotal"],
     ["Debt (₹ cr)", finance.debt, "cr", "", "debt"],
     ["Equity (₹ cr)", finance.equity, "cr", "", "equity"],
     ["Levelised cost of supply (₹/kWh)", finance.lcoe, "tariff", `at a ${(eng.fin.discountRate * 100).toFixed(1)}% discount rate`, "lcoe"],
@@ -242,6 +305,8 @@ export function cfdModelExport({ state, model, finance, review = null }) {
     ["Charging power", `${i.useMarket ? "green market" : "no green market"}${i.useGroup ? ", group RE after month 36" : ""}`, "text"],
     ["Financing", `equity IRR ${(i.targetEquityIrr * 100).toFixed(1)}% · debt ${(i.debtFraction * 100).toFixed(0)}% at ${(i.interestRate * 100).toFixed(2)}% for ${i.tenorYears} years · tax ${(i.taxRate * 100).toFixed(2)}%`, "text"],
     ["Repayment", `${E.REPAYMENT_METHODS[eng.fin.repayment]?.label || eng.fin.repayment}${eng.fin.graceYears ? `, ${eng.fin.graceYears}-year moratorium` : ""}${eng.fin.refiYear ? `, refinanced in year ${eng.fin.refiYear}` : ""}`, "text"],
+    ...(i.bilateralMonths > 0 && isNum(i.bilateralPrice) ? [["Existing plant (bilateral)", `₹${i.bilateralPrice.toFixed(2)}/kWh${i.bilateralCharges ? ` + ₹${i.bilateralCharges.toFixed(2)} of charges` : ""} for the first ${i.bilateralMonths} months${isNum(i.bilateralMw) && i.bilateralMw > 0 ? `, up to ${i.bilateralMw} MW along the solar shape` : ""}, ${i.bilateralUse === "cheapest" ? "where it is cheaper than the green market" : "taken before the green market"}`, "text", "within the green-market / bilateral allowance (CfDA 4.4.1.iv as amended)"]] : []),
+    ...(late ? [["Own RE", `commissioned ${i.reCodMonths} months after the SCD and paid for then (operating year ${late.year})`, "text"]] : []),
   ];
   const tender = [
     ["Procurer", "Solar Energy Corporation of India Limited (SECI)", "text"],
@@ -251,7 +316,7 @@ export function cfdModelExport({ state, model, finance, review = null }) {
     ["Settlement", "The strike price on every kWh supplied; the market price risk is the CfD Pool's (Amendment-03)", "text"],
     ["Ceiling tariff", "None (removed by Amendment-03)", "text"],
   ];
-  const notes = [...MODEL_NOTES, `Inputs marked "Industry benchmark" are ${BENCHMARK_NOTE.charAt(0).toLowerCase()}${BENCHMARK_NOTE.slice(1)}; those marked "Competitive-bidder value" are what a bidder who wins SECI's 2026 auctions shows a lender; the rest are the bidder's own (sheet Inputs).`];
+  const notes = [...modelNotesOf(i), `Inputs marked "Industry benchmark" are ${BENCHMARK_NOTE.charAt(0).toLowerCase()}${BENCHMARK_NOTE.slice(1)}; those marked "Competitive-bidder value" are what a bidder who wins SECI's 2026 auctions shows a lender; the rest are the bidder's own (sheet Inputs).`];
   const inputs = FIELDS.map((f) => ({ group: f.section, input: f.label, value: i[f.key], unit: f.pct ? "%" : f.unit, source: sourceOf(state, f.key) }));
   for (const k of ["effectiveDate", "sellMarket", "useMarket", "useGroup", "merchant", "augmentation", "afterTerm"]) {
     // the augmentation as the model runs it: the finance team's schedule or year-by-year table over the Design step's choice
@@ -260,15 +325,21 @@ export function cfdModelExport({ state, model, finance, review = null }) {
   for (const [label, value, unit] of [["Repayment", eng.fin.repayment], ["Principal moratorium", eng.fin.graceYears, "years"], ["Instalments a year", eng.fin.paymentsPerYear], ["Refinance at the end of year", eng.fin.refiYear, "year"], ["Receivable days", eng.fin.receivableDays, "days"], ["O&M in hand", eng.fin.omStockMonths, "months"], ["Maintenance spares", eng.fin.sparesPctOm, "%"], ["Debt service reserve", eng.fin.dsraMonths, "months"], ["Tax depreciation", eng.fin.taxDepreciation], ["WDV rate", eng.fin.wdvRate, "%"], ["Book life", eng.fin.bookLifeYears, "years"], ["Salvage value", eng.fin.salvagePct, "%"], ["Construction", eng.costs.constructionMonths, "months"]]) {
     inputs.push({ group: "Financing terms", input: label, value, unit: unit || "", source: "Finance inputs (editable on the Financial model)" });
   }
+  const whenBuilt = late ? `spent in operating year ${late.year}, when it is commissioned` : undefined;
   const capexRows = [
     ["Battery", eng.sizes.bessMwh * eng.costs.bessCrPerMwh, "cr", `${Math.round(eng.sizes.bessMwh)} MWh`],
-    ["Own solar", eng.sizes.solarMw * eng.costs.solarCrPerMw, "cr"],
-    ["Own wind", eng.sizes.windMw * eng.costs.windCrPerMw, "cr"],
+    ["Own solar", eng.sizes.solarMw * (late ? late.solarCrPerMw : eng.costs.solarCrPerMw), "cr", eng.sizes.solarMw > 0 ? whenBuilt : undefined],
+    ["Own wind", eng.sizes.windMw * (late ? late.windCrPerMw : eng.costs.windCrPerMw), "cr", eng.sizes.windMw > 0 ? whenBuilt : undefined],
     ["Transmission to the ISTS substation", eng.costs.evacuationCr, "cr"],
     ["SECI's charges and the bank guarantees' cost", eng.costs.otherCapexCr, "cr", "RfS cost, bid fee, Contract Administration Charges with GST; EMD and PBG over their validity"],
-    ["Total project cost (incl. pre-operative & IDC)", finance.capex.total, "cr", `pre-operative ${((eng.costs.preopPct || 0) * 100).toFixed(1)}% of hard cost`],
+    [late ? "Project cost at the SCD (incl. pre-operative & IDC), without own RE" : "Total project cost (incl. pre-operative & IDC)", finance.capex.total, "cr", `pre-operative ${((eng.costs.preopPct || 0) * 100).toFixed(1)}% of hard cost`],
     ["Debt", finance.debt, "cr", `${(eng.fin.debtFraction * 100).toFixed(0)}%`],
     ["Equity", finance.equity, "cr"],
+    ...(late ? [
+      [`Own RE, put in in operating year ${late.year}`, late.capexCr, "cr", `₹${late.hardCr.toFixed(1)} cr with ₹${late.preopCr.toFixed(1)} cr of pre-operative cost and ₹${late.idcCr.toFixed(1)} cr of interest during its construction`],
+      ["  of which debt, drawn that year", late.debtShare * late.capexCr, "cr", `${(late.debtShare * 100).toFixed(0)}%, repaid over the years left`],
+      ["  of which equity, put in that year", (1 - late.debtShare) * late.capexCr, "cr"],
+    ] : []),
   ];
   const energy = { title: "Energy and strike price", lines: [
     ["Energy to supply (2 MWh/MW a day)", "demandMu", "mu", "MU"], ["Supplied under the CfD", "deliveredMu", "mu", "MU"], ["Supplied ÷ required", "dfr", "pct", "", false],
@@ -284,7 +355,7 @@ export function cfdModelExport({ state, model, finance, review = null }) {
     { title: "Debt", lines: [["Opening debt", "openingDebt", "cr", "₹ cr", false], ["Interest", "interest"], ["Principal", "principal"], ["Closing debt", "closingDebt", "cr", "₹ cr", false], ["DSCR", "dscr", "x", "×", false]] },
   ];
   return {
-    fileName: `SECI_CfD-I_bid_${X}MW_financial_model`,
+    fileName: `SECI_CfD-I_bid_${X}MW${i.reCostAtCod || i.bilateralMonths > 0 ? "_own_solar" : ""}_financial_model`, // the CfD Own Solar tab's bid is named apart
     title: "SECI CfD-I · bid financial model",
     subtitle: [`${X} MW × 2 h assured peak supply`, `strike price ₹${quote?.toFixed(2)}/kWh`, `${finance.rows.length} years`].filter(Boolean).join(" · "),
     tenderNumber: "SECI/C&P/IPP/13/0002/26-27",

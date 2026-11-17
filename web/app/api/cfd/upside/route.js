@@ -1,4 +1,5 @@
 import { currentUserWithAccess, handler, HttpError } from "@/lib/auth";
+import { mayUseCfd } from "@/lib/tabs";
 import { logEvent } from "@/lib/activity";
 import { runUpsideCase, runUpsideSweep } from "@/lib/cfdUpside";
 
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const POST = handler(async (req) => {
   const user = await currentUserWithAccess();
   if (!user) throw new HttpError(401, "Sign in required.");
-  if (user.role !== "admin" && !user.allowedTabs?.includes("cfd")) throw new HttpError(403, "No access to the CfD bid tab.");
+  if (user.role !== "admin" && !mayUseCfd(user)) throw new HttpError(403, "No access to the CfD bid tab.");
   const body = await req.json();
   let out;
   try {

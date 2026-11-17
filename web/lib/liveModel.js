@@ -687,9 +687,13 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   inp("carbonYears", "Credits earned for", "years", { v: carbon.years ?? 10, kind: "input", fmt: "int", source: src("fin.carbon", "Model default") });
   inp("carbonEsc", "Carbon price escalation", "%/yr", { v: carbon.escalation ?? 0.03, kind: "input", fmt: "pct", source: src("fin.carbon", "Model default") });
   const rp = fi.repower || {};
-  inp("rpYear", "Solar repowering: year", "year (0: none)", { v: nz(rp.year), kind: "input", fmt: "int", source: src("fin.repower", "Model default") });
-  inp("rpCapex", "Solar repowering: capital cost", "₹ cr", { v: nz(rp.capexCr), kind: "input", fmt: "cr", source: src("fin.repower", "Model default"), note: "Depreciated straight line over the book life left" });
-  inp("rpUplift", "Solar repowering: energy uplift", "% of the solar share of the energy, from the year after", { v: nz(rp.upliftPct), kind: "input", fmt: "pct", source: src("fin.repower", "Model default") });
+  // what this capital spend in an operating year is: the solar repowering, or (the CfD Own Solar
+  // tab) the bid's own RE commissioned after the SCD, put in by lenders and equity in that year
+  const rpName = m.repowerLabel || "Solar repowering";
+  inp("rpYear", `${rpName}: year`, "year (0: none)", { v: nz(rp.year), kind: "input", fmt: "int", source: src("fin.repower", "Model default") });
+  inp("rpCapex", `${rpName}: capital cost`, "₹ cr", { v: nz(rp.capexCr), kind: "input", fmt: "cr", source: src("fin.repower", "Model default"), note: "Depreciated straight line over the book life left" });
+  inp("rpUplift", `${rpName}: energy uplift`, "% of the solar share of the energy, from the year after", { v: nz(rp.upliftPct), kind: "input", fmt: "pct", source: src("fin.repower", "Model default") });
+  inp("rpFunded", `${rpName}: put in by lenders and equity`, "Yes / No", { v: rp.funded ? "Yes" : "No", kind: "input", list: ["Yes", "No"], source: src("fin.repower", "Model default"), note: "Yes: the capital is funded like the project (its debt is the top-up of the same year, the rest is equity put in that year) and stays out of the cash available for debt service. No: it is paid from the year's operating cash." });
 
   if (on.bess) {
     I.section("Battery augmentation");
@@ -1561,9 +1565,16 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
     f: (y) => `IF(AND(${S.s("extYears")}>0,${S.yr(y)}=${S.s("ppaYears")}),MAX(0,${S.s("extCapexIn")}),0)`,
     v: (y) => (EXT > 0 && y === NP ? Math.max(0, S.v("extCapexIn")) : 0), total: true, note: "Spent in the last PPA year",
   });
-  S.series("repower", "Solar repowering capital cost", "₹ cr", {
+  S.series("repower", `${rpName} capital cost`, "₹ cr", {
     f: (y) => `IF(AND(${S.s("rpOn")}=1,${S.yr(y)}=${S.s("rpYear")}),${S.s("rpCapex")},0)`,
     v: (y) => (rpOn && y === S.v("rpYear") ? S.v("rpCapex") : 0), total: true,
+  });
+  const rpFundedOn = S.v("rpFunded") === "Yes";
+  S.series("rpFund", "Of which put in by lenders and equity (outside the operating cash)", "₹ cr", {
+    f: (y) => `IF(${S.s("rpFunded")}="Yes",${S.at("repower", y)},0)`, v: (y) => (rpFundedOn ? S.v("repower", y) : 0), total: true,
+  });
+  S.series("rpOps", "Of which paid from the year's operating cash", "₹ cr", {
+    f: (y) => `${S.at("repower", y)}-${S.at("rpFund", y)}`, v: (y) => S.v("repower", y) - S.v("rpFund", y), total: true,
   });
   S.series("capexOps", "Capital spend in operation", "₹ cr", { f: (y) => `${S.at("aug", y)}+${S.at("extCapex", y)}+${S.at("repower", y)}`, v: (y) => S.v("aug", y) + S.v("extCapex", y) + S.v("repower", y), total: true, bold: true });
 
@@ -1871,7 +1882,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
       const preS = income - intOpen - wcInt - bgFeesY - allowedShA - taxDep;
       const sS = setOff(preS);
       const taxS = sS.taxable * S.v("taxRate");
-      const cfadsS = S.v("ebitda", y) - taxS - S.v("dWc", y) - S.v("aug", y) - wcInt + otherIncomeV(y) - bgFeesY - S.v("extCapex", y) - S.v("repower", y);
+      const cfadsS = S.v("ebitda", y) - taxS - S.v("dWc", y) - S.v("aug", y) - wcInt + otherIncomeV(y) - bgFeesY - S.v("extCapex", y) - S.v("rpOps", y);
       const principal = repaying ? principalOf(methodY, open, n, rate, intOpen, { balloon: balloonAmt, cfads: cfadsS }) : 0;
       const debtAfterP = open - principal;
       const interest = intOpen - adj * principal;
@@ -1883,10 +1894,10 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
       const pre1 = income - interest - wcInt - (refiFeeCr + prepayRefi + bgFeesY) - allowedShA - taxDep;
       const s1 = setOff(pre1);
       const tax1 = s1.taxable * S.v("taxRate");
-      const cfadsOf = (tax) => S.v("ebitda", y) - tax - S.v("dWc", y) - S.v("aug", y) - wcInt + otherIncomeV(y) - bgFeesY - S.v("extCapex", y) - S.v("repower", y);
+      const cfadsOf = (tax) => S.v("ebitda", y) - tax - S.v("dWc", y) - S.v("aug", y) - wcInt + otherIncomeV(y) - bgFeesY - S.v("extCapex", y) - S.v("rpOps", y);
       const cfads1 = cfadsOf(tax1);
       const debtService = interest + principal;
-      const fcfeBefore = cfads1 - debtService - refiFeeCr - prepayRefi - mezzService;
+      const fcfeBefore = cfads1 - debtService - refiFeeCr - prepayRefi - mezzService - S.v("rpFund", y);
       // the cash sweep
       const sweepPct = S.v("sweepPct");
       const inRange = y >= S.v("sweepFrom") && y <= sweepToU;
@@ -1950,7 +1961,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
       const refiNowF = `AND(${S.s("refiOn")}=1,${Y}=${S.s("refiYear")})`;
       const ebitdaA = S.at("ebitda", y);
       const incomeF = `(${ebitdaA}+${S.at("otherIncome", y)})`;
-      const cfadsF = (taxA) => `${ebitdaA}-${taxA}-${S.at("dWc", y)}-${S.at("aug", y)}-${S.at("wcInt", y)}+${S.at("otherIncome", y)}-${S.at("bgFees", y)}-${S.at("extCapex", y)}-${S.at("repower", y)}`;
+      const cfadsF = (taxA) => `${ebitdaA}-${taxA}-${S.at("dWc", y)}-${S.at("aug", y)}-${S.at("wcInt", y)}+${S.at("otherIncome", y)}-${S.at("bgFees", y)}-${S.at("extCapex", y)}-${S.at("rpOps", y)}`;
       const setOffF = (preA, lossKey, depKey) => ({
         loss: `IF(${preA}>0,MIN(${S.at("lossBf", y)},${preA}),0)`,
         dep: `IF(${preA}>0,MIN(${S.at("depBf", y)},${preA}-${S.at(lossKey, y)}),0)`,
@@ -1993,7 +2004,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
         tax1: `${S.at("taxable1", y)}*${S.s("taxRate")}`,
         cfads1: cfadsF(S.at("tax1", y)),
         debtService: `${S.at("interest", y)}+${S.at("principal", y)}`,
-        fcfeBefore: `${S.at("cfads1", y)}-${S.at("debtService", y)}-${S.at("refiFeeCr", y)}-${S.at("prepayRefi", y)}-${S.at("mezzService", y)}`,
+        fcfeBefore: `${S.at("cfads1", y)}-${S.at("debtService", y)}-${S.at("refiFeeCr", y)}-${S.at("prepayRefi", y)}-${S.at("mezzService", y)}-${S.at("rpFund", y)}`,
         sweepDue: `IF(${sweepOnF},${S.s("sweepPct")}*MAX(0,${S.at("fcfeBefore", y)})+${y === 1 ? "0" : S.at("sweepAccr", y - 1)},0)`,
         sweep: `IF(${sweepOnF},MIN(${S.at("sweepDue", y)},MAX(0,${S.at("fcfeBefore", y)}),${S.at("debtAfterP", y)}),0)`,
         sweepAccr: `IF(${S.s("sweepPct")}>0,IF(${S.at("debtAfterP", y)}<=1E-9,0,IF(${sweepOnF},${S.at("sweepDue", y)}-${S.at("sweep", y)},${y === 1 ? "0" : S.at("sweepAccr", y - 1)})),0)`,
@@ -2061,8 +2072,8 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   // ---- cash flow
   S.section("Cash flow");
   S.series("cfads", "Cash flow available for debt service (CFADS)", "₹ cr", {
-    f: (y) => `${S.at("ebitda", y)}-${S.at("tax", y)}-${S.at("dWc", y)}-${S.at("aug", y)}-${S.at("wcInt", y)}+${S.at("otherIncome", y)}-${S.at("bgFees", y)}-${S.at("extCapex", y)}-${S.at("repower", y)}`,
-    v: (y) => S.v("ebitda", y) - S.v("tax", y) - S.v("dWc", y) - S.v("aug", y) - S.v("wcInt", y) + otherIncomeV(y) - S.v("bgFees", y) - S.v("extCapex", y) - S.v("repower", y), total: true, bold: true,
+    f: (y) => `${S.at("ebitda", y)}-${S.at("tax", y)}-${S.at("dWc", y)}-${S.at("aug", y)}-${S.at("wcInt", y)}+${S.at("otherIncome", y)}-${S.at("bgFees", y)}-${S.at("extCapex", y)}-${S.at("rpOps", y)}`,
+    v: (y) => S.v("ebitda", y) - S.v("tax", y) - S.v("dWc", y) - S.v("aug", y) - S.v("wcInt", y) + otherIncomeV(y) - S.v("bgFees", y) - S.v("extCapex", y) - S.v("rpOps", y), total: true, bold: true,
     note: "EBITDA − tax − working capital − capital spend in operation − interest on working capital + other income − guarantee fees",
   });
   S.series("dscr", "DSCR", "×", {
@@ -2104,8 +2115,8 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   });
   S.series("fcfe", "Equity cash flow (year 0: the equity put in)", "₹ cr", {
     y0: { f: `-${S.s("equity")}`, v: -equity0 },
-    f: (y) => `${S.at("cfads", y)}-${S.at("debtService", y)}-${S.at("refiFeeCr", y)}-${S.at("prepayFee", y)}-${S.at("sweep", y)}-${S.at("mezzService", y)}-${S.at("quasiInt", y)}-${S.at("quasiRepay", y)}+${S.at("topUp", y)}-${S.at("dMargin", y)}-${S.at("dDsra", y)}+${S.at("terminal", y)}-${S.at("debtEnd", y)}`,
-    v: (y) => S.v("cfads", y) - S.v("debtService", y) - S.v("refiFeeCr", y) - S.v("prepayFee", y) - S.v("sweep", y) - S.v("mezzService", y) - S.v("quasiInt", y) - S.v("quasiRepay", y) + S.v("topUp", y) - S.v("dMargin", y) - S.v("dDsra", y) + S.v("terminal", y) - S.v("debtEnd", y), total: true, bold: true,
+    f: (y) => `${S.at("cfads", y)}-${S.at("debtService", y)}-${S.at("refiFeeCr", y)}-${S.at("prepayFee", y)}-${S.at("sweep", y)}-${S.at("mezzService", y)}-${S.at("quasiInt", y)}-${S.at("quasiRepay", y)}+${S.at("topUp", y)}-${S.at("dMargin", y)}-${S.at("dDsra", y)}+${S.at("terminal", y)}-${S.at("debtEnd", y)}-${S.at("rpFund", y)}`,
+    v: (y) => S.v("cfads", y) - S.v("debtService", y) - S.v("refiFeeCr", y) - S.v("prepayFee", y) - S.v("sweep", y) - S.v("mezzService", y) - S.v("quasiInt", y) - S.v("quasiRepay", y) + S.v("topUp", y) - S.v("dMargin", y) - S.v("dDsra", y) + S.v("terminal", y) - S.v("debtEnd", y) - S.v("rpFund", y), total: true, bold: true,
     note: "CFADS − debt service − fees − sweep − mezzanine service − quasi-equity interest and repayment + top-up − margin money and reserve put aside + salvage and working capital released − debt still owed",
   });
   S.series("dividends", "Paid out to equity (the free cash)", "₹ cr", { f: (y) => S.at("fcfe", y), v: (y) => S.v("fcfe", y), total: true });
@@ -2269,7 +2280,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   out.checks = [`IF(AND(${checks.map((c) => `${c}="OK"`).join(",")}),"OK","CHECK")`, checks.length && [true, S.v("topUpYear") >= refiEnd || Math.abs(closeAtTenor) < 0.01, consOk, balanced, lossesOk, !partsOn || Math.abs(partsSum - 1) < 0.001].every(Boolean) ? "OK" : "CHECK"];
 
   // ---- the schedule sheets (the Tax schedule's pools give the Live model its losses available), then the key results
-  const sched = addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER });
+  const sched = addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER, rpName });
   out.lenderXirr[0] = out.lenderXirr[0].replace("__LENDER_XIRR__", sched.lenderXirrCell);
 
   // ---- key results (top of the sheet), against the app's numbers
@@ -2356,7 +2367,7 @@ function taxLayout(N) {
  * and Goal Seek keep working) or on the sheet's own rows; each carries its value for viewers that
  * do not recalculate. Returns the address of the lender's XIRR on the Returns sheet.
  */
-function addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER: REG }) {
+function addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, refiEnd, debt0, total, equity0, mezz0, quasi0, TL, pools, lossLimit, lenderDated, nominalCod, consM, cons, regLabelAll, REGISTER: REG, rpName = "Solar repowering" }) {
   const L = `'${LIVE_SHEET}'!`;
   const link = (key, y) => `${L}${S.at(key, y)}`; // a year cell of the Live model
   const one = (key) => (String(S.s(key)).includes("!") ? S.s(key) : `${L}${S.s(key)}`); // a single value of the Live model or an input
@@ -2488,7 +2499,7 @@ function addScheduleSheets(wb, sheets, S, { N, NP, yearRow, refiOn, tenorUsed, r
     T.section("Investing");
     own(T, "capexCash", "Project cost (year 0) and battery augmentation", "₹ cr", { y0: { f: `-${one("total")}`, v: -total }, f: (y) => `-${link("aug", y)}`, v: (y) => -S.v("aug", y), total: true });
     neg(T, "extCash", "extCapex", "Less: life extension capital cost");
-    neg(T, "rpCash", "repower", "Less: solar repowering");
+    neg(T, "rpCash", "repower", `Less: ${rpName.charAt(0).toLowerCase()}${rpName.slice(1)}`);
     own(T, "salvageCash", "Salvage and working capital released (final year)", "₹ cr", { f: (y) => link("terminal", y), v: (y) => S.v("terminal", y), total: true });
     own(T, "cfi", "Cash from investing", "₹ cr", {
       y0: { f: T.at("capexCash", 0), v: -total },
@@ -3161,6 +3172,7 @@ export function liveModelInput(raw) {
     title: String(raw.title || "").slice(0, 200),
     tariffLabel: typeof raw.tariffLabel === "string" ? raw.tariffLabel.replace(/[^\w ()·,.%/-]/g, "").slice(0, 40) : null,
     otherCapexLabel: typeof raw.otherCapexLabel === "string" ? raw.otherCapexLabel.replace(/[^\w ()·,.%/'-]/g, "").slice(0, 80) : null,
+    repowerLabel: typeof raw.repowerLabel === "string" && raw.repowerLabel.trim() ? raw.repowerLabel.replace(/[^\w ()·,.%/'-]/g, "").slice(0, 60) : null,
     engine: raw.engine === "simulation" ? "simulation" : "highs",
     bessNote: typeof raw.bessNote === "string" ? raw.bessNote.slice(0, 120) : null,
     sourceAll: typeof raw.sourceAll === "string" ? raw.sourceAll.slice(0, 80) : null,
@@ -3205,7 +3217,7 @@ export function liveModelInput(raw) {
       caseFactors: { p75: nOr(fin.caseFactors?.p75, D.caseFactors.p75), p90: nOr(fin.caseFactors?.p90, D.caseFactors.p90) },
       carbon: { enabled: Boolean(fin.carbon?.enabled), tPerMwh: nOr(fin.carbon?.tPerMwh, D.carbon.tPerMwh), pricePerT: nOr(fin.carbon?.pricePerT, D.carbon.pricePerT), years: Math.round(nOr(fin.carbon?.years, D.carbon.years)), escalation: nOr(fin.carbon?.escalation, D.carbon.escalation) },
       extension: { years: extYears, capexCr: Math.max(0, n(ext.capexCr)), tariffRsPerKwh: nn(ext.tariffRsPerKwh), omFactor: nOr(ext.omFactor, 1), degradation: nn(ext.degradation) },
-      repower: { year: Math.max(0, Math.round(n(fin.repower?.year))), capexCr: Math.max(0, n(fin.repower?.capexCr)), upliftPct: Math.max(0, n(fin.repower?.upliftPct)) },
+      repower: { year: Math.max(0, Math.round(n(fin.repower?.year))), capexCr: Math.max(0, n(fin.repower?.capexCr)), upliftPct: Math.max(0, n(fin.repower?.upliftPct)), funded: Boolean(fin.repower?.funded) },
       solarOmEscalation: nn(fin.solarOmEscalation), windOmEscalation: nn(fin.windOmEscalation), bessOmEscalation: nn(fin.bessOmEscalation),
       windOmComponents: list(fin.windOmComponents).map((c) => ({ label: text(c.label), lakhPerMw: n(c.lakhPerMw), escalation: nn(c.escalation) })),
       otherFixedLines: list(fin.otherFixedLines).map((l) => ({ label: text(l.label), crPerYear: n(l.crPerYear), escalation: nn(l.escalation) })),

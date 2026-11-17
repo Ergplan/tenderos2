@@ -343,6 +343,11 @@ PURPOSE = {
                 "it and the box's value at the time (`web/lib/evidence.js`).",
     "field_signoff": "A super admin's sign-off of a box's value, one row per box; `value_at` keeps the value signed, so a later "
                      "change shows as \"signed off at an older value\".",
+    "seci_tenders": "New tenders: SECI's open tenders as scanned from its website (the tender list and each tender's details "
+                    "page; no document is opened), one row per tender, updated by every scan, with the summary written by "
+                    "Claude or by rules (`web/db/migrations/018_seci_scan.sql`).",
+    "seci_scans": "The log of the New tenders scans: when, by whom, in which mode, what was found, new, changed and delisted, "
+                  "and any errors.",
     "schema_migrations": "Which `web/db/migrations/*.sql` files have been applied (`web/lib/db.js` migrate, run on start by "
                          "`web/instrumentation.js`). Not created by a migration file.",
 }

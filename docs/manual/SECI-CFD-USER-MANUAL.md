@@ -768,6 +768,52 @@ case in your browser, **Make it the bid's plant** applies it. The analyst needs 
 (an administrator adds it under API keys); the bid's inputs and results are sent to the model's
 service to answer. In an installation's core zone it is off, and the sweep above still runs.
 
+## The CfD Own Solar tab
+
+Use this tab when you have solar of your own: a plant that already runs and can supply for some
+months, and new solar at the site that is built after the battery. It is the same bid with the
+same twelve steps. It keeps its own bid, so you can run the CfD Bid tab and this one and compare
+them.
+
+**Start.** Open **CfD Own Solar** in the sidebar. On **Bid inputs**, section 3.4, press **Start
+from the CfD Bid tab's bid** to bring that bid in (size it there first), or enter a bid here from
+the start.
+
+**The existing plant** (section 3.4):
+
+| Input | What to enter |
+|---|---|
+| Available for | Months from the battery's commissioning (SCD) the plant supplies. Blank or 0: no plant. |
+| Its price | ₹/kWh at the plant, fixed for those months. |
+| Charges and losses on it | ₹/kWh of ISTS charges and losses to your meter. 0 if the price is delivered. |
+| The plant's size | MW. Blank: as much as the battery takes. A size limits each hour to the plant's output. |
+| Use it | *Before the green market*: a firm supply you have agreed to take. *Only where it is cheaper*: taken in the hours it beats the green market. |
+
+The plant's power is bought power under the tender: it counts in the green-market and bilateral
+allowance (the whole supply until month 36 from the Effective Date, 25% of the year's energy
+after). The model keeps within it.
+
+**When the new solar is paid for** (section 3.4). *Spent when it is commissioned* is the default:
+the battery, the line and SECI's charges are the project cost at the SCD, and the solar's cost is
+put in by lenders and equity in the year it is commissioned (set the months on **Design**, "RE
+generation commissioned", at most 21 months after the SCD). *Carried from the SCD* models it as
+the CfD Bid tab does.
+
+**Size** again after changing these (step 07): the cheapest own solar can differ between the two
+tabs.
+
+**Compare** (Financial model, section 5.0c). The table sets the CfD Bid tab's bid beside this
+tab's: the strike price, the returns, the cost at the SCD and when the solar is built, the equity,
+the first year's bought power and what it costs, the days short and the minimum DSCR. Green marks
+a difference in your favour, red one against. Press **Read the CfD Bid tab again** after changing
+that tab's bid.
+
+**What to expect.** A firm plant lowers the bid only if its price with charges is below what the
+green market costs in the charging hours; the row "Year 1: what the bought power costs" shows
+both. Paying for the solar when it is built lowers the bid against carrying its cost from the
+SCD, because equity and interest start later. The workbook, the forms and the agent work on this
+tab's bid exactly as on the CfD Bid tab.
+
 ## The bid agent
 
 ![The bid agent](img/cfd-agent.jpg)

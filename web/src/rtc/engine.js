@@ -142,7 +142,10 @@ export const DEFAULT_FINANCE = {
   caseFactors: { p75: 0.97, p90: 0.94 },
   carbon: { enabled: false, tPerMwh: 0.71, pricePerT: 500, years: 10, escalation: 0.03 }, // ₹ per tonne
   extension: { years: 0, capexCr: 0, tariffRsPerKwh: null, omFactor: 1, degradation: null }, // life beyond the PPA
-  repower: { year: 0, capexCr: 0, upliftPct: 0 }, // solar repowering
+  // solar repowering; `funded`: the capital is put in by lenders and equity like the project (with a
+  // top-up in the same year for the debt), not paid from the year's operating cash, so it stays out
+  // of the cash available for debt service (own RE commissioned after the COD, CfD Own Solar)
+  repower: { year: 0, capexCr: 0, upliftPct: 0, funded: false },
   solarOmEscalation: null, // null: omEscalation
   windOmEscalation: null,
   bessOmEscalation: null,
@@ -2068,6 +2071,8 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       const augCapex = aug[y] || 0;
       const extensionCapex = ext && y === years ? extCapex : 0;
       const repowerCapex = rp && y === rp.year ? rp.capexCr || 0 : 0;
+      const fundedCapex = rp?.funded ? repowerCapex : 0; // put in by lenders and equity, outside the operating cash
+      const repowerOps = repowerCapex - fundedCapex; // paid from the year's operating cash
       cumAug += augCapex;
       // book depreciation: straight line (by component life when given) and written down, both
       // kept; the augmentation over the remaining life
@@ -2145,7 +2150,7 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       let refiFee = 0;
       if (sculpt && repaying) {
         const t0 = taxOf(interestOpen, 0, mezzInterest);
-        const cfads0 = ebitda - t0.tax - dWc - augCapex - wcInterest + otherIncome - guaranteeFees - extensionCapex - repowerCapex;
+        const cfads0 = ebitda - t0.tax - dWc - augCapex - wcInterest + otherIncome - guaranteeFees - extensionCapex - repowerOps;
         principal = principalOf("sculpted", opening, n, rate, interestOpen, { cfads: cfads0, targetDscr: dt.targetDscr });
         interest = interestOpen;
       }
@@ -2157,9 +2162,9 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       if (refiFeeOn) { refiTopUp = debt * refiTopUpPct; refiFee = (debt + refiTopUp) * dt.refiFeePct; prepaymentFee += debt * prepayPct; balloonBase = debt; }
       // the cash flow before the sweep, the mezzanine and the quasi-equity
       const t1 = taxOf(interest, refiFee + prepaymentFee, mezzInterest);
-      const cfadsOf = (tax) => ebitda - tax - dWc - augCapex - wcInterest + otherIncome - guaranteeFees - extensionCapex - repowerCapex;
+      const cfadsOf = (tax) => ebitda - tax - dWc - augCapex - wcInterest + otherIncome - guaranteeFees - extensionCapex - repowerOps;
       const debtService = interest + principal;
-      let fcfeBefore = cfadsOf(t1.tax) - debtService - refiFee - prepaymentFee - mezzService;
+      let fcfeBefore = cfadsOf(t1.tax) - debtService - refiFee - prepaymentFee - mezzService - fundedCapex;
       // the cash sweep: a share of the free cash prepays the debt after the scheduled principal;
       // what cannot be paid accrues to the next year
       let sweepCr = 0;
@@ -2212,7 +2217,7 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       const cfads = cfadsOf(tax);
       const fscr = debtService > 1e-9 ? (cfads + other + guaranteeFees) / (debtService + other + guaranteeFees) : null;
       const totalDscr = debtService + mezzService > 1e-9 ? cfads / (debtService + mezzService) : null;
-      let fcfe = cfads - debtService - refiFee - prepaymentFee - sweepCr - mezzService - quasiInterestPaid - quasiRepaid + topUpCr - dMargin;
+      let fcfe = cfads - debtService - refiFee - prepaymentFee - sweepCr - mezzService - quasiInterestPaid - quasiRepaid + topUpCr - dMargin - fundedCapex;
       let projectCf = ebitda - Math.max(0, (ebitda - taxDep) * fin.taxRate) - dWc - augCapex - extensionCapex - repowerCapex + otherIncome - guaranteeFees;
       if (y === T) {
         fcfe += terminal - debt;
@@ -2323,6 +2328,7 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
         augCapex,
         extensionCapex,
         repowerCapex,
+        fundedCapex,
         cfads,
         debtRate: rate,
         openingDebt: opening,
@@ -2330,6 +2336,7 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
         sweepCr,
         sweepAccrued,
         topUpCr,
+        refiTopUpCr: refiTopUp,
         closingDebt: debt,
         debtService,
         dscr,

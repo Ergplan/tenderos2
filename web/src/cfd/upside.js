@@ -19,7 +19,7 @@
 // an augmentation) and fades from its own year; its O&M and insurance are operating costs from
 // that year. Plain JavaScript (no browser APIs), checked in Node by tools/check_cfd_upside.mjs.
 import * as E from "../rtc/engine.js";
-import { cfdEngineInputs, runCfdFinance } from "./finance.js";
+import { cfdEngineInputs, runCfdFinance, withLateRe } from "./finance.js";
 import { modelInputs, pricePathOf, priceBook, profiles, simulate } from "./model.js";
 import { TENDER, TERMS } from "./terms.js";
 
@@ -145,7 +145,8 @@ function financeOfPlan(ctx, plan, model, debtShare) {
     const running = (mwh * (i.essOmLakhPerMwh || 0)) / 100 * (1 + (i.omEscalation || 0)) ** (y - 1) + (i.insurancePct || 0) * capex;
     return running > 0 ? { ...o, pxFeesCr: (o.pxFeesCr || 0) + running, upsideRunningCr: running } : o;
   });
-  const run = (debtFraction) => E.runFinancialModel(null, sizes, { costs: eng.costs, fin: { ...eng.fin, tariff: ctx.tariff, debtFraction }, bess, dfrTarget: 0, tariffLocked: true, ops, solveBy: "npv" });
+  // (own RE paid for when it is commissioned keeps its own debt draw: withLateRe)
+  const run = (debtFraction) => withLateRe({ ...eng, fin: { ...eng.fin, tariff: ctx.tariff, debtFraction } }, (f) => E.runFinancialModel(null, sizes, { costs: eng.costs, fin: f, bess, dfrTarget: 0, tariffLocked: true, ops, solveBy: "npv" })).result;
   let f = run(eng.fin.debtFraction);
   // the debt on the addition: the bid's debt, plus the chosen share of what the addition costs at the SCD
   const d = debtShare ?? ctx.settings.debtShare;

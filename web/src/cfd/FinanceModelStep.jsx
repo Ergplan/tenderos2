@@ -8,7 +8,7 @@ import Cite from "./Cite.jsx";
 import MarketPrices from "./MarketPrices.jsx";
 import { TENDER } from "./terms.js";
 import { cfdBessAug, fmtDate, keyDates, lcCr, patchCfdBess, poolFlows, rfsAmounts } from "./model.js";
-import { MODEL_NOTES, cfdLiveRequest, cfdModelExport, downloadCfdModel, downloadCfdModel15, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
+import { modelNotesOf, cfdLiveRequest, cfdModelExport, downloadCfdModel, downloadCfdModel15, quoteOf, quotedStrikeReturns, runCfdFinance } from "./finance.js";
 import "./finance.css";
 
 // the CfD lines the shared financial view adds after "Other fixed" in the year-by-year table
@@ -195,7 +195,7 @@ export default function FinanceModelStep({ state, setState, setInput, patch, set
           <Stat label="Charging power over the term" value={`₹${nf(finance.totals.charging, 0)} cr`} detail={i.useMarket ? "green market and group RE" : "no bought power"} trace={{ line: "chargingCr", year: 1 }} />
           <Stat label="Equity payback" value={finance.payback ? `year ${finance.payback}` : "beyond the term"} trace={{ key: "payback" }} />
         </div>
-        <p className="rtc-note">{MODEL_NOTES[0]} {MODEL_NOTES[2]}</p>
+        <p className="rtc-note">{modelNotesOf(i)[0]} {modelNotesOf(i)[2]}</p>
       </Section>
 
       <Section index="5.0" title="Your quote" note="The strike price you will quote, against the price your target equity IRR needs">

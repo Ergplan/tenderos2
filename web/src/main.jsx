@@ -4,7 +4,7 @@
 // signs out. The legacy FDRE tabs (yield assessment, EYA report, custom dispatch and the
 // rest) are not part of this application.
 import React, { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, KeyRound, Newspaper, Lock, LogOut, Radar, Scale, UserRound, UserCog, Users, ClipboardList, MessageSquarePlus } from "lucide-react";
+import { Activity, ArrowLeftRight, BatteryCharging, Clock3, FileStack, FlaskConical, FolderOpen, Gavel, Inbox as InboxIcon, KeyRound, Newspaper, Lock, LogOut, Radar, Scale, Sun, UserRound, UserCog, Users, ClipboardList, MessageSquarePlus } from "lucide-react";
 import { flushActivity, startActivityTracker, trackEvent } from "./activity";
 import "./styles.css";
 import "./chartTheme";
@@ -35,6 +35,7 @@ const TABS = [
   ["seciRtc", FileStack, "SECI RTC tender"],
   ["bessTender", BatteryCharging, "BESS Tender"],
   ["cfd", Scale, "CfD Bid"],
+  ["cfdOwnSolar", Sun, "CfD Own Solar"],
   ["whatIf", FlaskConical, "What-if analysis"],
   ["newTenders", Radar, "New tenders"],
   ["recentTenders", Newspaper, "Recent tenders"],
@@ -144,7 +145,7 @@ function Restricted({ label, contacts = [] }) {
   );
 }
 
-const MODULE_TAB = { rtc: "rtc", bess: "bessTender", seci: "seciRtc", cfd: "cfd" };
+const MODULE_TAB = { rtc: "rtc", bess: "bessTender", seci: "seciRtc", cfd: "cfd", cfdOwnSolar: "cfdOwnSolar" };
 
 export default function App({ user = null, initialScenario = null }) {
   const allowed = useMemo(() => new Set(user?.allowedTabs ?? ALL_TAB_IDS), [user]);
@@ -173,7 +174,8 @@ export default function App({ user = null, initialScenario = null }) {
         {canView && activeTab === "rtc" && <RtcTab user={user} initialScenario={opened("rtc")} />}
         {canView && activeTab === "seciRtc" && <SeciTab initialScenario={opened("seci")} />}
         {canView && activeTab === "bessTender" && <BessTab initialScenario={opened("bess")} />}
-        {canView && activeTab === "cfd" && <CfdTab initialScenario={opened("cfd")} />}
+        {canView && activeTab === "cfd" && <CfdTab key="cfd" initialScenario={opened("cfd")} />}
+        {canView && activeTab === "cfdOwnSolar" && <CfdTab key="cfdOwnSolar" variant="ownSolar" initialScenario={opened("cfdOwnSolar")} />}
         {canView && activeTab === "whatIf" && <WhatIfTab />}
         {canView && activeTab === "newTenders" && <NewTendersTab />}
         {canView && activeTab === "recentTenders" && <RecentTendersTab />}

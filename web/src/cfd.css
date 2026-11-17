@@ -243,3 +243,8 @@
 .aug-table-wrap td.aug-short { color: var(--bad); font-weight: 600; }
 .aug-na { color: var(--muted); font-size: 10.5px; }
 .aug-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.5; max-width: 980px; }
+
+/* the CfD Own Solar tab: the comparison with the CfD Bid tab */
+.own-compare table td:first-child { white-space: normal; min-width: 280px; }
+.own-compare td.own-good { color: var(--good, #7ddc9a); font-weight: 600; }
+.own-compare td.own-bad { color: var(--bad); font-weight: 600; }

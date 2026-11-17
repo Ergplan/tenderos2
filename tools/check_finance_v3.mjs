@@ -227,6 +227,23 @@ const ok = (name, detail) => { checks.push(name); console.log(`ok   ${name}${det
   ok("top-up", `₹${r.topUpCr.toFixed(1)} cr drawn at the end of year 2`);
 }
 
+// a capital spend in operation put in by lenders and equity (own RE commissioned after the COD):
+// outside the cash available for debt service, in the equity cash flow, the same assets and tax
+{
+  const rp = { year: 2, capexCr: 300, upliftPct: 0 };
+  const paid = run({ repower: rp });
+  const funded = run({ repower: { ...rp, funded: true } });
+  const a = paid.rows[1], b = funded.rows[1];
+  assert.ok(b.fundedCapex === 300 && a.fundedCapex === 0 && b.repowerCapex === 300);
+  assert.ok(close(b.cfads, a.cfads + 300, 1e-9) && close(b.fcfe, a.fcfe, 1e-9), "out of the CFADS, still in the equity cash flow");
+  assert.ok(b.dscr > a.dscr && close(b.dscr, base.rows[1].dscr, 1e-9), "the year's DSCR is the plant's own");
+  assert.ok(close(b.bookDep, a.bookDep, 1e-9) && close(b.taxDep, a.taxDep, 1e-9) && close(b.projectCf, a.projectCf, 1e-9) && close(funded.projectIrr, paid.projectIrr, 1e-12) && close(funded.equityIrr, paid.equityIrr, 1e-12), "the same assets, tax and returns");
+  const withDebt = run({ repower: { ...rp, funded: true }, topUp: { year: 2, debtFraction: (base.rows[1].closingDebt + 0.7 * 300) / base.capex.total } });
+  assert.ok(close(withDebt.rows[1].topUpCr, 210, 1e-9) && close(withDebt.rows[1].fcfe, base.rows[1].fcfe - 90, 1e-9), "with 70% of it drawn as debt that year, equity puts in the other 30%");
+  assert.ok(Math.abs(withDebt.rows[withDebt.debtTerms.tenor - 1].closingDebt) < 1e-6, "repaid by the tenor");
+  ok("capital put in by lenders and equity in an operating year", `₹300 cr in year 2: DSCR ${b.dscr.toFixed(2)} (paid from operating cash it would read ${a.dscr.toFixed(2)}); ₹210 cr drawn, ₹90 cr of equity`);
+}
+
 // the top-up at the refinancing: a share of the balance refinanced, paid out to equity; the fee
 // on the new loan (the balance and the top-up), the prepayment penalty on the balance taken out
 {

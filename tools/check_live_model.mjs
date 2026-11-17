@@ -30,7 +30,7 @@ import { buildModelWorkbook } from "../web/lib/modelWorkbook.js";
 import { defaultLosses } from "../web/src/bid/model.js";
 import { rtcModelExport } from "../web/src/rtc/exportModel.js";
 import { defaultCfdState, fillBenchmarks, runModel as runCfdModel } from "../web/src/cfd/model.js";
-import { cfdLiveRequest, runCfdFinance } from "../web/src/cfd/finance.js";
+import { cfdLiveRequest, runCfdFinance, withLateRe } from "../web/src/cfd/finance.js";
 
 const require = createRequire(new URL("../web/package.json", import.meta.url));
 const ExcelJS = require("exceljs");
@@ -231,9 +231,22 @@ const CASES = [
     ...V3,
     fin: { refiYear: 2, refiRate: 0.083, refiTenorYears: 12, refiFeePct: 0.005, prepaymentPct: 0.01, refiTopUpPct: 0.05, graceYears: 1, paymentsPerYear: 4 },
   })],
+  // own RE commissioned after the COD: ₹900 cr put in by lenders and equity in year 2 (the funded
+  // capital spend, named by the request), its debt the top-up of that year
+  ["own RE commissioned in year 2: its cost put in by lenders and equity that year, 70% of it drawn as debt", (() => {
+    // the top-up of year 2 is set as the CfD bid sets it (withLateRe): to the share of project cost
+    // that draws 70% of the ₹900 cr
+    const c = bid({ ...V3, fin: { repower: { year: 2, capexCr: 900, upliftPct: 0, funded: true }, graceYears: 1 } });
+    const { result, fin } = withLateRe({ fin: c.m.fin, lateRe: { year: 2, capexCr: 900, debtShare: 0.7 } }, (f) => c.run({ fin: f }));
+    c.m.fin = fin;
+    c.finance = result;
+    c.req = { ...liveModelRequest({ state: c.s, lp: c.lp, finance: result, costs: c.m.costs, fin, bess: c.m.bess, ops: c.ops, dfrTarget: c.dfrTarget }), repowerLabel: "Own RE commissioned after the SCD" };
+    return c;
+  })()],
 ];
-const BY_YEAR = CASES.length - 2;
-const REFI_TOP = CASES.length - 1;
+const BY_YEAR = CASES.length - 3;
+const REFI_TOP = CASES.length - 2;
+const LATE_RE = CASES.length - 1;
 // the second bid uses a one-time augmentation in year 10, with the battery price falling 3% a year
 {
   const c = CASES[1][1];
@@ -260,7 +273,7 @@ const SAME = {
   mezzOpen: "mezzOpening", mezzInt: "mezzInterest", mezzPrin: "mezzPrincipal", mezzClose: "mezzClosing", mezzService: "mezzService",
   quasiOpen: "quasiOpening", quasiInt: "quasiInterestPaid", quasiAccr: "quasiAccrued", quasiRepay: "quasiRepaid", quasiClose: "quasiClosing",
   taxDepSlm: "taxDepSlm", taxDepWdv: "taxDepWdv", taxable: "taxableIncome", lossUsed: "lossSetOff", depUsed: "depSetOff", lossCf: "lossCarried", depCf: "depCarried", intDisallowed: "interestDisallowed", intCf: "interestCarried",
-  extCapex: "extensionCapex", repower: "repowerCapex", sweep: "sweepCr", sweepAccr: "sweepAccrued", topUp: "topUpCr", totalDscr: "totalDscr", fscr: "fscr", llcr: "llcr", plcr: "plcr",
+  extCapex: "extensionCapex", repower: "repowerCapex", rpFund: "fundedCapex", sweep: "sweepCr", sweepAccr: "sweepAccrued", topUp: "topUpCr", totalDscr: "totalDscr", fscr: "fscr", llcr: "llcr", plcr: "plcr",
   preTaxEq: "preTaxEquityCf", preTaxProj: "preTaxProjectCf", retained: "retained", cash: "cash", lenderCf: "lenderCf", dividends: "dividends",
 };
 // the asset register by component and the dated year row, compared apart (objects and dates)
@@ -330,6 +343,12 @@ assert.ok(CASES[8][1].finance.rows.every((r) => r.dscr === null), "no debt: no D
 {
   const y = CASES[BY_YEAR][1].finance;
   assert.ok(y.rows.filter((r) => r.augCapex > 0).map((r) => r.year).join() === "4,8,12" && y.rows[7].augCapex === 40, "augmentation year by year: years 4, 8 and 12, the year-8 cost as entered");
+  const l = CASES[LATE_RE][1].finance;
+  {
+    const r = l.rows[1];
+    assert.ok(r.fundedCapex === 900 && Math.abs(r.topUpCr - 630) < 1e-3 && r.dscr > 1 && Math.abs(r.cfads - r.debtService - 270 - r.fcfe) < 1e-3 && l.rows.every((x, k) => k === 1 || !(x.fundedCapex > 0)),
+      `own RE in year 2: outside the CFADS, 70% of it drawn as debt, the other ₹270 cr from equity's cash (top-up ${r.topUpCr}, DSCR ${r.dscr}, FCFE ${r.fcfe})`);
+  }
   const t = CASES[REFI_TOP][1].finance;
   assert.ok(t.rows[1].topUpCr > 0 && Math.abs(t.rows[1].topUpCr - 0.05 * (t.rows[1].closingDebt - t.rows[1].topUpCr)) < 1e-9 && t.rows.filter((r) => r.topUpCr > 0).length === 1 && t.rows[1].refiFee > 0, "the top-up at the refinancing: 5% of the balance, in year 2 only");
 }
