@@ -163,11 +163,13 @@ export function defaultCfdState() {
 export function patchCfdBess(s, values) {
   const bess = { ...(s.bess || {}), ...values };
   const inputs = { ...s.inputs };
+  const filled = { ...(s.filled || {}) };
   if (values.augmentation === "annual" || values.augmentation === "none") {
     inputs.augmentation = values.augmentation;
     bess.augmentation = null;
-  }
-  return { ...s, inputs, bess };
+  } else if (values.augmentation && !inputs.augmentation) inputs.augmentation = "none"; // the tender input stays answered
+  if ("augmentation" in values) delete filled.augmentation; // chosen, no longer a benchmark
+  return { ...s, inputs, bess, filled };
 }
 
 /** The augmentation choice shown on the finance team's inputs. */
@@ -515,6 +517,62 @@ export function augmentationText(state) {
   if (a.augmentationMode === "schedule") return a.augmentationYears.length ? `on a schedule, in year${a.augmentationYears.length > 1 ? "s" : ""} ${a.augmentationYears.join(", ")}` : "on a schedule, with no year entered";
   if (a.augmentationMode === "oneTime") return `once, in year ${a.augmentationYear ?? "?"}`;
   return a.augmentationMode === "annual" ? "every year" : "none";
+}
+
+/**
+ * The additions (share of the nameplate, index = the operating year) that give the capacity the
+ * bid's present augmentation choice keeps: what "year by year" starts from when a year is typed
+ * over another choice. Each addition fades from its own year, so keeping the capacity takes a
+ * little more each year than the year's fade.
+ */
+export function impliedAugmentation(state, years = TENDER.termYears) {
+  const deg = state?.inputs?.essDegradation || 0;
+  const a = { essDegradation: deg, ...modelAugmentation(state) };
+  const add = new Array(years + 1).fill(0);
+  if (a.augmentationMode === "byYear") {
+    for (let y = 2; y <= years; y += 1) add[y] = a.augmentationPct[y] || 0;
+    return add;
+  }
+  for (let y = 2; y <= years; y += 1) {
+    let have = Math.max(0.4, 1 - deg * (y - 1));
+    for (let k = 2; k < y; k += 1) have += add[k] * Math.max(0.4, 1 - deg * (y - k));
+    add[y] = Math.max(0, Math.round((bessCapFactor(a, y) - have) * 1e5) / 1e5);
+  }
+  return add;
+}
+
+/**
+ * The battery's augmentation year by year as the bid has it, for the table of the Design step:
+ * [{ year, pct, mwh, costCr, entered, factor, short }] for every operating year. `pct` is the
+ * share of the nameplate added at the start of the year (what the financial model pays for),
+ * `costCr` its cost (the one entered, else the MWh at that year's battery price), `factor` the
+ * usable capacity of the year as a share of the nameplate, `short` whether that is below the
+ * daily supply at the plant's availability.
+ */
+export function augmentationByYear(state, years = TENDER.termYears) {
+  const i = state?.inputs || {};
+  const X = i.contractedMw || 0;
+  const deg = i.essDegradation || 0;
+  const a = modelAugmentation(state);
+  const mwh = X * essTotalMwhPerMw(i);
+  const byYear = a.augmentationMode === "byYear";
+  const entered = Array.isArray(state?.bess?.augmentationCr) ? state.bess.augmentationCr : [];
+  const cost = E.augmentationScheduleCr({ bessMwh: mwh }, { bessCrPerMwh: i.essCrPerMwh || 0 }, {
+    annualDegradation: deg, costDeclinePct: i.augDecline || 0, augmentation: a.augmentationMode, augmentationYears: a.augmentationYears, augmentationYear: a.augmentationYear,
+    augmentationPct: a.augmentationPct, augmentationCr: entered,
+  }, years);
+  const priceAt = (y) => (i.essCrPerMwh || 0) * (1 - (i.augDecline || 0)) ** (y - 1);
+  const need = essRequiredPerMw(state);
+  const floor = isNum(i.essMwhPerMw) && i.essMwhPerMw > 0 ? ((TENDER.essHoursMin / need.meter) * (isNum(i.availability) ? i.availability : 1)) / (i.essMwhPerMw * need.window) : null;
+  const fi = { essDegradation: deg, ...a };
+  const out = [];
+  for (let y = 1; y <= years; y += 1) {
+    const costCr = cost[y] || 0;
+    const pct = y < 2 ? 0 : byYear ? (a.augmentationPct[y] || 0) : (mwh > 0 && priceAt(y) > 0 ? costCr / (mwh * priceAt(y)) : 0);
+    const factor = bessCapFactor(fi, y);
+    out.push({ year: y, pct, mwh: mwh * pct, costCr, entered: byYear && isNum(entered[y]) && entered[y] > 0, factor, short: floor !== null && factor < floor - 1e-9 });
+  }
+  return out;
 }
 
 /**

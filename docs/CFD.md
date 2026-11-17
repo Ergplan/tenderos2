@@ -347,6 +347,13 @@ share of nameplate by the shared engine's convention (restored in an augmentatio
 the degradation since the last one, never below 40%), and `simulate` sizes each day's charging to
 it. Before 10 Nov 2026 the operation faded the battery from year 1 whenever the choice was not
 annual, while the financial model paid for the scheduled augmentation: the two now agree.
+The Design step shows the augmentation of every operating year under "Battery capacity over the
+term" (`AugmentationTable.jsx`): `augmentationByYear(state)` gives, for whatever choice the bid
+has, the share of the nameplate added each year, its MWh and cost (the financial model's own
+figure for that year: `tools/check_cfd_model.mjs` compares them for four choices) and the usable
+capacity. Each year is an input: typing one makes the choice year by year, seeded by
+`impliedAugmentation(state)`, the additions that keep the capacity the present choice keeps.
+
 A fifth choice, **year by year** (`state.bess.augmentation = "byYear"`, 17 Nov 2026), takes a table
 of the Finance inputs step: for each operating year from the second, the capacity added at the
 start of the year as a share of the nameplate (`augmentationPct[year]`) and, where it is known, the

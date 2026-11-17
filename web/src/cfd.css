@@ -229,3 +229,17 @@
 .analyst-plan button { font-size: 11px; padding: 2px 8px; }
 .analyst-ask { display: flex; gap: 8px; align-items: flex-end; }
 .analyst-ask textarea { flex: 1; min-height: 52px; resize: vertical; padding: 8px 10px; border: 1px solid var(--line-2, var(--line)); background: var(--surface); color: var(--ink); font: inherit; font-size: 13.5px; }
+
+/* the augmentation of each year, under "Battery capacity over the term" (Design step) */
+.aug-table { margin-top: 10px; }
+.aug-table-wrap { margin-top: 8px; overflow-x: auto; border: 1px solid var(--line); }
+.aug-table-wrap table { border-collapse: collapse; font-size: 12px; width: 100%; }
+.aug-table-wrap th, .aug-table-wrap td { padding: 5px 6px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.aug-table-wrap thead th { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--muted); }
+.aug-table-wrap tbody th, .aug-table-wrap thead th:first-child { text-align: left; font-weight: 500; white-space: normal; min-width: 230px; position: sticky; left: 0; background: var(--surface); }
+.aug-table-wrap tbody th small { color: var(--muted); font-weight: 400; }
+.aug-table-wrap input { width: 56px; padding: 3px 4px; text-align: right; border: 1px solid var(--line-2, var(--line)); background: transparent; color: var(--ink); font: inherit; }
+.aug-table-wrap input::placeholder { color: var(--muted); }
+.aug-table-wrap td.aug-short { color: var(--bad); font-weight: 600; }
+.aug-na { color: var(--muted); font-size: 10.5px; }
+.aug-note { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.5; max-width: 980px; }

@@ -435,3 +435,49 @@ console.log(`CfD model checks passed (strike price ₹${opt.bid.toFixed(2)}/kWh 
   assert.ok(shortDays(stepped) < shortDays(faded) / 2, `two additions halve the short days at least (${shortDays(stepped)} against ${shortDays(faded)})`);
   console.log(`CfD faded battery: ${shortDays(faded)} days short, green market ${(100 * Math.max(...after36.map((y) => y.shareMarket))).toFixed(1)}% and group RE ${(100 * Math.max(...after36.map((y) => y.shareGroup))).toFixed(1)}% of the supply at most; added every year ${shortDays(kept)} days, in years 4 and 8 ${shortDays(stepped)} days`);
 }
+
+// ---- the augmentation of each year (the Design step's table): what every choice does year by year
+{
+  const { augmentationByYear, impliedAugmentation, patchCfdBess, bessCapFactor: capOf, modelAugmentation: augOf } = await import("../web/src/cfd/model.js");
+  const { runCfdFinance: priceBid } = await import("../web/src/cfd/finance.js");
+  const base = fillBenchmarks(defaultCfdState());
+  base.inputs = { ...base.inputs, contractedMw: 150, essMwhPerMw: 2.25, essDegradation: 0.02, essCrPerMwh: 0.7, augDecline: 0.05, effectiveDate: "2027-02-01", availability: 0.97, essSocMin: 0.05, essSocMax: 1 };
+  const close = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(b));
+  // every choice: the table's cost of a year is what the financial model spends that year
+  for (const [name, st] of [
+    ["annual", patchCfdBess(base, { augmentation: "annual" })],
+    ["none", patchCfdBess(base, { augmentation: "none" })],
+    ["schedule", patchCfdBess(base, { augmentation: "schedule", augmentationYears: [4, 8] })],
+    ["year by year", patchCfdBess(base, { augmentation: "byYear", augmentationPct: Object.assign(new Array(16).fill(0), { 4: 0.06, 8: 0.2 }), augmentationCr: Object.assign(new Array(16).fill(0), { 8: 30 }) })],
+  ]) {
+    const rows = augmentationByYear(st);
+    const fin = priceBid(st, runModel(st, prices));
+    assert.equal(rows.length, 15);
+    rows.forEach((r, k) => assert.ok(close(r.costCr, fin.rows[k].augCapex, 1e-9), `${name}, year ${r.year}: ₹${r.costCr} cr in the table, ₹${fin.rows[k].augCapex} cr in the financial model`));
+    const a = { essDegradation: 0.02, ...augOf(st) };
+    rows.forEach((r) => assert.ok(close(r.factor, capOf(a, r.year), 1e-12) && r.pct >= 0 && close(r.mwh, 337.5 * r.pct, 1e-9), `${name}, year ${r.year}: the usable capacity is the operation's`));
+    assert.ok(rows[0].pct === 0 && rows[0].costCr === 0, "year 1 is the plant itself");
+  }
+  const annual = augmentationByYear(patchCfdBess(base, { augmentation: "annual" }));
+  assert.ok(annual.slice(1).every((r) => close(r.pct, 0.02, 1e-9) && r.factor === 1 && !r.short), "annual: 2% a year replaced, the capacity kept");
+  const none = augmentationByYear(patchCfdBess(base, { augmentation: "none" }));
+  assert.ok(none.every((r) => r.pct === 0 && r.costCr === 0) && none[5].short && !none[4].short && close(none[14].factor, 0.72), "none: nothing added, short from year 6");
+  const typed = augmentationByYear(patchCfdBess(base, { augmentation: "byYear", augmentationPct: Object.assign(new Array(16).fill(0), { 4: 0.06, 8: 0.2 }), augmentationCr: Object.assign(new Array(16).fill(0), { 8: 30 }) }));
+  assert.ok(typed[7].entered && typed[7].costCr === 30 && !typed[3].entered && close(typed[3].costCr, 337.5 * 0.06 * 0.7 * 0.95 ** 3) && close(typed[7].factor, 0.86 + 0.06 * 0.92 + 0.2), "year by year: the cost typed, else the MWh at the year's price; each addition fades from its own year");
+  // what "year by year" starts from: the additions that keep the capacity of the present choice
+  for (const [name, st] of [["annual", patchCfdBess(base, { augmentation: "annual" })], ["schedule", patchCfdBess(base, { augmentation: "schedule", augmentationYears: [4, 8] })], ["none", patchCfdBess(base, { augmentation: "none" })]]) {
+    const seed = impliedAugmentation(st);
+    const was = { essDegradation: 0.02, ...augOf(st) };
+    const now = { essDegradation: 0.02, ...augOf(patchCfdBess(st, { augmentation: "byYear", augmentationPct: seed })) };
+    for (let y = 1; y <= 15; y += 1) assert.ok(close(capOf(now, y), capOf(was, y), 1e-4), `${name} made year by year keeps the capacity of year ${y}: ${capOf(now, y)} vs ${capOf(was, y)}`);
+    assert.ok(seed.length === 16 && seed[0] === 0 && seed[1] === 0);
+  }
+  assert.ok(impliedAugmentation(patchCfdBess(base, { augmentation: "annual" }))[15] > 0.02 && impliedAugmentation(patchCfdBess(base, { augmentation: "none" })).every((v) => v === 0), "keeping the capacity takes a little more each year than the fade; none adds nothing");
+  // the choice is stored where the model reads it, and is no longer a benchmark once chosen
+  const chosen = patchCfdBess({ ...base, inputs: { ...base.inputs, augmentation: null }, filled: { augmentation: "benchmark" } }, { augmentation: "byYear", augmentationPct: [] });
+  assert.ok(chosen.bess.augmentation === "byYear" && chosen.inputs.augmentation === "none" && !("augmentation" in chosen.filled));
+  const back = patchCfdBess(chosen, { augmentation: "annual" });
+  assert.ok(back.bess.augmentation === null && back.inputs.augmentation === "annual");
+  console.log(`CfD augmentation by year: the table's cost equals the financial model's in every year for four choices; ₹${annual.reduce((x, r) => x + r.costCr, 0).toFixed(1)} cr over the term when every year is augmented`);
+}
+

@@ -224,8 +224,16 @@ needed; the tender sets the battery's minimum, nothing else.
 * **Operation.** **Round-trip efficiency** with where it is quoted (the Losses section below sets
   the point; the model applies the round trip at the 33 kV bus), **Minimum** and **Maximum state
   of charge** (usable = (maximum − minimum) × nameplate; empty means the whole nameplate is
-  usable), **Battery degradation**, **Battery capacity over the term** (augment every year, or let
-  it fade).
+  usable), **Battery degradation**, **Battery capacity over the term** (augment every year, let
+  it fade, or set it year by year).
+  Under the choice, a table shows the augmentation of every operating year: the capacity added at
+  the start of the year (% of nameplate), the MWh that is, its cost in ₹ crore, and the usable
+  capacity that results, marked in red from the year it falls below the daily supply at your
+  availability. The table shows what the present choice does (2% a year replaced when every year
+  is augmented; nothing when it fades). Every year is an input: type a capacity or a cost in any
+  year and the choice becomes **Year by year**, starting from additions that keep the capacity the
+  present choice keeps. A cost left blank is the MWh at that year's battery price (the grey
+  figure); a cost you type is used as it is. The same table is on the Finance inputs.
 * **Costs.** Capex per MWh (all-in), O&M per MWh, the yearly decline of augmentation cost.
 
 **4.1 · Own RE.** **Optimise own RE** finds the solar (and wind, if you have it) that gives the
