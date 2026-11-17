@@ -145,6 +145,10 @@ try {
   // tender types, sections
   for (const tt of ["fdre", "bess", "cfd"]) { await page.locator(`#tt-tabs button[data-tt="${tt}"]`).click(); check(await page.locator(`#tt-${tt} svg.iso`).isVisible(), `tender type ${tt}: no drawing`); if (SHOTS) await page.locator("#tenders").screenshot({ path: join(SHOTS, `tenders-${tt}.png`) }); }
   if (SHOTS) { await page.screenshot({ path: join(SHOTS, "hero.png") }); for (const s of ["time", "optimiser", "team", "security", "what"]) await page.locator(`#${s}`).screenshot({ path: join(SHOTS, `section-${s}.png`) }); }
+  // the desktop is unchanged by the phone layout: no pane tabs, and the page beside the list
+  await page.locator('.sim-rail button[data-stage="1"]').click();
+  check(await page.evaluate(() => { const t = document.querySelector("#st-read .pane-tabs"), a = document.querySelector("#ev-list").getBoundingClientRect(), b = document.querySelector("#ev-page").getBoundingClientRect(); return !document.querySelector("#sim").classList.contains("phone") && getComputedStyle(t).display === "none" && b.left > a.right - 2 && b.width > 200; }), "desktop: the phone's panes changed the desktop layout");
+  check(await page.locator("#time .tm-tag").count() === 16, "time chart: the before and after labels are missing on the desktop");
   // an ordinary visit: what was used is recorded, with no label on it
   const plain = await page.evaluate(() => window.TOSTrack.log);
   check(plain.some((e) => e.name === "Tour screen" && e.data.screen === "studio") && plain.some((e) => e.name === "Tender type opened" && e.data.type === "bess") && plain.some((e) => e.name === "Scenario saved"), `analytics: an ordinary visit recorded ${[...new Set(plain.map((e) => e.name))].join(", ")}`);
@@ -290,10 +294,43 @@ try {
   await phone.locator("#chat .chat-x").click();
   for (const k of [0, 2, 5, 9]) { await phone.locator(`.sim-rail button[data-stage="${k}"]`).click(); await phone.waitForTimeout(250); const o = await phone.evaluate(() => document.documentElement.scrollWidth - window.innerWidth); check(o <= 1, `phone: screen ${k + 1} scrolls sideways by ${o}px`); if (SHOTS) await phone.locator("#sim").screenshot({ path: join(SHOTS, `phone-stage-${k + 1}.png`) }); }
   if (SHOTS) await phone.screenshot({ path: join(SHOTS, "phone-hero.png") });
+  // the time chart says before and after in words on every row
+  check(await phone.locator("#time .tm-tag.hand").count() === 8 && await phone.locator("#time .tm-tag.tos").count() === 8 && (await phone.locator("#time .tm-tag.hand").first().textContent()).includes("Before") && (await phone.locator("#time .tm-tag.tos").first().textContent()).includes("With TenderOS"), "time chart: the before and after labels are missing");
+  // the whole demo holds one screen of the phone: the window is no taller than the screen under the
+  // header, and every pane of every screen fits its box without scrolling
+  const fits = await phone.evaluate(async () => {
+    const sim = document.querySelector("#sim"), out = [], top = document.querySelector("header.top").offsetHeight;
+    if (!sim.classList.contains("phone") || sim.getBoundingClientRect().height > innerHeight - top) out.push(`the window is ${Math.round(sim.getBoundingClientRect().height)} px on a ${innerHeight} px screen`);
+    for (const tab of document.querySelectorAll(".sim-rail button")) {
+      tab.click(); await new Promise((r) => setTimeout(r, 60));
+      const st = document.querySelector(".stage:not([hidden])"), box = st.querySelector(".pane-box"), tabs = [...st.querySelectorAll(".pane-tabs button")];
+      if (st.id !== "st-pack" && tabs.length < 2) out.push(`${st.id} has no panes`);
+      for (const b of tabs.length ? tabs : [null]) {
+        if (b) { b.click(); await new Promise((r) => setTimeout(r, 60)); }
+        const shown = [...st.querySelectorAll("[data-pane]")].filter((n) => n.offsetParent !== null).map((n) => n.dataset.pane);
+        if (b && (!shown.length || shown.some((x) => x !== b.dataset.to))) out.push(`${st.id}: the tab ${b.dataset.to} shows ${[...new Set(shown)].join(", ") || "nothing"}`);
+        if (box.scrollHeight > box.clientHeight + 2) out.push(`${st.id} ${b ? b.dataset.to : ""} needs ${box.scrollHeight} px of ${box.clientHeight}`);
+      }
+    }
+    return out;
+  });
+  check(!fits.length, `phone: ${fits.join("; ")}`);
   await phone.close();
+  // on a phone the tour settles the window into the screen and opens the panes by itself
+  const pt = await browser.newPage({ viewport: { width: 390, height: 700 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true, colorScheme: "dark" });
+  watch(pt, "phone tour");
+  await ready(pt);
+  await pt.locator('.hero a[href="#tour"]').tap();
+  await pt.waitForFunction(() => document.querySelector("#cursor").classList.contains("on"), null, { timeout: 15000 });
+  await pt.waitForFunction(() => document.querySelector("#st-upload").dataset.pane === "What was read" || !document.querySelector("#st-read").hidden, null, { timeout: 30000 });
+  const where = await pt.evaluate(() => { const r = document.querySelector("#sim").getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom), innerHeight, document.querySelector("header.top").offsetHeight, getComputedStyle(document.querySelector("#chat-open")).opacity]; });
+  check(where[0] >= where[3] - 1 && where[1] <= where[2] + 1, `phone tour: the window sits at ${where[0]}..${where[1]} on a ${where[2]} px screen`);
+  check(where[4] === "0", "phone tour: the chat button is over the demo");
+  if (SHOTS) await pt.screenshot({ path: join(SHOTS, "phone-tour.png") });
+  await pt.close();
 } finally {
   await browser.close();
   server.close();
 }
 if (errors.length) { console.error("render: FAILED\n  " + errors.join("\n  ")); process.exit(1); }
-console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, visit analytics and personal links, the chat box, day mode and phone all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);
+console.log(`render: 13 screens, studio, what-if, guided tour, voice-over, market feed, visit analytics and personal links, the chat box, the time chart's labels, day mode, and the phone layout (one screen, panes) all pass${SHOTS ? `; screenshots in ${SHOTS}` : ""}`);

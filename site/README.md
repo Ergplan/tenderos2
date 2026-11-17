@@ -128,3 +128,20 @@ soundtrack to the animation's own cue points (an original synthesised track: not
 `--music FILE` uses another track instead) and writes `public/social/tenderos-linkedin.mp4`, the
 cover `tenderos-linkedin.jpg` and the music alone as `tenderos-linkedin-music.mp3`. The figures
 in it are read from `public/data/demo.json`.
+
+## The tour on a phone, and the time chart's labels
+
+Under 860 px of width `app.js` puts the demo window in phone mode (`.sim.phone`): the window is
+one screen tall under the header, the intro paragraph of each screen gives way to the caption,
+and each screen is split into panes (the columns it has on a desktop: `PANES` in `app.js`) shown
+one at a time under a row of tabs. A pane taller than its box is drawn smaller, down to 62% of
+its size, and scrolls inside itself only below that. The tour's cursor opens the pane of whatever
+it is about to touch (`reveal`), a press whose answer appears elsewhere opens that pane
+(`FOLLOW`), and the panes the cursor did not open are shown in turn before the tour moves on.
+The page settles with the window filling the screen (scroll snap, proximity) and the chat button
+steps aside while the demo is in view. The desktop layout is untouched: there the pane wrappers
+are `display: contents`.
+
+Every row of the time chart carries two labels, "Before" with the time by hand and "With
+TenderOS" with the time in the product; once the chart is in view they light in turn while the
+bar between them closes up (off under reduced motion).

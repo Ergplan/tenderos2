@@ -76,11 +76,104 @@
   // stays pending until it is released, so the cursor and the narration pick up where they stopped
   let hold = false;
   const wait = (ms, t) => new Promise((res, rej) => { const end = () => { if (t.dead) rej(CANCEL); else if (hold) setTimeout(end, 200); else res(); }; setTimeout(end, ms * speed); });
+
+  // ---- on a phone the whole demo holds one screen. The window is as tall as the screen; each of
+  // the tour's screens is split into panes (the columns it has on a desktop), shown one at a time
+  // under a row of tabs; a pane that is still too tall is drawn smaller until it fits, and scrolls
+  // inside itself only below a size that stops being readable. The tour's cursor opens the pane
+  // of whatever it is about to touch, so nobody has to scroll the page to follow it.
+  const mqPhone = window.matchMedia("(max-width: 860px)");
+  const phone = () => mqPhone.matches;
+  const MIN_FIT = 0.62;
+  const PANES = {
+    upload: (q) => [["Files", q("#dropzone")], ["What was read", q(".up-side")]],
+    read: (q) => [["Values", q("#ev-list")], ["The page", q("#ev-page")]],
+    amend: (q) => [["Net effect", q("#am-net")], ["Changes", q(".am-nav")], ["Was · now", q("#am-body")], ["The page", q("#am-page")]],
+    conditions: (q) => [["Groups", q(".groups")], ["Tested", q(".cond-test")]],
+    team: (q) => [...q(".tcol").map((n) => [n.querySelector("h4")?.textContent || "Inputs", [n]]), ["Thread", q("#team-thread")]],
+    studio: (q) => [["Design", q("#sd-form, .sd-price, .sd-kv:not(.wide)")], ["Plant", q("#sd-iso, .sd-kv.wide")], ["Conditions", q("#sd-checks")]],
+    size: (q) => q(".opt2 > div").map((n, k) => [["The search", "All plants"][k], [n]]),
+    dispatch: (q) => q(".dp-grid > div").map((n, k) => [["One day", "15 years"][k], [n]]),
+    finance: (q) => [["Numbers", q(".tiles")], ...q(".fin-grid > div").map((n, k) => [["Cash", "Drivers"][k], [n]])],
+    whatif: (q) => q(".wi-grid > div").map((n, k) => [["Levers", "Route"][k], [n]]),
+    wins: (q) => q(".wins-grid > div").map((n, k) => [["The Pool", "Risks"][k], [n]]),
+    review: (q) => q(".rv-grid > .rv-col").map((n, k) => [["Findings", "Market"][k], [n]]),
+  };
+  // a press in one pane whose answer appears in another: the answer's pane opens by itself
+  const FOLLOW = { read: { Values: "The page" }, amend: { "Net effect": "Was · now", Changes: "Was · now" } };
+  const paneNames = new Map(), paneSeen = new Map();
+  const fit = (p) => {
+    const box = $(".pane-box", p), inner = $(".pane-fit", p);
+    if (!box || !inner) return;
+    inner.style.width = ""; inner.style.transform = ""; inner.style.marginBottom = "";
+    if (!phone() || p.hidden) return;
+    const room = box.clientHeight;
+    if (inner.offsetHeight <= room + 1) return;
+    let lo = MIN_FIT, hi = 1;
+    for (let i = 0; i < 6; i += 1) { const z = (lo + hi) / 2; inner.style.width = `${100 / z}%`; if (inner.offsetHeight * z <= room + 1) lo = z; else hi = z; }
+    inner.style.width = `${100 / lo}%`; inner.style.transformOrigin = "0 0"; inner.style.transform = `scale(${lo.toFixed(4)})`;
+    inner.style.marginBottom = `${-Math.ceil(inner.offsetHeight * (1 - lo))}px`;
+  };
+  const setPane = (p, label) => {
+    const names = paneNames.get(p) || [];
+    if (!names.includes(label)) return;
+    p.dataset.pane = label;
+    paneSeen.get(p)?.add(label);
+    $$("[data-pane]", p).forEach((n) => n.classList.toggle("pane-off", n.dataset.pane !== label));
+    $$(".pane-tabs button", p).forEach((b) => b.setAttribute("aria-selected", String(b.dataset.to === label)));
+    const box = $(".pane-box", p);
+    if (box) box.scrollTop = 0;
+    fit(p);
+  };
+  const resetPanes = (p) => { paneSeen.set(p, new Set()); const names = paneNames.get(p) || []; if (names.length) setPane(p, names[0]); else fit(p); };
+  panels.forEach((p, k) => {
+    const list = (PANES[idOf(k)]?.((sel) => $$(sel, p)) || []).filter(([, els]) => els.length);
+    const head = $(".stage-head", p), box = document.createElement("div"), inner = document.createElement("div"), tabs = document.createElement("div");
+    box.className = "pane-box"; inner.className = "pane-fit"; tabs.className = "pane-tabs"; tabs.setAttribute("role", "tablist"); tabs.setAttribute("aria-label", "Parts of this screen");
+    [...p.children].forEach((c) => { if (c !== head) inner.appendChild(c); });
+    box.appendChild(inner); p.append(tabs, box);
+    list.forEach(([label, els]) => {
+      els.forEach((e) => { e.dataset.pane = label; });
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = label; b.dataset.to = label; b.setAttribute("role", "tab");
+      b.addEventListener("click", () => setPane(p, label));
+      tabs.appendChild(b);
+    });
+    if (list.length < 2) tabs.classList.add("none");
+    paneNames.set(p, list.map(([label]) => label));
+    p.addEventListener("click", (e) => {
+      const own = e.target.closest?.("[data-pane]"), to = own && FOLLOW[idOf(k)]?.[own.dataset.pane];
+      if (phone() && to) setTimeout(() => { if (!p.hidden && p.dataset.pane === own.dataset.pane) setPane(p, to); }, 520);
+      setTimeout(() => fit(p), 90);
+    });
+    p.addEventListener("input", () => setTimeout(() => fit(p), 90));
+  });
+  // before the cursor goes to something: its pane is opened and, if it is below the fold of the pane, brought up
+  const reveal = async (n, t) => {
+    if (!phone()) return;
+    const p = n.closest(".stage"), own = n.closest("[data-pane]");
+    if (p && own && p.dataset.pane !== own.dataset.pane) { setPane(p, own.dataset.pane); await wait(280, t); }
+    const box = p && $(".pane-box", p);
+    if (!box) return;
+    const r = n.getBoundingClientRect(), b = box.getBoundingClientRect();
+    if (r.top < b.top + 4 || r.bottom > b.bottom - 4) { box.scrollTop += r.top - b.top - Math.max(0, (b.height - r.height) / 2); await wait(140, t); }
+  };
+  const toSim = () => { if (phone()) sim.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" }); };
+  const applyPhone = () => {
+    sim.classList.toggle("phone", phone());
+    document.documentElement.classList.toggle("snap-tour", phone());
+    document.documentElement.style.setProperty("--top", `${$("header.top")?.offsetHeight || 58}px`);
+    panels.forEach((p) => { if (!p.hidden) fit(p); });
+  };
+  mqPhone.addEventListener?.("change", applyPhone);
+  window.addEventListener("resize", () => { if (phone()) fit(panels[cur]); }, { passive: true });
+  applyPhone();
   const at = (target) => (typeof target === "string" ? $(target, screen) : target);
   const place = (x, y, dur) => { cursor.classList.add("on"); cursor.style.transitionDuration = `${dur * speed}ms, 300ms`; cursor.style.transform = `translate(${x}px, ${y}px)`; };
   const moveTo = async (t, target, { fx = 0.5, fy = 0.55, dur = 750 } = {}) => {
     const n = at(target);
     if (!n) return null;
+    await reveal(n, t);
     const r = n.getBoundingClientRect(), s = screen.getBoundingClientRect();
     place(r.left - s.left + r.width * fx, r.top - s.top + r.height * fy, dur);
     await wait(dur + 70, t);
@@ -100,6 +193,7 @@
   const drag = async (t, target, to, dur = 1500) => {
     const input = at(target);
     if (!input) return;
+    await reveal(input, t);
     const from = +input.value, step = +input.step || 1;
     place(...thumb(input, from), 650);
     await wait(720, t);
@@ -624,7 +718,7 @@
   const audio = new Audio();
   audio.preload = "auto";
   const voiceBtn = $("#sim-voice"), capBox = $("#sim-caption"), capText = $("#sim-caption-text");
-  let voice = false, voiceChosen = false, wantVoice = false;
+  let voice = false, voiceChosen = false, wantVoice = false, capRoll = null;
   const hasVoice = () => Object.values(D.narration || {}).some((n) => n.src);
   const setVoice = (on) => { voice = Boolean(on) && hasVoice(); voiceBtn.setAttribute("aria-pressed", String(voice)); voiceBtn.classList.toggle("on", voice); voiceBtn.classList.remove("nudge"); voiceBtn.title = voice ? "Turn the voice-over off" : "Turn the voice-over on"; if (!voice) audio.pause(); };
   // one screen's narration: resolves when the clip ends, fails to start, or the screen is left
@@ -649,11 +743,15 @@
     title.textContent = `TenderOS · SECI CfD-I · ${$(".t", railTabs[cur]).textContent}`;
     bar.style.width = `${(cur / (panels.length - 1)) * 100}%`;
     S[id]?.rest?.(p);
+    resetPanes(p);
     if (auto || sim.dataset.ready) track("Tour screen", { screen: id }, true);
     void p.offsetWidth; p.classList.add("play");
     capBox.hidden = !auto || !n;
     if (!auto) return;
     if (n) capText.textContent = n.text;
+    // on a phone the caption keeps three lines and the words move up through them as they are said
+    capRoll?.cancel(); capRoll = null;
+    if (n && phone() && !reduce) requestAnimationFrame(() => { const over = capText.scrollHeight - capBox.clientHeight + 14; if (over > 0) capRoll = capText.animate([{ transform: "translateY(0)" }, { transform: `translateY(${-over}px)` }], { duration: Math.max(3000, n.seconds * (voice ? 1000 : 620) - 2600), delay: 2200, fill: "forwards", easing: "linear" }); });
     capBox.classList.toggle("spoken", voice);
     p.classList.add("staged");
     const mine = { dead: false }; tok = mine;
@@ -662,6 +760,8 @@
         const t0 = performance.now(), said = speak(id, mine);
         await wait(450, mine);
         await (S[id]?.script || (async (t) => wait(3000, t)))(mine, p);
+        // on a phone: the panes the cursor did not open are shown in turn before the tour moves on
+        if (phone()) for (const label of paneNames.get(p) || []) if (!paneSeen.get(p)?.has(label)) { setPane(p, label); await wait(2200, mine); }
         await said;
         if (mine.dead) throw CANCEL;
         // without the voice, leave time to read the caption
@@ -699,12 +799,13 @@
     setPlayLabel();
     voiceBtn.hidden = !hasVoice();
     heroRotator();
-    playBtn.addEventListener("click", () => (playing ? pause(false) : play(true)));
+    playBtn.addEventListener("click", () => { if (playing) pause(false); else { toSim(); play(true); } });
     document.querySelectorAll("#tour-routes button").forEach((b) => b.addEventListener("click", () => {
       route = b.dataset.route === "short" ? SHORT : null;
       document.querySelectorAll("#tour-routes button").forEach((x) => x.classList.toggle("on", x === b));
       railTabs.forEach((t, k) => t.classList.toggle("off-route", !onRoute(k)));
       if (playing) pause(false);
+      toSim();
       cur = first(); play(true);
     }));
     // the demo request: no server behind this page, so it opens the visitor's own mail with the answers
@@ -725,7 +826,7 @@
     // theirs. Scrolling over the window is not taking the controls: the tour and its voice go on.
     for (const type of ["click", "input", "keydown"]) screen.addEventListener(type, (e) => { if (e.isTrusted && playing) { track("Took the controls", { screen: idOf(cur) }, true); pause(true); } }, { capture: true, passive: true });
     // a click on a link to the tour is a request to watch it: it may start with the voice
-    document.querySelectorAll('a[href="#tour"]').forEach((link) => link.addEventListener("click", () => { wantVoice = true; }));
+    document.querySelectorAll('a[href="#tour"]').forEach((link) => link.addEventListener("click", (e) => { wantVoice = true; if (phone()) { e.preventDefault(); toSim(); } }));
     // how much of the window is on screen, of what could be (a window taller than the screen counts
     // as fully shown when it fills the screen). The tour starts when half is in view, is held (voice
     // and cursor frozen in place) once more than half is out, and picks up again on return.
@@ -734,6 +835,7 @@
     const onView = () => {
       queued = false;
       inView = shown() >= 0.5;
+      document.body.classList.toggle("tour-on", inView && phone()); // the chat button steps aside for the demo
       if (inView && !started && !reduce) { play(wantVoice); if (!voice) voiceBtn.classList.add("nudge"); }
       else if (!inView && playing && !hold) { hold = true; heldAudio = !audio.paused; audio.pause(); sim.classList.add("held"); }
       else if (inView && hold) { hold = false; sim.classList.remove("held"); if (playing && voice && heldAudio) audio.play().catch(() => {}); heldAudio = false; }
