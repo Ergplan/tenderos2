@@ -476,6 +476,38 @@ sized at once. The Inputs sheet and the Bid review read the mark (`WINNING_NOTE`
 fill prices at about ₹8.4/kWh against ₹10.1 on `fillBenchmarks`, which the checks keep
 (`tools/check_cfd_winning.mjs`). The agent's `use_benchmarks` does the same.
 
+## The bid inputs from Excel (November 2026)
+
+**Download input template** and **Upload bid inputs** sit beside Fill up for me please in the
+fill bars (`inputs.jsx FillBar`, both tabs) through `InputSheetTools.jsx`, which loads ExcelJS
+(`exceljs/dist/exceljs.min.js`) and JSZip only on the click; nothing goes to the server.
+
+* `inputSheet.js sheetRows(state, catalogue)`: the template's rows. The tab's agent catalogue
+  (`agentInputs` of `cfd/agent.js` or `fdrex/agent.js`: every box of the bid, design and finance
+  inputs), the existing-plant inputs on the Own Solar tab, "Own RE size" (`sizeAuto`), the finance
+  team's scalar terms in `state.fin`/`state.costs` (`FIN_EXTRA`: covenant, refinancing top-up and
+  prepayment, step-down, top-up, sweep, bridge, DSRA basis and interest, tax and book depreciation,
+  loss carry-forward, thin capitalisation, O&M escalation by technology, P75/P90, quasi-equity,
+  mezzanine, carbon, repowering, holding company, MIRR, FX) and the battery augmentation choice;
+  each with group, unit, range, options, benchmark, a note (`ABOUT`) and where it is in the app.
+  Percent rows hold fractions and are shown in percent.
+* `inputWorkbook.js buildInputWorkbook(ExcelJS, …)`: Read me, Bid inputs (yellow input cells with
+  notes, list validation from a very hidden Lists sheet, range validation, the key per row),
+  Battery augmentation (years 2–25) and Other fixed costs; the Read me carries the mark
+  `TenderOS bid inputs · <module> · v1` (modules `cfd`, `cfdOwnSolar`, `fdrex`).
+* `readInputWorkbook(JSZip, data, …)` through `xlsxCells.js readXlsx` (shared strings, inline
+  strings, booleans, errors, formula results, number formats for percentages and dates, 1904
+  dates, merged ranges), written for this because ExcelJS's reader fails on notes saved by other
+  programs. Rows are matched by key; blank keeps the app's value; the app's own value written back
+  passes even where it lies outside today's box range; every other cell is parsed strictly (no
+  fuzzy matching of choices) and range-checked; a frozen input that would change is an error. Any
+  error loads nothing. The tables are applied only when they differ from the app's.
+
+`tools/check_bid_input_sheet.mjs` checks all three tabs: notes, checks and keys on every row; a
+template read back as written changes nothing; every row takes a value; eight kinds of wrong cell
+are named; other tabs' templates and non-templates are refused; the tables are read. In the
+browser the uploaded file gives the same strike price as the same file applied in Node.
+
 ## Where the own-RE size came from
 
 The optimiser records its result on the bid (`state.sized`: solarMw, windMw, the price, the

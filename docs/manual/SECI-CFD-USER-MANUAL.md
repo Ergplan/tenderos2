@@ -217,6 +217,33 @@ them, and the workbook's Inputs sheet says which is which. Why these win is on t
 step (11.1): on 100 MW they price at about ₹8.4/kWh against ₹10.1 on the plain benchmarks. Typed
 values are never touched.
 
+**Download input template** and **Upload bid inputs**, beside Fill up for me please (on the Bid
+inputs, Design and Finance inputs steps), take every input from an Excel file instead of typing it
+into the boxes, which avoids typos. The template is filled with the tab's current values:
+
+* **Bid inputs**: one row per input, grouped (the bid, charging power and markets, plant and
+  resource, battery augmentation, costs, operating cost, financing, debt, reserves, construction,
+  tax and depreciation, generation, funding below the senior debt, other revenue, returns, the
+  quote). The yellow cell is the value; its note says what the input is, how the model uses it,
+  its unit, the values allowed, what Fill up for me please would put there and where it sits in the
+  app. Choices have a dropdown and numbers a range check. Percent inputs are typed in percent (24
+  for 24%); a cell formatted as a percentage is read as such too. Dates are typed as 01-Feb-2027.
+  A blank cell keeps the app's value. The Key column is how the app finds each row: leave it as it
+  is (rows may be sorted or moved).
+* **Battery augmentation**: the MWh added in each operating year, as a percent of the nameplate,
+  and optionally its cost; used when "Battery augmentation (finance team)" says year by year.
+* **Other fixed costs**: named lines (a land lease, a fee) with their ₹ cr a year and escalation;
+  the table replaces the app's list.
+
+Upload reads the file in your browser (it is not sent to the server) and checks every cell first.
+If any cell is wrong (text in a number, a value out of range or not whole, a choice not in the
+list, an impossible date, a frozen input changed, a cost line without a name), nothing is loaded
+and the tab lists each cell (sheet and address), what was typed and what is wrong. If every cell is
+right, all are loaded and the tab lists what changed; the own RE is then sized again unless "Own
+RE size" says Your size or you changed the solar or wind size. A template of another tab, or a
+file that is not a template, is refused with the reason. The CfD Bid, CfD Own Solar and FDRE-X Bid
+tabs each have their own template.
+
 **Purpose.** The plant behind the bid: the battery the tender mandates, the own RE that charges
 it, the losses to the billing meter and the site layout. The chip says how many inputs are still
 needed; the tender sets the battery's minimum, nothing else.

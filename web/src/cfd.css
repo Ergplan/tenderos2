@@ -252,3 +252,14 @@
 .own-compare table td:first-child { white-space: normal; min-width: 280px; }
 .own-compare td.own-good { color: var(--good, #7ddc9a); font-weight: 600; }
 .own-compare td.own-bad { color: var(--bad); font-weight: 600; }
+.cfd-sheet-result { flex-basis: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; position: relative; border: 1px solid var(--line); border-left: 3px solid var(--good, #7ddc9a); background: var(--surface); padding: 10px 34px 10px 12px; font-size: 13px; display: grid; gap: 8px; }
+.cfd-sheet-result.bad { border-left-color: var(--bad); }
+.cfd-sheet-result strong { display: inline-flex; align-items: center; gap: 6px; }
+.cfd-sheet-result.bad strong svg { color: var(--bad); }
+.cfd-sheet-result.ok strong svg { color: var(--good, #7ddc9a); }
+.cfd-sheet-result table { border-collapse: collapse; font-size: 12.5px; width: 100%; table-layout: fixed; }
+.cfd-sheet-result td, .cfd-sheet-result th { white-space: normal; overflow-wrap: anywhere; }
+.cfd-sheet-result.bad th:nth-child(1) { width: 18%; } .cfd-sheet-result.bad th:nth-child(2) { width: 22%; } .cfd-sheet-result.bad th:nth-child(3) { width: 14%; }
+.cfd-sheet-result th, .cfd-sheet-result td { text-align: left; border-top: 1px solid var(--line); padding: 5px 8px; vertical-align: top; }
+.cfd-sheet-result th { color: var(--muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; }
+.cfd-sheet-close { position: absolute; top: 6px; right: 6px; }

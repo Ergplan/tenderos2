@@ -112,6 +112,12 @@ what differs (for example the PPA says "Project Capacity" where the RfS says Con
 liquidity you must show, worked on your plant. **Fill up for me please** puts a competitive
 bidder's value in every empty box and sizes the own RE.
 
+**Download input template** and **Upload bid inputs** beside it take every input from an Excel
+file: the yellow cells hold the values, each with a note (what it is, its unit, the values
+allowed, the Fill up value, where it sits in the app), with dropdowns and range checks. A file with
+any wrong cell loads nothing and lists each cell with the reason; the CfD manual (Step 05) has the
+details.
+
 ## Step 05 · Design *(Design)*
 
 The battery (energy and power per contracted MW, the state-of-charge window, degradation, the
