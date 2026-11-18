@@ -19,9 +19,10 @@ export default function useSizing({ state, setState, terms, prices, session, mod
 
   /** The IEX price year when the bid sells at an IEX market (null for a flat price or no sale). */
   const marketPrices = useCallback(async () => {
-    if (!(state.market.sell && state.market.source !== "flat")) return null;
+    // SECI-FDRE-X buys power at the hourly market price too
+    if (!(state.market.sell && state.market.source !== "flat") && !terms?.purchase?.enabled) return null;
     return prices || loadMarketPrices();
-  }, [state.market.sell, state.market.source, prices]);
+  }, [state.market.sell, state.market.source, prices, terms?.purchase?.enabled]);
 
   /** Size the plant; resolves with the sizing summary (or null when it did not run or failed). */
   const startSizing = useCallback(async () => {

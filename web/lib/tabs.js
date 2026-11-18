@@ -7,7 +7,7 @@ export const TAB_CATALOG = [
   { id: "bessTender", label: "BESS Tender", engine: ["bess"] },
   { id: "cfd", label: "CfD Bid", engine: [] },
   { id: "cfdOwnSolar", label: "CfD Own Solar", engine: [] },
-  { id: "fdrex", label: "FDRE-X Bid", engine: [] },
+  { id: "fdrex", label: "FDRE-X Bid", engine: ["rtc", "bid"] }, // HiGHS sizing (rtc/lp) as the SECI RTC tab
   { id: "whatIf", label: "What-if analysis", engine: [] },
   { id: "newTenders", label: "New tenders", engine: [] },
   { id: "recentTenders", label: "Recent tenders", engine: [] },

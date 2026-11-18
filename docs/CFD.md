@@ -483,7 +483,7 @@ fill bars (`inputs.jsx FillBar`, both tabs) through `InputSheetTools.jsx`, which
 (`exceljs/dist/exceljs.min.js`) and JSZip only on the click; nothing goes to the server.
 
 * `inputSheet.js sheetRows(state, catalogue)`: the template's rows. The tab's agent catalogue
-  (`agentInputs` of `cfd/agent.js` or `fdrex/agent.js`: every box of the bid, design and finance
+  (`agentInputs` of `cfd/agent.js`: every box of the bid, design and finance
   inputs), the existing-plant inputs on the Own Solar tab, "Own RE size" (`sizeAuto`), the finance
   team's scalar terms in `state.fin`/`state.costs` (`FIN_EXTRA`: covenant, refinancing top-up and
   prepayment, step-down, top-up, sweep, bridge, DSRA basis and interest, tax and book depreciation,
@@ -494,7 +494,7 @@ fill bars (`inputs.jsx FillBar`, both tabs) through `InputSheetTools.jsx`, which
 * `inputWorkbook.js buildInputWorkbook(ExcelJS, …)`: Read me, Bid inputs (yellow input cells with
   notes, list validation from a very hidden Lists sheet, range validation, the key per row),
   Battery augmentation (years 2–25) and Other fixed costs; the Read me carries the mark
-  `TenderOS bid inputs · <module> · v1` (modules `cfd`, `cfdOwnSolar`, `fdrex`).
+  `TenderOS bid inputs · <module> · v1` (modules `cfd`, `cfdOwnSolar`).
 * `readInputWorkbook(JSZip, data, …)` through `xlsxCells.js readXlsx` (shared strings, inline
   strings, booleans, errors, formula results, number formats for percentages and dates, 1904
   dates, merged ranges), written for this because ExcelJS's reader fails on notes saved by other
@@ -519,7 +519,7 @@ the optimiser chose is never labelled as the bidder's own.
 
 ## The own-RE optimiser (November 2026)
 
-`optimiseOwnRe` (`web/src/cfd/model.js`, the same in `web/src/fdrex/model.js`) finds the own solar,
+`optimiseOwnRe` (`web/src/cfd/model.js`; the FDRE-X tab now sizes with HiGHS, docs/FDREX.md) finds the own solar,
 and wind when the bid has wind, in whole MW, every candidate priced by the full financial model:
 
 * **"Every day met"** is no short day over the term, as the Size step counts it (less than the

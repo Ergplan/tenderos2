@@ -21,7 +21,7 @@ function ComplianceTable({ lp }) {
       {rules.map((r, i) => (
         <div key={r.id} className="bid-compliance-row">
           <span>{r.label || r.id}</span>
-          <span>{pf(r.target, 1)}{r.max != null ? ` to ${pf(r.max, 1)}` : ""}</span>
+          <span>{pf(r.target, 1)}{r.max != null ? ` to ${pf(r.max, 1)}` : ""}{r.tolerance ? ` (${pf(r.tolerance, 0)} free)` : ""}</span>
           {years.map((y) => {
             const o = y.rules[i];
             // a time-block floor: met in every block (with the lowest block's supply), or the share
@@ -31,6 +31,11 @@ function ComplianceTable({ lp }) {
                 {o.met ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {o.met
                   ? `Met in every block (lowest ${pf(o.achieved, 1)})`
                   : `Met in ${pf(o.hoursMet, 1)} of blocks; ${nf(o.shortfallMu, 1)} MU short${o.penaltyMultiple != null ? ", penalty paid" : ""}`}</span>;
+            }
+            // a monthly reconciliation with a free share (SECI-FDRE-X): within it no penalty; beyond it the penalty is paid
+            if (o.tolerance != null || o.penaltyMultiple != null) {
+              const cls = o.met ? "ok" : o.withinTolerance || o.penaltyMultiple != null ? "warn" : "bad";
+              return <span key={y.year} className={cls} title="The worst month's share of its peak energy">{o.met ? <CheckCircle2 size={12} /> : <TriangleAlert size={12} />} {pf(o.achieved, 1)}{o.met ? "" : o.withinTolerance ? ", within the free share" : o.penaltyMultiple != null ? ", penalty paid beyond the free share" : ""}</span>;
             }
             return <span key={y.year} className={o.met ? "ok" : "bad"}>{o.met ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {pf(o.achieved, 1)}</span>;
           })}
@@ -167,7 +172,7 @@ function SplitSites({ lp }) {
   );
 }
 
-export default function SizeStep({ state, terms, run, startSizing, stopSizing, startDispatch15, hourly, goto, prices, missing }) {
+export default function SizeStep({ state, terms, run, startSizing, stopSizing, startDispatch15, hourly, goto, prices, missing, dispatch15 = true }) {
   const lp = state.lp;
   const mix = useMemo(() => energyMix(hourly), [hourly]);
   const running = Boolean(run?.active);
@@ -181,9 +186,9 @@ export default function SizeStep({ state, terms, run, startSizing, stopSizing, s
           <span className="rtc-index">4</span>
           <h2>Least-tariff plant</h2>
           <p>
-            HiGHS sizes {on.map((s) => s.title.toLowerCase()).join(", ") || "nothing"} for {nf(total || 0, 0)} MW round the clock, hour by hour over the PPA years,
+            HiGHS sizes {on.map((s) => s.title.toLowerCase()).join(", ") || "nothing"} for {nf(total || 0, 0)} MW {terms.supplyLabel ? `of ${terms.supplyLabel}` : "round the clock"}, hour by hour over the PPA years,
             {terms.rules.length
-              ? <> so that {terms.rules.map((r) => `${r.label.toLowerCase()} ≥ ${pf(r.target, 0)}`).join(", ")}{terms.greenMin && state.sources.thermal ? ` and green share ≥ ${pf(terms.greenMin, 0)}` : ""} hold every year,</>
+              ? <> so that {terms.rules.map((r) => (r.tolerance != null ? `${r.label.toLowerCase()} holds` : `${r.label.toLowerCase()} ≥ ${pf(r.target, 0)}`)).join(", ")}{terms.greenMin && state.sources.thermal ? ` and green share ≥ ${pf(terms.greenMin, 0)}` : ""} every year,</>
               : " once the tender's supply floor is known (this tender states none the sizing can use),"}
             {" "}at the lowest {terms.years || state.fin.years}-year tariff for a {pf(state.fin.targetEquityIrr || 0, 1)} equity IRR.
             {state.market.sell ? ` ${terms.sale === "mandated_solar" ? "Solar surplus" : "Surplus"} is sold at ${marketLabel(state, prices)} after the PPA.` : " Nothing is sold outside the PPA."}
@@ -249,7 +254,7 @@ export default function SizeStep({ state, terms, run, startSizing, stopSizing, s
           </Section>
         </>
       )}
-      {lp && !lp.sites?.split && <Dispatch15 lp={lp} start={startDispatch15} />}
+      {lp && !lp.sites?.split && dispatch15 && <Dispatch15 lp={lp} start={startDispatch15} />}
       {lp?.sites?.split && <p className="rtc-note bid-hint" data-testid="bid-d15-split">The 15-minute dispatch models one battery site; it is not available yet for separate solar and wind sites. The hourly sizing above models both sites.</p>}
       {!lp && !running && <p className="rtc-note bid-hint">Size the plant to see the least-tariff design, the tender conditions it meets and the dispatch.</p>}
     </>

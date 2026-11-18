@@ -241,7 +241,7 @@ list, an impossible date, a frozen input changed, a cost line without a name), n
 and the tab lists each cell (sheet and address), what was typed and what is wrong. If every cell is
 right, all are loaded and the tab lists what changed; the own RE is then sized again unless "Own
 RE size" says Your size or you changed the solar or wind size. A template of another tab, or a
-file that is not a template, is refused with the reason. The CfD Bid, CfD Own Solar and FDRE-X Bid
+file that is not a template, is refused with the reason. The CfD Bid and CfD Own Solar
 tabs each have their own template.
 
 **Purpose.** The plant behind the bid: the battery the tender mandates, the own RE that charges

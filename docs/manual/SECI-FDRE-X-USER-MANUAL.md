@@ -4,11 +4,11 @@
 SECI-FDRE-X, RfS No. SECI/C&P/IPP/13/0012/26-27 dated 07.10.2026: 4,800 MWh of assured peak
 supply (1,200 MW × 4 hours), Amendment-01 in force.*
 
-The tab has the flow of the CfD Bid tab: the same sidebar, heading tools (Save, Team, Open,
-Export and Import of the bid as a file, Reset inputs), twelve step chips with the owning team, boxes with pings, evidence and feedback, the Talk
-to the bid agent button, Save and Open to the library. The CfD manual
-(`SECI-CFD-USER-MANUAL.md`) describes those tools; this manual covers what is different: the
-tender and what each step does with it.
+The tab works like the SECI RTC tender tab: the same sidebar, heading tools (Save, Team, Open,
+Reset inputs), eight step chips with the owning team, and the Tender to Bid steps for the design,
+the finance terms, the sizing and the financial model. The SECI RTC manual
+(`SECI-RTC-USER-MANUAL.md`) describes those shared screens; this manual covers what is this
+tender's own.
 
 ---
 
@@ -49,7 +49,7 @@ exchange price applies to what you sold.
 **The grid connection.** You apply for ISTS connectivity with access in the non-solar hours
 before you bid, for at least the contracted capacity. With that alone the plant cannot inject in
 the day: solar beyond what the battery needs earns nothing. If you also hold connectivity for the
-solar hours, say so on Bid inputs; it lowers the tariff you need by a wide margin.
+solar hours, say so on Bid inputs.
 
 **What else the plant may earn.** Outside the four hours the battery may sell to others or on the
 exchange, the PPA always first. Energy above the assured supply goes to SECI at the tariff if the
@@ -64,139 +64,99 @@ and surety bonds are all accepted.
 **How it differs from the other SECI tenders in TenderOS.** FDRE-RTC-V asks for supply in every
 time block around the clock; this tender asks only for four buyer-chosen hours. CfD-I is two
 hours sold on the exchange and settled against a strike price for 15 years; this is a 25-year PPA
-at a fixed tariff, with a monthly test and only 5% of bought power.
+at a fixed tariff, with a monthly test and only 5% of bought power. The tab is built like the SECI
+RTC tender tab: the same Design, Finance inputs, Size and Financial model steps, with HiGHS sizing
+the plant against this tender's rules.
 
 ---
 
-## Step 01 · What FDRE-X asks *(Tender / Legal)*
+---
 
-The explanation above with a worked example for a capacity you pick (50 to 600 MW): the energy a
-day, the battery, a day's four evening hours with their exchange prices from the IEX year, what
-the tariff pays for them, and what a short month costs. Every claim carries its clause; click a
-citation to open the page of the document.
-
-## Step 02 · Tender & amendments *(Tender / Legal)*
+## Step 01 · Tender & amendments *(Tender / Legal)*
 
 The four documents (RfS, standard PPA, standard PSA, Amendment-01) with what matters in each, and
-a link to every PDF. The schedule: dates from the RfS and dates from SECI's website, the second
-kind marked as such (online bids 1 December 2026, 18:00; offline documents 3 December; opening
-4 December; the e-reverse auction date is not announced). The twelve rows of Amendment-01, each
-with the clause as it stood and "Deleted": the Buying Entity's right to resell surplus power and
-to schedule the plant are gone, so scheduling stays with you. How the bid goes, step by step, and
-the points worth raising with SECI.
+a link to every PDF. The schedule (dates from SECI's website are marked as such). The twelve rows
+of Amendment-01, each with the clause as it stood and "Deleted". How the bid goes, step by step,
+and the points worth raising with SECI.
 
-## Step 03 · Bid conditions *(Tender / Legal)*
+## Step 02 · Bid conditions *(Tender / Legal)*
 
-The 450 conditions of the RfS, the PPA and the PSA, by group (Scheme and bid, Auction, Daily
-supply, Tariff and payment, Plant, Energy sourcing, Dates, Bid security and charges, Penalties and
-security, Eligibility, Bid documents). Each has a plain line, the clause, the page and the
-quoted words. Search by word. Conditions the amendment deleted are shown struck through beside
-what replaced them. Fourteen are marked **conflict**: places where the documents disagree, with
-what differs (for example the PPA says "Project Capacity" where the RfS says Contracted Capacity).
+The 450 conditions of the RfS, the PPA and the PSA, by group. Each has a plain line, the clause,
+the page and the quoted words. Search by word. Conditions the amendment deleted are struck through
+beside what replaced them; fourteen are marked **conflict** where the documents disagree.
 
-## Step 04 · Bid inputs *(Projects)*
+## Step 03 · Bid inputs *(Projects)*
 
 | Box | What to enter |
 |---|---|
-| Contracted capacity you bid | 50 to 600 MW, whole MW, one bid for your group. |
-| Effective Date of the PPA | 15 days after SECI's invitation to sign. Every date below follows from it: documents and PBG, financial closure, the SCSD 18 months later, the last day with penalty, the PBG's validity, the end of the 25 years. |
-| Exchange for market prices | The buyer's four dearest evening hours are read from it; the extra battery's sale is priced in it. |
-| Buy green-market power to charge the battery | Yes or no. Within 5% of each year's energy. |
-| Sell surplus own RE in the market | Yes or no. At exchange prices, on days the supply is met. |
-| Connectivity in the solar hours too | The tender asks for connectivity with access in the non-solar hours only. *No* (the default): nothing is injected from 06:00 to 18:00, so solar beyond what charges the battery is curtailed. *Yes*: you hold connectivity for the solar hours as well, and the day's surplus is sold. |
-| Cover under SECI's Payment Security Mechanism | Yes takes ₹0.02/kWh off every bill for the term. |
-| Shortfall policy | *Meet every day*, or *Pay the penalty* where that is cheaper than more plant. |
-| After the 25-year term | Nothing, or years of market sales. |
+| Contracted capacity | 50 to 600 MW, whole MW, one bid for your group. The supply to assure is 4 MWh per MW a day, 1 MWh per MW in each of the buyer's hours. |
+| The buyer's four hours | *The 4 costliest non-solar hours each day* (the default): each night the 4 hours from 18:00 to 06:00 with the highest IEX Day-Ahead prices, the hours a buyer would most likely name (most often 18:00–22:00). *Evening 18:00–22:00*: cheaper to plan for, but short if the buyer names other hours. The plant is sized for these hours only. |
+| Shortfall | *Pay the penalty beyond 10%* (the default): each month 10% of the peak energy may fall short for free (its revenue is lost) and the energy short beyond it costs 1.5 × the tariff; the optimizer weighs that against more plant. *Meet every month in full*: no shortfall. |
+| Buy green-market or bilateral power | Yes or no. Up to 5% of each year's energy, supplied directly or through the storage, at the hourly IEX GDAM price plus the **charges on bought power** (exchange fee, transmission, losses; ₹0.30/kWh to start). |
+| Connectivity in the solar hours too | *No* (the tender's connectivity): nothing is sold from 06:00 to 18:00. *Yes*: you hold connectivity for the solar hours as well, and the day's surplus may be sold. |
+| Payment Security Mechanism | Yes takes ₹0.02/kWh off every bill for the 25 years. |
+| Effective Date of the PPA | Financial Closure, the SCSD (18 months later) and the latest start follow from it. |
 
-**Money at stake** shows the EMD, the PBG, the Success Charges, the bid fee, and the net worth and
-liquidity you must show, worked on your plant. **Fill up for me please** puts a competitive
-bidder's value in every empty box and sizes the own RE.
+**Money at stake** shows the EMD, the PBG, the net worth to show and the Success Charges (with
+GST) on the sized plant: the RE in MW and the storage in MWh. The Success Charges, the RfS cost and
+the bid fee are in the project cost. Every box carries its clause; click it to open the page.
 
-**Download input template** and **Upload bid inputs** beside it take every input from an Excel
-file: the yellow cells hold the values, each with a note (what it is, its unit, the values
-allowed, the Fill up value, where it sits in the app), with dropdowns and range checks. A file with
-any wrong cell loads nothing and lists each cell with the reason; the CfD manual (Step 05) has the
-details.
+## Step 04 · Design *(Design)*
 
-## Step 05 · Design *(Design)*
+Solar, wind and the storage, each switched on for this tender. On each source card:
 
-The battery (energy and power per contracted MW, the state-of-charge window, degradation, the
-augmentation of every year as a table), the own solar and wind with their profiles, and the
-losses to the meter. The battery must hold 4 MWh per MW usable at the meter; the step says what
-nameplate that needs. **Optimise own RE** finds the solar (and wind) that gives the lowest tariff.
+* **Optimizer sizes it / Size fixed**: by default the optimizer chooses the size, up to the most
+  you allow (the box). Switch to *Size fixed* to set the size yourself; the optimizer then sizes
+  the other sources around it.
+* The costs, the CUF and degradation, and the hourly profile: an upload or a profile from the
+  shared library (the measured Beed wind cluster, the Beed PVsyst solar), scaled to your CUF.
 
-## Step 06 · Finance inputs *(Finance)*
+Also here: the losses to the billing meter, one site or separate sites, and **Sale in the market**
+(sell the surplus or not, at which IEX market, its escalation). *Fill up for me please* puts
+benchmark values in every empty box.
 
-Costs, financing, construction, working capital and the finance team's detailed inputs, as on the
-CfD tab. The loan tenor may run to 25 years. There is no Letter of Credit and no REC price here.
+## Step 05 · Finance inputs *(Finance)*
 
-## Step 07 · Size *(Projects)*
+The financing, the debt repayment and refinancing, construction, working capital and the reserves,
+and the finance team's detailed inputs, as on the SECI RTC tab.
 
-The tariff to bid, the days short, the tender's checks (capacity, the battery for the four hours,
-bought power within 5%, 4 MWh per MW every day, the monthly shortfall within 10%), the Bid
-review's findings, the day-by-day operation and the 15-minute dispatch.
+## Step 06 · Size *(Projects)*
 
-**Own RE size: sized for you, or your size.** Below the Optimise own RE button (Design and Size
-steps). *Sized for you*, the default: whenever you change an input the size depends on (the
-battery, where the charging power comes from, prices, costs, finance), the tab sizes the solar
-(and wind) again a moment later, in whole MW, and says so. *Your size*: the tab keeps the size you
-set; typing a solar or wind size, a What-if move or an Upside plan switches to it, and Optimise
-own RE hands the size back. When no size meets every day, the message says how many days fall
-short, when, and what would cure them (for example green-market power before your own RE is
-online).
+**Size the plant** runs HiGHS: hour by hour over the modelled years, the least 25-year tariff at
+your target equity IRR with the buyer's four hours supplied, the monthly rule held, bought power
+within 5% and nothing sold where there is no connectivity. A 100 MW bid takes about a minute; the
+solver's log streams as it runs. Then:
 
-## Step 08 · Financial model *(Finance)*
+* **Plant**: the solar, wind and storage sizes and the tariff HiGHS proves no design can beat.
+* **The monthly rule** year by year: the worst month's share of its peak energy, marked within the
+  free 10% or with the penalty paid beyond it.
+* **Tender conditions**: each condition checked on the plant, with its page.
+* A dispatch week and where the energy went.
 
-The tariff for your target equity IRR and the tariff to quote (two decimals), the returns at a
-tariff you type, the project cost, the revenue and costs by year, the monthly penalty over the
-term, the tariff received after the PSM discount, and what the same hours cost on the exchange.
-**Download the financial model** gives the workbook with every number a formula; the second
-button adds the 15-minute dispatch behind the energy.
+## Step 07 · Financial model *(Finance)*
 
-## Step 09 · What-if *(Finance)*
+The tariff for your target equity IRR (the exact model on HiGHS's design), the returns at the
+tariff you mean to quote, the project cost, the revenue and costs by year (the power bought, the
+PSM discount, the monthly penalty), and **Download the financial model**: the workbook with its
+Live model sheet, every cell a formula.
 
-The levers that move the tariff, each priced through the full model, the track from the model's
-tariff to the one you want to quote, and Freeze, which pins a lever's value with its evidence.
+## Step 08 · Bid forms *(Tender / Legal)*
 
-## Step 10 · Bid forms *(Tender / Legal)*
+The RfS's 23 formats, filled from the bid and the sized plant: the Covering Letter (with your PSM
+choice), the Power of Attorney and the Consortium Agreement where they apply, the EMD and PBG in
+each of the three instruments, the board resolutions, the financial requirement, the undertakings
+and disclosures, the financial bid, the cost estimate, and the annexures. Particulars are asked
+once and used everywhere. Each format opens as a letter and exports as a Word file.
 
-The RfS's 23 formats, filled from the bid: the Covering Letter, the Power of Attorney and the
-Consortium Agreement where they apply, the EMD and PBG in each of the three instruments, the
-board resolutions, the financial requirement, the undertakings and disclosures, the financial
-bid, the cost estimate, and the annexures. Particulars are asked once and used everywhere. A
-format that does not apply to your bid says so. Each can be opened as a letter and exported as a
-Word file; the bid pack exports them together.
-
-## Step 11 · Reference bids *(Projects)*
-
-What wins: your tariff against SECI's earlier firm and peak-power awards, against what the same
-four hours cost on the exchange, and the auction's rules (80% of the qualified capacity awarded,
-winners within 2% of the lowest tariff). The risks that are yours: the buyer chooses the hours,
-the monthly penalty, the 5% limit on bought power, battery fade, delay in commissioning, a part
-award.
-
-## Step 12 · Upside *(Finance)*
-
-What more solar and battery behind the same connection would earn on the exchange, case by case,
-with the bid's own model. Selling is allowed outside the buyer's four hours, the PPA first. SECI's
-first right to excess energy at the tariff is an upside the step names and does not count.
-
-## The bid agent
-
-**Talk to the bid agent** works the tab by voice: it explains the tender with pages, takes the
-inputs in order, sizes the plant and explains the tariff. **Ask the analyst** on the Upside step
-is the written analyst, which runs the bid's model to answer questions; it needs the Anthropic
-key on the server and is switched off in the core zone.
-
-## Quick reference: an FDRE-X bid in ten clicks
+## Quick reference: an FDRE-X bid in eight clicks
 
 1. **FDRE-X Bid** in the sidebar.
-2. **Bid inputs**: the contracted MW and the Effective Date.
-3. **Fill up for me please**; wait for the optimiser.
-4. Replace the marked boxes with your own figures (battery and solar prices, financing).
-5. **Design**: check the battery and the profiles; **Optimise own RE** again.
-6. **Size**: read the checks and the Bid review.
-7. **Financial model**: the tariff to quote; type the tariff you mean to bid to see its returns.
-8. **What-if**: the levers that close the gap to the price you want.
-9. **Bid forms**: fill the particulars, review each format, export the pack.
-10. **Save**; download the financial model.
+2. **Bid inputs**: the contracted MW, the Effective Date, the buyer's hours, the shortfall plan,
+   bought power, connectivity and the PSM.
+3. **Design**: *Fill up for me please*, then your solar, wind and storage costs; fix any size you
+   already know, leave the rest to the optimizer; say whether the surplus is sold.
+4. **Finance inputs**: your financing.
+5. **Size**: *Size the plant*; read the plant and the monthly rule.
+6. **Financial model**: the tariff to quote; type your quote to see its returns; download the workbook.
+7. **Bid forms**: fill the particulars, review each format, export the pack.
+8. **Save**.

@@ -1,5 +1,5 @@
 // Checks for the Excel bid-input template ("Download input template" and "Upload bid inputs"
-// beside "Fill up for me please" in the CfD Bid, CfD Own Solar and FDRE-X Bid tabs):
+// beside "Fill up for me please" in the CfD Bid and CfD Own Solar tabs):
 // web/src/cfd/inputSheet.js (the rows), inputWorkbook.js (write and read), xlsxCells.js (the reader).
 //   1. every row of each tab's template has a yellow input cell with a note, a check (a dropdown or
 //      a range) and its key; the groups come in order, each once;
@@ -21,13 +21,10 @@ import { buildInputWorkbook, readInputWorkbook, shownValue } from "../web/src/cf
 import * as CM from "../web/src/cfd/model.js";
 import * as CA from "../web/src/cfd/agent.js";
 import { OWN_SOLAR_DEFAULTS } from "../web/src/cfd/ownSolar.js";
-import * as FM from "../web/src/fdrex/model.js";
-import * as FA from "../web/src/fdrex/agent.js";
 
 const TABS = [
   { name: "CfD Bid", state: CM.fillWinning(CM.defaultCfdState()), catalogue: { agentInputs: CA.agentInputs, fields: CM.FIELDS, choices: CM.CHOICES, bilateral: false }, meta: { module: "cfd", title: "CfD bid · SECI", tender: "SECI CfD-I" } },
   { name: "CfD Own Solar", state: (() => { const s = CM.fillWinning(CM.defaultCfdState()); s.inputs = { ...s.inputs, ...OWN_SOLAR_DEFAULTS }; return s; })(), catalogue: { agentInputs: CA.agentInputs, fields: CM.FIELDS, choices: CM.CHOICES, bilateral: true }, meta: { module: "cfdOwnSolar", title: "CfD bid · own solar · SECI", tender: "SECI CfD-I" } },
-  { name: "FDRE-X Bid", state: FM.fillWinning(FM.defaultCfdState()), catalogue: { agentInputs: FA.agentInputs, fields: FM.FIELDS, choices: FM.CHOICES, bilateral: false }, meta: { module: "fdrex", title: "FDRE-X bid · SECI", tender: "SECI-FDRE-X" } },
 ];
 const plain = (s) => JSON.parse(JSON.stringify(s));
 const bufferOf = async (wb) => Buffer.from(await wb.xlsx.writeBuffer());

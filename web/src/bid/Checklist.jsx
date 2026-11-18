@@ -65,16 +65,28 @@ export function buildChecklist(state, terms, lp, bidTariff = null) {
     }
     const worst = outcomes.length ? Math.min(...outcomes.map((o) => o.achieved)) : null;
     const where = `${rule.basis === "monthly" ? "every month" : "each year"}${rule.hours === "all" ? "" : rule.hours === "any" ? `, in each of the ${anyHours(terms.peak).length} hours the procurer may pick` : ", peak hours"}`;
-    add({ id: `rule.${rule.id}`, condition: rule.label, source: prov[`rule.${rule.id}`], tender: `At least ${pf(rule.target, 0)} CUF, ${where}`,
+    if (rule.tolerance != null) {
+      // a monthly reconciliation with a free share (SECI-FDRE-X): short up to it costs only the lost
+      // revenue; beyond it the penalty is paid on the energy short
+      const free = outcomes.every((o) => o.met || o.withinTolerance);
+      add({ id: `rule.${rule.id}`, condition: rule.label, source: prov[`rule.${rule.id}`],
+        tender: `The whole peak energy, ${where}; up to ${pf(rule.tolerance, 0)} short is free, the energy short beyond it costs ${nf(rule.penaltyMultiple, 1)} × tariff`,
+        result: worst === null ? pending : `${pf(worst, 1)} of the month's peak energy in the worst month (years ${years.map((y) => y.year).join(", ")})${outcomes.every((o) => o.met) ? "" : free ? ": within the free share, no penalty" : ": the penalty is paid on the energy short beyond the free share"}`,
+        status: worst === null ? "info" : free ? "met" : "info" });
+      continue;
+    }
+    add({ id: `rule.${rule.id}`, condition: rule.label, source: prov[`rule.${rule.id}`], tender: terms.supplyMask ? `The whole peak energy, ${where}` : `At least ${pf(rule.target, 0)} CUF, ${where}`,
       result: worst === null ? pending : `${pf(worst, 1)} in the worst modelled year (years ${years.map((y) => y.year).join(", ")})`,
       status: worst === null ? "info" : outcomes.every((o) => o.met) ? "met" : "failed" });
   }
   if (prov["peak.hours"]) {
     const picked = terms.peak?.picked;
+    const picks = terms.peak?.hours && terms.supplyMask ? terms.peak.hours : 6; // SECI RTC: 6 hours; SECI-FDRE-X: the buyer's 4
+    const windowText = terms.peak?.windows?.[0] ? `${terms.peak.windows[0].start}–${terms.peak.windows[0].end}` : "18:00–10:00";
     add({ id: "peak.hours", condition: "Peak hours", source: prov["peak.hours"], tender: `${prov["peak.hours"].display} a day${prov["peak.setBy"] ? `; ${prov["peak.setBy"].display.toLowerCase()}` : ""}`,
       result: picked
-        ? `Each day, the 6 hours of the 18:00–10:00 window with the highest ${picked.marketLabel} prices are held to the peak floor (most often ${hourRanges(picked.mostOften)}; ₹${picked.pickedRsPerKwh.toFixed(2)}/kWh on average, against ₹${picked.windowRsPerKwh.toFixed(2)} for the whole window)`
-        : terms.peak?.pricesPending ? "The IEX prices are not loaded yet: every hour of the 18:00–10:00 window is held to the peak floor"
+        ? `Each day, the ${picks} hours of the ${windowText} window with the highest ${picked.marketLabel} prices are held to the peak floor (most often ${hourRanges(picked.mostOften)}; ₹${picked.pickedRsPerKwh.toFixed(2)}/kWh on average, against ₹${picked.windowRsPerKwh.toFixed(2)} for the whole window)`
+        : terms.peak?.pricesPending ? (terms.supplyMask ? "The IEX prices are not loaded yet: the evening hours are used" : `The IEX prices are not loaded yet: every hour of the ${windowText} window is held to the peak floor`)
         : terms.peakAny
         ? (terms.peak?.windows?.length ? `Every hour inside the windows (${anyHours(terms.peak).length} h a day) is checked against the peak floor` : `Every hour of the day is checked against the peak floor`)
         : `Checked in the chosen window`, status: "met" });

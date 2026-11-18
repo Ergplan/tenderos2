@@ -13,7 +13,7 @@ import BessTab from "./bess/BessTab";
 import BidTab from "./bid/BidTab";
 import SeciTab from "./seci/SeciTab";
 import CfdTab from "./cfd/CfdTab.jsx";
-import FdrexTab from "./fdrex/FdrexTab.jsx";
+import FdrexTab from "./fdrex/FdrexBidTab.jsx";
 import WhatIfTab from "./whatif/WhatIfTab";
 import RecentTendersTab from "./market/RecentTendersTab";
 import NewTendersTab from "./market/NewTendersTab.jsx";

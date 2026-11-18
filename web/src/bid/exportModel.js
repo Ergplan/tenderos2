@@ -128,8 +128,14 @@ export function modelExport({ state, terms, finance, costs, fin, prices, bess, o
     ["PPA supply revenue", "energyRevenue"], [lp.market ? `Market sale revenue (IEX ${lp.market})` : "Market sale revenue", "surplusRevenue"],
     ...(buyerSold ? [["Solar Hours excess sold to the buyer", "buyerRevenue"]] : []), ["Shortfall penalty", "penalty"], ["Total revenue", "revenue"],
   ] };
+  // SECI-FDRE-X: the power bought (green market, bilateral) and the PSM discount, when there are any
+  const bought = finance.rows.some((r) => (r.charging || 0) > 0);
+  const psm = finance.rows.some((r) => (r.pxFees || 0) > 0);
   const costsSection = { title: "Operating costs", lines: [
-    ["O&M", "om"], ["Insurance", "insurance"], ["Other fixed cost", "other"], ...plantLines, ["Total operating cost", "opex"],
+    ["O&M", "om"], ["Insurance", "insurance"], ["Other fixed cost", "other"], ...plantLines,
+    ...(bought ? [[terms?.workbookLabels?.chargingCost || "Power bought", "charging"]] : []),
+    ...(psm ? [[terms?.workbookLabels?.pxFeeCost || "Per-kWh charges", "pxFees"]] : []),
+    ["Total operating cost", "opex"],
   ] };
   const streams = [energy, revenue, costsSection, { title: "Capital spend in operation", lines: [["Battery augmentation", "augCapex"]] }];
   const statements = [
@@ -144,7 +150,7 @@ export function modelExport({ state, terms, finance, costs, fin, prices, bess, o
   return {
     fileName: `${shortName}_bid_${state.bid.baseMw}MW_financial_model`,
     title: `${issuer.match(/\(([^)]+)\)/)?.[1] || issuer || "Tender"} ${values["core.identity.tender_type_as_stated"] || ""} · bid financial model`.replace(/\s+/g, " "),
-    subtitle: [tenderNumber, `${total} MW round the clock`, `${finance.rows.length} years`].filter(Boolean).join(" · "),
+    subtitle: [tenderNumber, terms?.supplyLabel ? `${total} MW, ${terms.supplyLabel}` : `${total} MW round the clock`, `${finance.rows.length} years`].filter(Boolean).join(" · "),
     tenderNumber,
     cover: { outputs, plant, inputs: keyInputs, tender, notes },
     conditions,
@@ -155,7 +161,7 @@ export function modelExport({ state, terms, finance, costs, fin, prices, bess, o
     streams,
     statements,
     flows: { equity: finance.equityFlows, project: finance.projectFlows },
-    live: ops && bess ? liveModelRequest({ state, lp, finance, costs, fin, bess, ops, dfrTarget, sourceOf }) : null,
+    live: ops && bess ? liveModelRequest({ state, lp, finance, costs, fin, bess, ops, dfrTarget, sourceOf, labels: terms?.workbookLabels || null }) : null,
   };
 }
 

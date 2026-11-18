@@ -9,7 +9,7 @@ import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../r
  * What the Live model sheet (web/lib/liveModel.js) needs to rebuild the financial model as Excel
  * formulas: the inputs, the optimiser's energy by year and the app's results to compare with.
  */
-export function liveModelRequest({ state, lp, finance, costs, fin, bess, ops, dfrTarget, sourceOf = () => "Your input" }) {
+export function liveModelRequest({ state, lp, finance, costs, fin, bess, ops, dfrTarget, sourceOf = () => "Your input", labels = null }) {
   const n = finance.rows.length;
   const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o?.[k]]));
   const sources = {};
@@ -34,15 +34,17 @@ export function liveModelRequest({ state, lp, finance, costs, fin, bess, ops, df
     on: Object.fromEntries(SOURCES.map((s) => [s.id, Boolean(state.sources[s.id])])),
     sizes: pick(lp.sizes, ["solarMw", "windMw", "bessMw", "bessMwh", "biomassMw", "hydroMw", "thermalMw"]),
     costs: {
-      ...pick(costs, LIVE_COST_KEYS),
+      ...pick(costs, [...LIVE_COST_KEYS, "otherCapexCr"]), // otherCapexCr: a tender's charges on the plant (SECI-FDRE-X)
       plants: (costs.plants || []).map((p) => pick(p, ["id", "capexCrPerMw", "fixedLakhPerMw", "energyRsPerKwh", "recRsPerKwh", "escalation"])),
     },
     fin: pick(fin, LIVE_FIN_KEYS),
     bess: pick(bess, LIVE_BESS_KEYS),
-    ops: ops.slice(0, n).map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "dsmChargeCr", "dsmA", "dsmB", "solarGenMWh", "windGenMWh"])),
+    ops: ops.slice(0, n).map((o) => pick(o, ["demandMWh", "deliveredMWh", "excessMWh", "surplusRevenueCr", "buyerExcessMWh", "buyerExcessShare", "biomassMWh", "hydroMWh", "thermalMWh", "blockShortfallMWh", "dsmChargeCr", "dsmA", "dsmB", "solarGenMWh", "windGenMWh", "chargingCostCr", "pxFeesCr"])),
     gen,
     dispatch: dispatchFor(lp), // the modelled years hour by hour: the workbook's dispatch sheets
     sources,
     app: liveResults(finance, fin),
+    ...(labels ? { labels } : {}), // a tender's names for rows (SECI-FDRE-X: the power bought, the PSM discount)
+    ...(labels?.otherCapex ? { otherCapexLabel: labels.otherCapex } : {}),
   };
 }

@@ -475,6 +475,9 @@ export function modelInputs(state, terms) {
     // the finance team's inputs (docs/dev/FINANCE-V3-SPEC.md): hard-cost phasing, the module share for the sensitivities
     phasing: state.costs.phasing || null,
     moduleSharePct: state.costs.moduleSharePct ?? 0.45,
+    // charges the tender levies on the sized plant (SECI-FDRE-X: Success Charges on the Installed
+    // Capacity, with GST), added to the project cost once the plant is sized
+    otherCapexCr: typeof terms?.otherCapexCr === "function" && state.lp?.sizes ? terms.otherCapexCr(state.lp.sizes, plantMw(state, terms)) : 0,
     plants: ["hydro", "thermal"].filter(on).map((id) => ({
       id,
       capexCrPerMw: s[id].capex,
@@ -500,7 +503,10 @@ export function modelInputs(state, terms) {
     biomassFuelEscalation: on("biomass") ? s.biomass.fuelEscalation : 0,
     solarDegradation: on("solar") ? s.solar.degradation : 0,
     // time-block floors with a penalty (SECI RTC-TM: 1.5 x tariff on the energy short)
-    blockPenaltyMultiple: Math.max(0, ...(terms?.rules || []).filter((r) => r.basis === "block" && r.penaltyMultiple != null).map((r) => r.penaltyMultiple)),
+    // (SECI-FDRE-X: a monthly reconciliation, the energy short beyond the free tolerance at 1.5 x tariff)
+    blockPenaltyMultiple: Math.max(0, ...(terms?.rules || []).filter((r) => (r.basis === "block" || r.basis === "monthly") && r.penaltyMultiple != null).map((r) => r.penaltyMultiple)),
+    // SECI-FDRE-X: the Payment Security Mechanism, a discount in Rs/kWh on every bill (0 when not taken)
+    psmRsPerKwh: terms?.psmRsPerKwh || 0,
     windDegradation: 0,
   };
   const duration = s.bess.duration === "free" ? null : Number(s.bess.duration) || null;
@@ -616,7 +622,9 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
   const solarScale = sf.split && sf.common > 0 ? sf.solar / sf.common : 1;
   const payload = {
     ctx: {
-      demand: new Array(E.HOURS).fill(m.plantMw), // round-the-clock supply at the contracted capacity (at the meter)
+      // round-the-clock supply at the contracted capacity (at the meter); SECI-FDRE-X: only in the hours
+      // the buyer takes (terms.supplyMask)
+      demand: terms.supplyMask ? Array.from(terms.supplyMask, (v) => (v ? m.plantMw : 0)) : new Array(E.HOURS).fill(m.plantMw),
       solarCf: round(Array.from(solarCf, (v) => v * lf.solar * solarScale), 6),
       windCf: round(Array.from(windCf, (v) => v * lf.wind), 6),
       plantMw: m.plantMw,
@@ -632,8 +640,9 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
     dfrTarget: rules.find((r) => r.hours === "all")?.target ?? 0,
     dfrBasis: "annual",
     vars: m.vars,
-    compliance: rules.map(({ id, label, basis, hours, target, penaltyMultiple, max, excessTariffShare }) => ({ id, label, basis, hours, target,
-      ...(penaltyMultiple != null ? { penaltyMultiple } : {}), ...(max != null ? { max } : {}), ...(excessTariffShare != null ? { excessTariffShare } : {}) })),
+    compliance: rules.map(({ id, label, basis, hours, target, penaltyMultiple, max, excessTariffShare, tolerance }) => ({ id, label, basis, hours, target,
+      ...(penaltyMultiple != null ? { penaltyMultiple } : {}), ...(max != null ? { max } : {}), ...(excessTariffShare != null ? { excessTariffShare } : {}),
+      ...(tolerance != null ? { tolerance } : {}) })),
     returnLifetime: true,
     returnHourly: true,
     returnDispatch: true, // every modelled year hour by hour, for the workbook's dispatch sheets
@@ -665,6 +674,15 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
     }
   }
   if (splitSitesOn(state)) payload.sites = { split: true };
+  // SECI-FDRE-X: power bought from the green market or a bilateral agreement within a share of the
+  // year's energy, at the hourly price of terms.purchase.market plus charges
+  const buy = terms.purchase;
+  const buyPrices = buy?.enabled ? prices?.markets?.[buy.market]?.hourlyRsPerMwh : null;
+  if (buy?.enabled && buyPrices) {
+    payload.purchase = { maxShare: buy.maxShare, prices: buyPrices.map((v) => Math.round(v) / 1000), chargesRsPerKwh: buy.chargesRsPerKwh || 0, escalation: state.market.escalation || 0 };
+  }
+  // the hours a sale is allowed in (SECI-FDRE-X: connectivity for the non-solar hours only)
+  if (selling && terms.saleMask) payload.saleMask = Array.from(terms.saleMask);
   if (rules.some((r) => r.hours === "peak" || r.hours === "offpeak" || r.hours === "remaining")) payload.peakMask = Array.from(peakMask(terms.peak));
   else if (rules.some((r) => r.hours === "any") && terms.peak?.windows?.length) payload.peakMask = Array.from(anyMask(terms.peak));
   // SECI FDRE-RTC-V (Amendment-03): the Solar Hours, whose floor, cap and excess differ
@@ -794,7 +812,10 @@ export function opsFromLp(lp, fin, bess, dsm = null) {
       biomassMWh: row.biomassMwh || 0,
       hydroMWh: row.hydroMwh || 0,
       thermalMWh: row.thermalMwh || 0,
-      blockShortfallMWh: row.blockShortfallMwh || 0, // short of the time-block floors (SECI RTC-TM)
+      blockShortfallMWh: row.blockShortfallMwh || 0, // short of the time-block floors (SECI RTC-TM), or beyond the monthly tolerance (SECI-FDRE-X)
+      // SECI-FDRE-X: power bought from the green market or a bilateral agreement, and the PSM discount on the energy delivered
+      chargingCostCr: row.purchaseCostCr || 0,
+      pxFeesCr: (fin.psmRsPerKwh || 0) * deliveredMWh * 1e-4,
       // CERC deviation settlement: the year's charge given outright, or its line in the tariff
       ...(row.dsmChargeCr !== undefined ? { dsmChargeCr: row.dsmChargeCr } : dsmYears ? dsmYears[i] : {}),
       // surplus sale revenue at the hourly market price, when the sizing used one

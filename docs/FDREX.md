@@ -2,170 +2,122 @@
 
 The **FDRE-X Bid** tab works a bid for SECI's tender SECI-FDRE-X: RfS No.
 SECI/C&P/IPP/13/0012/26-27 dated 07.10.2026, assured peak supply of 4,800 MWh (1,200 MW × 4 hours)
-from ISTS-connected RE projects with energy storage, under a 25-year PPA with SECI. It has the
-flow and depth of the CfD Bid tab: twelve steps from what the tender asks to the upside, a bid
-agent by voice, a written analyst, the financial model as a workbook of formulas, the RfS's bid
-formats filled from the bid.
+from ISTS-connected RE projects with energy storage, under a 25-year PPA with SECI.
 
-The code is `web/src/fdrex/`, a fork of `web/src/cfd/` (as the CfD tab was forked from the SECI RTC
-tab): the same file names, the same stylesheet (`web/src/cfd.css`, `web/src/cfd/*.css`) and the
-same `cfd-…` test ids, so a fix in one tab can be carried to the other file by file. Function
-names inherited from the CfD model are kept (`defaultCfdState`, `runCfdFinance` …). The CfD tabs
-are not touched by this tab.
-
-## The tender, from its documents
-
-| Document | File (`web/public/tenders/seci-fdre-x/`) | Pages |
-| --- | --- | --- |
-| RfS, 07.10.2026 | `RfS.pdf` | 138 printed (the PDF has a cover first: PDF page = printed + 1) |
-| Standard PPA (SECI and the developer) | `Standard-PPA.pdf` | 84 |
-| Standard PSA (SECI and the Buying Entity) | `Standard-PSA.pdf` | 33 |
-| Amendment-01, 29.10.2026 | `Amendment-01.pdf` | 7 |
-
-* `terms.js`: 450 conditions, each with its document, clause, printed page and a word-for-word
-  quote; `tests/engine/test_fdrex_terms.py` checks every quote against its page. `TENDER` there is
-  every number the documents state. Fourteen terms are marked `conflict` where the documents
-  disagree (for example PPA 4.4.1(a)(i) says "Project Capacity" where the RfS says Contracted
-  Capacity; the Success Charges clause against its own illustration).
-* `pack.js`: the documents with summaries, the twelve rows of Amendment-01 (all deletions: PPA
-  6.1.6 to 6.1.11 and the mirror PSA provisions, the Buying Entity's resale and scheduling
-  rights), the schedule (dates from SECI's website are marked as such), how the bid goes, points
-  to raise with SECI. `formatsData.js`: the RfS's 23 bid formats with every blank quoted on its
-  page. `tools/check_fdrex_content.mjs` checks the quotes of both.
-* `tender.js`: the numbers the model applies: `terms.js`'s `TENDER` plus the model's own readings
-  (below) and the names the model inherited from the CfD model (`essScdMonths`, `loaToEdDays`,
-  `cacLakhPerMw` for the Success Charges).
-
-What the tender asks, in the model's terms:
-
-| | SECI-FDRE-X | Where |
-| --- | --- | --- |
-| Supply | 4 MWh per MW of Contracted Capacity a day, 1 MWh per MW in an hour, in 4 hours the Buying Entity chooses each day (by 06:00) from the non-solar hours | RfS 8.1.a–c, PPA 4.4.1.a |
-| Contract | PPA with SECI, 25 years from the SCSD, one tariff fixed for the term | RfS 20.2, PPA 9.1 |
-| Sources | 100% RE; up to 5% of the year's energy from the green market or bilateral agreements, direct or through the storage, counted on the energy discharged; no other grid charging | RfS 8.1.e, PPA 4.4.1.a.vii |
-| Shortfall | 1.5 × the tariff on a billing month's energy short beyond 10% | RfS 8.2, PPA 4.4.1.b |
-| Other sale | The storage may sell to others outside the Peak Hours, the PPA first; SECI has the first right to excess generation at the tariff | RfS 8.1.f, PPA 9.3 |
-| Connectivity | ISTS at 220 kV or above, with injection rights in the non-solar hours, applied for before the bid, for at least the Contracted Capacity | RfS 7.1, 7.2 |
-| Dates | Effective Date 15 days after SECI's invitation to sign; SCSD 18 months later, for the whole Project; Financial Closure 6 months before it; up to 6 months' delay with the PBG encashed | RfS 20.4, 9.2, 21.1 |
-| Bid | 50 to 600 MW; e-reverse auction; 80% of the qualified capacity awarded; L1 + 2%; no ceiling tariff | RfS 5.1, 40, 41 |
-| Money | EMD and PBG per MW and per MWh as CfD-I; PBG to 9 months after the SCSD; Success Charges ₹1 lakh per MW of Installed Capacity; PSM discount ₹0.02/kWh (the bidder's option) | RfS 16, 17, 18 |
-
-## The model (`model.js`)
-
-`simulate` runs every day of the 25 years, as the CfD model does, with this tender's rules:
-
-* **The four hours.** The Buying Entity is taken to choose its four dearest hours of 18:00 to
-  24:00 in the exchange chosen for market prices (`inputs.sellMarket`). This is the model's
-  reading: the tender lets the buyer choose any four of the non-solar hours, evening to the next
-  morning. A morning choice needs the same stored energy; it would change what the extra battery
-  can sell.
-* **The battery** must carry the whole 4 MWh per MW (`TENDER.essHoursMin = 4`, the model's
-  requirement: the RfS makes storage mandatory and states no size). The nameplate grows with the
-  state-of-charge window and the losses to the meter, as in the CfD model (`essRequiredPerMw`).
-* **Charging** before 18:00 from own solar and wind first, then from the green market (hourly GDAM
-  price plus charges) within 5% of the Contract Year's energy (`marketShare`), set on what the
-  plant can supply. No group RE, no first-months allowance, no separate RE commissioning date:
-  the inputs `reCodMonths`, `groupPrice`, `groupCharges`, `useGroup`, `recPrice` and `lcCostPct`
-  do not exist here (`modelInputs` switches them off for the shared arithmetic).
-* **Billing months.** Each year row carries `months` (`{ start, required, supplied, beyondMwh }`),
-  where the CfD model has `weeks`: `beyondMwh = max(0, 0.9 × required − supplied)`, the PPA's own
-  example. `penaltyCr(cy, tariff) = 1.5 × tariff × Σ beyondMwh`; `penaltyMwh(cy)` is the energy. A
-  month is counted in the year its last day falls in.
-* **Connectivity and surplus.** The tender asks for connectivity with non-solar-hour access (RfS
-  7.2), so by default nothing is injected from 06:00 to 18:00 and the day's surplus solar is
-  curtailed (`inputs.dayInjection = false`, a choice of the Bid inputs step, "Connectivity in the
-  solar hours too"). With it on, surplus RE is sold at exchange prices on days the supply is met,
-  within the connection. The difference is large: a 100 MW bid sized by the optimiser needs
-  ₹8.87/kWh on a competitive bidder's inputs with non-solar-hour access only (112 MWac of solar,
-  86 MU a year curtailed) and ₹7.01 with solar-hour connectivity too (132 MWac, the surplus sold);
-  ₹10.03 and ₹8.16 on the plain benchmarks. SECI's first right to excess energy at the tariff
-  (PPA 9.3) is not counted on in either case.
-* `exchangeValue(sim, tariff)` gives, per Contract Year, what the energy supplied would cost the
-  buyer on the exchange against the tariff (it stands where the CfD model has the Pool's flows).
-* `psmDiscount(inputs)`: ₹0.02/kWh when the bid opts for the Payment Security Mechanism
-  (`inputs.psm`, a choice of the Bid inputs step, on by default in the benchmarks).
-* `rfsAmounts`: EMD, PBG and net worth on the installed capacities; the Success Charges on the
-  Installed Capacity as RfS 18.1 defines it, the RE's MW plus the battery's rated MWh (the RfS's
-  own illustration uses the awarded capacity instead, a conflict the conditions flag: the
-  clause's reading, the larger, is budgeted);
-  `BG_YEARS.pbg` from 15 days after the Effective Date to 9 months after the SCSD plus the claim
-  period.
-* Benchmarks and the competitive bidder's values (`BENCHMARKS`, `WINNING`): a 4 MWh per MW
-  battery, an 18-year loan (20 for a competitive bidder) on the 25-year PPA, a 25-year book life,
-  Effective Date 1 June 2027.
-
-## The financial model (`finance.js`)
-
-The shared engine (`web/src/rtc/engine.js`), as for the CfD bid:
-
-* Revenue is the tariff on the energy supplied in the Peak Hours.
-* The **monthly penalty** is the engine's tariff-multiple penalty: `ops[].blockShortfallMWh` is the
-  year's `penaltyMwh`, `fin.blockPenaltyMultiple = 1.5`; the row is `blockPenalty`.
-* **Charging power** bought is the cost line `charging`; the **PSM discount** on the energy billed
-  and the **exchange fees** on what is sold in the market are the line `pxFees`.
-* No Letter of Credit and no weekly penalty (`lcCostPct = 0`, `cfdPenaltyMultiple = 0`).
-* The workbook (`cfdModelExport`, POST `/api/fdrex/model`) is the same workbook as the other tabs'.
-  `web/lib/liveModel.js` takes the names of the bought-power, fee and penalty rows from the
-  request (`labels`), and leaves out the Letter of Credit and weekly-penalty rows when a bid has
-  none, so the Live model reads "Monthly shortfall penalty" and "PSM discount and exchange fees".
-  The second version puts the 15-minute dispatch behind the energy
-  (`web/lib/fdrexBlockSheets.js`: sixteen peak blocks a day, no group-RE sheet).
-
-Notes shown beside the results (`MODEL_NOTES`): the whole project cost is spent before the SCSD;
-years are operating years from the SCSD; the tariff is fixed; the evening-hours reading; the
-non-solar-hour connectivity and what is sold.
+Since 18 November 2026 the tab is built like the **SECI RTC tender** tab (`docs/SECI_RTC.md`): on the
+Tender to Bid steps, with the plant sized by **HiGHS** (`engine/sizing/rtc_lp.py`) against the
+tender's constraints, and the financial model, its formula workbook and the bid forms on that
+sizing. Solar, wind and the storage are each sized by the optimizer or fixed by the bidder (the
+switch on every source card of the Design step). The earlier tab, a fork of the CfD Bid tab with a
+day-by-day simulation and a whole-MW search, is gone; its tender content (the conditions, the
+documents, the bid formats and letters) is kept and reused.
 
 ## The steps
 
-| Step | Files | What is this tender's own |
+| Step | What it shows | Code |
 | --- | --- | --- |
-| 01 What FDRE-X asks | `ExplainStep.jsx`, `ExampleStep.jsx`, `example.js`, `VisualModel.jsx` | A PPA purchase explained, not a CfD: what is bought, built, sourced, paid, penalised and earned besides; a worked day on the four dearest evening hours of the IEX year against the tariff; a short billing month's penalty (`shortfallPenaltyLakh`); the flow diagram with the surplus curtailed or sold by the bid's connectivity choice |
-| 02 Tender & amendments | `DocumentsStep.jsx`, `pack.js` | Four documents, the schedule (website-only dates badged), the twelve deleted rows of Amendment-01, the bid process, queries for SECI |
-| 03 Bid conditions | `ConditionsStep.jsx`, `terms.js` | 450 terms in eleven groups, the deleted ones beside what replaced them, fourteen conflicts |
-| 04 Bid inputs | `BidInputsStep.jsx` | The Effective Date of the PPA and its dates; the choices `useMarket`, `merchant`, `dayInjection`, `psm`; the money at stake with the Success Charges |
-| 05 Design, 06 Finance inputs | `DesignStep.jsx`, `FinanceInputsStep.jsx`, `AugmentationTable.jsx` | The battery for the four hours; tenor and refinancing up to 25 years |
-| 07 Size | `SizeStep.jsx`, `checks.js`, `review.js`, `dispatch15.js` | The checks `capacity`, `ess`, `market` (5% of the energy required), `daily`, `monthly`; the Bid review's findings (`market-limit`, `monthly-penalty`, `no-day-connectivity`, `day-connectivity`, `surplus-re`, `buyer-hours`, `psm`, and the price against SECI's peak-power awards); the 15-minute dispatch with sixteen peak blocks and the curtailed energy |
-| 08 Financial model | `FinanceModelStep.jsx`, `MarketPrices.jsx`, `finance.js` | The tariff after the PSM discount, the monthly penalty, the exchange price of the hours supplied, the curtailed energy; the midday price band matters only for bought power and, with solar-hour connectivity, the surplus |
-| 09 What-if | `WhatIfStep.jsx`, `levers.js`, `leverNotes.js`, `track.js`, `TrackView.jsx`, `Freeze.jsx` | 36 levers with this tender's ranges and notes; evidence filed under the tab `fdrex` |
-| 10 Bid forms | `BidForms.jsx`, `formats.js`, `formatsData.js`, `forms.js`, `letters/` | 23 formats: EMD and PBG as bank guarantee, Payment on Order Instrument or surety bond; Annexure-K when another entity's connectivity is used; Annexure-H after the award; the PSM choice in the Covering Letter from `inputs.psm`; the Success Charges from `rfsAmounts` |
-| 11 Reference bids | `ReferenceBids.jsx`, `winning.js` | The tariff against SECI's earlier firm and peak-power awards (not like for like: they say so), against the exchange price of the four hours (`tariffAt`, `tariffTable`), the auction's arithmetic (`awardCapacity`, `h1Dropped`, `awardList`), thirteen risks |
-| 12 Upside | `UpsideStep.jsx`, `upside.js`, `web/lib/fdrexUpside.js` | Day injection follows the bid's connectivity; without it the cases carry a "with solar-hour connectivity too" what-if |
-| The agents | `agent.js`, `voice.js`, `web/lib/fdrexAgent.js` | The voice agent's tools and script on this tender (`check_tariff` on the full model); the written analyst with the fdrex model as its tools |
+| 01 Tender & amendments | The four documents, the schedule, the twelve deleted rows of Amendment-01, the bid process, queries for SECI | `DocumentsStep.jsx`, `pack.js` |
+| 02 Bid conditions | 450 terms in eleven groups, each quoted on its page; the deleted ones beside what replaced them; fourteen conflicts | `ConditionsStep.jsx`, `terms.js` |
+| 03 Bid inputs | The contracted MW (50 to 600); the buyer's four hours (the 4 costliest non-solar hours each day, or 18:00–22:00); the shortfall plan; bought power and its charges; connectivity in the solar hours; the PSM; the Effective Date and the dates from it; EMD, PBG, net worth and Success Charges on the sized plant | `BidInputs.jsx`, `bidTerms.js` |
+| 04 Design | Solar, wind (on) and the storage, each "Optimizer sizes it" or "Size fixed", with costs and profiles (the RTC tab's profile library: upload or a built-in measured profile); the losses to the meter; the market sale of the surplus | `../bid/SourcesStep.jsx` |
+| 05 Finance inputs | The financing, repayment, refinancing, working capital and the finance team's inputs | `../bid/FinanceInputsStep.jsx` |
+| 06 Size | HiGHS: the least-tariff plant, the solver's log, the monthly rule year by year, the tender's conditions checked on the plant, a dispatch week | `../bid/SizeStep.jsx`, `../bid/useSizing.js`, `../bid/Checklist.jsx` |
+| 07 Financial model | The tariff for the target equity IRR, the returns at your quote, the statements, the workbook with its Live model (every cell a formula) | `../bid/FinanceStep.jsx`, `../bid/exportModel.js`, `web/lib/liveModel.js` |
+| 08 Bid forms | The RfS's 23 formats filled from the bid and its sized plant | `BidForms.jsx`, `forms.js`, `formats.js`, `letters/` |
 
-Known limits: the engine's average DSCR is a plain mean over the debt years, so a small last
-instalment of a sculpted loan can make it read very high (the minimum DSCR is the figure to
-read); `shortfallCauses` does not attribute short days to battery fade when the bid has wind;
-the third-party-sale penalty (RfS 8.1.f) is not priced, because the model never sells while the
-PPA is short; the Python end-to-end test of the CfD tab has no FDRE-X counterpart yet.
+The tab is `FdrexBidTab.jsx`; its state (the Tender to Bid state with `fdrex` settings), a saved
+bid read back and the view the bid forms read (`formsView`: the contracted MW, the Effective Date,
+the storage per MW and the sizes as the forms name them) are in `bidState.js`. This browser keeps
+the bid under `tenderos.fdrex.bid.v2`; a bid saved by the earlier tab opens as a new bid.
 
-## The own-RE optimiser
+## The tender as the sizing sees it (`bidTerms.js`)
 
-The same search as the CfD tab's (`docs/CFD.md`, "The own-RE optimiser"): whole MW, no short day
-for "meet", the tab sizing the own RE again whenever an input changes unless the size is the
-bidder's own. Checked on 48 FDRE-X combinations (50, 100 and 150 MW; the green market on and off;
-surplus sale on and off; solar-hour connectivity on and off; both policies) against every whole MW
-of solar from 0 to 4 × the capacity: the exhaustive best on all 48.
+`fdrexTerms(settings, prices)` gives the terms in the shape of `web/src/bid/tenderMap.js` (as
+`seciTerms` does), from the figures of `terms.js` (`TENDER`), each tied there to its clause:
+
+| | The sizing | Where |
+| --- | --- | --- |
+| Supply | The demand is the contracted MW in the buyer's four hours each day (`supplyMask`) and nothing in the others: 4 MWh per MW a day, 1 MWh per MW in each hour | RfS 8.1.a–c |
+| The four hours | "The 4 costliest non-solar hours each day": each night, the 4 hours of 18:00–06:00 with the highest IEX DAM prices (`costliestHours` with the window as a parameter; most often 18:00–22:00, ₹7.50/kWh against ₹5.86 for the window); or "Evening 18:00–22:00". Until the prices load, the evening hours | RfS 8.1.a, PPA 4.4.1 |
+| Shortfall | One monthly rule on the month's peak energy. "Pay the penalty beyond 10%": up to 10% short free (its revenue lost), the energy short beyond it at 1.5 × the tariff (`basis: "monthly"`, `tolerance: 0.1`, `penaltyMultiple: 1.5`); "Meet every month in full": a hard floor | RfS 8.2 |
+| Bought power | Green market or bilateral, within 5% of each year's required energy, supplied directly or through the storage, at the hourly IEX GDAM price plus the charges to the meter (`purchase`); never resold | RfS 8.1.e |
+| Sale | The surplus sold outside the buyer's hours (the PPA first), at the market chosen on Design; without solar-hour connectivity nothing is sold from 06:00 to 18:00 (`saleMask`) | RfS 8.1.f, 7.2; PPA 9.3 |
+| PSM | ₹0.02/kWh off every bill when taken (`psmRsPerKwh`) | RfS 18.4 |
+| SECI's charges | Success Charges ₹1 lakh per MW of Installed Capacity (the RE in MW and the storage in MWh), the RfS cost and the bid fee, with GST, in the project cost (`otherCapexCr`, worked out on the sized plant) | RfS 18.1, Bid Information Sheet |
+| Sources | Solar, wind and the storage (mandatory); 50 to 600 MW; 25 years from the SCSD | RfS 3.1, 5.1, 20.2 |
+
+## The sizing (`engine/sizing/rtc_lp.py`)
+
+The LP gained four things for this tender, each optional so the other tabs are unchanged
+(`tests/engine/test_fdrex_lp.py`):
+
+* **Demand by hour**: the payload's `ctx.demand` carries the four hours (it always took an hourly series).
+* **Purchases** (`purchase: { maxShare, prices, chargesRsPerKwh, escalation, capMw? }`): an hourly
+  column per modelled year that adds to the energy at the bus, priced at the hourly price plus
+  charges (carried to the years each modelled year stands for, escalating), within `maxShare` of
+  the year's required energy; with a sale, a row keeps the sale to own RE. Results: `purchaseMu`
+  per modelled year, `purchaseMwh` and `purchaseCostCr` per year, `purchase` hour by hour.
+* **A sale mask** (`saleMask`): the export column is closed in the hours marked 0.
+* **Monthly rules with a penalty and a free tolerance** (`basis: "monthly"`, `penaltyMultiple`,
+  `tolerance`): one column per month and modelled year for the energy short beyond the tolerance,
+  in the row `delivered + short ≥ (1 − tolerance) × target × demand`, worth −penaltyMultiple × the
+  tariff in the objective (the Dinkelbach λ, as the block penalty). Results: `monthlyPenaltyMu`,
+  and the yearly `monthlyPenaltyMwh`, also added to `blockShortfallMwh` so the finance charges it;
+  a rule's outcome carries `tolerance`, `withinTolerance` and `penaltyMultiple`.
+
+On the benchmark inputs (solar ₹4.0 cr/MWac at 25%, wind ₹6.5 cr/MW at 33%, storage ₹1.2 cr/MWh,
+14% equity), a 100 MW bid sizes in about a minute to 21 MWac solar, 89 MW wind and 74 MW / 297 MWh
+of storage: wind blows at night when the four hours fall; the storage is under 4 MWh per MW because
+the free 10%, the bought 5% and the wind direct cover the rest. HiGHS's tariff ₹8.927/kWh; the
+financial model's ₹8.802/kWh (the LP takes tax as linear; the app prices the design exactly).
+
+## The financial model
+
+The shared engine on the LP's yearly energy (`web/src/bid/model.js` `opsFromLp`):
+
+* revenue: the tariff on the energy supplied in the four hours, and the sale of the surplus at the
+  hourly market price;
+* `chargingCostCr` ← the purchases' cost (the row `charging`); `pxFeesCr` ← the PSM discount on the
+  energy supplied (the row `pxFees`); `blockShortfallMWh` ← the energy short beyond the monthly
+  10%, at `fin.blockPenaltyMultiple` (monthly rules now count) × the tariff;
+* `costs.otherCapexCr` ← SECI's charges on the sized plant (`terms.otherCapexCr(sizes, MW)`).
+
+The workbook (`/api/bid/model`, `buildModelWorkbook`) is the Tender to Bid workbook. The request
+carries `chargingCostCr`, `pxFeesCr` and `otherCapexCr`, and the tender's names for those rows
+(`terms.workbookLabels`: "Power bought (green market, bilateral)", "PSM discount", "Monthly
+shortfall penalty", "SECI's charges …"); the operating-cost statement shows them when they are not
+nil. Recalculated in LibreOffice, the Live model agrees with the app (₹8.8021, equity IRR 14.00%,
+minimum DSCR 1.129 on the benchmark bid).
+
+The 15-minute dispatch (`engine/sizing/dispatch15.py`) does not model purchases, the sale mask or
+the monthly tolerance yet, so the Size step does not offer it in this tab (`dispatch15={false}`).
 
 ## Where it is registered
 
-Tab id and library module `fdrex` (`web/src/main.jsx`, `web/lib/tabs.js`, `web/lib/scenarios.js`,
-migration `020_fdrex_module.sql`); this browser keeps the bid under `fdre.fdrex.v1`. Routes under
-`/api/fdrex/` (model, dispatch15, forms, letters, agent, upside) allow the tab `fdrex`; the voice
-agent's session route `/api/seci/live` takes `tab: "fdrex"`.
+Tab id and library module `fdrex` (`web/src/main.jsx`, `web/lib/tabs.js`, `web/lib/scenarios.js`).
+The tab may call the engine's `rtc` and `bid` routes (the sizing, `lib/tabs.js`) and the bid
+workbook route (`requireBidAccess`, `lib/tenders.js`). The routes under `/api/fdrex/` (forms,
+letters) serve the bid forms; `/api/fdrex/model`, `dispatch15`, `agent` and `upside` and the
+modules behind them (`model.js`, `finance.js`, `agent.js`, `upside.js`, `review.js`,
+`dispatch15.js`) belong to the earlier tab's model; the forms still use `model.js` `rfsAmounts`.
 
 ## Checks
 
-* `tools/check_fdrex_model.mjs`: the tender's numbers, the inputs, the dates, the day-by-day
-  operation (four evening hours, 1 MWh per MW in an hour, bought power within 5%, the billing
-  months), the PPA's own penalty example, the financial model (the tariff for the target IRR, the
-  PSM discount, the monthly penalty in the engine), the optimiser, and that the workbook request
-  carries nothing of CfD-I.
-* `tools/check_fdrex_content.mjs`: every quote of the pack and the formats on its PDF page.
-* `tests/engine/test_fdrex_terms.py`: every quote of the 450 terms on its page.
-* `tools/check_fdrex_forms.mjs`, `check_fdrex_agent.mjs`, `check_fdrex_winning.mjs`,
-  `check_fdrex_review.mjs`, `check_fdrex_whatif.mjs`: the forms and letters, the agents, steps 01
-  and 11, the Bid review with the 15-minute dispatch, the levers, track and upside.
-* `tools/check_fdrex_blocks.mjs`: the workbook with the 15-minute dispatch behind its energy,
-  recalculated in LibreOffice (about 2.3 lakh formulas; it runs itself with a larger heap).
-* `tools/check_live_model.mjs`: the case "SECI-FDRE-X …" and the workbook "SECI-FDRE-X bid" are
-  recalculated in LibreOffice with the others.
+* `tools/check_fdrex_bid.mjs`: the terms (four hours a night from the non-solar window, the plans,
+  the monthly rule, 5% bought, the sale mask, the PSM), the sizing request (demand only in those
+  hours, the tolerance, the purchase at GDAM + charges, the optimizer's switches, a fixed size kept),
+  the finance on a sizing result (power bought, the PSM, the penalty at 1.5 × tariff, SECI's
+  charges, the workbook's rows and names), the dates, the money at stake, the forms' view and a
+  saved bid.
+* `tests/engine/test_fdrex_lp.py`: supply only in the four hours and every month met; purchases
+  within 5% and priced; no sale in the solar hours and nothing bought resold; the monthly tolerance
+  and penalty (the penalised MWh equal the energy short beyond 90%, and the free tenth can only
+  lower the tariff); dear power not bought.
+* `tools/check_fdrex_content.mjs`, `tests/engine/test_fdrex_terms.py`: every quote of the pack, the
+  formats and the 450 terms on its PDF page. `tools/check_fdrex_forms.mjs`: the forms and letters.
+* `tools/check_fdrex_model.mjs`, `check_fdrex_agent.mjs`, `check_fdrex_review.mjs`,
+  `check_fdrex_blocks.mjs`: the earlier tab's model, agents, review and 15-minute workbook, kept
+  while their modules are.
+
+Not yet in this tab: the voice agent, the What-if step and the Excel input template (they were
+built on the earlier tab's model).

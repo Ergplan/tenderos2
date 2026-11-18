@@ -13,7 +13,7 @@ export function bidFileText(state, { module, title }) {
 
 /** The file name: the tab, the contracted MW and the date. */
 export function bidFileName(state, { module }) {
-  const mw = state?.inputs?.contractedMw;
+  const mw = state?.inputs?.contractedMw ?? state?.bid?.baseMw; // the CfD tabs, or the Tender to Bid shape (FDRE-X)
   return `tenderos-${module}${Number.isFinite(mw) ? `-${mw}mw` : ""}-${new Date().toISOString().slice(0, 10)}.json`;
 }
 

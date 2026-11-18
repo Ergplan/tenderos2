@@ -1,6 +1,6 @@
 // The bid's inputs as rows of an Excel template (web/src/cfd/inputWorkbook.js writes and reads the
-// file): every input box of the CfD Bid, CfD Own Solar and FDRE-X Bid tabs (the bid agent's
-// catalogue, ./agent.js and ../fdrex/agent.js agentInputs) and the finance team's terms that sit in
+// file): every input box of the CfD Bid and CfD Own Solar tabs (the bid agent's
+// catalogue, ./agent.js agentInputs) and the finance team's terms that sit in
 // state.fin, state.costs and state.bess, each with its group, unit, allowed values, the "Fill up for
 // me please" value and a comment that says what the input is and how the model uses it.
 //
@@ -87,7 +87,7 @@ Object.assign(ABOUT, {
   recPrice: "The price of a Renewable Energy Certificate (one per MWh). RECs are issued on supply sold in the brown markets (DAM, RTM); the CfDA lets you keep 50% of them (CfDA 9.2.vi). 0 if you will not sell them.",
   bilateralPrice: "The existing plant's price for its power at the plant, in ₹/kWh, fixed for the months above.",
   bilateralUse: "Before the green market: the existing plant charges the battery before any market power (a firm supply). Only where cheaper: it is used only in hours where it costs less than the green market. Own RE always charges first.",
-  essMwhPerMw: "Usable battery energy for each contracted MW, at the billing meter, before degradation. The tender asks for at least the energy of its daily supply (CfD-I: 2 MWh per MW, Amendment-02; FDRE-X: 4 MWh per MW). More than the minimum lets the battery carry fade and losses without augmentation.",
+  essMwhPerMw: "Usable battery energy for each contracted MW, at the billing meter, before degradation. The tender asks for at least the energy of its daily supply (2 MWh per MW, Amendment-02). More than the minimum lets the battery carry fade and losses without augmentation.",
   essMwPerMw: "Battery inverter (PCS) power for each contracted MW. At least 1, so the battery can supply the contracted MW in each hour of the supply.",
   reCodMonths: "When your own solar and wind start generating, in months after the battery's Scheduled Commencement (SCD). Until then the battery charges only from bought power within the tender's limits. CfD-I: by 36 months from the Effective Date, which is 21 months after the SCD.",
   solarDegradation: "Loss of solar output each year (0.5% a year is usual for mono PERC and TOPCon modules). The model applies it year by year to the hourly profile.",
