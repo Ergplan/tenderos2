@@ -11,7 +11,7 @@ import { nf } from "../rtc/ui";
 import * as E from "../rtc/engine";
 import { loadMarketPrices } from "../bid/model.js";
 import * as M from "./model.js";
-import { STORAGE_KEY, defaultCfdState, mergeCfdState, missingInputs, optimiseOwnRe, runModel } from "./model.js";
+import { defaultCfdState, fmtDate, mergeCfdState, missingInputs, optimiseOwnRe, runModel, shortDaysByPeriod, sizesItself, sizingKey, STORAGE_KEY } from "./model.js";
 import { runCfdFinance } from "./finance.js";
 import { RFS, TENDER } from "./terms.js";
 import { exampleMw } from "./example.js";
@@ -230,37 +230,93 @@ export default function CfdTab({ initialScenario = null, variant = "cfd" }) {
   // the model: the day-by-day operation and the strike price for the target IRR (about a second)
   const model = useMemo(() => (missing.length || !prices ? null : runModel(state, prices, { price: pricer })), [state.inputs, state.fin, state.costs, prices]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const optimise = useCallback(async () => {
+  /** Why no own-RE size meets every day: where the closest plant's short days fall, and what would cure them. */
+  const noSizeMeets = (s, best, px) => {
+    const i = s.inputs;
+    const m = runModel({ ...s, inputs: { ...i, solarMw: best.solarMw, windMw: best.windMw } }, px);
+    const p = shortDaysByPeriod(m);
+    const d = m?.sim?.dates;
+    const parts = [];
+    const fixes = [];
+    if (p.beforeRe) {
+      parts.push(`${nf(p.beforeRe)} before your own RE is online (${fmtDate(d.reCod)}), when only bought power${i.bilateralMonths > 0 ? " or your existing plant" : ""} may charge the battery${i.useMarket ? "" : " and the green market is switched off"}`);
+      fixes.push(i.useMarket ? "bring the RE forward (Design)" : "switch on green-market power (Bid inputs) or bring the RE forward (Design)");
+    }
+    if (p.beforeExtraEnd) parts.push(`${nf(p.beforeExtraEnd)} before month 36 from the Effective Date (${fmtDate(d.extraUntil)}), when group-company RE may not yet charge it`);
+    if (p.after) {
+      parts.push(`${nf(p.after)} after it, with the green market${i.useMarket ? " at 25%" : " switched off"} and group-company RE${i.useGroup ? " at 50%" : " not used"} of the year's energy`);
+      if (!i.useMarket) fixes.push("switch on green-market power");
+      if (!i.useGroup) fixes.push("allow group-company RE");
+      fixes.push("more battery or wind for cloudy runs");
+    }
+    fixes.push("set the policy to pay the penalty");
+    return `No own-RE size meets every day's supply within the sourcing limits: the closest is solar ${nf(best.solarMw)} MWac${best.windMw ? ` with ${nf(best.windMw)} MW of wind` : ""}, short on ${nf(best.shortDays)} days (${parts.join("; ")}). ${p.beforeRe && !p.after && !p.beforeExtraEnd ? "More solar cannot cure them: " : "To meet every day: "}${[...new Set(fixes)].join(", or ")}.`;
+  };
+  // the own-RE sizing: run by the button, by "Fill up for me please", and by the tab itself whenever an
+  // input the size depends on changes (sizingKey), unless the size is the bidder's own (sizesItself)
+  const runningKey = useRef(null);
+  const optimise = useCallback(async (opts) => {
+    const auto = opts?.auto === true; // the button passes its click event: not an automatic run
     const s = stateRef.current;
     if (!prices || abortRef.current || missingInputs(s).length) return null;
     const abort = new AbortController();
     abortRef.current = abort;
-    setOptimising({ done: 0, total: 1 });
-    setMessage(null);
+    const key = sizingKey(s);
+    runningKey.current = key;
+    setOptimising({ done: 0, total: 1, auto });
+    if (!auto) setMessage(null);
     try {
-      const best = await optimiseOwnRe(s, prices, { signal: abort.signal, price: pricer, onProgress: (done, total) => setOptimising({ done, total }) });
-      trackEvent("optimize", { module: V.module, contractedMw: s.inputs.contractedMw });
+      const best = await optimiseOwnRe(s, prices, { signal: abort.signal, price: pricer, onProgress: (done, total) => setOptimising({ done, total, auto }) });
+      trackEvent("optimize", { module: V.module, contractedMw: s.inputs.contractedMw, auto });
       setState((st) => {
         const filled = { ...st.filled };
         delete filled.solarMw;
         delete filled.windMw;
-        return { ...st, inputs: { ...st.inputs, solarMw: best.solarMw, windMw: best.windMw }, filled, sized: { solarMw: best.solarMw, windMw: best.windMw, sp: best.sp, policy: best.policy, at: new Date().toISOString() } };
+        return { ...st, inputs: { ...st.inputs, solarMw: best.solarMw, windMw: best.windMw }, filled, sizeAuto: true, sized: { solarMw: best.solarMw, windMw: best.windMw, sp: best.sp, policy: best.policy, at: new Date().toISOString(), key } };
       });
-      setMessage(best.policy === "pay"
+      const said = best.policy === "pay"
         ? { ok: true, text: `Own RE optimised on the strike price alone (policy: pay the penalty): solar ${nf(best.solarMw)} MWac${best.windMw ? `, wind ${nf(best.windMw)} MW` : ""} gives ₹${best.sp.toFixed(4)}/kWh${best.ok ? ", with every day's supply met" : `, with ${nf(best.short, 0)} MWh of shortfall over the term paid for as penalty`}.` }
         : best.ok
           ? { ok: true, text: `Own RE optimised (policy: meet every day): solar ${nf(best.solarMw)} MWac${best.windMw ? `, wind ${nf(best.windMw)} MW` : ""} gives the lowest strike price, ₹${best.sp.toFixed(4)}/kWh, with every day's supply met.` }
-          : { ok: false, text: `No own-RE size up to 3 × the contracted capacity meets every day's supply within the sourcing limits; the closest is solar ${nf(best.solarMw)} MWac. Allow group-company RE or more wind, or set the policy to pay the penalty on Bid inputs.` });
+          : { ok: false, text: noSizeMeets(s, best, prices) };
+      setMessage({ ...said, text: auto ? `Sized again for the changed inputs. ${said.text}` : said.text });
       return best;
     } catch (err) {
-      setMessage({ ok: false, text: err.message });
+      // a run overtaken by a newer input is restarted for it without a word; one the bidder stopped hands the size to them
+      if (abort.signal.reason !== "restart") setMessage({ ok: false, text: abort.signal.reason === "user" ? "Sizing stopped: the own RE stays as it is and is now your size. Optimise own RE sizes it again and hands it back to the model." : err.message });
       return null;
     } finally {
       setOptimising(null);
       abortRef.current = null;
+      runningKey.current = null;
     }
   }, [prices]);
-  const stopOptimise = useCallback(() => abortRef.current?.abort(), []);
+  const stopOptimise = useCallback(() => {
+    if (!abortRef.current) return;
+    abortRef.current.abort("user");
+    setState((s) => ({ ...s, sizeAuto: false }));
+  }, []);
+  // a size the bidder sets (typed, by the agent, a What-if move, an Upside plan) is theirs: the tab no
+  // longer sizes it; the fill's first guess and the optimiser's own result are not
+  const sizeKey = sizingKey(state);
+  useEffect(() => {
+    const z = state.sized;
+    if (!z || state.sizeAuto === false || state.filled?.solarMw) return;
+    if (z.solarMw !== state.inputs.solarMw || (z.windMw || 0) !== (state.inputs.windMw || 0)) setState((s) => ({ ...s, sizeAuto: false }));
+  }, [state.inputs.solarMw, state.inputs.windMw]); // eslint-disable-line react-hooks/exhaustive-deps
+  // size the own RE again for changed inputs, a moment after the last change; a run for inputs since
+  // changed is stopped and started again for the new ones
+  useEffect(() => {
+    const z = state.sized;
+    const current = z && z.key === sizeKey && z.solarMw === state.inputs.solarMw && (z.windMw || 0) === (state.inputs.windMw || 0);
+    if (!sizesItself(state) || !prices || missing.length || current) return undefined;
+    if (abortRef.current) {
+      if (runningKey.current !== sizeKey) abortRef.current.abort("restart");
+      return undefined;
+    }
+    const id = setTimeout(() => { optimise({ auto: true }); }, 1500);
+    return () => clearTimeout(id);
+  }, [sizeKey, state.sizeAuto, state.locks?.solarMw, state.inputs.solarMw, state.inputs.windMw, prices, missing.length, optimising === null]); // eslint-disable-line react-hooks/exhaustive-deps
   // the sizing as the agent and the Finance inputs step see it
   const sizing = useMemo(() => ({
     startSizing: optimise,

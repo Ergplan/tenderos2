@@ -281,10 +281,28 @@ export function fillBenchmarks(state) {
   return { ...state, inputs, filled };
 }
 
+/**
+ * What the own-RE size depends on: every input but the solar and wind sizes themselves, the finance
+ * team's terms, the costs, the battery's augmentation, the losses and the profiles. The tab sizes the
+ * own RE again whenever this changes (state.sized.key holds the one it was last sized for), unless
+ * the size is the bidder's own (state.sizeAuto === false, or the solar size locked).
+ */
+export function sizingKey(state) {
+  const inputs = { ...(state?.inputs || {}) };
+  delete inputs.solarMw;
+  delete inputs.windMw;
+  return JSON.stringify([inputs, state?.fin || {}, state?.costs || {}, state?.bess || {}, state?.losses || null,
+    state?.solarUpload?.name || null, state?.windUpload?.name || null, state?.solarMonthScale || null, state?.windMonthScale || null]);
+}
+
+/** Whether the tab sizes the own RE for the bidder (re-sized whenever an input changes). */
+export const sizesItself = (state) => state?.sizeAuto !== false && !state?.locks?.solarMw;
+
 /** How the own RE size came about: the optimiser's (and when), a first guess from the fill, or typed. */
 export function ownReSource(state) {
   const i = state?.inputs || {};
   const z = state?.sized;
+  if (z && isNum(z.solarMw) && z.solarMw === i.solarMw && (z.windMw || 0) === (i.windMw || 0) && z.key && z.key !== sizingKey(state)) return { kind: "stale", at: z.at || null, label: `sized on ${z.at ? new Date(z.at).toISOString().slice(0, 10) : "an earlier day"} for inputs since changed: Optimise own RE sizes it for these` };
   if (z && isNum(z.solarMw) && z.solarMw === i.solarMw && (z.windMw || 0) === (i.windMw || 0)) return { kind: "optimised", at: z.at || null, label: `sized by the optimiser${z.at ? ` on ${new Date(z.at).toISOString().slice(0, 10)}` : ""} for the least strike price${z.policy === "pay" ? " (policy: pay the penalty)" : " with every day met"}` };
   if (state?.filled?.solarMw) return { kind: "guess", at: null, label: "a first guess; Optimise own RE refines it" };
   return { kind: "typed", at: null, label: z ? "your size (the optimiser's result was changed since)" : "your size" };
@@ -1311,19 +1329,103 @@ export function runModel(state, prices, opts = {}) {
   return out;
 }
 
+/**
+ * Where a bid's short days fall, for the optimiser's message when no size meets every day: before the
+ * own RE is online (only bought power or an existing plant can charge the battery then), between that
+ * and the end of the first 36 months from the Effective Date, and after. Runs the operation once more.
+ */
+export function shortDaysByPeriod(model) {
+  const out = { beforeRe: 0, beforeExtraEnd: 0, after: 0, total: 0 };
+  if (!model?.sim) return out;
+  const d = model.sim.dates;
+  const avail = model.inputs.availability;
+  simulate(model.inputs, model.book, model.prof, {
+    onDay: (k, r) => {
+      if (r.delivered >= r.required * avail - 1e-6) return;
+      out.total += 1;
+      if (r.date < d.reCod) out.beforeRe += 1;
+      else if (r.date < d.extraUntil) out.beforeExtraEnd += 1;
+      else out.after += 1;
+    },
+  });
+  return out;
+}
+
 /** The energy short of the daily 2 MWh per MW over the term (charging power or battery capacity), MWh. */
 export const capShortfall = (sim) => sim.years.reduce((a, cy) => a + cy.shortMwh, 0);
 
 /**
- * The own solar (and wind, if any) that gives the lowest strike price with every day's supply met:
- * a coarse grid then a finer one around the best, on solar; then the same on wind when wind is in
- * the bid. Calls onProgress(done, total) between evaluations; resolves to { solarMw, windMw, sp }.
+ * The own-RE size search, over whole MW: under the policy "meet", the size with no short day at the
+ * least price (a day is short as the Size step counts it: less than the mandate at the plant's
+ * availability reaches the meter); when no size up to the range meets every day, the fewest short
+ * days and then the least price; under "pay", the least price, which carries the penalty and the lost
+ * revenue of the short days. `evaluate(mw)` returns { sp, shortDays, shortMwh }.
+ *
+ * The short days never rise with more of the source (checked on 432 bids and the client's), so the
+ * smallest size that meets every day is found by bisection; above it the price is not one smooth
+ * curve (surplus sale, the sourcing limits and the battery's charging make humps), so the range is
+ * scanned in about 40 steps and every whole MW is tried around the four best local minima. Checked
+ * against an exhaustive 1 MW search on 432 combinations (tools/check_cfd_optimiser.mjs).
+ */
+export async function searchSize({ evaluate, hi, from = 0, policy = "meet", tick = null, signal = null }) {
+  const memo = new Map();
+  const at = async (mw) => {
+    if (signal?.aborted) throw new Error("Stopped.");
+    const k = Math.max(from, Math.min(hi, Math.round(mw)));
+    if (!memo.has(k)) {
+      memo.set(k, { mw: k, ...evaluate(k) });
+      if (tick) await tick(memo.size);
+    }
+    return memo.get(k);
+  };
+  const cheaper = (a, b) => a.sp < b.sp - 1e-9 || (Math.abs(a.sp - b.sp) <= 1e-9 && a.mw < b.mw);
+  let lo = from;
+  let meets = true;
+  let least = 0;
+  if (policy === "meet") {
+    const top = await at(hi);
+    least = top.shortDays;
+    meets = least === 0;
+    // the smallest size whose short days are the fewest there are (none, when a size meets every day)
+    if ((await at(from)).shortDays <= least) lo = from;
+    else {
+      let a = from;
+      let b = hi;
+      while (b - a > 1) {
+        const m = Math.floor((a + b) / 2);
+        if ((await at(m)).shortDays <= least) b = m; else a = m;
+      }
+      lo = b;
+    }
+  }
+  const allowed = (p) => policy !== "meet" || p.shortDays <= least;
+  const step = Math.max(1, Math.ceil((hi - lo) / 40));
+  const coarse = [];
+  for (let mw = lo; mw <= hi; mw += step) coarse.push(await at(mw));
+  if (coarse[coarse.length - 1].mw !== hi) coarse.push(await at(hi));
+  const ok = coarse.filter(allowed);
+  const minima = ok.filter((p, k) => (k === 0 || p.sp <= ok[k - 1].sp) && (k === ok.length - 1 || p.sp <= ok[k + 1].sp)).sort((a, b) => a.sp - b.sp);
+  for (const c of minima.slice(0, 4)) for (let mw = c.mw - step + 1; mw <= c.mw + step - 1; mw += 1) if (mw >= lo && mw <= hi) await at(mw);
+  let best = null;
+  for (const p of memo.values()) if (p.mw >= lo && allowed(p) && (!best || cheaper(p, best))) best = p;
+  return { best, meets, evaluations: memo.size };
+}
+
+/**
+ * The own solar (and wind, if any) that gives the lowest strike price with every day's supply met
+ * (policy "meet"), or the lowest strike price with the shortfall paid for (policy "pay"), in whole
+ * MW: searchSize on solar up to 3 × the contracted capacity (further when the best is at the top);
+ * with wind in the bid, the best solar for each wind size, wind refined around the best, then every
+ * whole MW of both around the result (tools/check_cfd_optimiser.mjs). A size locked on the Bid inputs
+ * step is kept. Calls onProgress(done, total) as it goes; resolves to { solarMw, windMw, sp, short,
+ * shortDays, ok, policy } where ok means no short day over the term.
  */
 export async function optimiseOwnRe(state, prices, { onProgress, signal, price = null } = {}) {
   const base = modelInputs(state);
   if (!base) throw new Error("Fill in the inputs first.");
   const book = priceBook(prices, base.sellMarket);
   const X = base.contractedMw;
+  const policy = base.shortfallPolicy === "pay" ? "pay" : "meet";
   // price(inputs, sim): the full financial model's strike price (the one shown everywhere); without
   // it the fast screening model prices each candidate
   const priceOf = (inputs, sim) => {
@@ -1333,55 +1435,83 @@ export async function optimiseOwnRe(state, prices, { onProgress, signal, price =
     }
     return solveStrikePrice(inputs, sim).sp ?? Infinity;
   };
+  const memo = new Map();
+  const prof = profiles({ ...base, windMw: Math.max(1, base.windMw || 0) }); // per MW: the same for every size
   const evaluate = (solarMw, windMw) => {
-    const inputs = { ...base, solarMw, windMw };
-    const sim = simulate(inputs, book, profiles(inputs));
-    const short = capShortfall(sim);
-    return { solarMw, windMw, sp: priceOf(inputs, sim), short, ok: short < 1e-3 * X };
-  };
-  // "meet": a plant that meets every day beats one that does not, then the price; when none meets
-  // every day, the least short (then the price). "pay": the price alone, which already carries the
-  // weekly penalty and the lost revenue of the short days
-  const policy = base.shortfallPolicy === "pay" ? "pay" : "meet";
-  const better = (a, b) => {
-    if (policy === "meet") {
-      if (a.ok !== b.ok) return a.ok;
-      if (!a.ok && Math.abs(a.short - b.short) > 1e-6) return a.short < b.short;
+    const key = `${solarMw}|${windMw}`;
+    if (!memo.has(key)) {
+      const inputs = { ...base, solarMw, windMw };
+      const sim = simulate(inputs, book, prof);
+      const shortDays = sim.opYears.reduce((a, y) => a + y.shortDays, 0);
+      memo.set(key, { solarMw, windMw, sp: priceOf(inputs, sim), short: capShortfall(sim), shortDays });
     }
-    return a.sp < b.sp;
+    return memo.get(key);
   };
-  const tick = () => new Promise((r) => { setTimeout(r, 0); });
-  let best = evaluate(base.solarMw || 0, base.windMw || 0);
-  best.policy = policy;
-  const scan = async (key, values, total, done0) => {
-    let done = done0;
-    for (const v of values) {
-      if (signal?.aborted) throw new Error("Stopped.");
-      const cand = key === "solar" ? evaluate(v, best.windMw) : evaluate(best.solarMw, v);
-      if (better(cand, best)) best = cand;
-      done += 1;
-      if (done % 4 === 0) { onProgress?.(done, total); await tick(); }
-    }
-    return done;
+  let done = 0;
+  const expected = (base.windMw || 0) > 0 ? 900 : 60; // evaluations a search takes, about
+  const tick = async () => {
+    done += 1;
+    if (done % 3 === 0) { onProgress?.(done, Math.max(expected, done + 5)); await new Promise((r) => { setTimeout(r, 0); }); }
   };
-  const coarse = (maxMul) => Array.from({ length: 41 }, (_, i) => Math.round((i / 40) * maxMul * X));
-  const fine = (center) => Array.from({ length: 21 }, (_, i) => Math.max(0, Math.round(center + (i - 10) * 0.01 * X)));
-  const hasWind = (base.windMw || 0) > 0 && isNum(base.windCuf);
-  // a locked size is the bidder's decision (the lock on the Bid inputs step): the optimiser keeps it
   const solarLocked = Boolean(state.locks?.solarMw);
   const windLocked = Boolean(state.locks?.windMw);
-  const total = (solarLocked ? 0 : 62) + (hasWind && !windLocked ? 62 : 0);
-  let done = 0;
-  if (!solarLocked) {
-    done = await scan("solar", coarse(3), total, 0);
-    done = await scan("solar", fine(best.solarMw), total, done);
+  const hasWind = (base.windMw || 0) > 0 && isNum(base.windCuf) && !windLocked;
+  // the better of two plants: under "meet" the fewer short days first, then the price
+  const better = (a, b) => (policy === "meet" && a.shortDays !== b.shortDays ? a.shortDays < b.shortDays : a.sp < b.sp - 1e-9 || (Math.abs(a.sp - b.sp) <= 1e-9 && a.solarMw + a.windMw < b.solarMw + b.windMw));
+  // the best solar for a wind size: the whole range (widened while the best sits at its top), or a window
+  const solarFor = async (windMw, window = null) => {
+    if (solarLocked) return evaluate(Math.round(base.solarMw || 0), windMw);
+    const run = async (from, hi) => (await searchSize({ evaluate: (mw) => evaluate(mw, windMw), from, hi, policy, tick, signal })).best.mw;
+    if (window) return evaluate(await run(Math.max(0, window[0]), window[1]), windMw);
+    let hi = 3 * X;
+    let mw = await run(0, hi);
+    while (mw >= hi && hi < 8 * X) { hi += 2 * X; mw = await run(0, hi); }
+    return evaluate(mw, windMw);
+  };
+  let best;
+  if (!hasWind) best = await solarFor(Math.round(base.windMw || 0));
+  else {
+    // solar and wind together, nested: the best solar for each wind size (searched in full on a coarse
+    // grid of wind, then in a window around the best solar while the wind is refined), then every whole
+    // MW of both around the best. Solar and wind in turn stalls short of the best on these bids.
+    const W = 2 * X;
+    const sW = Math.max(1, Math.ceil(W / 10));
+    const coarse = [];
+    for (let w = 0; w <= W; w += sW) coarse.push(await solarFor(w));
+    const order = [...coarse].sort((a, b) => (better(a, b) ? -1 : better(b, a) ? 1 : 0));
+    const minima = coarse.filter((p, k) => (k === 0 || !better(coarse[k - 1], p)) && (k === coarse.length - 1 || !better(coarse[k + 1], p)));
+    const seeds = [...new Set([...minima, order[0]])].sort((a, b) => (better(a, b) ? -1 : 1)).slice(0, 2);
+    const r = Math.max(3, Math.ceil(0.15 * X));
+    best = order[0];
+    for (const seed of seeds) {
+      let cur = seed;
+      for (let stride = Math.max(1, Math.floor(sW / 2)); ; stride = Math.floor(stride / 2)) {
+        for (;;) {
+          let moved = false;
+          for (const w of [cur.windMw - stride, cur.windMw + stride]) {
+            if (w < 0 || w > W) continue;
+            const p = await solarFor(w, [cur.solarMw - r, cur.solarMw + r]);
+            if (better(p, cur)) { cur = p; moved = true; }
+          }
+          if (!moved) break;
+        }
+        if (stride === 1) break;
+      }
+      if (better(cur, best)) best = cur;
+    }
+    for (let w = Math.max(0, best.windMw - 2); w <= Math.min(W, best.windMw + 2); w += 1) {
+      for (let s = Math.max(0, best.solarMw - 2); s <= best.solarMw + 2; s += 1) {
+        if (solarLocked && s !== Math.round(base.solarMw || 0)) continue;
+        const p = evaluate(s, w);
+        if (better(p, best)) best = p;
+      }
+      await tick();
+    }
   }
-  if (hasWind && !windLocked) {
-    done = await scan("wind", coarse(2), total, done);
-    await scan("wind", fine(best.windMw), total, done);
-  }
-  onProgress?.(total, total);
-  return { ...best, policy };
+  const solar = best.solarMw;
+  const wind = best.windMw;
+  onProgress?.(done, done);
+  return { solarMw: solar, windMw: wind, sp: best.sp, short: best.short, shortDays: best.shortDays, ok: best.shortDays === 0, policy };
 }
 
 /** The CfD Pool at this strike price: this project's net pay-in each Contract Year (₹ cr, + = into the Pool). */

@@ -80,6 +80,10 @@
 .cfd-rfs-grid small { color: var(--ink-2); line-height: 1.4; }
 .cfd-rfs-cites { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
 .cfd-optimise { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.cfd-size-mode { display: flex; flex-direction: column; gap: 4px; flex-basis: 100%; max-width: 640px; }
+.cfd-size-mode > span { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted, #9a9a9a); }
+.cfd-size-mode select { max-width: 420px; }
+.cfd-size-mode small { color: var(--muted, #9a9a9a); }
 .cfd-table { display: grid; margin-top: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .cfd-row { display: grid; grid-template-columns: minmax(120px, 1.1fr) repeat(8, minmax(80px, 1fr)); gap: 10px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line); }
 .cfd-row.head { border-top: 0; color: var(--muted); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }

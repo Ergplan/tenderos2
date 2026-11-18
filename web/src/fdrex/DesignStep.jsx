@@ -12,7 +12,7 @@ import SiteSchematic from "../bid/SiteSchematic";
 import { defaultLosses } from "../bid/model";
 import { useTeamContext } from "../team/useTeam";
 import Cite from "./Cite.jsx";
-import { designProfiles, essRequiredPerMw, lossFactorsOfCfd, missingInputs, socWindow, socWindowWarning } from "./model.js";
+import { designProfiles, essRequiredPerMw, lossFactorsOfCfd, missingInputs, socWindow, socWindowWarning, sizesItself, ownReSource } from "./model.js";
 import { Fields, FillBar } from "./inputs.jsx";
 import { fadeNote } from "./checks.js";
 import AugmentationTable from "./AugmentationTable.jsx";
@@ -21,14 +21,26 @@ const COLORS = { solar: DATA_COLORS.solar, wind: DATA_COLORS.wind, bess: DATA_CO
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
 /** The optimiser's button and its words: offered on Design and on Size. */
-export function OptimiseBar({ missing, optimise, optimising, stopOptimise, note = true, policy = "meet" }) {
+export function OptimiseBar({ missing, optimise, optimising, stopOptimise, note = true, policy = "meet", state = null, setState = null }) {
+  const auto = state ? sizesItself(state) : null;
+  const locked = Boolean(state?.locks?.solarMw);
   const aim = policy === "pay" ? "the lowest tariff, a day's shortfall allowed where paying for it is cheaper (your policy)" : "the lowest tariff with every day's supply met";
   return (
     <div className="cfd-optimise">
       {optimising
         ? <button type="button" className="secondary" onClick={stopOptimise} data-testid="cfd-optimise-stop"><Square size={14} /> Stop ({optimising.done}/{optimising.total})</button>
         : <button type="button" className="primary" onClick={optimise} disabled={missing.length > 0} data-testid="cfd-optimise"><Wand2 size={14} /> Optimise own RE</button>}
-      {note && <span className="rtc-note">{optimising ? <><Loader2 className="spin" size={12} /> Trying own-RE sizes: {aim}</> : `Finds the solar (and wind, if you have it) that gives ${aim} within the sourcing limits. One to three minutes.`}</span>}
+      {note && <span className="rtc-note">{optimising ? <><Loader2 className="spin" size={12} /> {optimising.auto ? "Sizing the own RE again for your changed inputs" : "Trying own-RE sizes"}: {aim}</> : `Finds the solar (and wind, if you have it) that gives ${aim} within the sourcing limits. One to three minutes.`}</span>}
+      {state && setState && (
+        <label className="cfd-size-mode" data-testid="cfd-size-mode">
+          <span>Own RE size</span>
+          <select value={locked ? "own" : auto ? "auto" : "own"} disabled={locked} onChange={(e) => setState((s) => ({ ...s, sizeAuto: e.target.value === "auto" }))}>
+            <option value="auto">Sized for you: again whenever an input changes</option>
+            <option value="own">Your size: only when you press Optimise</option>
+          </select>
+          <small>{locked ? "The solar size is locked on this step: it is yours." : auto ? "Change the battery, the sourcing, the prices or the finance and the solar is sized again a moment later." : ownReSource(state).kind === "stale" ? "Your size, sized for other inputs: press Optimise own RE, or switch to sized for you." : "The model keeps the size you set."}</small>
+        </label>
+      )}
     </div>
   );
 }
@@ -216,7 +228,7 @@ export default function DesignStep({ state, setState, setInput, set, lockProps, 
       </Section>
 
       <Section index="4.1" title="Own RE generation" note="Solar, wind or other RE in any mix; together they may be more or less than the contracted capacity; the whole Project is due by the SCSD">
-        <OptimiseBar missing={missing} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} policy={i.shortfallPolicy || "meet"} />
+        <OptimiseBar missing={missing} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} policy={i.shortfallPolicy || "meet"} state={state} setState={setState} />
         <Fields state={state} setInput={setInput} section="project" only={["availability"]} lockProps={lockProps} />
         <SourceCard id="solar" state={state} setState={setState} setInput={setInput} set={set} lockProps={lockProps} isLocked={isLocked} user={user} profiles={profiles} />
         <SourceCard id="wind" state={state} setState={setState} setInput={setInput} set={set} lockProps={lockProps} isLocked={isLocked} user={user} profiles={profiles} />

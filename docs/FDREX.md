@@ -138,6 +138,14 @@ read); `shortfallCauses` does not attribute short days to battery fade when the 
 the third-party-sale penalty (RfS 8.1.f) is not priced, because the model never sells while the
 PPA is short; the Python end-to-end test of the CfD tab has no FDRE-X counterpart yet.
 
+## The own-RE optimiser
+
+The same search as the CfD tab's (`docs/CFD.md`, "The own-RE optimiser"): whole MW, no short day
+for "meet", the tab sizing the own RE again whenever an input changes unless the size is the
+bidder's own. Checked on 48 FDRE-X combinations (50, 100 and 150 MW; the green market on and off;
+surplus sale on and off; solar-hour connectivity on and off; both policies) against every whole MW
+of solar from 0 to 4 × the capacity: the exhaustive best on all 48.
+
 ## Where it is registered
 
 Tab id and library module `fdrex` (`web/src/main.jsx`, `web/lib/tabs.js`, `web/lib/scenarios.js`,

@@ -130,6 +130,15 @@ The tariff to bid, the days short, the tender's checks (capacity, the battery fo
 bought power within 5%, 4 MWh per MW every day, the monthly shortfall within 10%), the Bid
 review's findings, the day-by-day operation and the 15-minute dispatch.
 
+**Own RE size: sized for you, or your size.** Below the Optimise own RE button (Design and Size
+steps). *Sized for you*, the default: whenever you change an input the size depends on (the
+battery, where the charging power comes from, prices, costs, finance), the tab sizes the solar
+(and wind) again a moment later, in whole MW, and says so. *Your size*: the tab keeps the size you
+set; typing a solar or wind size, a What-if move or an Upside plan switches to it, and Optimise
+own RE hands the size back. When no size meets every day, the message says how many days fall
+short, when, and what would cure them (for example green-market power before your own RE is
+online).
+
 ## Step 08 · Financial model *(Finance)*
 
 The tariff for your target equity IRR and the tariff to quote (two decimals), the returns at a

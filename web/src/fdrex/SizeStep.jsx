@@ -158,7 +158,7 @@ function EnergyMix({ model }) {
  * tariff with every day's 4 MWh per MW met within the 5% limit on bought power; then the plant,
  * the tender's conditions on it, a year's energy and the day-by-day operation over the term.
  */
-export default function SizeStep({ state, model, prices, optimise, optimising, stopOptimise, goto }) {
+export default function SizeStep({ state, setState, model, prices, optimise, optimising, stopOptimise, goto }) {
   const [k, setK] = useState(200);
   const [blockView, setBlockView] = useState(false);
   const [d15, setD15] = useState(null); // the 15-minute dispatch's totals, computed on request
@@ -213,7 +213,7 @@ export default function SizeStep({ state, model, prices, optimise, optimising, s
     <>
       <Section index="6" title="Plant" note="The own RE that gives the lowest tariff with every day's supply met; the battery that carries the buyer's four hours"
         actions={<button type="button" className="secondary" onClick={() => goto("finance")} data-testid="cfd-to-finance-model">Financial model <ArrowRight size={14} /></button>}>
-        <OptimiseBar missing={missing} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} />
+        <OptimiseBar missing={missing} optimise={optimise} optimising={optimising} stopOptimise={stopOptimise} state={state} setState={setState} policy={state.inputs?.shortfallPolicy || "meet"} />
         <div className="rtc-grid rtc-grid-4" data-testid="cfd-plant">
           <Stat label="Contracted" value={`${nf(X)} MW`} detail={`${nf(X * TENDER.mwhPerMwDay)} MWh a day in the ${TENDER.peakHours} hours the buyer chooses`} />
           <Stat label="Battery" value={`${nf(X * i.essMwPerMw)} MW / ${nf(X * (i.essMwhPerMw + (i.extraEssMwhPerMw || 0)))} MWh`} detail={`${nf(i.essMwhPerMw, 2)} MWh per MW for the buyer's ${TENDER.peakHours} hours${i.extraEssMwhPerMw ? ` + ${nf(i.extraEssMwhPerMw, 2)} for evening sale` : ""}; round trip ${pf(i.rte, 1)}`} />

@@ -485,6 +485,57 @@ in, "your size" when typed (with a note when the optimiser's result was changed 
 workbook's cover and its Inputs sheet (`sizedLabel` on the live request) say the same, so a size
 the optimiser chose is never labelled as the bidder's own.
 
+## The own-RE optimiser (November 2026)
+
+`optimiseOwnRe` (`web/src/cfd/model.js`, the same in `web/src/fdrex/model.js`) finds the own solar,
+and wind when the bid has wind, in whole MW, every candidate priced by the full financial model:
+
+* **"Every day met"** is no short day over the term, as the Size step counts it (less than the
+  mandate at the plant's availability reaching the meter). The earlier test, the term's shortfall
+  under 0.001 MWh per contracted MW, could call a plant with a few short days met.
+* **Solar** (`searchSize`): under `meet`, the smallest size with no short day is found by bisection
+  (the short days never rise with more solar: true on every one of the 432 audited bids); above it,
+  the price is not one smooth curve (surplus sale, the sourcing limits and the battery's charging
+  make humps: 106 of the 432 curves have more than one local minimum), so the range is scanned in
+  about 40 steps and every whole MW is tried around the four best local minima. When no size meets
+  every day, the fewest short days and then the least price. The range is 0 to 3 × the contracted
+  capacity, widened while the best sits at its top. About 60 to 80 evaluations.
+* **Wind and solar** together: the best solar for each wind size on a coarse grid of wind, wind
+  refined around the two best with a local solar search each time, then every whole MW of both
+  around the result. Solar and wind in turn (the earlier method) stalls short of the best.
+* The hourly profiles are built once per run (they are per MW).
+* **When it runs.** The button; "Fill up for me please"; and the tab itself, a moment after any
+  input the size depends on changes (`sizingKey`: every input but the sizes, the finance terms,
+  costs, battery, losses, profiles), unless the size is the bidder's own: `state.sizeAuto` false
+  (set when the bidder types or otherwise changes the size, or stops a run) or the solar size
+  locked. The choice is on the Design and Size steps ("Own RE size": sized for you / your size); a
+  run for inputs since changed is stopped and started again for the new ones; `state.sized.key`
+  holds the inputs a size was found for, and `ownReSource` reports a size found for other inputs.
+* **When no size meets every day** the message says where the closest plant's short days fall
+  (`shortDaysByPeriod`: before the own RE is online, before month 36, after) and what would cure
+  them (green-market power, the RE brought forward, group-company RE, battery or wind, or the
+  policy to pay the penalty).
+
+**The audit behind it.** Every whole MW of solar from 0 to 4 × the contracted capacity, priced
+through the full model, on 432 combinations: 50, 100 and 150 MW; group-company RE none, at ₹1
+with no charges, at ₹2.5 with ₹0.3; the green market on and off; surplus sale on and off; the first
+years with nothing more, an existing plant for 24 months at ₹1, or the group company's RE under a
+bilateral agreement for the whole first 36 months at ₹1 (group RE as such is allowed only after
+month 36, Amendment-02); the RE at the SCD or 21 months after it; both policies. The earlier
+optimiser (a 41-point grid of 7.5% of the capacity, then 1% steps around the best) missed the best
+size on 62 of the 432, by up to ₹0.056/kWh, almost all at 150 MW where its steps were 11.25 and
+1.5 MW; on two it chose a plant with more short days than the best. On three bids with wind its
+solar-then-wind search missed by ₹0.006 to ₹0.38/kWh. The new search finds the exhaustive best on
+all 432, on the wind bids against a 2-D grid, and on the client's 150 MW bid
+(`tools/check_cfd_optimiser.mjs` keeps a representative set of these as a check, with 800
+synthetic searches).
+
+**What was behind the high strike price on 18 November.** The bid on screen still carried the
+14 MWac of the uploaded workbook after the green market was switched off: nothing re-sized it, and
+from mid-2030, with the existing plant's months over, 14 MWac and group RE capped at 50% could not
+charge the battery on about a third of the days. Pressing Optimise own RE would have found about
+168 MWac; the tab now re-sizes by itself.
+
 ## The sourcing limits' basis
 
 The green-market and group-RE limits are shares of the energy supplied (Amendment-02), so

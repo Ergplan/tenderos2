@@ -427,6 +427,15 @@ means anything.
 
 ---
 
+**Own RE size: sized for you, or your size.** Below the Optimise own RE button (Design and Size
+steps). *Sized for you*, the default: whenever you change an input the size depends on (the
+battery, where the charging power comes from, prices, costs, finance), the tab sizes the solar
+(and wind) again a moment later, in whole MW, and says so. *Your size*: the tab keeps the size you
+set; typing a solar or wind size, a What-if move or an Upside plan switches to it, and Optimise
+own RE hands the size back. When no size meets every day, the message says how many days fall
+short, when, and what would cure them (for example green-market power before your own RE is
+online).
+
 ## Step 08 · Financial model *(Finance)*
 
 ![Financial model](img/cfd-08-finance-full.jpg)
