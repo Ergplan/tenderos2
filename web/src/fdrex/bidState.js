@@ -4,7 +4,7 @@
 import { defaultBidState, defaultLosses, mergeBidState } from "../bid/model.js";
 import { DEFAULT_SETTINGS, TENDER_ID } from "./bidTerms.js";
 
-export const STEP_IDS = ["documents", "conditions", "bid", "sources", "financeInputs", "size", "finance", "forms"];
+export const STEP_IDS = ["documents", "conditions", "bid", "sources", "financeInputs", "size", "finance", "whatif", "forms"];
 
 /** The FDRE-X bid when nothing is entered: the Tender to Bid state with this tender, 100 MW, solar, wind and the storage on. */
 export function defaultFdrexBidState() {

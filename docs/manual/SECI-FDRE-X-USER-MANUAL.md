@@ -140,7 +140,23 @@ tariff you mean to quote, the project cost, the revenue and costs by year (the p
 PSM discount, the monthly penalty), and **Download the financial model**: the workbook with its
 Live model sheet, every cell a formula.
 
-## Step 08 · Bid forms *(Tender / Legal)*
+## Step 08 · What-if *(Finance)*
+
+Starts from the plant HiGHS sized and every input of the bid, and answers at once: change a size,
+the storage hours, a cost, the financing, the buyer's hours, the shortfall plan, the bought power,
+the connectivity or the PSM, and see the tariff your target equity IRR needs, the IRRs and DSCR at
+your bid tariff, and whether the plant still meets the tender (the buyer's hours supplied, the
+months within the free 10%, the energy short beyond it, the power bought against the 5%, the
+surplus sold). The levers table ranks which input moves the tariff most, and how far each would
+have to move to reach a tariff you name.
+
+The What-if runs an instant rule-based dispatch (the battery serves the buyer's hours; the power
+bought goes first to the months beyond the free 10%, cheapest hours first; the surplus is sold at
+the hourly IEX price outside the solar hours), not the optimizer, so the sized bid itself reads a
+little dearer here than in the Financial model (₹9.05 against ₹8.80 on the benchmark bid). Use it
+to compare cases; size again for the bid. *Back to the sized bid* restores the starting case.
+
+## Step 09 · Bid forms *(Tender / Legal)*
 
 The RfS's 23 formats, filled from the bid and the sized plant: the Covering Letter (with your PSM
 choice), the Power of Attorney and the Consortium Agreement where they apply, the EMD and PBG in
@@ -148,7 +164,22 @@ each of the three instruments, the board resolutions, the financial requirement,
 and disclosures, the financial bid, the cost estimate, and the annexures. Particulars are asked
 once and used everywhere. Each format opens as a letter and exports as a Word file.
 
-## Quick reference: an FDRE-X bid in eight clicks
+## The voice bid agent
+
+**Talk to the bid agent** (bottom right) opens a GPT-Live voice conversation that works this tab
+with you. It briefs the tender's key conditions with their documents and pages, asks your inputs
+in order (the MW, the buyer's hours, the shortfall plan, bought power and its charges, the
+connectivity, the PSM, the Effective Date, then the benchmarks or each design input), changes
+anything you name on screen, sizes the plant with HiGHS, explains the plant, the monthly rule, the
+power bought, EMD, PBG, net worth and SECI's charges, gives the tariff for your target IRR, checks
+the tariff you mean to quote, tries what-ifs ("what if storage costs ₹0.9 crore per MWh?"), works
+out the energy with the formula, and fills and reviews the bid forms with you. Every number comes
+from the screen and every tender fact from the documents; it never changes a term.
+
+It needs the OpenAI key set up once by an administrator (API keys in the Library) and an HTTPS
+address for the microphone.
+
+## Quick reference: an FDRE-X bid in nine clicks
 
 1. **FDRE-X Bid** in the sidebar.
 2. **Bid inputs**: the contracted MW, the Effective Date, the buyer's hours, the shortfall plan,
@@ -158,5 +189,8 @@ once and used everywhere. Each format opens as a letter and exports as a Word fi
 4. **Finance inputs**: your financing.
 5. **Size**: *Size the plant*; read the plant and the monthly rule.
 6. **Financial model**: the tariff to quote; type your quote to see its returns; download the workbook.
-7. **Bid forms**: fill the particulars, review each format, export the pack.
-8. **Save**.
+7. **What-if**: try another size, cost or plan; the levers table shows what moves the tariff.
+8. **Bid forms**: fill the particulars, review each format, export the pack.
+9. **Save**.
+
+Or talk to the bid agent and let it take you through the same steps.

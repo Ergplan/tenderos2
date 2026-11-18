@@ -5,7 +5,7 @@ import { LiveEvents, createToolRunner } from "./agent";
 import { agentChart } from "./charts";
 
 /** What the agent's log says for each SECI tool (a tab can pass its own words). */
-const TOOL_WORDS = {
+export const TOOL_WORDS = {
   get_status: () => "Read the bid on screen",
   tender_brief: () => "Read the key conditions",
   tender_lookup: (a) => `Looked up “${a.query}” in the tender`,

@@ -14,6 +14,7 @@ import { TraceButton, TraceProvider } from "../model/ModelExplorer";
 import SolarStudio from "../plant/SolarStudio";
 import WindStudio from "../plant/WindStudio";
 import { PEAK_PLANS, PROFILES, SHORTFALL_MODES } from "../seci/terms";
+import { DEFAULT_SETTINGS as FX_SETTINGS, PEAK_PLANS as FX_PEAK_PLANS, SHORTFALL_MODES as FX_SHORTFALL, TENDER as FX_TENDER } from "../fdrex/bidTerms";
 import { SECI_LIMITS, WHATIF_NOTE, defaultWhatIf, runWhatIf } from "./model";
 import { loadMarketPrices } from "../bid/model";
 
@@ -34,6 +35,12 @@ const VERDICT = {
   pass: { icon: CheckCircle2, cls: "good", text: "Meets the tender: inside the bid range, storage in place, every peak and off-peak block at its floor in year 1." },
   penalty: { icon: TriangleAlert, cls: "warn", text: "Meets the tender's limits; some blocks fall below their floor and are paid at 1.5 × the tariff (the tender allows this)." },
   fail: { icon: XCircle, cls: "bad", text: "Does not meet the tender: see the checks below." },
+};
+// SECI-FDRE-X (a case from the FDRE-X Bid tab): the buyer's four hours and the monthly rule
+const FX_VERDICT = {
+  pass: { ...VERDICT.pass, text: "Meets the tender: inside the bid range, storage in place, every month of year 1 within the free 10% (or in full), bought power within 5%." },
+  penalty: { ...VERDICT.penalty, text: "Meets the tender's limits; in some months the energy short goes beyond the free 10% and is paid at 1.5 × the tariff (the tender allows this)." },
+  fail: VERDICT.fail,
 };
 
 /** A week of the year-1 dispatch against the block floors. */
@@ -60,7 +67,8 @@ function weekOption(y1, week, contracted) {
       { ...stack("Solar", idx.map((t) => r(H.solar[t])), DATA_COLORS.solar), markArea: { silent: true, itemStyle: { color: "rgba(212,255,63,0.07)" }, data: areas } },
       stack("Wind", idx.map((t) => r(H.wind[t])), DATA_COLORS.wind),
       stack("Battery", idx.map((t) => r(H.discharge[t])), DATA_COLORS.bess),
-      { name: "Block floor", type: "line", step: "middle", symbol: "none", data: idx.map((t) => r(H.floor[t])), lineStyle: { color: "#ff6b5f", type: "dashed", width: 1.2 }, itemStyle: { color: "#ff6b5f" } },
+      ...(H.bought ? [stack("Bought", idx.map((t) => r(H.bought[t])), DATA_COLORS.surplus)] : []),
+      { name: H.bought ? "Buyer's demand" : "Block floor", type: "line", step: "middle", symbol: "none", data: idx.map((t) => r(H.floor[t])), lineStyle: { color: "#ff6b5f", type: "dashed", width: 1.2 }, itemStyle: { color: "#ff6b5f" } },
       { name: "Contracted", type: "line", symbol: "none", data: idx.map(() => r(contracted)), lineStyle: { color: "#f4f4f1", type: "dotted", width: 1 }, itemStyle: { color: "#f4f4f1" } },
     ],
   };
@@ -117,12 +125,16 @@ export default function WhatIfTab({ seed = null, seedKey = "", embedded = false,
   const curve = useMemo(() => irrCurve(res), [res]);
   const week1 = useMemo(() => weekOption(res.year1, week, state.contractedMw), [res, week, state.contractedMw]);
   const f = res.finance;
-  const V = VERDICT[res.verdict];
+  const fx = state.tender === "fdrex";
+  const V = (fx ? FX_VERDICT : VERDICT)[res.verdict];
   const VIcon = V.icon;
   const y1 = res.year1;
   // the blocks outside the Peak Hours: off-peak (Amendment-01), or Solar and Remaining (Amendment-03)
   const other = Object.entries(y1.rules).filter(([k]) => k !== "peak").reduce((a, [, r]) => ({ met: a.met + r.met, hours: a.hours + r.hours }), { met: 0, hours: 0 });
   other.share = other.hours ? other.met / other.hours : 1;
+  const fxs = fx ? { ...FX_SETTINGS, ...(state.fdrex || {}) } : null;
+  const setFx = (v) => setState((st) => ({ ...st, fdrex: { ...FX_SETTINGS, ...(st.fdrex || {}), ...v } }));
+  const freeMonths = fx ? y1.months.filter((m) => m.free).length : 0;
   const capex = res.atBid.capex;
   const rows = res.atBid.rows;
 
@@ -156,7 +168,7 @@ export default function WhatIfTab({ seed = null, seedKey = "", embedded = false,
         <div className={`whatif-verdict tone-${V.cls}`} data-testid="whatif-verdict" data-verdict={res.verdict}>
           <VIcon size={18} />
           <div>
-            <b>{res.verdict === "pass" ? "Compliant" : res.verdict === "penalty" ? "Compliant, with block penalties" : "Not compliant"}</b>
+            <b>{res.verdict === "pass" ? "Compliant" : res.verdict === "penalty" ? (fx ? "Compliant, with monthly penalties" : "Compliant, with block penalties") : "Not compliant"}</b>
             <span>{V.text}</span>
           </div>
           <div className="whatif-verdict-fin">
@@ -194,25 +206,37 @@ export default function WhatIfTab({ seed = null, seedKey = "", embedded = false,
           </div>
         </Section>
 
-        <Section index="2" title="Tender compliance" note="SECI RTC-TM-V: the bid range, storage, and the floors in every Peak and off-peak block">
+        <Section index="2" title="Tender compliance" note={fx ? "SECI-FDRE-X: the bid range, storage, the month's peak energy (10% free, 1.5 × tariff beyond), bought power within 5%, the sale outside the buyer's hours" : "SECI RTC-TM-V: the bid range, storage, and the floors in every Peak and off-peak block"}>
+          {fx && res.pricesPending && <p className="rtc-note" data-testid="whatif-prices-pending">The IEX prices are still loading: until they are in, the buyer&apos;s hours are the evening ones and nothing is bought.</p>}
           <table className="studio-cost whatif-checks" data-testid="whatif-checks">
             <thead><tr><th /><th>Condition</th><th>This plant</th></tr></thead>
             <tbody>
               {res.checks.map((c) => (
                 <tr key={c.id} className={c.ok ? "" : "is-bad"} data-testid={`whatif-check-${c.id}`}>
                   <td>{c.ok ? <CheckCircle2 size={14} className="good" /> : <XCircle size={14} className="bad" />}</td>
-                  <td>{c.label}{!c.hard && <small>shortfall allowed, paid at 1.5 × tariff</small>}</td>
+                  <td>{c.label}{!c.hard && (!fx || c.id === "monthly") && <small>{fx ? "10% short free, beyond it 1.5 × tariff" : "shortfall allowed, paid at 1.5 × tariff"}</small>}</td>
                   <td>{c.detail}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {fx ? (
+            <div className="rtc-grid rtc-grid-4" data-testid="whatif-fdrex-stats">
+              <Stat label="Buyer's hours supplied in full, year 1" value={pf(y1.rules.peak.share, 1)} detail={`${nf(y1.rules.peak.met, 0)} of ${nf(y1.rules.peak.hours, 0)} hours · ${pf(y1.deliveredMWh / y1.demandMWh, 1)} of the energy`} tone={y1.rules.peak.share >= 0.999 ? "good" : undefined} />
+              <Stat label={fxs.shortfall === "hard" ? "Months met in full, year 1" : "Months within the free 10%, year 1"} value={`${fxs.shortfall === "hard" ? y1.months.filter((m) => m.share >= 1 - 1e-9).length : freeMonths} of 12`} detail={`worst month ${pf(Math.min(...y1.months.map((m) => m.share)), 1)} of its peak energy`} />
+              <Stat label="Short beyond the free 10%, year 1" value={`${nf(y1.blockShortfallMWh / 1000, 2)} MU`} detail={fxs.shortfall === "hard" ? "no penalty in this plan: the energy short loses its revenue" : `penalty ₹${nf(res.penaltyY1, 2)} cr at 1.5 × tariff`} trace={{ line: "blockPenCr", year: 1 }} />
+              <Stat label="Power bought, year 1" value={`${nf(y1.purchaseMWh / 1000, 2)} MU`} detail={fxs.buy ? `${pf(y1.purchaseShare, 2)} of the energy (5% allowed) · ₹${nf(y1.purchaseCostCr, 2)} cr` : "not bought"} />
+              <Stat label="Surplus sold / curtailed" value={`${nf(y1.excessMWh / 1000, 0)} / ${nf(y1.curtailMWh / 1000, 0)} MU`} detail={!state.fin.sellSurplus ? "sale switched off" : `${fxs.dayInjection ? "solar hours included" : "none from 06:00 to 18:00"}${state.saleMarket ? ` · at the IEX ${state.saleMarket} price` : ` · at ₹${nf(state.fin.surplusPrice, 2)}/kWh`}`} />
+              <Stat label="SECI's charges in the project cost" value={`₹${nf(res.costs.otherCapexCr || 0, 2)} cr`} detail="Success Charges, RfS cost and bid fee, with GST" />
+            </div>
+          ) : (
           <div className="rtc-grid rtc-grid-4">
             <Stat label="Peak blocks at the floor, year 1" value={pf(y1.rules.peak.share, 1)} detail={`${nf(y1.rules.peak.met, 0)} of ${nf(y1.rules.peak.hours, 0)} hours`} tone={y1.rules.peak.share >= 0.999 ? "good" : undefined} />
             <Stat label={y1.rules.offpeak ? "Off-peak blocks at the floor" : "Solar and Remaining blocks at the floor"} value={pf(other.share, 1)} detail={`${nf(other.met, 0)} of ${nf(other.hours, 0)} hours`} tone={other.share >= 0.999 ? "good" : undefined} />
             <Stat label="Short of the floors, year 1" value={`${nf(y1.blockShortfallMWh / 1000, 1)} MU`} detail={`penalty ₹${nf(res.penaltyY1, 1)} cr at 1.5 × tariff`} trace={{ line: "blockPenCr", year: 1 }} />
             <Stat label="Surplus sold / curtailed" value={`${nf(y1.excessMWh / 1000, 0)} / ${nf(y1.curtailMWh / 1000, 0)} MU`} detail={!state.fin.sellSurplus ? "sale switched off" : res.ops[0].buyerExcessMWh > 0 ? `${nf(res.ops[0].buyerExcessMWh / 1000, 0)} MU of it to the buyer at half the tariff (Solar Hours), the rest at ₹${nf(state.fin.surplusPrice, 2)}/kWh` : `at ₹${nf(state.fin.surplusPrice, 2)}/kWh`} />
           </div>
+          )}
         </Section>
 
         <LeverPanel index="3" state={state} setState={setState} prices={prices} base={f.tariffNeeded} />
@@ -221,12 +245,24 @@ export default function WhatIfTab({ seed = null, seedKey = "", embedded = false,
           <div className="whatif-inputs">
             <div className="whatif-group">
               <div className="rtc-subhead">Tender and plan</div>
+              {fx ? (
+              <div className="rtc-grid rtc-grid-2" data-testid="whatif-fdrex-plan">
+                <Field label="Contracted capacity (bid)" unit="MW" value={state.contractedMw} onChange={(v) => set({ contractedMw: v })} step={10} min={0} hint={`The tender takes ${FX_TENDER.bidMinMw}–${FX_TENDER.bidMaxMw} MW from one bidder`} />
+                <SelectBox label="The buyer's four hours" value={fxs.peakPlan} onChange={(v) => setFx({ peakPlan: v })} options={Object.entries(FX_PEAK_PLANS).map(([k, p]) => [k, p.label])} hint={FX_PEAK_PLANS[fxs.peakPlan]?.detail} />
+                <SelectBox label="Shortfall plan" value={fxs.shortfall} onChange={(v) => setFx({ shortfall: v })} options={Object.entries(FX_SHORTFALL).map(([k, p]) => [k, p.label])} hint={FX_SHORTFALL[fxs.shortfall]?.detail} />
+                <SwitchBox label="Buy green-market / bilateral power (within 5%)" checked={Boolean(fxs.buy)} onChange={(v) => setFx({ buy: v })} />
+                {fxs.buy && <Field label="Charges on bought power" unit="₹/kWh" value={fxs.buyCharges} onChange={(v) => setFx({ buyCharges: v })} step={0.05} min={0} hint="exchange fee, transmission and losses to the meter, on the IEX GDAM price" />}
+                <SwitchBox label="Connectivity in the solar hours too" checked={Boolean(fxs.dayInjection)} onChange={(v) => setFx({ dayInjection: v })} />
+                <SwitchBox label={`Payment Security Mechanism (₹${FX_TENDER.psmChargeRsPerKwh}/kWh off every bill)`} checked={Boolean(fxs.psm)} onChange={(v) => setFx({ psm: v })} />
+              </div>
+              ) : (
               <div className="rtc-grid rtc-grid-2">
                 <Field label="Contracted capacity (bid)" unit="MW" value={state.contractedMw} onChange={(v) => set({ contractedMw: v })} step={10} min={0} hint={`The tender takes ${SECI_LIMITS.minBidMw}–${SECI_LIMITS.maxBidMw} MW from one bidder`} />
                 <SelectBox label="Supply profile" value={state.profile || "amd3"} onChange={(v) => set({ profile: v })} options={Object.entries(PROFILES).map(([k, p]) => [k, p.label])} hint={PROFILES[state.profile || "amd3"]?.detail} />
                 <SelectBox label="Peak Hours plan" value={state.peakPlan} onChange={(v) => set({ peakPlan: v })} options={Object.entries(PEAK_PLANS).map(([k, p]) => [k, p.label])} hint={PEAK_PLANS[state.peakPlan]?.detail} />
                 <SelectBox label="Shortfall below a floor" value={state.shortfall} onChange={(v) => set({ shortfall: v })} options={Object.entries(SHORTFALL_MODES).map(([k, p]) => [k, p.label])} hint={SHORTFALL_MODES[state.shortfall]?.detail} />
               </div>
+              )}
             </div>
             <div className="whatif-group">
               <div className="rtc-subhead">Size</div>
@@ -298,7 +334,8 @@ export default function WhatIfTab({ seed = null, seedKey = "", embedded = false,
             <table data-testid="whatif-years">
               <thead><tr><th>₹ crore</th>{rows.map((r) => <th key={r.year}>Y{r.year}</th>)}</tr></thead>
               <tbody>
-                {[["Delivered (MU)", "deliveredMu", 0], ["Short of the floors (MU)", "blockShortfallMu", 1], ["PPA revenue", "energyRevenue", 1], ["Surplus sale", "surplusRevenue", 1], ["Block penalty", "blockPenalty", 1], ["Operating cost", "opex", 1], ["EBITDA", "ebitda", 1], ["Interest", "interest", 1], ["Principal", "principal", 1], ["Tax", "tax", 1], ["Free cash to equity", "fcfe", 1], ["DSCR", "dscr", 2]].map(([label, k, d]) => (
+                {[["Delivered (MU)", "deliveredMu", 0], [fx ? "Short beyond the free 10% (MU)" : "Short of the floors (MU)", "blockShortfallMu", 1], ["PPA revenue", "energyRevenue", 1], ["Surplus sale", "surplusRevenue", 1], [fx ? "Monthly shortfall penalty" : "Block penalty", "blockPenalty", 1],
+                  ...(fx ? [["Power bought", "charging", 1], ["PSM discount", "pxFees", 1]] : []), ["Operating cost", "opex", 1], ["EBITDA", "ebitda", 1], ["Interest", "interest", 1], ["Principal", "principal", 1], ["Tax", "tax", 1], ["Free cash to equity", "fcfe", 1], ["DSCR", "dscr", 2]].map(([label, k, d]) => (
                   <tr key={k}><td>{label}</td>{rows.map((r) => <td key={r.year}>{r[k] === null || r[k] === undefined ? "–" : nf(r[k], d)}</td>)}</tr>
                 ))}
               </tbody>

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight, ChevronLeft, CircleDollarSign, ClipboardCheck, FileStack, FolderOpen, Landmark, Layers, ListChecks, MoonStar, RotateCcw, Save, Scale, Users, Zap } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, ChevronLeft, CircleDollarSign, ClipboardCheck, FileStack, FlaskConical, FolderOpen, Landmark, Layers, ListChecks, MoonStar, RotateCcw, Save, Scale, Users, Zap } from "lucide-react";
 import SaveDialog from "../scenarios/SaveDialog";
 import BidFileTools from "../cfd/BidFileTools.jsx";
 import { scenarioApi } from "../scenarios/client";
@@ -13,6 +13,10 @@ import SourcesStep from "../bid/SourcesStep";
 import SizeStep from "../bid/SizeStep";
 import FinanceStep from "../bid/FinanceStep";
 import FinanceInputsStep from "../bid/FinanceInputsStep";
+import WhatIfTab from "../whatif/WhatIfTab";
+import { whatIfFromBid } from "../whatif/model";
+import LiveAgent, { TOOL_WORDS } from "../seci/LiveAgent";
+import { createToolRunner } from "./bidAgent.js";
 import { DOCUMENTS, RFS, TENDER, fdrexTerms } from "./bidTerms.js";
 import { defaultFdrexBidState, formsView, fromSaved } from "./bidState.js";
 import { TERMS } from "./terms.js";
@@ -35,6 +39,7 @@ export const FDREX_STEPS = [
   { id: "financeInputs", title: "Finance inputs", icon: Landmark, color: "#9ad7a0", team: "Finance" },
   { id: "size", title: "Size", icon: Zap, color: "#f5b83d", team: "Projects" },
   { id: "finance", title: "Financial model", icon: CircleDollarSign, color: "#7ddc9a", team: "Finance" },
+  { id: "whatif", title: "What-if", icon: FlaskConical, color: "#ff9fd0", team: "Finance" },
   { id: "forms", title: "Bid forms", icon: ClipboardCheck, color: "#a98bff", team: "Tender / Legal" },
 ];
 
@@ -58,7 +63,8 @@ const sizingSession = { hourly: null, run: null };
  * sources (solar, wind and the storage, each sized by the optimizer or fixed), the HiGHS sizing
  * against the tender's constraints (the buyer's four hours, the monthly reconciliation, bought
  * power within 5%, no sale without connectivity), the financial model with its formula workbook,
- * and the bid forms. Built on the Tender to Bid steps, as the SECI RTC tab.
+ * an instant What-if on the sized plant, and the bid forms, with a voice bid agent (GPT-Live) that
+ * works all of it. Built on the Tender to Bid steps, as the SECI RTC tab.
  */
 export default function FdrexBidTab({ initialScenario = null }) {
   const opened = initialScenario?.current?.inputs?.state;
@@ -72,6 +78,17 @@ export default function FdrexBidTab({ initialScenario = null }) {
   const terms = useMemo(() => fdrexTerms(state.fdrex, prices), [state.fdrex, prices]);
   const missing = useMemo(() => missingInputs(state, terms), [state, terms]);
   const sizing = useSizing({ state, setState, terms, prices, session: sizingSession, module: MODULE });
+
+  // the voice agent (web/src/fdrex/bidAgent.js): its tools run on this tab's state; the What-if and
+  // the bought power read the IEX prices
+  const [agent, setAgent] = useState(null); // { available, model, backendModel } from /api/seci/live
+  const [docked, setDocked] = useState(false); // the agent's panel is open: the page makes room for it
+  useEffect(() => {
+    fetch("/api/seci/live", { credentials: "same-origin" }).then((r) => (r.ok ? r.json() : null)).then(setAgent).catch(() => setAgent(null));
+  }, []);
+  const pricesRef = useRef(prices);
+  pricesRef.current = prices;
+  const agentRunner = useCallback((ctx) => createToolRunner({ ...ctx, getPrices: () => pricesRef.current }), []);
 
   const team = useTeam(linked?.id || null);
   const [teamOpen, setTeamOpen] = useState(false);
@@ -150,6 +167,7 @@ export default function FdrexBidTab({ initialScenario = null }) {
     financeInputs: missing.length === 0,
     size: Boolean(state.lp),
     finance: Boolean(state.lp),
+    whatif: Boolean(state.lp),
     forms: Boolean(state.lp) && formIssues(forms).length === 0 && formatsSummary(forms).reviewed === formatsSummary(forms).needed,
   };
   const summary = {
@@ -160,6 +178,7 @@ export default function FdrexBidTab({ initialScenario = null }) {
     financeInputs: financeMissing.length ? `${financeMissing.length} input${financeMissing.length > 1 ? "s" : ""} needed` : missing.length ? "Design inputs pending" : "Ready to size",
     size: state.lp ? `₹${nf(state.lp.tariff, 3)}/kWh` : "Not sized",
     finance: state.lp ? "Tariff and returns" : "After sizing",
+    whatif: state.lp ? "Tariff levers" : "After sizing",
     forms: `${formatsSummary(forms).reviewed} of ${formatsSummary(forms).needed} formats reviewed`,
   };
   const index = FDREX_STEPS.findIndex((s) => s.id === state.step);
@@ -169,15 +188,20 @@ export default function FdrexBidTab({ initialScenario = null }) {
   const props = { state, setState, patch, set, lockProps, isLocked, goto, prices, terms, missing };
   // the bid forms' state updates go to this tab's state: they only touch forms, formsReview, letters and the view
   const setForms = setState;
+  // the agent opens the traceable model at a line (explain_generation): the Financial model step shows it
+  const [traceAsk, setTraceAsk] = useState(null);
+  const onTrace = useCallback((t) => setTraceAsk({ ...t, at: Date.now() }), []);
+  useEffect(() => { if (step.id !== "finance") setTraceAsk(null); }, [step.id]);
+  const whatIfSeed = useMemo(() => (state.lp ? whatIfFromBid(state, terms) : null), [state, terms]);
 
   return (
     <TeamContext.Provider value={teamCtx}>
-    <div className={`rtc story bid seci fdrex-bid ${teamOpen ? "team-docked" : ""}`} data-testid="fdrex-tab">
+    <div className={`rtc story bid seci fdrex-bid ${docked ? "agent-docked" : ""} ${teamOpen ? "team-docked" : ""}`} data-testid="fdrex-tab">
       <section className="story-hero">
         <div>
           <div className="eyebrow"><MoonStar size={13} /> SECI-FDRE-X · RfS No. {RFS.number}</div>
           <h1 data-testid="fdrex-title">FDRE-X bid · SECI</h1>
-          <p>Assured peak supply of 4,800 MWh a day (1,200 MW × 4 hours) from ISTS-connected RE projects with storage. The tender and its amendment, the conditions in force, what you bid, your solar, wind and storage sized by HiGHS against the tender's constraints (the buyer's four hours each day, the monthly 10% tolerance and 1.5 × penalty, bought power within 5%, no sale without connectivity), the financial model with its formula workbook, and the RfS's bid formats.</p>
+          <p>Assured peak supply of 4,800 MWh a day (1,200 MW × 4 hours) from ISTS-connected RE projects with storage. The tender and its amendment, the conditions in force, what you bid, your solar, wind and storage sized by HiGHS against the tender's constraints (the buyer's four hours each day, the monthly 10% tolerance and 1.5 × penalty, bought power within 5%, no sale without connectivity), the financial model with its formula workbook, an instant What-if, and the RfS's bid formats. Talk to the bid agent to go through it by voice.</p>
         </div>
         <div className="story-hero-tools">
           {linked && <span className="rtc-live" data-testid="fdrex-linked">{linked.name} · v{linked.version}</span>}
@@ -220,8 +244,9 @@ export default function FdrexBidTab({ initialScenario = null }) {
         {step.id === "sources" && <SourcesStep {...props} startSizing={sizing.startSizing} hourly={sizing.hourly} withFinance={false} />}
         {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={sizing.startSizing} />}
         {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={sizing.startSizing} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} dispatch15={false} />}
-        {step.id === "finance" && <FinanceStep {...props} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
-        {step.id === "forms" && <BidForms state={forms} setState={setForms} goto={goto} model={formsModel} index="8" />}
+        {step.id === "finance" && <FinanceStep {...props} traceRequest={traceAsk} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
+        {step.id === "whatif" && <WhatIfTab embedded seed={whatIfSeed} seedKey={state.lp ? `${JSON.stringify(state.lp.sizes)}|${state.lp.tariff}|${JSON.stringify(state.fdrex)}` : ""} onBack={() => goto("finance")} />}
+        {step.id === "forms" && <BidForms state={forms} setState={setForms} goto={goto} model={formsModel} index="9" />}
       </div>
 
       <footer className="story-page-foot bid-foot">
@@ -239,8 +264,19 @@ export default function FdrexBidTab({ initialScenario = null }) {
           onClose={() => setShowSave(false)}
         />
       )}
+      <LiveAgent tab={MODULE} runner={agentRunner} charts={null} toolWords={FDREX_TOOL_WORDS}
+        intro="Talk naturally: it explains the tender and its conditions with their pages, takes your inputs in order, changes anything on screen, sizes the plant with HiGHS, explains the tariff and the returns, tries what-ifs and fills the bid forms. Every number comes from this screen; every tender fact from the documents."
+        state={state} setState={setState} terms={terms} goto={goto} sizing={sizing} info={agent} onDock={setDocked} onTrace={onTrace} />
       {teamOpen && <TeamPanel team={teamCtx} state={state} bidName={linked?.name} onAccept={acceptAnswer} onClose={() => setTeamOpen(false)} focusId={teamFocus} />}
     </div>
     </TeamContext.Provider>
   );
 }
+
+/** The agent's log for this tab's own tools (the rest as the SECI RTC tab says them). */
+const FDREX_TOOL_WORDS = {
+  ...TOOL_WORDS,
+  list_conditions: (a) => (a.group ? `Listed the ${a.group} conditions` : "Listed the condition groups"),
+  amendment_changes: () => "Read what Amendment-01 changed",
+  what_if: (a, r) => (r?.ok ? `What-if: ₹${r.tariffNeeded}/kWh needed (${r.change >= 0 ? "+" : ""}${r.change} against the sized bid)` : `What-if: ${r?.error || ""}`),
+};

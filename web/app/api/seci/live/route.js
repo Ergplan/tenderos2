@@ -5,7 +5,7 @@ import { CLOUD_AGENTS, ZONE } from "@/lib/zone";
 import { logEvent } from "@/lib/activity";
 import { LIVE_MODEL, liveSessionConfig } from "@/src/seci/agent";
 import { liveSessionConfig as cfdSessionConfig, CFD_GREETING } from "@/src/cfd/agent";
-import { liveSessionConfig as fdrexSessionConfig, CFD_GREETING as FDREX_GREETING } from "@/src/fdrex/agent";
+import { liveSessionConfig as fdrexSessionConfig, GREETING as FDREX_GREETING } from "@/src/fdrex/bidAgent";
 import { getSecret } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +47,7 @@ export const POST = handler(async (req) => {
   const sdp = body?.sdp;
   // which tab's agent: the SECI RTC tender (default) or the CfD bid, each with its own instructions and tools
   const cfd = body?.tab === "cfd";
-  const fdrex = body?.tab === "fdrex"; // the SECI-FDRE-X bid (web/src/fdrex/agent.js)
+  const fdrex = body?.tab === "fdrex"; // the SECI-FDRE-X bid (web/src/fdrex/bidAgent.js, on the FDRE-X Bid tab)
   const greeting = fdrex ? FDREX_GREETING : cfd ? CFD_GREETING : GREETING;
   const sessionOf = fdrex ? fdrexSessionConfig : cfd ? cfdSessionConfig : liveSessionConfig;
   if (typeof sdp !== "string" || !sdp.startsWith("v=0") || sdp.length > 65536) throw new HttpError(400, "A WebRTC offer (SDP) is required.");
