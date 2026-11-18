@@ -1,5 +1,5 @@
 {
- "scannedAt": "2026-11-17T01:49:09",
+ "scannedAt": "2026-11-18T03:07:34",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -38,7 +38,7 @@
    "firstSeen": "2026-09-02",
    "status": "open",
    "lastAmendment": "2026-10-19",
-   "daysToBid": -11
+   "daysToBid": -12
   },
   {
    "source": "SECI",
@@ -72,7 +72,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": -1
+   "daysToBid": -2
   },
   {
    "source": "SECI",
@@ -98,7 +98,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 2
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -146,7 +146,7 @@
    "firstSeen": "2026-04-19",
    "status": "amended",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 3
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -180,7 +180,7 @@
    "firstSeen": "2026-07-16",
    "status": "open",
    "lastAmendment": "2026-09-28",
-   "daysToBid": 3
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -210,7 +210,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -235,7 +235,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -260,7 +260,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -293,9 +293,9 @@
    ],
    "fingerprint": "77c97b8a89f45da5",
    "firstSeen": "2026-10-01",
-   "status": "amended",
+   "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -327,7 +327,7 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -350,7 +350,30 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 13
+   "daysToBid": 12
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000298",
+   "ref": "SECI/C&P/OP/11/0009/26-28",
+   "title": "Request for Empanelment of Battery Energy Storage System (BESS) Suppliers",
+   "url": "https://www.seci.co.in/tender-details/Ymt_",
+   "published": "2026-11-17",
+   "bidDeadline": "2026-11-30",
+   "bidOpen": "2026-12-01",
+   "category": "bess",
+   "categoryLabel": "Battery storage (standalone BESS)",
+   "capacity": {},
+   "scheme": null,
+   "ipp": false,
+   "summary": "Battery storage (standalone BESS); for EPC contractors: build the plant for SECI. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 25 Nov 2026, 14:30. Bids open 1 Dec 2026, 10:00.",
+   "documents": 1,
+   "amendments": [],
+   "fingerprint": "e06e40ea9d9ba539",
+   "firstSeen": "2026-11-18",
+   "status": "new",
+   "lastAmendment": null,
+   "daysToBid": 12
   },
   {
    "source": "SECI",
@@ -382,7 +405,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 14
+   "daysToBid": 13
   },
   {
    "source": "SECI",
@@ -407,7 +430,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 14
+   "daysToBid": 13
   },
   {
    "source": "SECI",
@@ -432,7 +455,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 16
+   "daysToBid": 15
   },
   {
    "source": "SECI",
@@ -455,7 +478,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 27
+   "daysToBid": 26
   },
   {
    "source": "NHPC",
@@ -480,7 +503,7 @@
    "firstSeen": "2026-11-04",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 28
+   "daysToBid": 27
   }
  ],
  "results": [
@@ -1019,6 +1042,15 @@
  ],
  "events": [
   {
+   "date": "2026-11-18",
+   "source": "SECI",
+   "id": "SECI000298",
+   "tender": "Request for Empanelment of Battery Energy Storage System (BESS) Suppli…",
+   "kind": "new tender",
+   "detail": "Battery storage (standalone BESS); for EPC contractors: build the plant for SECI.",
+   "url": "https://www.seci.co.in/tender-details/Ymt_"
+  },
+  {
    "date": "2026-11-16",
    "source": "SECI",
    "id": "SECI000282",
@@ -1056,10 +1088,10 @@
   }
  ],
  "counts": {
-  "tenders": 16,
+  "tenders": 17,
   "ipp": 12,
-  "seci": 15,
+  "seci": 16,
   "nhpc": 1,
-  "newToday": 0
+  "newToday": 1
  }
 }
