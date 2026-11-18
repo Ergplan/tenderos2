@@ -5,9 +5,16 @@ to click. Pictures are of the demo installation (SECI CfD-I, RfS No. SECI/C&P/IP
 dated 15.07.2026, 1,000 MWh of assured peak supply, Amendments 01 to 04 in force).*
 
 The tab follows the SECI RTC tender tab exactly: the same sidebar, heading tools (Save, Team,
-Open, Reset inputs), step chips with the owning team, boxes with pings, evidence and feedback, the
-Talk to the bid agent button, Save and Open to the library. See the RTC manual's section 0 for
-those; this manual covers what is different: the tender and its eleven steps.
+Open, Export, Import, Reset inputs), step chips with the owning team, boxes with pings, evidence
+and feedback, the Talk to the bid agent button, Save and Open to the library. See the RTC manual's
+section 0 for those; this manual covers what is different: the tender and its eleven steps.
+
+**Export** downloads the bid as a file (`tenderos-cfd-150mw-<date>.json`): every input, the
+finance terms, the own RE as sized, the forms and letters. **Import** loads such a file into the
+tab: the strike price, the returns and the workbook then come out exactly as where the file was
+written, and the own RE is not sized again unless an input differs. A file from another tab (the
+CfD Own Solar tab or the FDRE-X tab) is refused with the tab it belongs to. The CfD Own Solar and
+FDRE-X Bid tabs have the same two buttons.
 
 ---
 

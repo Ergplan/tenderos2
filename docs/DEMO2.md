@@ -430,8 +430,12 @@ carry the finance team's full set of terms. Every one of them is a formula in th
   the balance), balloon (a share in the last year, the rest in equal parts), bullet, step-up (the
   principal growing at a rate a year). A principal moratorium (years within the tenor, interest
   paid). Instalments a year (1, 2, 4, 12): the balance is paid down through the year, so the
-  interest is on the average balance ((n − 1) ÷ 2n of the year's principal less); sculpting is
-  worked out yearly. The tenor is door to door.
+  interest is the year's rate on the average balance (the opening balance less (n − 1) ÷ 2n of
+  the year's principal); sculpting is worked out yearly. The tenor is door to door. Until
+  18 November 2026 the engine and the workbook took (n − 1) ÷ 2n of the principal off the
+  interest itself rather than off the balance, so a loan paid half-yearly, quarterly or monthly
+  carried too little interest (in late years none); yearly instalments, the default, were not
+  affected. A quarterly 150 MW CfD bid priced before then read about ₹0.67/kWh too low.
 * **Refinancing**: at the end of a chosen year, a new rate and tenor; the fee on the balance is
   expensed that year; the schedule continues under the same method with the years left.
 * **Working capital** per CERC norms: receivable days, O&M in hand (months), maintenance spares

@@ -262,6 +262,28 @@ const ok = (name, detail) => { checks.push(name); console.log(`ok   ${name}${det
   ok("top-up at the refinancing", `5% of ₹${p.closingDebt.toFixed(1)} cr: ₹${r.topUpCr.toFixed(1)} cr to equity at the end of year 3; equity IRR ${(plain.equityIrr * 100).toFixed(2)}% → ${(f.equityIrr * 100).toFixed(2)}%`);
 }
 
+// instalments within the year: the interest is on the average balance, the opening balance less
+// (q − 1) / 2q of the year's principal, at the year's rate; never below zero (18 Nov 2026: the
+// rate was missing, so quarterly interest came out too low and turned negative in late years)
+{
+  for (const [q, repayment] of [[4, "stepUp"], [4, "equal"], [12, "annuity"], [2, "balloon"]]) {
+    const terms = { paymentsPerYear: q, repayment, stepUpPct: 0.033, graceYears: 1, refiYear: 1, refiRate: 0.083, refiTenorYears: 12 };
+    const f = run(terms);
+    const adj = (q - 1) / (2 * q);
+    for (const r of f.rows) {
+      if (!(r.openingDebt > 0)) continue;
+      const rate = r.year > 1 ? 0.083 : f.engine?.fin?.interestRate ?? r.debtRate;
+      assert.ok(close(r.interest, r.debtRate * (r.openingDebt - adj * r.principal), 1e-9), `${q} instalments, ${repayment}, year ${r.year}: interest ${r.interest} on the average balance`);
+      assert.ok(r.interest >= 0, `${q} instalments, ${repayment}, year ${r.year}: interest is never negative`);
+      void rate;
+    }
+  }
+  const yearly = run({ paymentsPerYear: 1 });
+  const quarterly = run({ paymentsPerYear: 4 });
+  assert.ok(quarterly.rows[3].interest < yearly.rows[3].interest && quarterly.rows[3].interest > 0.8 * yearly.rows[3].interest, "quarterly instalments save a little interest, not most of it");
+  ok("instalments within the year", `quarterly: year-4 interest ₹${quarterly.rows[3].interest.toFixed(2)} cr against ₹${yearly.rows[3].interest.toFixed(2)} cr yearly`);
+}
+
 // 5d. cash sweep (with accrual) and the prepayment fee
 {
   const f = run({ sweep: { pct: 0.5, fromYear: 2, toYear: 10 }, prepaymentPct: 0.01 });

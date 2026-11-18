@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BookOpen, ChevronLeft, CircleDollarSign, ClipboardCheck, Factory, FileStack, FlaskConical, FolderOpen, Landmark, ListChecks, RotateCcw, Save, Scale, TrendingUp, Trophy, Users, Zap } from "lucide-react";
 import SaveDialog from "../scenarios/SaveDialog";
+import BidFileTools from "../cfd/BidFileTools.jsx";
 import { scenarioApi } from "../scenarios/client";
 import useTeam, { TeamContext } from "../team/useTeam";
 import TeamPanel from "../team/TeamPanel";
@@ -327,6 +328,15 @@ export default function FdrexTab({ initialScenario = null }) {
     setSaveMessage(`Accepted “${a.target_label}” from ${a.answer?.by || "the team"}: saved as version ${res.version}.`);
   }
 
+  // a bid file (Export in the heading): the same state as where it was written; the tab is no
+  // longer linked to a saved bid in the library
+  function importBid(saved, name) {
+    stopOptimise();
+    setState(fromSaved(saved));
+    setLinked(null);
+    setMessage({ ok: true, text: `Loaded the bid file “${name}”: every input, the own RE as sized, the forms and letters.` });
+  }
+
   function resetAll() {
     if (!window.confirm("Clear your FDRE-X bid: inputs, finance terms, forms and letters in this tab?")) return;
     stopOptimise();
@@ -395,6 +405,7 @@ export default function FdrexTab({ initialScenario = null }) {
             </button>
           )}
           <a className="rtc-reset" href={`/scenarios?module=${V.module}`}><FolderOpen size={13} /> Open</a>
+          <BidFileTools state={state} module={V.module} title={V.title} onLoad={importBid} onError={(text) => setMessage({ ok: false, text })} />
           <button type="button" className="rtc-reset" onClick={resetAll} data-testid="cfd-reset"><RotateCcw size={13} /> Reset inputs</button>
         </div>
       </section>

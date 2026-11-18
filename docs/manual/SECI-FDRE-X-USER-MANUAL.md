@@ -4,8 +4,8 @@
 SECI-FDRE-X, RfS No. SECI/C&P/IPP/13/0012/26-27 dated 07.10.2026: 4,800 MWh of assured peak
 supply (1,200 MW × 4 hours), Amendment-01 in force.*
 
-The tab has the flow of the CfD Bid tab: the same sidebar, heading tools (Save, Team, Open, Reset
-inputs), twelve step chips with the owning team, boxes with pings, evidence and feedback, the Talk
+The tab has the flow of the CfD Bid tab: the same sidebar, heading tools (Save, Team, Open,
+Export and Import of the bid as a file, Reset inputs), twelve step chips with the owning team, boxes with pings, evidence and feedback, the Talk
 to the bid agent button, Save and Open to the library. The CfD manual
 (`SECI-CFD-USER-MANUAL.md`) describes those tools; this manual covers what is different: the
 tender and what each step does with it.

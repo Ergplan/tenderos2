@@ -1082,7 +1082,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   const graceUsed = Math.min(tenorUsed - 1, Math.max(0, Math.round(S.v("grace"))));
   S.one("graceUsed", "Moratorium used", "years", { f: `MIN(${S.s("tenorUsed")}-1,MAX(0,ROUND(${S.s("grace")},0)))`, v: graceUsed, fmt: "int" });
   const q = Number(S.v("instalments")) || 1;
-  S.one("adjBase", "Interest saved by instalments within the year", "× the year's principal", { f: `(VALUE(${S.s("instalments")})-1)/(2*VALUE(${S.s("instalments")}))`, v: (q - 1) / (2 * q), fmt: "factor", note: "(instalments − 1) ÷ (2 × instalments): the principal is paid through the year, so the interest is on the average balance; 0 in a sculpted year" });
+  S.one("adjBase", "Interest saved by instalments within the year", "× the year's principal", { f: `(VALUE(${S.s("instalments")})-1)/(2*VALUE(${S.s("instalments")}))`, v: (q - 1) / (2 * q), fmt: "factor", note: "(instalments − 1) ÷ (2 × instalments): the principal is paid through the year, so the interest is on the average balance, the opening balance less this share of the year's principal (at the year's rate); 0 in a sculpted year" });
   const refiOn = S.v("refiYear") > 0 && S.v("refiYear") < tenorUsed ? 1 : 0;
   S.one("refiOn", "Refinancing applies", "1 / 0", { f: `IF(AND(${S.s("refiYear")}>0,${S.s("refiYear")}<${S.s("tenorUsed")}),1,0)`, v: refiOn, fmt: "int", note: "Only while there is a balance to refinance" });
   const refiEnd = refiOn ? Math.min(NP, S.v("refiYear") + Math.max(1, Math.round(S.v("refiTenor")))) : tenorUsed;
@@ -1750,7 +1750,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
   S.group("Repayment");
   S.series("principal", "Principal", "₹ cr", { v: () => null, total: true, note: "Under the repayment method, after the moratorium, until the last year of the debt (which clears it)" });
   S.series("debtAfterP", "Balance after the scheduled principal", "₹ cr", { v: () => null });
-  S.series("interest", "Interest", "₹ cr", { v: () => null, total: true, note: "On the opening balance, less the instalment saving on the year's principal" });
+  S.series("interest", "Interest", "₹ cr", { v: () => null, total: true, note: "On the opening balance, less the instalment saving: the year's rate × the factor × the year's principal" });
   S.series("refiFeeCr", "Refinancing fee", "₹ cr", { v: () => null, total: true, note: "On the balance refinanced, in the refinancing year" });
   S.series("prepayRefi", "Prepayment fee on the refinancing takeout", "₹ cr", { v: () => null, total: true });
   S.group("The cash before the sweep, the mezzanine and the quasi-equity (the tax before the sweep's fee and the quasi-equity's interest)");
@@ -1890,7 +1890,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
       const cfadsS = S.v("ebitda", y) - taxS - S.v("dWc", y) - S.v("aug", y) - wcInt + otherIncomeV(y) - bgFeesY - S.v("extCapex", y) - S.v("rpOps", y);
       const principal = repaying ? principalOf(methodY, open, n, rate, intOpen, { balloon: balloonAmt, cfads: cfadsS }) : 0;
       const debtAfterP = open - principal;
-      const interest = intOpen - adj * principal;
+      const interest = intOpen - rate * adj * principal;
       const refiNow = refiOn && y === S.v("refiYear");
       const refiTop = refiNow ? debtAfterP * S.v("refiTopPct") : 0;
       const refiFeeCr = refiNow ? (debtAfterP + refiTop) * S.v("refiFee") : 0;
@@ -2001,7 +2001,7 @@ export function addLiveModel(wb, m, { dispatchRows = true, sensitivity = true, b
         cfadsS: cfadsF(S.at("taxS", y)),
         principal: `IF(AND(${Y}>${S.s("graceUsed")},${Y}<=${S.at("endY", y)},${O}>1E-9),${method},0)`,
         debtAfterP: `${O}-${S.at("principal", y)}`,
-        interest: `${IO}-${S.at("adjY", y)}*${S.at("principal", y)}`,
+        interest: `${IO}-${S.at("rateY", y)}*${S.at("adjY", y)}*${S.at("principal", y)}`,
         refiFeeCr: `IF(${refiNowF},${S.at("debtAfterP", y)}*(1+${S.s("refiTopPct")})*${S.s("refiFee")},0)`,
         prepayRefi: `IF(${refiNowF},${S.at("debtAfterP", y)}*${S.s("prepayPct")},0)`,
         pre1: `${incomeF}-${S.at("interest", y)}-${S.at("wcInt", y)}-(${S.at("refiFeeCr", y)}+${S.at("prepayRefi", y)}+${S.at("bgFees", y)})-${S.at("allowedShA", y)}-${S.at("taxDep", y)}`,

@@ -2127,7 +2127,9 @@ function cashflows(ops, sizes, costs, fin, bess, dfrTarget, tariff) {
       const sculpt = method === "sculpted";
       let principal = 0;
       if (repaying && !sculpt) principal = principalOf(method, opening, n, rate, interestOpen, { balloon: dt.balloonPct * balloonBase, stepUp: dt.stepUp });
-      let interest = interestOpen - adj * principal;
+      // instalments through the year: interest on the average balance, the opening balance less
+      // (q − 1) / 2q of the year's principal, at the year's rate
+      let interest = interestOpen - rate * adj * principal;
       // the mezzanine: interest on the opening balance, principal per its schedule
       const mezzOpening = mezzBal;
       const mezzInterest = mezzOpening * (mz?.rate || 0);
