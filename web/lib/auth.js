@@ -7,6 +7,8 @@ import { SESSION_COOKIE, verifySession } from "./session";
 import { getSetting } from "./settings";
 import { ALL_TAB_IDS, resolveTabs } from "./tabs";
 import { APP_SWITCH_URL, DEMO_EMAIL, DEMO_MODE } from "./demo";
+import { isClient, licenceProblem } from "./workspace";
+import { HttpError } from "./httpError";
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -29,15 +31,19 @@ export function validatePassword(password) {
   return null;
 }
 
-/** The signed-in user, re-checked against the database (deleted users and reset sessions are rejected). */
+/**
+ * The signed-in user, re-checked against the database: deleted users, reset sessions, and
+ * licences switched off or ended (docs/LICENCES.md) are rejected.
+ */
 export async function currentUser() {
   const jar = await cookies();
   const session = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!session) return null;
-  const { rows } = await query("SELECT id, email, name, role, session_epoch, tab_access FROM users WHERE id = $1", [session.id]);
+  const { rows } = await query("SELECT id, email, name, role, session_epoch, tab_access, org, expires_at, disabled FROM users WHERE id = $1", [session.id]);
   const user = rows[0];
   if (!user || user.session_epoch !== session.epoch) return null;
-  return { id: user.id, email: user.email, name: user.name, role: user.role, tab_access: user.tab_access, sid: session.sid, session_epoch: user.session_epoch };
+  if (licenceProblem(user)) return null;
+  return { id: user.id, email: user.email, name: user.name, role: user.role, tab_access: user.tab_access, org: user.org || "", expires_at: user.expires_at, sid: session.sid, session_epoch: user.session_epoch };
 }
 
 /** The signed-in user plus the dashboard tabs they may open and whom to contact for more. */
@@ -52,6 +58,7 @@ export async function currentUserWithAccess() {
     // the shared demo user opens every tab, including tabs added after it was created
     allowedTabs: DEMO_MODE && user.email === DEMO_EMAIL ? [...ALL_TAB_IDS] : resolveTabs(user, defaults),
     adminContacts: admins.rows.map((a) => ({ name: a.name, email: a.email })),
+    client: isClient(user), // a client's demo licence: its own workspace, no tender team
     demo: DEMO_MODE,
     switchUrl: APP_SWITCH_URL,
   };
@@ -62,12 +69,7 @@ export async function userCount() {
   return rows[0].n;
 }
 
-export class HttpError extends Error {
-  constructor(status, message) {
-    super(message);
-    this.status = status;
-  }
-}
+export { HttpError };
 
 export async function requireUser({ admin = false } = {}) {
   const user = await currentUser();

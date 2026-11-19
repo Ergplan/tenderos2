@@ -3,9 +3,9 @@ import { addVersion, deleteScenario, getScenario, updateScenarioMeta } from "@/l
 import { logEvent } from "@/lib/activity";
 
 export const GET = handler(async (req, { params }) => {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
-  return Response.json(await getScenario(id, new URL(req.url).searchParams.get("version")));
+  return Response.json(await getScenario(id, new URL(req.url).searchParams.get("version"), user));
 });
 
 // Save a new version (inputs + results); earlier versions are kept.
@@ -19,14 +19,14 @@ export const PUT = handler(async (req, { params }) => {
 
 // Rename, describe or archive.
 export const PATCH = handler(async (req, { params }) => {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
-  return Response.json({ scenario: await updateScenarioMeta(id, await req.json()) });
+  return Response.json({ scenario: await updateScenarioMeta(id, await req.json(), user) });
 });
 
 export const DELETE = handler(async (_req, { params }) => {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
-  await deleteScenario(id);
+  await deleteScenario(id, user);
   return Response.json({ ok: true });
 });

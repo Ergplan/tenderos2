@@ -3,6 +3,7 @@ import { query } from "@/lib/db";
 import { handler, HttpError, verifyPassword } from "@/lib/auth";
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
 import { logEvent, startSession } from "@/lib/activity";
+import { licenceProblem } from "@/lib/workspace";
 
 // Simple in-memory brute-force brake: 10 failures per email+IP per 15 minutes.
 const failures = globalThis.__fdreLoginFailures || (globalThis.__fdreLoginFailures = new Map());
@@ -15,7 +16,7 @@ export const POST = handler(async (req) => {
   const now = Date.now();
   const recent = (failures.get(key) || []).filter((t) => now - t < WINDOW_MS);
   if (recent.length >= 10) throw new HttpError(429, "Too many attempts. Try again in 15 minutes.");
-  const { rows } = await query("SELECT id, email, name, role, password_hash, session_epoch FROM users WHERE lower(email) = lower($1)", [String(email || "").trim()]);
+  const { rows } = await query("SELECT id, email, name, role, password_hash, session_epoch, disabled, expires_at FROM users WHERE lower(email) = lower($1)", [String(email || "").trim()]);
   const user = rows[0];
   if (!user || !(await verifyPassword(String(password || ""), user.password_hash))) {
     failures.set(key, [...recent, now]);
@@ -23,6 +24,13 @@ export const POST = handler(async (req) => {
     throw new HttpError(401, "Email or password is incorrect.");
   }
   failures.delete(key);
+  // the right password, but the licence is switched off or has ended: say so, and whom to ask
+  const problem = licenceProblem(user);
+  if (problem) {
+    const admin = (await query("SELECT email FROM users WHERE role = 'admin' AND NOT disabled ORDER BY created_at LIMIT 1")).rows[0];
+    await logEvent({ user, kind: "login_failed", detail: { reason: problem }, req });
+    throw new HttpError(403, `${problem}${admin ? ` To continue, write to ${admin.email}.` : ""}`);
+  }
   await query("UPDATE users SET last_login_at = now() WHERE id = $1", [user.id]);
   const sid = await startSession(user, req);
   await logEvent({ user, sessionId: sid, kind: "login", detail: { userAgent: String(req.headers.get("user-agent") || "").slice(0, 200) }, req });

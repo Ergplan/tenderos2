@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const GET = handler(async () => {
   const user = await currentUserWithAccess();
   requireTenderAccess(user);
-  return Response.json({ tenders: await listTenderReads() });
+  return Response.json({ tenders: await listTenderReads(30, user) });
 });
 
 export const POST = handler(async (req) => {

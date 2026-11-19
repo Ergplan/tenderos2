@@ -4,10 +4,10 @@ import { deleteProfile, getProfile } from "@/lib/profiles";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const GET = handler(async (_req, { params }) => {
-  await requireUser();
+  const user = await requireUser();
   const { id } = await params;
   if (!UUID.test(id)) throw new HttpError(404, "Profile not found.");
-  return Response.json({ profile: await getProfile(id) });
+  return Response.json({ profile: await getProfile(id, user) });
 });
 
 export const DELETE = handler(async (_req, { params }) => {

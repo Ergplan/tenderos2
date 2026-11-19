@@ -3,9 +3,9 @@ import { createScenario, listScenarios } from "@/lib/scenarios";
 import { logEvent } from "@/lib/activity";
 
 export const GET = handler(async (req) => {
-  await requireUser();
+  const user = await requireUser();
   const sp = new URL(req.url).searchParams;
-  const rows = await listScenarios({ module: sp.get("module"), q: sp.get("q"), archived: sp.get("archived") === "true" });
+  const rows = await listScenarios({ module: sp.get("module"), q: sp.get("q"), archived: sp.get("archived") === "true", viewer: user });
   return Response.json({ scenarios: rows });
 });
 

@@ -1,6 +1,7 @@
 // Tender readings (Tender to Bid): save each tender the engine reads, list them for the team,
 // and load built-in readings from db/seed/tenders. Server-only.
 import fs from "node:fs";
+import { orgOf, visibleTo } from "./workspace";
 import path from "node:path";
 import { query } from "./db";
 import { HttpError } from "./auth";
@@ -25,17 +26,22 @@ function summary(result) {
   };
 }
 
-export async function listTenderReads(limit = 30) {
+/** The readings the viewer's workspace may see (lib/workspace.js), and the built-in ones. */
+export async function listTenderReads(limit = 30, viewer) {
+  const vals = [Math.max(1, Math.min(100, limit))];
+  const cond = visibleTo(viewer, "u", vals, "t.seed_key");
   const { rows } = await query(
-    `SELECT ${LIST_COLS} FROM tender_reads t LEFT JOIN users u ON u.id = t.created_by ORDER BY t.created_at DESC LIMIT $1`,
-    [Math.max(1, Math.min(100, limit))],
+    `SELECT ${LIST_COLS} FROM tender_reads t LEFT JOIN users u ON u.id = t.created_by WHERE ${cond} ORDER BY t.created_at DESC LIMIT $1`,
+    vals,
   );
   return rows;
 }
 
-export async function getTenderRead(id) {
+export async function getTenderRead(id, viewer) {
   if (!/^[0-9a-f-]{36}$/i.test(String(id))) throw new HttpError(404, "Tender reading not found.");
-  const { rows } = await query("SELECT * FROM tender_reads WHERE id = $1", [id]);
+  const vals = [id];
+  const cond = visibleTo(viewer, "u", vals, "t.seed_key");
+  const { rows } = await query(`SELECT t.* FROM tender_reads t LEFT JOIN users u ON u.id = t.created_by WHERE t.id = $1 AND ${cond}`, vals);
   if (!rows[0]) throw new HttpError(404, "Tender reading not found.");
   return rows[0];
 }
@@ -47,7 +53,13 @@ export async function saveTenderRead(user, { fileName, result }) {
   const s = summary(result);
   const body = JSON.stringify(result);
   if (body.length > 8 * 1024 * 1024) throw new HttpError(413, "The reading is too large to save.");
-  if (s.sha256) await query("DELETE FROM tender_reads WHERE sha256 = $1 AND mode = $2 AND seed_key IS NULL", [s.sha256, s.mode]);
+  // the same file read the same way replaces the earlier reading of the saver's own workspace only
+  if (s.sha256) {
+    await query(
+      "DELETE FROM tender_reads WHERE sha256 = $1 AND mode = $2 AND seed_key IS NULL AND coalesce((SELECT org FROM users WHERE id = tender_reads.created_by), '') = $3",
+      [s.sha256, s.mode, orgOf(user)],
+    );
+  }
   const { rows } = await query(
     `INSERT INTO tender_reads (file_name, title, issuer, tender_number, tender_type, capacity_mw, mode, sha256, pages, found, fields, result, created_by)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, created_at`,

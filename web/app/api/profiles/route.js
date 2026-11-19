@@ -3,9 +3,9 @@ import { createProfile, listProfiles } from "@/lib/profiles";
 import { logEvent } from "@/lib/activity";
 
 export const GET = handler(async (req) => {
-  await requireUser();
+  const user = await requireUser();
   const kind = new URL(req.url).searchParams.get("kind");
-  return Response.json({ profiles: await listProfiles(["wind", "solar"].includes(kind) ? kind : null) });
+  return Response.json({ profiles: await listProfiles(["wind", "solar"].includes(kind) ? kind : null, user) });
 });
 
 export const POST = handler(async (req) => {

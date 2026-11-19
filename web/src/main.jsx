@@ -80,6 +80,7 @@ function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox, feedba
           })}
         </nav>
       </div>
+      {!user?.client && (
       <div className="side-section">
         <h3>Team</h3>
         <nav className="side-nav">
@@ -92,6 +93,8 @@ function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox, feedba
           </button>
         </nav>
       </div>
+      )}
+      {!user?.client && (
       <div className="side-section">
         <h3>Feedback</h3>
         <nav className="side-nav">
@@ -104,6 +107,7 @@ function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox, feedba
           </button>
         </nav>
       </div>
+      )}
       <div className="side-section">
         <h3>Library</h3>
         <nav className="side-nav">
@@ -121,7 +125,7 @@ function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox, feedba
       )}
       {user && !user.demo && (
         <div className="side-section side-user">
-          <a href="/account" className="side-user-link"><UserRound size={15} /><span><strong>{user.name || user.email}</strong><small>{user.role}</small></span></a>
+          <a href="/account" className="side-user-link"><UserRound size={15} /><span><strong>{user.name || user.email}</strong><small data-testid="side-licence">{user.client ? `${user.org} · demo licence${user.expires_at ? ` until ${new Date(user.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}` : user.role}</small></span></a>
           <button type="button" className="rtc-icon-btn" title="Sign out" onClick={async () => { await flushActivity(); await authApi.logout().catch(() => {}); window.location.href = "/login"; }}><LogOut size={15} /></button>
         </div>
       )}

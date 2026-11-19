@@ -1773,3 +1773,40 @@ tr.selected td { background: var(--surface-3); color: var(--ink); font-weight: 6
 .fin-v3-row small { color: var(--muted); }
 .fin-v3-bad { color: var(--warn, #f5b83d) !important; }
 .fin-v3 input[type="date"] { min-height: 34px; }
+
+/* Administration › Users and licences (components/UserAdmin.jsx) */
+.licence-form h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 15px; }
+.licence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; }
+.licence-grid label { display: grid; gap: 5px; font-size: 12px; color: var(--muted); }
+.licence-grid label small { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+.licence-grid input, .licence-grid select { width: 100%; }
+.licence-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; padding: 10px 12px; border: 1px solid var(--line); }
+.licence-tabs legend { padding: 0 6px; font-size: 12px; color: var(--muted); }
+.licence-tabs label { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--line); font-size: 12.5px; cursor: pointer; }
+.licence-tabs label.on { border-color: var(--signal); color: var(--ink); }
+.licence-submit { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.licence-card { border-color: var(--signal); }
+.licence-card header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.licence-card header strong { display: inline-flex; align-items: center; gap: 8px; }
+.licence-card pre { margin: 10px 0; padding: 12px 14px; background: var(--bg-2, rgba(127,127,127,0.08)); border: 1px solid var(--line); white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; user-select: all; }
+.licence-card-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.licence-mail { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.licence-table td small { display: block; color: var(--muted); font-size: 11.5px; }
+.licence-table td .licence-note-text { font-style: italic; }
+.licence-table tr.is-off td { opacity: 0.6; }
+.licence-tabs-cell { max-width: 260px; font-size: 12px; }
+.licence-state { display: inline-block; padding: 2px 8px; border: 1px solid var(--line); font-size: 11.5px; white-space: nowrap; }
+.licence-state.on { border-color: var(--good); color: var(--good); }
+.licence-state.soon { border-color: var(--warn); color: var(--warn); }
+.licence-state.ended, .licence-state.off { border-color: var(--bad); color: var(--bad); }
+.licence-subhead { margin: 26px 0 8px; font-size: 14px; }
+.licence-tabs label, .licence-grid label small { text-transform: none; letter-spacing: normal; font-family: inherit; }
+.licence-tabs input[type="checkbox"], .licence-grid input[type="checkbox"] { width: 14px; height: 14px; min-height: 0; margin: 0; padding: 0; flex: none; }
+.licence-table table { table-layout: fixed; }
+.licence-table th:nth-child(1) { width: 19%; } .licence-table th:nth-child(2) { width: 12%; } .licence-table th:nth-child(3) { width: 20%; }
+.licence-table th:nth-child(4) { width: 15%; } .licence-table th:nth-child(5) { width: 11%; }
+.licence-table td { overflow-wrap: anywhere; vertical-align: top; }
+.licence-tabs-cell { max-width: none; }
+.licence-table .lib-actions .rtc-link { margin: 2px 10px 2px 0; }
+.licence-table td.lib-actions { white-space: normal; text-align: left; }
+.licence-table .lib-actions .rtc-link { display: inline-flex; white-space: nowrap; }

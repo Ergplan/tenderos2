@@ -117,6 +117,8 @@ not touched. `deploy/shared-vm/install.sh` puts TenderOS beside the old app:
   * "Switch app" in the TenderOS sidebar, or `/__switch`, shows the chooser again.
 * TenderOS runs in demo mode (`DEMO_MODE=1`). Every visitor is signed in as one shared demo user
   who can open every tab.
+  * To give clients demo licences (sign-in, chosen tabs, an end date, a workspace each), demo mode
+    must be off on that server: docs/LICENCES.md.
   * Sign-in, first-run setup, account changes and administration are switched off.
   * Saved scenarios are shared by everyone who opens the demo.
 * The old app's web container moves from `0.0.0.0:8081` to `127.0.0.1:8082`, and the router

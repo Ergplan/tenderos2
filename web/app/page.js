@@ -14,7 +14,7 @@ export default async function Home({ searchParams }) {
   let openError = "";
   if (sp?.open) {
     try {
-      initialScenario = plain(await getScenario(sp.open, sp.v || null));
+      initialScenario = plain(await getScenario(sp.open, sp.v || null, user));
     } catch (err) {
       openError = err.message;
     }

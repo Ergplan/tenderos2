@@ -17,7 +17,7 @@ export default async function Compare({ searchParams }) {
   const missing = [];
   for (const id of ids) {
     try {
-      const d = await getScenario(id);
+      const d = await getScenario(id, null, user);
       items.push(plain({ scenario: d.scenario, current: { version: d.current.version, summary: d.current.summary, created_at: d.current.created_at } }));
     } catch {
       missing.push(id);

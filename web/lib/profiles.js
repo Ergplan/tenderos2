@@ -1,5 +1,6 @@
 // Resource-profile library. Server-only.
 import fs from "node:fs";
+import { visibleTo } from "./workspace";
 import path from "node:path";
 import { query } from "./db";
 import { HttpError } from "./auth";
@@ -8,10 +9,11 @@ import { MIN_WIND_PLF } from "../src/rtc/engine";
 const LIST_COLS = `p.id, p.seed_key, p.kind, p.name, p.site, p.region, p.source, p.capacity_mw, p.period_from, p.period_to,
   p.coverage, p.cuf, p.monthly_cuf, p.quality, p.issues, p.created_by, p.created_at, u.name AS created_by_name, u.email AS created_by_email`;
 
-export async function listProfiles(kind) {
+/** The profiles the viewer's workspace uploaded (lib/workspace.js), and the built-in ones. */
+export async function listProfiles(kind, viewer) {
   const vals = [];
-  let where = "";
-  if (kind) { vals.push(kind); where = "WHERE p.kind = $1"; }
+  let where = `WHERE ${visibleTo(viewer, "u", vals, "p.seed_key")}`;
+  if (kind) { vals.push(kind); where += ` AND p.kind = $${vals.length}`; }
   const { rows } = await query(
     `SELECT ${LIST_COLS} FROM resource_profiles p LEFT JOIN users u ON u.id = p.created_by ${where}
      ORDER BY CASE p.quality WHEN 'validated' THEN 0 WHEN 'suspect' THEN 1 ELSE 2 END, p.seed_key IS NULL, p.name`,
@@ -20,8 +22,11 @@ export async function listProfiles(kind) {
   return rows;
 }
 
-export async function getProfile(id) {
-  const { rows } = await query(`SELECT ${LIST_COLS}, p.vals FROM resource_profiles p LEFT JOIN users u ON u.id = p.created_by WHERE p.id = $1`, [id]);
+export async function getProfile(id, viewer = null) {
+  // viewer null: the server's own use (after an upload)
+  const vals = [id];
+  const cond = viewer ? visibleTo(viewer, "u", vals, "p.seed_key") : "TRUE";
+  const { rows } = await query(`SELECT ${LIST_COLS}, p.vals FROM resource_profiles p LEFT JOIN users u ON u.id = p.created_by WHERE p.id = $1 AND ${cond}`, vals);
   if (!rows[0]) throw new HttpError(404, "Profile not found.");
   return rows[0];
 }
@@ -59,7 +64,7 @@ export async function createProfile(user, body) {
 }
 
 export async function deleteProfile(user, id) {
-  const p = await getProfile(id);
+  const p = await getProfile(id, user);
   if (p.seed_key && user.role !== "admin") throw new HttpError(403, "Only administrators can remove built-in profiles.");
   if (!p.seed_key && p.created_by !== user.id && user.role !== "admin") throw new HttpError(403, "You can only remove profiles you uploaded.");
   await query("DELETE FROM resource_profiles WHERE id = $1", [id]);

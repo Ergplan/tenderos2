@@ -40,7 +40,7 @@ export const GET = handler(async (req) => {
   const ids = (sp.get("ids") || "").split(",").filter(Boolean).slice(0, 20);
   if (!ids.length) throw new HttpError(400, "ids are required.");
   const items = [];
-  for (const id of ids) items.push(await getScenario(id, ids.length === 1 ? sp.get("version") : null));
+  for (const id of ids) items.push(await getScenario(id, ids.length === 1 ? sp.get("version") : null, user));
   await logEvent({ user, kind: "export", detail: { what: "scenarios.xlsx", scenarios: items.map((i) => i.scenario.name) }, req });
 
   const wb = new ExcelJS.Workbook();

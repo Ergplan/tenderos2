@@ -16,6 +16,7 @@ import { HttpError } from "./auth";
 import { DEMO_MODE } from "./demo";
 import { mailMode, sendMail } from "./mail";
 import { ALL_TAB_IDS } from "./tabs";
+import { isClient } from "./workspace";
 
 export const TEAMS = {
   management: "Tender management",
@@ -81,6 +82,9 @@ export async function actingMember(user) {
     const { rows } = await query(`SELECT ${MEMBER_COLS} FROM team_members WHERE active AND super_admin ORDER BY created_at LIMIT 1`);
     return rows[0] || null;
   }
+  // a client's demo licence is never on the tender team: the team, its messages, evidence and
+  // change requests span the installation (lib/workspace.js)
+  if (isClient(user)) return null;
   const { rows } = await query(
     `SELECT ${MEMBER_COLS} FROM team_members WHERE active AND (user_id = $1 OR (user_id IS NULL AND lower(email) = lower($2))) ORDER BY (user_id = $1) DESC LIMIT 1`,
     [user.id, user.email],

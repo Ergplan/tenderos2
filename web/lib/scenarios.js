@@ -1,6 +1,7 @@
 // Scenario persistence. Server-only.
 import { query, tx } from "./db";
 import { HttpError } from "./auth";
+import { isAdmin, visibleTo } from "./workspace";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function assertId(id) {
@@ -9,9 +10,23 @@ export function assertId(id) {
 
 const MODULES = new Set(["rtc", "bess", "seci", "cfd", "cfdOwnSolar", "fdrex"]);
 
-export async function listScenarios({ module, q, archived = false }) {
+/**
+ * Only bids the viewer's workspace may see (lib/workspace.js): 404 for one of another workspace,
+ * as if it were not there.
+ */
+async function assertVisible(id, viewer) {
+  assertId(id);
+  if (isAdmin(viewer)) return;
+  const vals = [id];
+  const cond = visibleTo(viewer, "u", vals);
+  const { rows } = await query(`SELECT 1 FROM scenarios s LEFT JOIN users u ON u.id = s.created_by WHERE s.id = $1 AND ${cond}`, vals);
+  if (!rows[0]) throw new HttpError(404, "Scenario not found.");
+}
+
+export async function listScenarios({ module, q, archived = false, viewer }) {
   const vals = [archived];
   let where = "s.archived = $1";
+  where += ` AND ${visibleTo(viewer, "cu", vals)}`;
   if (module && MODULES.has(module)) { vals.push(module); where += ` AND s.module = $${vals.length}`; }
   if (q) { vals.push(`%${q}%`); where += ` AND (s.name ILIKE $${vals.length} OR s.description ILIKE $${vals.length})`; }
   const { rows } = await query(
@@ -30,8 +45,8 @@ export async function listScenarios({ module, q, archived = false }) {
   return rows;
 }
 
-export async function getScenario(id, version = null) {
-  assertId(id);
+export async function getScenario(id, version = null, viewer) {
+  await assertVisible(id, viewer);
   const s = await query(
     `SELECT s.*, u.name AS created_by_name, u.email AS created_by_email FROM scenarios s LEFT JOIN users u ON u.id = s.created_by WHERE s.id = $1`,
     [id],
@@ -72,7 +87,7 @@ export async function createScenario(user, { name, description = "", module, inp
 }
 
 export async function addVersion(user, id, { inputs, results = null, summary = {}, note = "" }) {
-  assertId(id);
+  await assertVisible(id, user);
   validPayload({ inputs, summary });
   return tx(async (c) => {
     const s = await c.query("SELECT id FROM scenarios WHERE id = $1 FOR UPDATE", [id]);
@@ -89,7 +104,7 @@ export async function addVersion(user, id, { inputs, results = null, summary = {
 }
 
 export async function restoreVersion(user, id, version) {
-  const { current } = await getScenario(id, version);
+  const { current } = await getScenario(id, version, user);
   return addVersion(user, id, {
     inputs: current.inputs,
     results: current.results,
@@ -98,8 +113,8 @@ export async function restoreVersion(user, id, version) {
   });
 }
 
-export async function updateScenarioMeta(id, { name, description, archived }) {
-  assertId(id);
+export async function updateScenarioMeta(id, { name, description, archived }, viewer) {
+  await assertVisible(id, viewer);
   const sets = [];
   const vals = [];
   if (name !== undefined) {
@@ -115,8 +130,8 @@ export async function updateScenarioMeta(id, { name, description, archived }) {
   return rows[0];
 }
 
-export async function deleteScenario(id) {
-  assertId(id);
+export async function deleteScenario(id, viewer) {
+  await assertVisible(id, viewer);
   const { rowCount } = await query("DELETE FROM scenarios WHERE id = $1", [id]);
   if (!rowCount) throw new HttpError(404, "Scenario not found.");
 }

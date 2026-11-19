@@ -7,6 +7,6 @@ export const GET = handler(async (req, { params }) => {
   const user = await currentUserWithAccess();
   requireTenderAccess(user);
   const { id } = await params;
-  const row = await getTenderRead(id);
+  const row = await getTenderRead(id, user);
   return Response.json({ tender: row });
 });

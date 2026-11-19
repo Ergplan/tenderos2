@@ -15,7 +15,7 @@ export default async function ScenarioPage({ params, searchParams }) {
   const sp = await searchParams;
   let data;
   try {
-    data = plain(await getScenario(id, sp?.v || null));
+    data = plain(await getScenario(id, sp?.v || null, user));
   } catch {
     notFound();
   }
