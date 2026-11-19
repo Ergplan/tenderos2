@@ -18,6 +18,8 @@ import WhatIfTab from "../whatif/WhatIfTab";
 import { whatIfFromBid } from "../whatif/model";
 import { DEFAULT_SETTINGS, PACK, seciTerms } from "./terms";
 import DocumentsStep from "./DocumentsStep";
+import DocumentsView from "../tender/DocumentsView.jsx";
+import { PACK as TENDER_PACK } from "./terms";
 import ConditionsStep from "./ConditionsStep";
 import BidStep from "./BidStep";
 import BidForms from "./BidForms";
@@ -255,7 +257,7 @@ export default function SeciTab({ initialScenario = null }) {
       </nav>
 
       <div className="bid-page" style={{ "--chapter": step.color }} key={step.id}>
-        {step.id === "documents" && <DocumentsStep />}
+        {step.id === "documents" && <DocumentsView pack={TENDER_PACK}><DocumentsStep /></DocumentsView>}
         {step.id === "conditions" && <ConditionsStep state={state} />}
         {step.id === "bid" && <BidStep {...props} />}
         {step.id === "sources" && <SourcesStep {...props} startSizing={sizing.startSizing} hourly={sizing.hourly} withFinance={false} />}

@@ -19,6 +19,8 @@ import { exampleMw } from "./example.js";
 import { createToolRunner } from "./agent.js";
 import ExplainStep from "./ExplainStep.jsx";
 import DocumentsStep from "./DocumentsStep.jsx";
+import DocumentsView from "../tender/DocumentsView.jsx";
+import { PACK as TENDER_PACK } from "./pack.js";
 import ConditionsStep from "./ConditionsStep.jsx";
 import BidInputsStep from "./BidInputsStep.jsx";
 import DesignStep from "./DesignStep.jsx";
@@ -462,7 +464,7 @@ export default function CfdTab({ initialScenario = null, variant = "cfd" }) {
 
       <div className="bid-page" style={{ "--chapter": step.color }} key={step.id}>
         {step.id === "explain" && <ExplainStep state={state} prices={prices} model={model} setExample={setExample} goto={goto} />}
-        {step.id === "documents" && <DocumentsStep />}
+        {step.id === "documents" && <DocumentsView pack={TENDER_PACK}><DocumentsStep /></DocumentsView>}
         {step.id === "conditions" && <ConditionsStep state={state} />}
         {step.id === "bid" && <BidInputsStep {...props} />}
         {step.id === "bid" && own && <OwnSolarInputs state={state} setState={setState} otherKey={CFD_VARIANTS.cfd.storageKey} fromSaved={(saved) => fromSaved(saved, "ownSolar")} />}

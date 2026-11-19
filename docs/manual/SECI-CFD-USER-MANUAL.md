@@ -103,6 +103,11 @@ real IEX evenings settled, a Contract Week with a missed evening, a year of even
 
 ## Step 02 · Tender & amendments *(Tender / Legal)*
 
+*Amended RfS: track changes*, the second view at the top of the step, shows the RfS whole with
+the four amendments applied where they stand: replaced text struck through in red, the
+amendment's text underlined in green with its tag, added clauses in a green block. *Amended text*
+and *Original* show it as it now reads and as printed.
+
 ![Tender and amendments](img/cfd-02-documents-full.jpg)
 
 **1 · Documents.** The RfS of 15.07.2026 (it replaces the one of 17.04.2026), the standard CfD

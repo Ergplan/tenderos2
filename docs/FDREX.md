@@ -16,7 +16,7 @@ documents, the bid formats and letters) is kept and reused.
 
 | Step | What it shows | Code |
 | --- | --- | --- |
-| 01 Tender & amendments | The four documents, the schedule, the twelve deleted rows of Amendment-01, the bid process, queries for SECI | `DocumentsStep.jsx`, `pack.js` |
+| 01 Tender & amendments | The four documents, the schedule, the twelve deleted rows of Amendment-01, the bid process, queries for SECI; and the amended PPA and PSA whole, in track changes (docs/SECI_RTC.md, "The amended document in track changes") | `DocumentsStep.jsx`, `pack.js`, `web/src/tender/` |
 | 02 Bid conditions | 450 terms in eleven groups, each quoted on its page; the deleted ones beside what replaced them; fourteen conflicts | `ConditionsStep.jsx`, `terms.js` |
 | 03 Bid inputs | The contracted MW (50 to 600); the buyer's four hours (the 4 costliest non-solar hours each day, or 18:00–22:00); the shortfall plan; bought power and its charges; connectivity in the solar hours; the PSM; the Effective Date and the dates from it; EMD, PBG, net worth and Success Charges on the sized plant | `BidInputs.jsx`, `bidTerms.js` |
 | 04 Design | Solar, wind (on) and the storage, each "Optimizer sizes it" or "Size fixed", with costs and profiles (the RTC tab's profile library: upload or a built-in measured profile); the losses to the meter; the market sale of the surplus | `../bid/SourcesStep.jsx` |

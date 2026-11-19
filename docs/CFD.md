@@ -22,6 +22,9 @@ an administrator grants it like the other tabs.
 
 Across the steps: Save / Open (library module `cfd`), the Team panel with assignments on boxes, formats and conditions, pings and evidence on every box, feedback, and the voice bid agent (GPT-Live) with sixteen tools (`agent.js`, `voice.js`; the session from `POST /api/seci/live` with `tab: "cfd"`).
 
+The Tender & amendments step also shows the amended RfS whole, in track changes, with all four
+amendments applied where they stand (docs/SECI_RTC.md, "The amended document in track changes").
+
 ## Worked example (`workedExample`)
 
 For a bid of X MW (default: the contracted MW, else 100) and a strike price (default: the solved bid,

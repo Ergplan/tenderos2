@@ -55,6 +55,30 @@ Three items the four smaller documents left open are now answered by the RfS:
 Clause 34.3 (technical eligibility) stays **unclear**. Amendment-02 marks it "Not used", but other
 clauses still refer to it.
 
+## The amended document in track changes
+
+Once an amendment is out, the Tender & amendments step of the SECI RTC, CfD and FDRE-X tabs has a
+second view, **Amended RfS: track changes** (or the PPA and PSA, when those are what an amendment
+changes): the whole document, page by page, with each amendment applied where it stands. The text
+an amendment replaces is struck through in red; the amendment's text follows, underlined in green,
+tagged with the amendment, its date and the clause; a clause the amendment adds sits after the
+clause it belongs to in a green block. *Amended text* shows the document as it now reads; *Original*
+shows it as printed. "Go to one" lists the changes and jumps to each; a change whose original
+wording is not in the document (a title, or a definition the RfS does not number) is listed above
+the text with the reason. Every page links to its PDF page. The amendment's own wording governs.
+
+* `tools/build_tender_text.py` reads each PDF under `web/public/tenders/<tender>/` into
+  `text/<name>.json`, page by page in paragraphs, without the running headers and footers. Run it
+  when a tender's PDF is added or replaced.
+* `web/src/tender/trackChanges.js` places each change row of the pack (`before`, `after`,
+  `clause`): the original text is looked for in the document by its letters and digits alone,
+  over a page break too; when it is not found whole, by its first and last 60 letters; an added
+  clause after the paragraph that starts with its number (an annexure by its heading, a new clause
+  after the one before it).
+* `web/src/tender/TrackedDocument.jsx` and `DocumentsView.jsx` draw it.
+* `tools/check_tracked_documents.mjs` places every change of the three packs and fails when fewer
+  than 80% are placed (now 57 of 60).
+
 ## The steps
 
 | Step | What it shows | Code |

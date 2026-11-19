@@ -21,6 +21,8 @@ import { DOCUMENTS, RFS, TENDER, fdrexTerms } from "./bidTerms.js";
 import { defaultFdrexBidState, formsView, fromSaved } from "./bidState.js";
 import { TERMS } from "./terms.js";
 import DocumentsStep from "./DocumentsStep.jsx";
+import DocumentsView from "../tender/DocumentsView.jsx";
+import { PACK as TENDER_PACK } from "./pack.js";
 import ConditionsStep from "./ConditionsStep.jsx";
 import BidInputs from "./BidInputs.jsx";
 import BidForms from "./BidForms.jsx";
@@ -305,7 +307,7 @@ export default function FdrexBidTab({ initialScenario = null }) {
       </nav>
 
       <div className="bid-page" style={{ "--chapter": step.color }} key={step.id}>
-        {step.id === "documents" && <DocumentsStep />}
+        {step.id === "documents" && <DocumentsView pack={TENDER_PACK}><DocumentsStep /></DocumentsView>}
         {step.id === "conditions" && <ConditionsStep state={forms} />}
         {step.id === "bid" && <BidInputs {...props} />}
         {step.id === "sources" && <SourcesStep {...props} startSizing={startWithTheatre} hourly={sizing.hourly} withFinance={false} />}
