@@ -80,6 +80,6 @@ assert.match(licenceProblem({ disabled: false, expires_at: now.toISOString() }, 
 // ---- the credentials text (components/UserAdmin.jsx), without React
 {
   const src = readFileSync(new URL("../web/components/UserAdmin.jsx", import.meta.url), "utf8");
-  for (const line of ["Sign in at: ${origin}/login", "Email: ${user.email}", "Password: ${password}", "Tabs: ${tabs}", "Valid until:"]) assert.ok(src.includes(line), line);
+  for (const line of ["Sign in at: ${origin}${signInPath}", "Email: ${user.email}", "Password: ${password}", "Tabs: ${tabs}", "Valid until:"]) assert.ok(src.includes(line), line);
 }
 console.log("Licence checks passed: workspaces, licence ends, generated passwords, the administrator's migration");

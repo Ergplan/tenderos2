@@ -18,7 +18,8 @@ export default async function UsersPage() {
   const { rows } = await query(`SELECT ${USER_COLS} FROM users ORDER BY created_at`);
   return (
     <PageShell user={user} active="users" eyebrow="Administration" title="Users and licences">
-      <UserAdmin me={user} initial={plain(rows)} defaultTabs={cleanTabList(await getSetting("default_tabs", null)) ?? ALL_TAB_IDS} />
+      <UserAdmin me={user} initial={plain(rows)} defaultTabs={cleanTabList(await getSetting("default_tabs", null)) ?? ALL_TAB_IDS}
+        signInPath={process.env.SIGN_IN_PATH || "/login"} />
     </PageShell>
   );
 }

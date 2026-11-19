@@ -60,7 +60,8 @@ export async function currentUserWithAccess() {
     adminContacts: admins.rows.map((a) => ({ name: a.name, email: a.email })),
     client: isClient(user), // a client's demo licence: its own workspace, no tender team
     demo: DEMO_MODE,
-    switchUrl: APP_SWITCH_URL,
+    // the other apps of a shared VM are not a client's: no "Switch app" for a demo licence
+    switchUrl: isClient(user) ? null : APP_SWITCH_URL,
   };
 }
 

@@ -21,9 +21,13 @@ services:
   web:
     ports: !reset []
     environment:
-      COOKIE_SECURE: "false"
-      DEMO_MODE: "1"
+      # demo mode (no sign-in) unless .env says DEMO_MODE=0: client demo licences need sign-in
+      # (docs/LICENCES.md); then COOKIE_SECURE=true when it is opened over HTTPS
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DEMO_MODE: ${DEMO_MODE:-1}
       APP_SWITCH_URL: /__switch
+      # where a client's sign-in details send them: past the chooser, straight to this app
+      SIGN_IN_PATH: ${SIGN_IN_PATH:-/__switch/demo2}
 
   router:
     image: caddy:2.8-alpine

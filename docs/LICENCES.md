@@ -9,11 +9,16 @@ Users and licences** and hands over the sign-in details the screen shows.
 A licence needs sign-in, so the server must not run in demo mode (`DEMO_MODE=1` signs every visitor
 in as one shared user and switches administration off).
 
-1. On the server: `cd ~/tenderos2 && docker compose config | grep DEMO_MODE`. If it prints
-   `DEMO_MODE: "1"`, remove that line where it is set (`docker-compose.override.yml`, or the
-   compose file of `deploy/demo2` / `deploy/shared-vm` if the app runs from one of those).
-2. Served over HTTPS: set `COOKIE_SECURE=true` in `.env`.
-3. `git pull && docker compose build web && docker compose up -d web`.
+1. On the server, in `~/tenderos2/.env`: `DEMO_MODE=0` (the Demo 2 compose file,
+   `deploy/demo2/docker-compose.demo2.yml`, reads it; without it the app stays in demo mode) and,
+   served over HTTPS, `COOKIE_SECURE=true`. A plain `docker-compose.yml` installation has no
+   demo mode unless a file of your own sets it: `docker compose config | grep DEMO_MODE` shows it.
+2. `git pull && docker compose build web && docker compose up -d web`.
+
+On the shared VM the address shows the chooser of the three apps; a client's sign-in details point
+past it, to `https://<site>/__switch/demo2` (`SIGN_IN_PATH`, set by the Demo 2 compose file), and a
+client's sidebar has no "Switch app". Demo 1 and the old app stay as they are: anyone who opens
+the address can still choose Demo 1, which has no sign-in.
 
 On its first start the web app applies `web/db/migrations/021_licences.sql`, which adds the licence
 columns and creates the licensing administrator **ergcon@joulewise.com** with the password handed

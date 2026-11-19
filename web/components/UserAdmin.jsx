@@ -37,12 +37,12 @@ function licenceState(u) {
 }
 
 /** The text handed to the client: where to sign in, the account, its tabs and its end. */
-export function credentialsText({ user, password, origin }) {
+export function credentialsText({ user, password, origin, signInPath = "/login" }) {
   const tabs = user.role === "admin" ? "every tab (administrator)" : Array.isArray(user.tab_access) ? user.tab_access.map(tabName).join(", ") : "the default tabs";
   return [
     `TenderOS 2 · ${user.role === "admin" ? "administrator account" : `demo licence${user.org ? ` for ${user.org}` : ""}`}`,
     "",
-    `Sign in at: ${origin}/login`,
+    `Sign in at: ${origin}${signInPath}`,
     `Email: ${user.email}`,
     `Password: ${password}`,
     `Tabs: ${tabs}`,
@@ -52,10 +52,10 @@ export function credentialsText({ user, password, origin }) {
   ].join("\n");
 }
 
-function Credentials({ creds, onClose }) {
+function Credentials({ creds, onClose, signInPath }) {
   const [copied, setCopied] = useState(false);
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const text = credentialsText({ ...creds, origin });
+  const text = credentialsText({ ...creds, origin, signInPath });
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { setCopied(false); }
   };
@@ -78,7 +78,8 @@ function Credentials({ creds, onClose }) {
 
 const EMPTY = { email: "", name: "", org: "", internal: false, role: "user", duration: "30", until: "", tabs: ["fdrex"], note: "" };
 
-export default function UserAdmin({ me, initial, defaultTabs }) {
+/** signInPath: where the details send a client (SIGN_IN_PATH; past the chooser on the shared VM). */
+export default function UserAdmin({ me, initial, defaultTabs, signInPath = "/login" }) {
   const [users, setUsers] = useState(initial);
   const [form, setForm] = useState(EMPTY);
   const [msg, setMsg] = useState("");
@@ -161,7 +162,7 @@ export default function UserAdmin({ me, initial, defaultTabs }) {
         </div>
       </form>
 
-      {creds && <Credentials creds={creds} onClose={() => setCreds(null)} />}
+      {creds && <Credentials creds={creds} signInPath={signInPath} onClose={() => setCreds(null)} />}
       {msg && <div className="loading">{msg}</div>}
       {error && <div className="alert" data-testid="licence-error">{error}</div>}
 
