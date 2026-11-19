@@ -1,6 +1,6 @@
 {
  "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
- "scannedAt": "2026-11-18T03:07:34",
+ "scannedAt": "2026-11-19T01:48:46",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -39,41 +39,7 @@
    "firstSeen": "2026-09-02",
    "status": "open",
    "lastAmendment": "2026-10-19",
-   "daysToBid": -12
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000278",
-   "ref": "SECI/C&P/IPP/15/0009/26-27",
-   "title": "700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&I-1)",
-   "url": "https://www.seci.co.in/tender-details/YmV_",
-   "published": "2026-09-03",
-   "bidDeadline": "2026-11-16",
-   "bidOpen": "2026-11-19",
-   "category": "solar",
-   "categoryLabel": "Solar power",
-   "capacity": {
-    "mw": 700
-   },
-   "scheme": "C&I-1",
-   "ipp": true,
-   "summary": "Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 16 Nov 2026, 18:00, already closed. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 19 Nov 2026, 10:00.",
-   "documents": 7,
-   "amendments": [
-    {
-     "name": "Pre Bid Clarifications1",
-     "date": "2026-10-13"
-    },
-    {
-     "name": "Amendment 011",
-     "date": "2026-10-13"
-    }
-   ],
-   "fingerprint": "f798274e21136d31",
-   "firstSeen": "2026-09-03",
-   "status": "open",
-   "lastAmendment": "2026-10-13",
-   "daysToBid": -2
+   "daysToBid": -13
   },
   {
    "source": "SECI",
@@ -99,7 +65,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 1
+   "daysToBid": 0
   },
   {
    "source": "SECI",
@@ -147,41 +113,7 @@
    "firstSeen": "2026-04-19",
    "status": "amended",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 2
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000263",
-   "ref": "SECI/C&P/OP/11/0003/26-27",
-   "title": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wind)",
-   "url": "https://www.seci.co.in/tender-details/YmR0",
-   "published": "2026-07-16",
-   "bidDeadline": "2026-11-20",
-   "bidOpen": "2026-11-25",
-   "category": "wind",
-   "categoryLabel": "Wind power",
-   "capacity": {
-    "mw": 45.6
-   },
-   "scheme": null,
-   "ipp": false,
-   "summary": "Wind power, 45.6 MW; for EPC contractors: build the plant for SECI. Bids are due 20 Nov 2026, 18:00. Pre-bid meeting 3 Aug 2026, 15:30. Bids open 25 Nov 2026, 10:30.",
-   "documents": 9,
-   "amendments": [
-    {
-     "name": "amendment-2 28092026",
-     "date": "2026-09-28"
-    },
-    {
-     "name": "Amendment-1 Clarification-1 dwgFile KML File SA-A SA-B SA-C",
-     "date": "2026-09-10"
-    }
-   ],
-   "fingerprint": "08ecc1910eff9b71",
-   "firstSeen": "2026-07-16",
-   "status": "open",
-   "lastAmendment": "2026-09-28",
-   "daysToBid": 2
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -211,7 +143,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -236,7 +168,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -261,7 +193,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -296,7 +228,45 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 7
+   "daysToBid": 6
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000263",
+   "ref": "SECI/C&P/OP/11/0003/26-27",
+   "title": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wind)",
+   "url": "https://www.seci.co.in/tender-details/YmR0",
+   "published": "2026-07-16",
+   "bidDeadline": "2026-11-25",
+   "bidOpen": "2026-11-26",
+   "category": "wind",
+   "categoryLabel": "Wind power",
+   "capacity": {
+    "mw": 45.6
+   },
+   "scheme": null,
+   "ipp": false,
+   "summary": "Wind power, 45.6 MW; for EPC contractors: build the plant for SECI. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 3 Aug 2026, 15:30. Bids open 26 Nov 2026, 10:30.",
+   "documents": 10,
+   "amendments": [
+    {
+     "name": "amended 3 Wind 18112026R",
+     "date": "2026-11-18"
+    },
+    {
+     "name": "amendment-2 28092026",
+     "date": "2026-09-28"
+    },
+    {
+     "name": "Amendment-1 Clarification-1 dwgFile KML File SA-A SA-B SA-C",
+     "date": "2026-09-10"
+    }
+   ],
+   "fingerprint": "fa5a4f786cfd3d66",
+   "firstSeen": "2026-07-16",
+   "status": "amended",
+   "lastAmendment": "2026-11-18",
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -328,7 +298,41 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 7
+   "daysToBid": 6
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000278",
+   "ref": "SECI/C&P/IPP/15/0009/26-27",
+   "title": "700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&I-1)",
+   "url": "https://www.seci.co.in/tender-details/YmV_",
+   "published": "2026-09-03",
+   "bidDeadline": "2026-11-30",
+   "bidOpen": "2026-12-03",
+   "category": "solar",
+   "categoryLabel": "Solar power",
+   "capacity": {
+    "mw": 700
+   },
+   "scheme": "C&I-1",
+   "ipp": true,
+   "summary": "Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 3 Dec 2026, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Pre Bid Clarifications1",
+     "date": "2026-10-13"
+    },
+    {
+     "name": "Amendment 011",
+     "date": "2026-10-13"
+    }
+   ],
+   "fingerprint": "4916d6522729c35b",
+   "firstSeen": "2026-09-03",
+   "status": "open",
+   "lastAmendment": "2026-10-13",
+   "daysToBid": 11
   },
   {
    "source": "SECI",
@@ -351,7 +355,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 12
+   "daysToBid": 11
   },
   {
    "source": "SECI",
@@ -374,7 +378,7 @@
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 12
+   "daysToBid": 11
   },
   {
    "source": "SECI",
@@ -406,7 +410,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 13
+   "daysToBid": 12
   },
   {
    "source": "SECI",
@@ -431,7 +435,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 13
+   "daysToBid": 12
   },
   {
    "source": "SECI",
@@ -456,7 +460,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 15
+   "daysToBid": 14
   },
   {
    "source": "SECI",
@@ -479,7 +483,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 26
+   "daysToBid": 25
   },
   {
    "source": "NHPC",
@@ -502,9 +506,9 @@
    "amendments": [],
    "fingerprint": "2026-12-15|0|RfS of Developer for Setting up BESS and Supply of Solar- Plus -BESS Power utilizing the 1200 MW Solar Project at Jalaun Solar Park of BSUL",
    "firstSeen": "2026-11-04",
-   "status": "new",
+   "status": "open",
    "lastAmendment": null,
-   "daysToBid": 27
+   "daysToBid": 26
   }
  ],
  "results": [
@@ -1043,6 +1047,33 @@
  ],
  "events": [
   {
+   "date": "2026-11-19",
+   "source": "SECI",
+   "id": "SECI000278",
+   "tender": "C&I-1",
+   "kind": "deadline moved",
+   "detail": "2026-11-16 → 2026-11-30",
+   "url": "https://www.seci.co.in/tender-details/YmV_"
+  },
+  {
+   "date": "2026-11-19",
+   "source": "SECI",
+   "id": "SECI000263",
+   "tender": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wi…",
+   "kind": "deadline moved",
+   "detail": "2026-11-20 → 2026-11-25",
+   "url": "https://www.seci.co.in/tender-details/YmR0"
+  },
+  {
+   "date": "2026-11-18",
+   "source": "SECI",
+   "id": "SECI000263",
+   "tender": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wi…",
+   "kind": "amendment",
+   "detail": "amended 3 Wind 18112026R",
+   "url": "https://www.seci.co.in/tender-details/YmR0"
+  },
+  {
    "date": "2026-11-18",
    "source": "SECI",
    "id": "SECI000298",
@@ -1093,6 +1124,6 @@
   "ipp": 12,
   "seci": 16,
   "nhpc": 1,
-  "newToday": 1
+  "newToday": 2
  }
 }
