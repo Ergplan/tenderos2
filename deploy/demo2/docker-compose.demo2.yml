@@ -28,6 +28,10 @@ services:
       APP_SWITCH_URL: /__switch
       # where a client's sign-in details send them: past the chooser, straight to this app
       SIGN_IN_PATH: ${SIGN_IN_PATH:-/__switch/demo2}
+      # Demo 1 keeps the cookie tenderos_session on this address: Demo 2's session has its own
+      SESSION_COOKIE_NAME: tenderos2_session
+      # Demo 1, off the chooser: administrators open it from the sidebar (apps.caddy forward_auth)
+      DEMO1_URL: /__switch/new
 
   router:
     image: caddy:2.8-alpine

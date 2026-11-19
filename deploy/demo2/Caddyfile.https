@@ -1,4 +1,4 @@
-# The Demo 2 router with HTTPS (docker-compose.demo2-https.yml): the chooser and the three apps on
+# The Demo 2 router with HTTPS (docker-compose.demo2-https.yml): the chooser and the apps on
 # https://{$SITE_ADDRESS} (port 80 redirects to it) and on port 8081.
 {
 	admin off

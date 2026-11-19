@@ -15,10 +15,18 @@ in as one shared user and switches administration off).
    demo mode unless a file of your own sets it: `docker compose config | grep DEMO_MODE` shows it.
 2. `git pull && docker compose build web && docker compose up -d web`.
 
-On the shared VM the address shows the chooser of the three apps; a client's sign-in details point
-past it, to `https://<site>/__switch/demo2` (`SIGN_IN_PATH`, set by the Demo 2 compose file), and a
-client's sidebar has no "Switch app". Demo 1 and the old app stay as they are: anyone who opens
-the address can still choose Demo 1, which has no sign-in.
+On the shared VM the address shows the chooser: TenderOS (Demo 2) and the old app. A client's
+sign-in details point past it, to `https://<site>/__switch/demo2` (`SIGN_IN_PATH`, set by the Demo
+2 compose file), and a client's sidebar has no "Switch app".
+
+**Demo 1 is for TenderOS administrators only.** It is off the chooser; the router
+(`deploy/demo2/apps.caddy`) asks TenderOS's `/api/auth/gate` before every Demo 1 request, with the
+visitor's cookies: an administrator signed in to TenderOS passes (204), anyone else is sent to the
+TenderOS sign-in. Administrators open it with **Demo 1 · administrators only** in the sidebar
+(`DEMO1_URL`, `/__switch/new`). Demo 1's own code and data are unchanged; it keeps its cookie
+`tenderos_session`, and TenderOS on this address uses `tenderos2_session` (`SESSION_COOKIE_NAME`),
+so opening one does not sign you out of the other. Signing out of TenderOS closes Demo 1 too.
+After this change everyone signs in to TenderOS once more (the cookie's name changed).
 
 On its first start the web app applies `web/db/migrations/021_licences.sql`, which adds the licence
 columns and creates the licensing administrator **ergcon@joulewise.com** with the password handed

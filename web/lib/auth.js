@@ -62,6 +62,8 @@ export async function currentUserWithAccess() {
     demo: DEMO_MODE,
     // the other apps of a shared VM are not a client's: no "Switch app" for a demo licence
     switchUrl: isClient(user) ? null : APP_SWITCH_URL,
+    // the shared VM's Demo 1, behind this app's administrator sign-in (deploy/demo2/apps.caddy)
+    demo1Url: user.role === "admin" ? process.env.DEMO1_URL || null : null,
   };
 }
 

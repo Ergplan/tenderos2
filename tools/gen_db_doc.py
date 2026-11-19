@@ -395,7 +395,7 @@ What is **not** in the database:
   and `web/src/seci/terms.js`), the SECI auction results (`web/src/market/seed.js`), the IEX hourly
   prices (`web/public/market/iex_hourly_prices.json`), and the seed files that are loaded into
   `resource_profiles` and `tender_reads` on start (`web/db/seed/`).
-* **Sessions are a signed cookie** (`tenderos_session`, HS256 JWT, `web/lib/session.js`); the
+* **Sessions are a signed cookie** (`tenderos_session`, or `SESSION_COOKIE_NAME`: `tenderos2_session` on the shared VM; HS256 JWT, `web/lib/session.js`); the
   database only records them in `user_sessions` for the usage report.
 """
 

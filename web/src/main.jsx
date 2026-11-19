@@ -118,6 +118,11 @@ function Sidebar({ activeTab, setActiveTab, user, allowed, team, onInbox, feedba
         </nav>
       </div>
       <div className="side-section side-theme"><ThemeToggle /></div>
+      {user?.demo1Url && (
+        <div className="side-section">
+          <nav className="side-nav"><a href={user.demo1Url} data-testid="nav-demo1"><ArrowLeftRight size={15} /> Demo 1 <small>administrators only</small></a></nav>
+        </div>
+      )}
       {user?.switchUrl && (
         <div className="side-section">
           <nav className="side-nav"><a href={user.switchUrl}><ArrowLeftRight size={15} /> Switch app</a></nav>

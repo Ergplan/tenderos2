@@ -35,8 +35,14 @@ route {
 			flush_interval -1
 		}
 	}
+	# Demo 1: TenderOS administrators only. Every request asks Demo 2 first (/api/auth/gate, with
+	# the visitor's cookies): 204 lets it through; anyone else gets Demo 2's answer, a redirect to
+	# its sign-in. Demo 1 is not on the chooser; administrators open it from Demo 2's sidebar.
 	@new header_regexp app Cookie (^|;\s*)tenderos_app=new(;|$)
 	handle @new {
+		forward_auth tenderos2-web-1:3000 {
+			uri /api/auth/gate
+		}
 		reverse_proxy tenderos-web-1:3000 {
 			flush_interval -1
 		}

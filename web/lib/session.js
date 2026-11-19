@@ -1,7 +1,9 @@
 // Signed session cookie (HS256 JWT). Safe to import from proxy.js: no database access.
 import { SignJWT, jwtVerify } from "jose";
 
-export const SESSION_COOKIE = "tenderos_session";
+// SESSION_COOKIE_NAME: another name where another app on the same address uses this one (the
+// shared VM: Demo 1 keeps tenderos_session, Demo 2 has tenderos2_session)
+export const SESSION_COOKIE = process.env.SESSION_COOKIE_NAME || "tenderos_session";
 export const SESSION_DAYS = 14;
 
 function key() {

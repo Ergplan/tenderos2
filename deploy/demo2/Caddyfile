@@ -1,6 +1,7 @@
-# Port 8081 on the shared VM with Demo 2: a chooser between TenderOS Demo 2, Demo 1 and the old
-# app (jouleWise). The choice is a cookie, so every app keeps its root paths:
-#   /__switch/demo2   Demo 2      /__switch/new   Demo 1      /__switch/old   the old app
+# Port 8081 on the shared VM with Demo 2: a chooser between TenderOS (Demo 2) and the old app
+# (jouleWise). Demo 1 is off the chooser and only for TenderOS administrators (apps.caddy:
+# forward_auth to Demo 2). The choice is a cookie, so every app keeps its root paths:
+#   /__switch/demo2   Demo 2      /__switch/new   Demo 1 (admins)      /__switch/old   the old app
 #   /__switch         forget the choice and show the chooser again
 {
 	auto_https off
