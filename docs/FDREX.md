@@ -26,6 +26,10 @@ documents, the bid formats and letters) is kept and reused.
 | 08 What-if | The sized bid in the instant What-if: change any size, cost, financing or FDRE-X setting and see the tariff the target IRR needs, the returns at the bid tariff, the tender checks and the tariff levers | `../whatif/WhatIfTab.jsx`, `../whatif/model.js` (`tender: "fdrex"`) |
 | 09 Bid forms | The RfS's 23 formats filled from the bid and its sized plant | `BidForms.jsx`, `forms.js`, `formats.js`, `letters/` |
 
+The bid forms read the bid through `formsView`, and their changes come back through the tab's
+`setForms`, which applies them to that view (so a format's review is fingerprinted on what the
+forms show) and drops the view's `inputs`.
+
 The tab is `FdrexBidTab.jsx`; its state (the Tender to Bid state with `fdrex` settings), a saved
 bid read back and the view the bid forms read (`formsView`: the contracted MW, the Effective Date,
 the storage per MW and the sizes as the forms name them) are in `bidState.js`. This browser keeps
@@ -90,6 +94,17 @@ shortfall penalty", "SECI's charges …"); the operating-cost statement shows th
 nil. Recalculated in LibreOffice, the Live model agrees with the app (₹8.8021, equity IRR 14.00%,
 minimum DSCR 1.129 on the benchmark bid).
 
+While HiGHS sizes the plant (from the Size, Design or Finance inputs step, or when the voice agent
+runs the optimizer), the tab shows the Round-the-Clock tab's optimizer theatre (`../rtc/Theatre.jsx`):
+a tariff surface over solar × wind builds on screen, HiGHS's live log scrolls beside it, and its
+optimum is marked when it returns; then the Size step shows the result. The surface is
+`surface.js`, built off the page's thread by `surface.worker.js`: solar 0–1.2 × and wind 0–1.75 ×
+the contracted MW (a fixed size, or a source switched off, is one point), and at each mix the
+tariff the target IRR needs with the best of three storage sizes (0.7, 0.85 and 1.0 × the MW at
+the bid's hours), from the instant What-if dispatch (about 0.1 s a design, some 15 s for the 56
+mixes). It is a picture of the design space; the bid's numbers come from HiGHS and the Financial
+model. Cancel stops the sizing.
+
 The 15-minute dispatch (`engine/sizing/dispatch15.py`) does not model purchases, the sale mask or
 the monthly tolerance yet, so the Size step does not offer it in this tab (`dispatch15={false}`).
 
@@ -133,7 +148,11 @@ PSM, the Effective Date, the benchmarks; `list_inputs`, `set_input` over 177 inp
 energy supplied, penalised, bought and sold, EMD, PBG, net worth, SECI's charges, the dates),
 `get_financials`, `check_tariff` (records the quote), `what_if` (the instant What-if on changed
 sizes, costs, IRR or tariff), `explain_generation`, and the bid forms (`review_bid_forms`,
-`open_format`, `mark_format_reviewed`). The earlier tab's agent (`agent.js`) still serves
+`open_format`, `mark_format_reviewed`). Asked to change inputs and size the plant, it sets each
+input on screen and runs the optimizer through the same path as the Size button, so the theatre
+opens beside its panel (the panel stays on top). If the voice service's audio cannot connect in 20
+seconds (a network that blocks WebRTC: UDP 3478 or TCP 443 to the voice servers), the panel says
+so instead of waiting. The earlier tab's agent (`agent.js`) still serves
 `/api/fdrex/agent` and lends its tender lookup.
 
 ## Where it is registered

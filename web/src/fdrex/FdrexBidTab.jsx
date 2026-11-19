@@ -26,6 +26,7 @@ import BidInputs from "./BidInputs.jsx";
 import BidForms from "./BidForms.jsx";
 import { formIssues } from "./forms.js";
 import { formatsSummary } from "./formats.js";
+import OptimizerTheatre from "../rtc/Theatre";
 
 export const STORAGE_KEY = "tenderos.fdrex.bid.v2";
 export const MODULE = "fdrex";
@@ -89,6 +90,67 @@ export default function FdrexBidTab({ initialScenario = null }) {
   const pricesRef = useRef(prices);
   pricesRef.current = prices;
   const agentRunner = useCallback((ctx) => createToolRunner({ ...ctx, getPrices: () => pricesRef.current }), []);
+
+  // the optimizer theatre of the Round-the-Clock tab while HiGHS sizes the plant (from a button or
+  // the agent): the tariff surface over solar × wind from the instant What-if (surface.worker.js),
+  // HiGHS's live log beside it, its optimum marked when it returns
+  const [theatre, setTheatre] = useState(false);
+  const feedRef = useRef(null);
+  const surfaceRef = useRef(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const startWithTheatre = useCallback(async () => {
+    if (sizing.run?.active) return null;
+    const st = stateRef.current;
+    if (missingInputs(st, terms).length) return sizing.startSizing();
+    surfaceRef.current?.terminate();
+    const id = Date.now();
+    const feed = {
+      startedAt: performance.now(), axes: null, cells: [], tcells: [], tariffMode: true, done: false, result: null, error: null, progress: null,
+      highs: { active: true, lines: [], progress: null, done: false, result: null, error: null, startedAt: performance.now() },
+    };
+    feedRef.current = feed;
+    setTheatre(true);
+    try {
+      const worker = new Worker(new URL("./surface.worker.js", import.meta.url), { type: "module" });
+      surfaceRef.current = worker;
+      worker.onmessage = (ev) => {
+        const m = ev.data;
+        if (m.id !== id || feedRef.current !== feed) return;
+        if (m.type === "axes") feed.axes = m.axes;
+        else if (m.type === "cells") { feed.cells.push(...m.cells); feed.tcells.push(...m.cells); }
+        else if (m.type === "done" || m.type === "error") worker.terminate();
+      };
+      worker.postMessage({ id, state: { ...st, lp: null, sizingSeed: null }, prices: pricesRef.current });
+    } catch { /* no workers: the theatre shows HiGHS alone */ }
+    const lp = await sizing.startSizing();
+    if (feedRef.current === feed) {
+      const best = lp ? { sizes: lp.sizes, tariff: lp.tariff } : null;
+      Object.assign(feed.highs, { done: true, result: best, error: lp ? null : "did not finish", endedAt: performance.now() });
+      if (best) { feed.result = { best }; feed.done = true; } else feed.error = "The sizing did not finish: see the Size step.";
+      // the surface is a picture: if it is not complete when HiGHS is back, draw what there is
+      if (best && !(feed.axes && feed.tcells.length >= feed.axes.solarGrid.length * feed.axes.windGrid.length)) {
+        setTimeout(() => {
+          if (feedRef.current !== feed || !feed.axes) return;
+          const have = new Set(feed.tcells.map((c) => `${c.si}|${c.wi}`));
+          for (let si = 0; si < feed.axes.solarGrid.length; si += 1) for (let wi = 0; wi < feed.axes.windGrid.length; wi += 1) {
+            if (!have.has(`${si}|${wi}`)) feed.tcells.push({ si, wi, sizes: { solarMw: feed.axes.solarGrid[si], windMw: feed.axes.windGrid[wi] }, z: null, feasible: false });
+          }
+        }, 6000);
+      }
+    }
+    return lp;
+  }, [sizing, terms]);
+  // HiGHS's log and Dinkelbach progress into the theatre
+  useEffect(() => {
+    const f = feedRef.current;
+    if (!f || !sizing.run) return;
+    f.highs.lines = (sizing.run.log || []).map((l) => ({ stage: l.stage || "highs", msg: l.msg || String(l) }));
+    if (sizing.run.iteration) f.highs.progress = { iteration: sizing.run.iteration, lambda: sizing.run.tariff ?? null };
+  }, [sizing.run]);
+  const closeTheatre = useCallback(() => { surfaceRef.current?.terminate(); feedRef.current = null; setTheatre(false); }, []);
+  const cancelTheatre = useCallback(() => { sizing.stopSizing(); closeTheatre(); }, [sizing, closeTheatre]);
+  const sizingForAgent = useMemo(() => ({ ...sizing, startSizing: startWithTheatre }), [sizing, startWithTheatre]);
 
   const team = useTeam(linked?.id || null);
   const [teamOpen, setTeamOpen] = useState(false);
@@ -186,8 +248,13 @@ export default function FdrexBidTab({ initialScenario = null }) {
   const next = FDREX_STEPS[index + 1];
   const prev = FDREX_STEPS[index - 1];
   const props = { state, setState, patch, set, lockProps, isLocked, goto, prices, terms, missing };
-  // the bid forms' state updates go to this tab's state: they only touch forms, formsReview, letters and the view
-  const setForms = setState;
+  // the bid forms work on formsView(state): their updates (forms, formsReview, letters, the view) are
+  // made on that view, so a review's fingerprint is taken on what the forms show, and come back
+  // without the view's `inputs`
+  const setForms = useCallback((fn) => setState((s) => {
+    const { inputs, ...next } = typeof fn === "function" ? fn(formsView(s)) : fn;
+    return next;
+  }), []);
   // the agent opens the traceable model at a line (explain_generation): the Financial model step shows it
   const [traceAsk, setTraceAsk] = useState(null);
   const onTrace = useCallback((t) => setTraceAsk({ ...t, at: Date.now() }), []);
@@ -241,9 +308,9 @@ export default function FdrexBidTab({ initialScenario = null }) {
         {step.id === "documents" && <DocumentsStep />}
         {step.id === "conditions" && <ConditionsStep state={forms} />}
         {step.id === "bid" && <BidInputs {...props} />}
-        {step.id === "sources" && <SourcesStep {...props} startSizing={sizing.startSizing} hourly={sizing.hourly} withFinance={false} />}
-        {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={sizing.startSizing} />}
-        {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={sizing.startSizing} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} dispatch15={false} />}
+        {step.id === "sources" && <SourcesStep {...props} startSizing={startWithTheatre} hourly={sizing.hourly} withFinance={false} />}
+        {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={startWithTheatre} />}
+        {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={startWithTheatre} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} dispatch15={false} />}
         {step.id === "finance" && <FinanceStep {...props} traceRequest={traceAsk} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
         {step.id === "whatif" && <WhatIfTab embedded seed={whatIfSeed} seedKey={state.lp ? `${JSON.stringify(state.lp.sizes)}|${state.lp.tariff}|${JSON.stringify(state.fdrex)}` : ""} onBack={() => goto("finance")} />}
         {step.id === "forms" && <BidForms state={forms} setState={setForms} goto={goto} model={formsModel} index="9" />}
@@ -266,7 +333,18 @@ export default function FdrexBidTab({ initialScenario = null }) {
       )}
       <LiveAgent tab={MODULE} runner={agentRunner} charts={null} toolWords={FDREX_TOOL_WORDS}
         intro="Talk naturally: it explains the tender and its conditions with their pages, takes your inputs in order, changes anything on screen, sizes the plant with HiGHS, explains the tariff and the returns, tries what-ifs and fills the bid forms. Every number comes from this screen; every tender fact from the documents."
-        state={state} setState={setState} terms={terms} goto={goto} sizing={sizing} info={agent} onDock={setDocked} onTrace={onTrace} />
+        state={state} setState={setState} terms={terms} goto={goto} sizing={sizingForAgent} info={agent} onDock={setDocked} onTrace={onTrace} />
+      {theatre && feedRef.current && (
+        <OptimizerTheatre feed={feedRef} onFinish={() => { closeTheatre(); goto("size"); }} onCancel={cancelTheatre} title="HiGHS: the least 25-year tariff for FDRE-X"
+          buildSteps={(st) => {
+            const total = st.total || 0;
+            return [
+              [`Instant dispatch of ${st.mapped}/${total || "…"} solar × wind mixes, the best storage at each (the What-if model)`, total > 0 && st.mapped >= total],
+              ["HiGHS LP: the buyer's 4 hours, the monthly 10% rule, bought power within 5%, the sale outside the solar hours", Boolean(st.highs?.done)],
+              ["Least tariff found: the Financial model prices it exactly", st.phase === "found"],
+            ];
+          }} />
+      )}
       {teamOpen && <TeamPanel team={teamCtx} state={state} bidName={linked?.name} onAccept={acceptAnswer} onClose={() => setTeamOpen(false)} focusId={teamFocus} />}
     </div>
     </TeamContext.Provider>

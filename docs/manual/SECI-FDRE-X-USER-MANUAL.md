@@ -124,8 +124,11 @@ and the finance team's detailed inputs, as on the SECI RTC tab.
 
 **Size the plant** runs HiGHS: hour by hour over the modelled years, the least 25-year tariff at
 your target equity IRR with the buyer's four hours supplied, the monthly rule held, bought power
-within 5% and nothing sold where there is no connectivity. A 100 MW bid takes about a minute; the
-solver's log streams as it runs. Then:
+within 5% and nothing sold where there is no connectivity. A 100 MW bid takes about a minute.
+While it runs, the optimizer animation fills the screen: a tariff surface over solar × wind (from
+the instant What-if model, the best storage at each mix) builds up, the solver's log streams beside
+it, and HiGHS's optimum is marked when it is found. *Skip animation* goes straight to the result;
+*Cancel* stops the sizing. Then:
 
 * **Plant**: the solar, wind and storage sizes and the tariff HiGHS proves no design can beat.
 * **The monthly rule** year by year: the worst month's share of its peak energy, marked within the
@@ -176,8 +179,13 @@ the tariff you mean to quote, tries what-ifs ("what if storage costs ₹0.9 cror
 out the energy with the formula, and fills and reviews the bid forms with you. Every number comes
 from the screen and every tender fact from the documents; it never changes a term.
 
-It needs the OpenAI key set up once by an administrator (API keys in the Library) and an HTTPS
-address for the microphone.
+Say, for example, "bid 150 megawatts, plan for the evening hours, use the benchmarks and run the
+optimizer": it sets each input on screen and starts HiGHS, and the optimizer animation opens beside
+its panel.
+
+It needs the OpenAI key set up once by an administrator (API keys in the Library), an HTTPS
+address for the microphone, and a network that lets the browser's voice connection (WebRTC) reach
+the voice service. If it cannot connect within 20 seconds, the panel says so.
 
 ## Quick reference: an FDRE-X bid in nine clicks
 

@@ -70,6 +70,8 @@
 
 /* the bid agent (GPT-Live) */
 .agent-panel { z-index: 42; }
+/* the optimizer theatre (FDRE-X: the agent can start it) stays beside the agent's panel, which stays on top */
+.agent-docked ~ .agent-panel, .agent-docked .agent-panel { z-index: 62; }
 .agent-phase { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .agent-log p.you { color: var(--ink); }
 .agent-log p.you::before { content: "You: "; color: var(--signal); }
@@ -152,6 +154,7 @@
 @media (min-width: 1200px) {
   .seci.agent-docked { margin-right: 440px; transition: margin-right 200ms ease; }
   .seci.agent-docked .bid-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .seci.agent-docked .theatre { right: 456px; }
   .agent-panel { top: 22px; max-height: calc(100vh - 44px); align-content: start; }
   .agent-panel .agent-log { max-height: none; }
 }

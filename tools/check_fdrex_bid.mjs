@@ -18,6 +18,8 @@ import { DEFAULT_SETTINGS, TENDER, fdrexTerms, keyDates, moneyAtStake, nonSolarM
 import { defaultFdrexBidState, formsView, fromSaved } from "../web/src/fdrex/bidState.js";
 import { dsmFor, fillBenchmarks, lpPayload, missingInputs, modelInputs, opsFromLp, resourceProfiles } from "../web/src/bid/model.js";
 import { liveModelRequest } from "../web/src/bid/liveModelRequest.js";
+import { surfaceAxes, surfaceCell, surfaceSeed } from "../web/src/fdrex/surface.js";
+import { FORMATS, formatPrint, formatStatus } from "../web/src/fdrex/formats.js";
 
 const prices = JSON.parse(readFileSync(new URL("../web/public/market/iex_hourly_prices.json", import.meta.url), "utf8"));
 const count = (mask) => mask.reduce((a, v) => a + (v ? 1 : 0), 0);
@@ -136,5 +138,37 @@ const base = () => {
   assert.deepEqual(back.fdrex, st.fdrex, "a saved bid comes back");
   assert.equal(fromSaved({ inputs: { contractedMw: 50 } }).bid.baseMw, 100, "a bid of the earlier FDRE-X tab starts afresh");
   console.log("ok   dates, EMD / PBG / Success Charges, the bid forms' view, a saved bid");
+}
+// ---- the bid forms' review: stamped on the view the forms show, it holds (the tab's setForms)
+{
+  const st = base();
+  st.lp = { sizes: { solarMw: 21, windMw: 89, bessMw: 74, bessMwh: 297 }, tariff: 8.9 };
+  const fmt = FORMATS.find((f) => f.id === "7.1");
+  const stamp = (on) => ({ ...st, formsReview: { "7.1": { at: "2026-11-19T00:00:00Z", print: formatPrint(on, fmt) } } });
+  assert.equal(formatStatus(formsView(stamp(formsView(st))), fmt).reviewed, "current", "reviewed on the forms' view: current");
+  assert.equal(formatStatus(formsView(stamp(st)), fmt).reviewed, "changed", "stamped on the raw bid it never matched (the bug fixed in FdrexBidTab's setForms)");
+  console.log("ok   a format's review holds");
+}
+
+// ---- the tariff surface drawn while HiGHS sizes (surface.js)
+{
+  const st = base();
+  const ax = surfaceAxes(st);
+  assert.deepEqual(ax.solarGrid, [0, 20, 40, 60, 80, 100, 120]);
+  assert.equal(ax.windGrid.length, 8);
+  assert.equal(ax.windGrid.at(-1), 175);
+  assert.deepEqual(ax.bessOptions, [70, 85, 100]);
+  const fixed = { ...st, src: { ...st.src, wind: { ...st.src.wind, capacity: { mode: "fixed", mw: 90 } } } };
+  assert.deepEqual(surfaceAxes(fixed).windGrid, [90], "a fixed size is one point");
+  assert.deepEqual(surfaceAxes({ ...st, sources: { ...st.sources, solar: false } }).solarGrid, [0], "a source switched off is nought");
+  const seed = surfaceSeed(st, prices);
+  const t0 = Date.now();
+  const good = surfaceCell(seed, ax, 1, 4, prices); // 20 MWac solar, 100 MW wind
+  const ms = (Date.now() - t0) / 3;
+  const none = surfaceCell(seed, ax, 0, 0, prices); // no generation at all
+  assert.ok(good.feasible && good.z > 7 && good.z < 12, `20 MW solar + 100 MW wind: ₹${good.z}`);
+  assert.equal(good.sizes.bessMwh, good.sizes.bessMw * 4);
+  assert.equal(none.feasible, false, "no plant: off the surface");
+  console.log(`ok   the tariff surface: ${ax.solarGrid.length} × ${ax.windGrid.length} mixes × ${ax.bessOptions.length} storage sizes, ${ms.toFixed(0)} ms a design; 20/100 MW needs ₹${good.z.toFixed(2)}`);
 }
 console.log("OK  FDRE-X Bid tab: the tender's terms, the HiGHS request and the financial model");

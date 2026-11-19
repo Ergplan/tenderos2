@@ -147,6 +147,7 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
     conn.current = null;
     if (!c) return;
     clearTimeout(c.closeTimer);
+    clearTimeout(c.connectTimer);
     c.mic?.getTracks().forEach((tr) => tr.stop());
     try { c.dc?.close(); } catch { /* closed */ }
     try { c.pc?.close(); } catch { /* closed */ }
@@ -215,6 +216,13 @@ export default function LiveAgent({ state, setState, terms, goto, sizing, info, 
       if (!res.ok) throw new Error(body.error || `The voice agent could not start (${res.status}).`);
       greeting = body.greeting || "";
       await pc.setRemoteDescription({ type: "answer", sdp: body.transport.sdp });
+      // the session is made; the audio needs a direct connection to the voice service, which some
+      // networks block: say so rather than wait on "Connecting…"
+      c.connectTimer = setTimeout(() => {
+        if (conn.current !== c || phaseRef.current !== "connecting") return;
+        setError("The voice service did not answer in 20 seconds: this network may block its audio connection (WebRTC, UDP 3478 or TCP 443 to the voice servers). Try another network, or ask IT to allow it.");
+        cleanup();
+      }, 20_000);
     } catch (err) {
       setError(err.name === "NotAllowedError" ? "The microphone is blocked: allow it for this site and try again." : err.message);
       cleanup();
