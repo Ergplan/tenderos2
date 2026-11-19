@@ -21,8 +21,9 @@ day, the scheduling block of the Indian Grid Code) for each PPA year, one HiGHS 
 
 Solar and wind profiles are hourly. Each hour is split into four 15-minute values along the
 hour's trend (half the difference between the next and the previous hour), keeping the hour's
-energy exactly and every value within [0, peak]; demand and market prices are the hour's value
-in each of its blocks.
+energy exactly and every value within [0, peak]; demand is the hour's value in each of its blocks.
+Market prices are the exchange's own 15-minute prices when the request carries them
+(ctx.surplusPrice15, purchase.prices15: 35,040 blocks, Rs/kWh), else the hour's price in each block.
 
 The objective is the sizing LP's at fixed sizes: PPA revenue at the bid tariff, plus market
 sales (worth at most just under the tariff when the PPA comes first), minus fuel and energy
@@ -87,6 +88,14 @@ def split_hourly(values: np.ndarray, peak: float | None = None) -> np.ndarray:
     slope = np.clip(slope, -room, room)
     blocks = v[:, None] + slope[:, None] * (np.array([-3.0, -1.0, 1.0, 3.0]) / 8)[None, :]
     return np.clip(blocks, 0.0, max(top, 0.0)).reshape(-1)  # the clip only removes rounding
+
+
+def _blocks(values: Any, name: str) -> np.ndarray:
+    """A series of 35,040 blocks (15-minute prices)."""
+    a = np.asarray(values, dtype=float)
+    if a.shape != (BLOCKS,) or not np.isfinite(a).all():
+        raise DispatchError(f"{name} must have {BLOCKS} finite values (15-minute blocks)")
+    return a
 
 
 def _inputs(payload: dict) -> dict:
@@ -158,6 +167,9 @@ def _inputs(payload: dict) -> dict:
     if purchase and float(purchase.get("maxShare") or 0) > 0:
         buy = {"share": min(1.0, float(purchase["maxShare"])),
                "price": np.maximum(0.0, RLP._series(purchase.get("prices"), "purchase.prices")) + max(0.0, float(purchase.get("chargesRsPerKwh") or 0)),
+               # the exchange's 15-minute prices, when given (else the hour's price in each block)
+               "price15": np.maximum(0.0, _blocks(purchase["prices15"], "purchase.prices15")) + max(0.0, float(purchase.get("chargesRsPerKwh") or 0))
+               if purchase.get("prices15") is not None else None,
                "esc": float(purchase.get("escalation") or 0),
                "cap": np.maximum(0.0, RLP._series(purchase.get("capMw"), "purchase.capMw")) if purchase.get("capMw") is not None else None}
     sale_mask = RLP._series(payload["saleMask"], "saleMask") > 0.5 if sell and payload.get("saleMask") is not None else None
@@ -171,6 +183,7 @@ def _inputs(payload: dict) -> dict:
         "poi": poi,
         "extra": max(0.0, float(ctx.get("extraExportMw") or 0)),
         "price": RLP._series(ctx["surplusPrice"], "surplusPrice") if sell and ctx.get("surplusPrice") is not None else None,
+        "price15": _blocks(ctx["surplusPrice15"], "surplusPrice15") if sell and ctx.get("surplusPrice15") is not None else None,
         "flat_price": float(fin.get("surplusPrice") or 0) if sell else 0.0,
         "sale_cap": RLP._series(ctx["surplusCapMw"], "surplusCapMw") if sell and ctx.get("surplusCapMw") is not None else None,
         "ppa_first": bool(payload.get("ppaFirst")) and sell,
@@ -178,6 +191,11 @@ def _inputs(payload: dict) -> dict:
         "bio": bio, "plants": plants,
         "green_min": float(payload.get("greenShareMin") or 0),
     }
+
+
+def _buy_price(buy: dict) -> np.ndarray:
+    """What a MWh bought costs in each block (Rs/kWh, with the charges): the 15-minute price when given."""
+    return buy["price15"] if buy.get("price15") is not None else np.repeat(buy["price"], BLOCKS_PER_HOUR)
 
 
 def _block_mask(rule: dict, peak_mask_blocks: np.ndarray | None, solar_mask_blocks: np.ndarray | None = None) -> np.ndarray:
@@ -318,7 +336,7 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
         if buy["cap"] is not None:
             hi[col["buy"]] = np.repeat(buy["cap"], BLOCKS_PER_HOUR) / poi
         add_one(col["buy"], np.full(BLOCKS, DT * 1e-3), -np.inf, 1e-3 * buy["share"] * float(target.sum()) * DT)
-        cost[col["buy"]] = np.repeat(buy["price"], BLOCKS_PER_HOUR) * (1 + buy["esc"]) ** (year - 1) * DT
+        cost[col["buy"]] = _buy_price(buy) * (1 + buy["esc"]) ** (year - 1) * DT
     gen_terms += [(col[f"pl:{pl['id']}"], -1.0) for pl in pl_live]
     green_terms = ([(col["bio"], -1.0)] if BM > 0 else []) + [(col[f"pl:{pl['id']}"], -1.0) for pl in pl_live if pl["green"]]
     # generation: dir + ch + ex <= solar + wind + dispatchable output
@@ -415,7 +433,8 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
     price_b = None
     if inp["sell"]:
         esc = (1 + float(fin.get("surplusEscalation") or 0)) ** (year - 1)
-        price_b = (np.repeat(inp["price"], BLOCKS_PER_HOUR) if inp["price"] is not None else np.full(BLOCKS, inp["flat_price"])) * esc
+        price_b = (inp["price15"] if inp["price15"] is not None else np.repeat(inp["price"], BLOCKS_PER_HOUR) if inp["price"] is not None
+                   else np.full(BLOCKS, inp["flat_price"])) * esc
         # a block whose excess the buyer may take at a share of the tariff earns at most that
         # (Amendment-03: the buyer's first right at 50%); elsewhere the PPA comes first if asked
         cap_b = np.where(np.isfinite(share_b), share_b, 0.995 if inp["ppa_first"] else np.inf) * lam
@@ -522,7 +541,7 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
         "simultaneousBlocks": int(((ch > 1e-6) & (dis > 1e-6)).sum()),
     }
     if inp["buy"]:
-        price_buy = np.repeat(inp["buy"]["price"], BLOCKS_PER_HOUR) * (1 + inp["buy"]["esc"]) ** (year - 1)
+        price_buy = _buy_price(inp["buy"]) * (1 + inp["buy"]["esc"]) ** (year - 1)
         summary["boughtMu"] = float(bought.sum() * DT * poi / 1000)  # at the meter, as rtc_lp reports it
         summary["boughtShare"] = float(bought.sum() / dem.sum()) if dem.sum() > 0 else 0.0
         summary["boughtCostCr"] = float((bought * price_buy).sum() * DT * 1e-4)  # MWh x Rs/kWh -> Rs crore
@@ -713,7 +732,9 @@ How it is computed
   penalty multiple x the tariff ("Shortfall MU" is that energy; "met" in full and within the
   tolerance are both in the request's rule).
 * Solar and wind profiles are hourly: each hour is split into four 15-minute values along the hour's
-  trend, keeping the hour's energy. Demand and market prices take the hour's value in each block.
+  trend, keeping the hour's energy. Demand takes the hour's value in each block; market prices are
+  the exchange's own 15-minute prices (IEX GDAM, DAM or RTM, built into the app) when the request
+  carries them, else the hour's price in each block.
 * Days are numbered from 1 January of the profile year; PPA year N uses year N's degradation.
 """
 

@@ -431,6 +431,41 @@ export function loadMarketPrices() {
   return pricesPromise;
 }
 
+// the same year in 15-minute blocks (tools/build_iex_prices.py), loaded only for the 15-minute dispatch
+export const MARKET15_URL = "/market/iex_15min_prices.json";
+let prices15Promise = null;
+
+/** The IEX price year in 35,040 15-minute blocks (Rs/MWh per market), fetched once when first needed. */
+export function loadMarketPrices15() {
+  if (!prices15Promise) {
+    prices15Promise = fetch(MARKET15_URL, { credentials: "same-origin" })
+      .then((r) => {
+        if (!r.ok) throw new Error(`15-minute market prices unavailable (${r.status})`);
+        return r.json();
+      })
+      .catch((err) => {
+        prices15Promise = null;
+        throw err;
+      });
+  }
+  return prices15Promise;
+}
+
+/**
+ * The 15-minute dispatch request with the exchange's own 15-minute prices (Rs/kWh) for the market
+ * the surplus is sold on and the market power is bought from; without them the engine uses each
+ * hour's price in its four blocks.
+ */
+export function withPrices15(request, state, terms, prices15) {
+  const blocks = (market) => prices15?.markets?.[market]?.blocksRsPerMwh || null;
+  const out = { ...request, payload: { ...request.payload, ctx: { ...request.payload.ctx } } };
+  const sale = state.market?.sell && state.market.source !== "flat" ? blocks(state.market.source) : null;
+  if (sale && out.payload.ctx.surplusPrice) out.payload.ctx.surplusPrice15 = sale.map((v) => Math.round(v) / 1000);
+  const buy = out.payload.purchase && terms?.purchase?.market ? blocks(terms.purchase.market) : null;
+  if (buy) out.payload.purchase = { ...out.payload.purchase, prices15: buy.map((v) => Math.round(v) / 1000) };
+  return out;
+}
+
 /** The chosen market's 8,760 hourly prices in Rs/kWh, or null for a flat price. */
 export function marketSeries(state, prices) {
   const m = prices?.markets?.[state.market?.source];

@@ -3,7 +3,7 @@
 // and the hourly dispatch survive switching dashboard tabs through the caller's `session` object.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { trackEvent } from "../activity";
-import { dispatch15Request, hourlyAtMeter, loadMarketPrices, lpPayload, missingInputs, plantMw, resourceProfiles, runSizing, sizingSeedOf, keepDispatch } from "./model";
+import { dispatch15Request, hourlyAtMeter, loadMarketPrices, loadMarketPrices15, lpPayload, missingInputs, plantMw, resourceProfiles, runSizing, sizingSeedOf, keepDispatch, withPrices15 } from "./model";
 import { getJson } from "./readTender";
 
 /**
@@ -69,10 +69,12 @@ export default function useSizing({ state, setState, terms, prices, session, mod
   const startDispatch15 = useCallback(async () => {
     if (!state.lp) throw new Error("Size the plant first.");
     const payload = lpPayload(state, terms, resourceProfiles(state), await marketPrices());
+    // the exchange's 15-minute prices for the sale and the purchases (the sizing works hour by hour)
+    const prices15 = await loadMarketPrices15().catch(() => null);
     const { job_id: jobId } = await getJson("/api/bid/dispatch15", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(dispatch15Request(payload, state.lp)),
+      body: JSON.stringify(withPrices15(dispatch15Request(payload, state.lp), state, terms, prices15)),
     });
     trackEvent("run", { module, action: "dispatch15" });
     setState((s) => (s.lp ? { ...s, lp: { ...s.lp, d15: { jobId, started: Date.now() } } } : s));

@@ -92,9 +92,14 @@ export function agentInputs(state) {
       benchmark: BENCHMARKS[f.section]?.[f.key] ?? null, get: (s) => s[f.section][f.key],
       set: (s, v) => clear({ ...s, [f.section]: { ...s[f.section], [f.key]: v }, filled: { ...s.filled, [`${f.section}.${f.key}`]: false } }) });
   }
-  add({ key: "market.sell", label: "Sell the surplus outside the buyer's hours (IEX GDAM)", step: "sources", kind: "boolean",
+  add({ key: "market.sell", label: "Sell the surplus on the exchange outside the buyer's hours (on the Bid inputs step; PPA 9.3 offers excess energy to SECI first)", step: "bid", kind: "boolean",
     get: (s) => Boolean(s.market.sell), benchmark: true,
-    set: (s, v) => clear({ ...s, market: { ...s.market, sell: Boolean(v), source: s.market.source === "flat" ? "flat" : "GDAM" }, filled: { ...s.filled, "market.sell": false } }) });
+    set: (s, v) => clear({ ...s, market: { ...s.market, sell: Boolean(v), source: v && (!s.market.source || s.market.source === "flat") ? "GDAM" : s.market.source }, filled: { ...s.filled, "market.sell": false } }) });
+  if (state.market?.sell) {
+    add({ key: "market.source", label: "Market the surplus is sold on (IEX 15-minute prices built in)", step: "bid", kind: "choice",
+      options: [["GDAM", "IEX GDAM (green day-ahead)"], ["DAM", "IEX DAM (day-ahead)"], ["RTM", "IEX RTM (real-time)"]],
+      get: (s) => s.market.source, benchmark: "GDAM", set: (s, v) => clear({ ...s, market: { ...s.market, source: v } }) });
+  }
   const view = formsView(state);
   for (const f of visibleFields(state.forms || {})) {
     add({ key: `forms.${f.key}`, label: f.label, step: "forms", kind: f.type === "select" ? "choice" : f.type === "number" ? "number" : f.type === "date" ? "date" : "text",
@@ -131,6 +136,8 @@ const GUIDE = [
   { key: "buy", ask: `Will you buy green-market or bilateral power, up to ${pct(TENDER.marketShare)} percent of each year's energy, when it is cheaper than more plant?` },
   { key: "buyCharges", ask: "What charges do you expect on bought power to your meter, in rupees per unit: the exchange fee, the transmission charges and the losses?" },
   { key: "dayInjection", ask: "Will you hold grid connectivity in the solar hours as well? Without it nothing is sold between six in the morning and six in the evening." },
+  { key: "market.sell", ask: "Will you sell the surplus on the exchange outside the buyer's hours? The RfS allows it; the PPA offers excess energy to SECI first, so the model assumes SECI does not take it." },
+  { key: "market.source", ask: "On which market: the green day-ahead market, the day-ahead market or the real-time market?" },
   { key: "psm", ask: `Will you opt for SECI's Payment Security Mechanism? It takes ${Math.round(TENDER.psmChargeRsPerKwh * 100)} paise off every unit billed.` },
   { key: "ppaDate", ask: `When do you expect the PPA's Effective Date? Supply starts ${TENDER.scdMonths} months later. Say a date like 1 June 2027.` },
   { key: "fill", ask: "Shall I fill the design and financing inputs still empty with the benchmarks, marked as such on screen, so we can size? Say no to give each one." },
@@ -181,7 +188,7 @@ export function tenderBrief() {
 const formsModelOf = (s) => (s.lp ? { bid: Math.ceil((s.lp.tariff || 0) * 100 - 1e-9) / 100 } : null);
 
 /** The yearly rule outcome, the bought power and the sale of the sized plant, year 1 and the worst year. */
-function sizingFacts(lp) {
+function sizingFacts(lp, hourly = null) {
   const life = lp.lifetime || [];
   const y1 = life[0] || {};
   const share = (row) => (row.demandMwh > 0 ? row.deliveredMwh / row.demandMwh : 1);
@@ -189,7 +196,10 @@ function sizingFacts(lp) {
   const rule = lp.perYear?.[0]?.rules?.[0] || null;
   return {
     year1: { suppliedPct: r(share(y1) * 100, 1), penalisedMu: r((y1.monthlyPenaltyMwh || 0) / 1000, 2), boughtMu: r((y1.purchaseMwh || 0) / 1000, 2),
-      boughtPct: r(y1.demandMwh > 0 ? ((y1.purchaseMwh || 0) / y1.demandMwh) * 100 : 0, 2), boughtCostCr: r(y1.purchaseCostCr || 0, 2), soldMu: r((y1.exportMwh || 0) / 1000, 1), saleRevenueCr: r(y1.exportRevenueCr || 0, 1) },
+      boughtPct: r(y1.demandMwh > 0 ? ((y1.purchaseMwh || 0) / y1.demandMwh) * 100 : 0, 2), boughtCostCr: r(y1.purchaseCostCr || 0, 2), soldMu: r((y1.exportMwh || 0) / 1000, 1), saleRevenueCr: r(y1.exportRevenueCr || 0, 1),
+      saleMarket: lp.market ? `IEX ${lp.market}` : "no sale",
+      // the surplus nobody takes (the year-1 hourly dispatch on screen, when it is there)
+      ...(hourly?.curtail ? { curtailedMu: r(hourly.curtail.reduce((a, v) => a + v, 0) / 1000, 1) } : {}) },
     worstYear: { year: worst.year ?? 1, suppliedPct: r(share(worst) * 100, 1), penalisedMu: r((worst.monthlyPenaltyMwh || 0) / 1000, 2) },
     monthlyRule: rule ? { tolerancePct: rule.tolerance != null ? pct(rule.tolerance) : null, withinTolerance: rule.withinTolerance ?? null, penaltyMultiple: rule.penaltyMultiple ?? null } : null,
   };
@@ -204,7 +214,8 @@ export function status(state, terms, run = null) {
   const s = { ...DEFAULT_SETTINGS, ...state.fdrex };
   return {
     step: state.step,
-    bid: { contractedMw: state.bid.baseMw, buyersHours: PEAK_PLANS[s.peakPlan]?.label, shortfall: SHORTFALL_MODES[s.shortfall]?.label, buyPower: s.buy ? `yes, charges ₹${s.buyCharges}/kWh` : "no",
+    bid: { contractedMw: state.bid.baseMw, buyersHours: PEAK_PLANS[s.peakPlan]?.label, shortfall: SHORTFALL_MODES[s.shortfall]?.label, buyPower: s.buy ? `yes, from IEX GDAM, charges ₹${s.buyCharges}/kWh` : "no",
+      sellSurplus: state.market?.sell ? `yes, on IEX ${state.market.source}` : "no: the surplus is curtailed",
       solarHourConnectivity: Boolean(s.dayInjection), psm: Boolean(s.psm), ppaDate: s.ppaDate },
     sources: SOURCES.filter((id) => state.sources[id]).map((id) => `${NAMES[id]} (${state.src[id].capacity.mode === "fixed" ? `fixed at ${state.src[id].capacity.mw} MW` : "optimizer sizes it"})`),
     inputsMissing: missing.length ? missing.slice(0, 12) : "none",
@@ -358,7 +369,7 @@ export function createToolRunner(ctx) {
         plant: { solarMwac: r(z.solarMw, 0), solarMwp: r(z.solarMw * (s.src.solar?.dcAc || 1), 0), windMw: r(z.windMw, 0), storageMw: r(z.bessMw, 0), storageMwh: r(z.bessMwh, 0),
           storageHoursPerContractedMw: r(mw > 0 ? z.bessMwh / mw : 0, 2) },
         sizingTariff: r(s.lp.tariff, 3),
-        ...sizingFacts(s.lp),
+        ...sizingFacts(s.lp, ctx.getHourly?.() || null),
         emdCr: r(money.emdRs / 1e7), pbgCr: r(money.pbgRs / 1e7), netWorthNeededCr: r(money.netWorthRs / 1e7), seciChargesCr: r(seciChargesCr(z, mw), 2),
         dates: keyDates(s.fdrex?.ppaDate) || "enter the PPA Effective Date for the dates",
       };
@@ -513,7 +524,8 @@ Truth rules:
 The guided exercise:
 1. get_status. If nothing is entered yet, tender_brief, then next_question.
 2. Ask exactly the question next_question returns, mentioning the current value and the benchmark. When the user answers, set_input with that key, confirm the value set, then next_question again. "Next", "keep it" or "same" keeps the current value: call next_question with keep set to that key. "Keep the rest" accepts all remaining values: keep_rest true. "Benchmark" sets the benchmark. For the key "fill", yes means use_benchmarks.
-3. When next_question says everything is in, offer run_optimizer; when it returns, explain the plant (solar, wind, storage), the sizing tariff, the share of the buyer's energy supplied, the energy penalised beyond the free ${pct(TENDER.shortfallTolerance)}%, the power bought against the ${pct(TENDER.marketShare)}% limit, the surplus sold, EMD, PBG, net worth, SECI's charges and the dates (get_results).
+Selling the surplus is the input market.sell (and market.source, the market), on the Bid inputs step: "yes" sells the energy the buyer's hours and the storage do not take, on IEX GDAM, DAM or RTM at its 15-minute prices; "no" curtails it. Say what the tender says with the pages: RfS 8.1.f allows the sale outside the buyer's hours, PPA 9.3 offers excess energy to SECI first (tender_lookup "excess").
+3. When next_question says everything is in, offer run_optimizer; when it returns, explain the plant (solar, wind, storage), the sizing tariff, the share of the buyer's energy supplied, the energy penalised beyond the free ${pct(TENDER.shortfallTolerance)}%, the power bought against the ${pct(TENDER.marketShare)}% limit, the surplus sold (and on which market) and the energy curtailed, EMD, PBG, net worth, SECI's charges and the dates (get_results).
 4. get_financials: the tariff for the target equity IRR, rounded up to the paisa for quoting, the equity and project IRR, the minimum DSCR, the power bought and the PSM discount if taken.
 5. Offer a what-if: what_if with what the user names (another size, capex, IRR or tariff); say the tariff it needs against the sized bid's and that it is an instant check, not the optimum; show true opens the What-if step.
 6. Ask what tariff they will quote; check_tariff with record true. If it is below the tariff the target needs, warn clearly and give the equity and project IRR at that tariff.

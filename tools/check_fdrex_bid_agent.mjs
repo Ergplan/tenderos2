@@ -82,7 +82,14 @@ const terms0 = fdrexTerms(state.fdrex, prices);
 const order = [];
 const confirmed = new Set();
 for (let q = nextQuestion(state, terms0, confirmed); q && order.length < 20; q = nextQuestion(state, terms0, confirmed)) { order.push(q.key); confirmed.add(q.key); }
-assert.deepEqual(order.slice(0, 9), ["bidMw", "peakPlan", "shortfall", "buy", "buyCharges", "dayInjection", "psm", "ppaDate", "fill"]);
+assert.deepEqual(order.slice(0, 11), ["bidMw", "peakPlan", "shortfall", "buy", "buyCharges", "dayInjection", "market.sell", "market.source", "psm", "ppaDate", "fill"]);
+// the sale is a bid input, and its market is offered only when selling
+{
+  const sell = agentInputs(state).find((x) => x.key === "market.sell");
+  assert.equal(sell.step, "bid");
+  const off = { ...state, market: { ...state.market, sell: false } };
+  assert.ok(!agentInputs(off).some((x) => x.key === "market.source"), "no market without a sale");
+}
 const first = await run("next_question", { keep: null, keep_rest: false });
 assert.equal(first.key, "bidMw");
 assert.equal(first.current, 100);
@@ -130,10 +137,12 @@ assert.equal(res.plant.windMw, 89);
 assert.equal(res.year1.boughtPct, 5);
 assert.equal(res.year1.penalisedMu, 0.12);
 assert.equal(res.monthlyRule.tolerancePct, 10);
+assert.equal(res.year1.saleMarket, "IEX GDAM", "the market the surplus is sold on");
 assert.ok(Math.abs(res.seciChargesCr - Number(seciChargesCr(lp.sizes, 100).toFixed(2))) < 1e-9);
 assert.equal(res.dates.scsd, "2028-12-01");
 assert.equal(shown.at(-1), "size");
 const status = await run("get_status", {});
+assert.match(status.bid.sellSurplus, /^yes, on IEX GDAM/);
 assert.equal(status.optimizer, "sized");
 assert.equal(status.bid.buyersHours, "Evening 18:00–22:00");
 const fin = await run("get_financials", {});
@@ -205,4 +214,12 @@ assert.equal(sent[0].item.call_id, "c1");
 assert.equal(JSON.parse(sent[0].item.output).ok, true);
 assert.equal(sent[1].type, "response.create");
 
-console.log(`FDRE-X bid agent checks passed (${AGENT_TOOLS.length} tools, ${agentInputs(state).length} inputs; guided order ${order.slice(0, 9).join(" → ")})`);
+// the curtailed energy, from the year-1 hourly dispatch on screen
+{
+  const hourly = { curtail: Array.from({ length: 8760 }, (_, t) => (t % 24 === 12 ? 100 : 0)) };
+  state = { ...state, lp };
+  const run2 = createToolRunner({ ...ctx, getHourly: () => hourly });
+  const r2 = await run2("get_results", {});
+  assert.equal(r2.year1.curtailedMu, 36.5, "365 days × 100 MWh");
+}
+console.log(`FDRE-X bid agent checks passed (${AGENT_TOOLS.length} tools, ${agentInputs(state).length} inputs; guided order ${order.slice(0, 11).join(" → ")})`);

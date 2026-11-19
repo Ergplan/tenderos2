@@ -102,3 +102,27 @@ def test_a_bad_tolerance_is_refused():
     p = _payload(penalty=1.5, tolerance=1.2)
     with pytest.raises(D.DispatchError):
         D._inputs(p)
+
+
+def test_fifteen_minute_prices_set_what_is_bought_and_when():
+    # the same hourly mean, but within each hour a dear second block and a cheap third one
+    shape = np.tile([1.0, 1.2, 0.8, 1.0], D.RLP.HOURS)
+    p15 = np.repeat(PRICE, D.BLOCKS_PER_HOUR) * shape
+    payload = _payload(penalty=1.5, tolerance=0.1, buy_share=0.05)
+    payload["purchase"]["prices15"] = p15.tolist()
+    payload["ctx"]["surplusPrice15"] = p15.tolist()
+    inp = D._inputs(payload)
+    res = D.dispatch_year(inp, SIZES, TARIFF, 1)
+    bought = np.asarray(res["series"]["bought"]) / inp["poi"]
+    cost = float((bought * (p15 + 0.3)).sum() * D.DT * 1e-4)
+    assert res["summary"]["boughtCostCr"] == pytest.approx(cost, rel=1e-6), "each block at its own price"
+    k = np.arange(D.BLOCKS) % 4
+    assert bought[k == 2].sum() >= bought[k == 1].sum() - 1e-6, "more is bought in the cheap block than in the dear one"
+    assert np.allclose(res["series"]["price"], p15), "sales priced block by block"
+
+
+def test_fifteen_minute_prices_must_cover_the_year():
+    payload = _payload(penalty=1.5, tolerance=0.1, buy_share=0.05)
+    payload["ctx"]["surplusPrice15"] = [3.0] * 8760
+    with pytest.raises(D.DispatchError, match="35040"):
+        D._inputs(payload)

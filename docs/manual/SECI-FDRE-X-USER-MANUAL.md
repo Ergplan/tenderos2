@@ -94,6 +94,7 @@ beside what replaced them; fourteen are marked **conflict** where the documents 
 | Shortfall | *Pay the penalty beyond 10%* (the default): each month 10% of the peak energy may fall short for free (its revenue is lost) and the energy short beyond it costs 1.5 × the tariff; the optimizer weighs that against more plant. *Meet every month in full*: no shortfall. |
 | Buy green-market or bilateral power | Yes or no. Up to 5% of each year's energy, supplied directly or through the storage, at the hourly IEX GDAM price plus the **charges on bought power** (exchange fee, transmission, losses; ₹0.30/kWh to start). |
 | Connectivity in the solar hours too | *No* (the tender's connectivity): nothing is sold from 06:00 to 18:00. *Yes*: you hold connectivity for the solar hours as well, and the day's surplus may be sold. |
+| Sell the surplus on the exchange | *Yes* sells what the buyer's hours and the storage do not take, outside the buyer's hours and within the connectivity, on **IEX GDAM** (green day-ahead, the usual choice), **DAM** or **RTM**, at that market's prices (the built-in IEX year; the 15-minute dispatch uses its 15-minute prices). *No* curtails it. The step quotes both sides: the RfS allows the sale (8.1.f), the PPA offers excess energy to SECI first (9.3); the model assumes SECI does not take it, so raise it in the pre-bid queries. |
 | Payment Security Mechanism | Yes takes ₹0.02/kWh off every bill for the 25 years. |
 | Effective Date of the PPA | Financial Closure, the SCSD (18 months later) and the latest start follow from it. |
 
@@ -156,7 +157,7 @@ have to move to reach a tariff you name.
 The What-if runs an instant rule-based dispatch (the battery serves the buyer's hours; the power
 bought goes first to the months beyond the free 10%, cheapest hours first; the surplus is sold at
 the hourly IEX price outside the solar hours), not the optimizer, so the sized bid itself reads a
-little dearer here than in the Financial model (₹9.05 against ₹8.80 on the benchmark bid). Use it
+little dearer here than in the Financial model (₹8.83 against ₹8.55 on the benchmark bid). Use it
 to compare cases; size again for the bid. *Back to the sized bid* restores the starting case.
 
 ## Step 09 · Bid forms *(Tender / Legal)*

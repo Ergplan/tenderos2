@@ -85,7 +85,36 @@ export default function BidInputs({ state, setState, terms }) {
             <small><Cite id="connectivityApplied" compact /> <Cite id="connectivityQuantum" compact /></small>
           </div>
         </div>
-        <p className="rtc-note">Whether to sell the surplus in the market, and at which price, is on the Design step. Outside the buyer's hours the storage may sell to others, the PPA first. <Cite id="essOtherUse" compact /> <Cite id="priority" compact /></p>
+      </Section>
+
+      <Section index="3.3.1" title="Selling the surplus" note="Outside the buyer's hours, the PPA first; PPA 9.3 offers excess energy to SECI first">
+        <div className="rtc-grid rtc-grid-2">
+          <div className="rtc-field" data-testid="fdrex-sell" data-voice="market.sell">
+            <div className="rtc-field-top"><span>Sell the surplus on the exchange</span></div>
+            <YesNo value={Boolean(state.market?.sell)} testid="fdrex-sell-choice"
+              onChange={(v) => setState((s) => ({ ...s, market: { ...s.market, sell: v, source: v && (!s.market?.source || s.market.source === "flat") ? "GDAM" : s.market?.source }, filled: { ...s.filled, "market.sell": false }, lp: null }))}
+              yes={`The energy the buyer's hours and the storage do not take is sold ${fx.dayInjection ? "at any hour" : "from 18:00 to 06:00 (no connectivity in the solar hours)"}, at the market's 15-minute price, within the connectivity; it assumes SECI does not take it under PPA 9.3`}
+              no="Nothing is sold: the surplus is curtailed (or offered to SECI under PPA 9.3, which pays the tariff only if the Buying Entity consents; not counted here)" />
+          </div>
+          {state.market?.sell && (
+            <div className="rtc-field" data-testid="fdrex-sell-market" data-voice="market.source">
+              <div className="rtc-field-top"><span>Market</span></div>
+              <Choice value={state.market.source} testid="fdrex-sell-market-choice"
+                onChange={(v) => setState((s) => ({ ...s, market: { ...s.market, source: v }, lp: null }))}
+                options={{
+                  GDAM: { label: "IEX GDAM (green day-ahead)", detail: "Renewable power at the green price; the usual market for an RE plant" },
+                  DAM: { label: "IEX DAM (day-ahead)", detail: "The conventional day-ahead market" },
+                  RTM: { label: "IEX RTM (real-time)", detail: "Half-hourly sessions close to delivery" },
+                }} />
+            </div>
+          )}
+        </div>
+        <p className="rtc-note">
+          The RfS lets the plant sell outside the buyer's hours, on an exchange or to third parties, within its connectivity and without a NOC <Cite id="essOtherUse" compact />;
+          selling while the day's supply is unmet is a breach, at 1.5 × the day's highest exchange rate <Cite id="thirdParty" compact /> <Cite id="thirdPartyPenalty" compact />.
+          The PPA bars selling excess energy to anyone but SECI unless SECI refuses it <Cite id="excessFirstRefusal" compact />, and SECI buys it at the tariff only if the Buying Entity consents <Cite id="excess" compact />:
+          the two differ, so ask SECI in the pre-bid queries. The sizing and the 15-minute dispatch sell at the chosen market's prices, the PPA first in every hour.
+        </p>
       </Section>
 
       <Section index="3.4" title="Payment Security Mechanism" note="Chosen once, in the Covering Letter, for the whole term">

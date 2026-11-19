@@ -43,10 +43,10 @@ the bid under `tenderos.fdrex.bid.v2`; a bid saved by the earlier tab opens as a
 | | The sizing | Where |
 | --- | --- | --- |
 | Supply | The demand is the contracted MW in the buyer's four hours each day (`supplyMask`) and nothing in the others: 4 MWh per MW a day, 1 MWh per MW in each hour | RfS 8.1.a–c |
-| The four hours | "The 4 costliest non-solar hours each day": each night, the 4 hours of 18:00–06:00 with the highest IEX DAM prices (`costliestHours` with the window as a parameter; most often 18:00–22:00, ₹7.50/kWh against ₹5.86 for the window); or "Evening 18:00–22:00". Until the prices load, the evening hours | RfS 8.1.a, PPA 4.4.1 |
+| The four hours | "The 4 costliest non-solar hours each day": each night, the 4 hours of 18:00–06:00 with the highest IEX DAM prices (`costliestHours` with the window as a parameter; most often 18:00–22:00, ₹7.98/kWh against ₹6.40 for the window); or "Evening 18:00–22:00". Until the prices load, the evening hours | RfS 8.1.a, PPA 4.4.1 |
 | Shortfall | One monthly rule on the month's peak energy. "Pay the penalty beyond 10%": up to 10% short free (its revenue lost), the energy short beyond it at 1.5 × the tariff (`basis: "monthly"`, `tolerance: 0.1`, `penaltyMultiple: 1.5`); "Meet every month in full": a hard floor | RfS 8.2 |
 | Bought power | Green market or bilateral, within 5% of each year's required energy, supplied directly or through the storage, at the hourly IEX GDAM price plus the charges to the meter (`purchase`); never resold | RfS 8.1.e |
-| Sale | The surplus sold outside the buyer's hours (the PPA first), at the market chosen on Design; without solar-hour connectivity nothing is sold from 06:00 to 18:00 (`saleMask`) | RfS 8.1.f, 7.2; PPA 9.3 |
+| Sale | The surplus sold outside the buyer's hours (the PPA first), when *Sell the surplus on the exchange* is Yes on Bid inputs (3.3.1), on IEX GDAM, DAM or RTM; without solar-hour connectivity nothing is sold from 06:00 to 18:00 (`saleMask`). The RfS allows the sale (8.1.f); the PPA offers excess energy to SECI first and SECI buys it at the tariff only if the Buying Entity consents (9.3): the step cites both and the sale assumes SECI does not take it | RfS 8.1.f, 7.2; PPA 9.3 |
 | PSM | ₹0.02/kWh off every bill when taken (`psmRsPerKwh`) | RfS 18.4 |
 | SECI's charges | Success Charges ₹1 lakh per MW of Installed Capacity (the RE in MW and the storage in MWh), the RfS cost and the bid fee, with GST, in the project cost (`otherCapexCr`, worked out on the sized plant) | RfS 18.1, Bid Information Sheet |
 | Sources | Solar, wind and the storage (mandatory); 50 to 600 MW; 25 years from the SCSD | RfS 3.1, 5.1, 20.2 |
@@ -71,10 +71,12 @@ The LP gained four things for this tender, each optional so the other tabs are u
   a rule's outcome carries `tolerance`, `withinTolerance` and `penaltyMultiple`.
 
 On the benchmark inputs (solar ₹4.0 cr/MWac at 25%, wind ₹6.5 cr/MW at 33%, storage ₹1.2 cr/MWh,
-14% equity), a 100 MW bid sizes in about a minute to 21 MWac solar, 89 MW wind and 74 MW / 297 MWh
-of storage: wind blows at night when the four hours fall; the storage is under 4 MWh per MW because
-the free 10%, the bought 5% and the wind direct cover the rest. HiGHS's tariff ₹8.927/kWh; the
-financial model's ₹8.802/kWh (the LP takes tax as linear; the app prices the design exactly).
+14% equity; the IEX year of 2 Nov 2025 to 18 Nov 2026), a 100 MW bid sizes in about a minute to
+14 MWac solar, 108 MW wind and 70 MW / 279 MWh of storage: wind blows at night when the four hours
+fall; the storage is under 4 MWh per MW because the free 10%, the bought 5% and the wind direct cover
+the rest. HiGHS's tariff ₹8.813/kWh; the financial model's ₹8.550/kWh (the LP takes tax as linear;
+the app prices the design exactly). With the earlier price year (Sep 2025 to Sep 2026) it was 21 MWac,
+89 MW and 74 MW / 297 MWh at ₹8.802: the dearer evenings of the new year earn more on the night sale.
 
 ## The financial model
 
@@ -92,7 +94,7 @@ carries `chargingCostCr`, `pxFeesCr` and `otherCapexCr`, and the tender's names 
 (`terms.workbookLabels`: "Power bought (green market, bilateral)", "PSM discount", "Monthly
 shortfall penalty", "SECI's charges …"); the operating-cost statement shows them when they are not
 nil. Recalculated in LibreOffice, the Live model agrees with the app (₹8.8021, equity IRR 14.00%,
-minimum DSCR 1.129 on the benchmark bid).
+minimum DSCR 1.129 on the benchmark bid with the earlier price year).
 
 While HiGHS sizes the plant (from the Size, Design or Finance inputs step, or when the voice agent
 runs the optimizer), the tab shows the Round-the-Clock tab's optimizer theatre (`../rtc/Theatre.jsx`):
@@ -114,7 +116,9 @@ energy, and the energy short beyond it costs 1.5 × the tariff (a hard plan: the
 panel gives each year's worst month against the free 10%, the energy penalised beyond it, the power
 bought and its share, curtailment and sales; the Excel workbook (Summary: *Bought MU*, *Bought share*,
 *Bought cost*; every year hour by hour with *Bought power*) and the ZIP of 15-minute CSV files carry
-them. On the 150 MW benchmark bid the 25 years take under a minute, and match the hourly sizing:
+them. Prices are the exchange's own 15-minute prices (below), for the sale and the purchases, so the
+dispatch moves the buying and the selling to the cheaper and the dearer quarter-hours. On a 150 MW
+bid (earlier price year) the 25 years take under a minute, and match the hourly sizing:
 year 1 exactly at the free 10%, year 25 at 87.1% (0.79 MU penalised), 5% bought every year.
 `tests/engine/test_fdrex_dispatch15.py`.
 
@@ -139,8 +143,8 @@ The step embeds the What-if tab seeded from the sized bid (`whatIfFromBid`, whic
 
 The finance is the shared engine with the same rows as the Financial model: the power bought
 (`chargingCostCr`), the PSM discount (`pxFeesCr`), SECI's charges (`costs.otherCapexCr`) and the
-sale at hourly prices (`surplusRevenueCr`). On the benchmark plant (21 MWac solar, 89 MW wind,
-74 MW / 296 MWh) it needs ₹9.05/kWh against the Financial model's ₹8.80 on the same plant: about
+sale at hourly prices (`surplusRevenueCr`). On the benchmark plant (14 MWac solar, 108 MW wind,
+70 MW / 279 MWh) it needs ₹8.83/kWh against the Financial model's ₹8.55 on the same plant: about
 3% dearer, as a rule-based dispatch should be against the optimum. The screen shows the FDRE-X
 plan (the buyer's hours, the shortfall plan, buying and its charges, solar-hour connectivity, the
 PSM), the FDRE-X checks and stats, and the power bought and the PSM discount by year; an RTC case
@@ -201,3 +205,20 @@ modules behind them (`model.js`, `finance.js`, `agent.js`, `upside.js`, `review.
   while their modules are.
 
 Not yet in this tab: the Excel input template (it was built on the earlier tab's model).
+
+## IEX prices (built in)
+
+`tools/build_iex_prices.py` turns IEX's 15-minute market results (GDAM, DAM and RTM exports, sheet
+"15min": date, time block, MCP) into a calendar year, each day from the latest year with data:
+
+* `web/public/market/iex_15min_prices.json`: 35,040 blocks per market (Rs/MWh), and GDAM's cleared
+  volume; loaded only for the 15-minute dispatch (`loadMarketPrices15`, `withPrices15` in
+  `web/src/bid/model.js`), which sends the sale market's and GDAM's blocks as `ctx.surplusPrice15`
+  and `purchase.prices15` (Rs/kWh); `engine/sizing/dispatch15.py` prices each block at its own price;
+* `web/public/market/iex_hourly_prices.json`: the same year as 8,760 hours (the mean of each hour's
+  four blocks), what the sizing, the finance and the buyer's costliest hours read.
+
+The year built in is 2 Nov 2025 to 18 Nov 2026 (1 Jan to 18 Nov from 2026, the rest from 2025):
+GDAM averages ₹5.30/kWh, DAM ₹4.87, RTM ₹4.45; 18:00–22:00 ₹8.08, ₹7.43 and ₹6.50; midday about
+₹2. To refresh it, export the three markets from IEX and run
+`python3 tools/build_iex_prices.py --gdam GDAM.xlsx --dam DAM.xlsx --rtm RTM.xlsx`.
