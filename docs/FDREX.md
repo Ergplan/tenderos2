@@ -105,8 +105,18 @@ the bid's hours), from the instant What-if dispatch (about 0.1 s a design, some 
 mixes). It is a picture of the design space; the bid's numbers come from HiGHS and the Financial
 model. Cancel stops the sizing.
 
-The 15-minute dispatch (`engine/sizing/dispatch15.py`) does not model purchases, the sale mask or
-the monthly tolerance yet, so the Size step does not offer it in this tab (`dispatch15={false}`).
+**The 15-minute dispatch** (Size step, *Run the 15-minute dispatch*; `engine/sizing/dispatch15.py`)
+takes the sized plant and dispatches every PPA year in 96 blocks a day, one HiGHS LP a year, with
+the sizing's FDRE-X rules: the contract only in the buyer's four hours; power bought (a column per
+block at the bus, the hour's GDAM price plus the charges, escalating) within 5% of the year's
+required energy and never resold; no sale where `saleMask` is 0; each month needs 90% of its
+energy, and the energy short beyond it costs 1.5 × the tariff (a hard plan: the whole month). The
+panel gives each year's worst month against the free 10%, the energy penalised beyond it, the power
+bought and its share, curtailment and sales; the Excel workbook (Summary: *Bought MU*, *Bought share*,
+*Bought cost*; every year hour by hour with *Bought power*) and the ZIP of 15-minute CSV files carry
+them. On the 150 MW benchmark bid the 25 years take under a minute, and match the hourly sizing:
+year 1 exactly at the free 10%, year 25 at 87.1% (0.79 MU penalised), 5% bought every year.
+`tests/engine/test_fdrex_dispatch15.py`.
 
 ## The What-if (`web/src/whatif/model.js`)
 

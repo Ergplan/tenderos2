@@ -12,7 +12,12 @@ day, the scheduling block of the Indian Grid Code) for each PPA year, one HiGHS 
   the plant cannot meet in a year is reported with its shortfall instead of failing the run;
 * the schedule to the procurer is kept smooth: among dispatches of equal value, the one with the
   least change in delivery from block to block;
-* each year uses that year's solar and wind degradation and battery capacity.
+* each year uses that year's solar and wind degradation and battery capacity;
+* SECI-FDRE-X, as in the sizing: power bought from the market (the payload's purchase) adds to the
+  energy at the bus, priced at the hourly price plus charges, within a share of the year's
+  required energy and never resold; the sale is closed where the saleMask is 0; a monthly rule
+  with a tolerance needs (1 - tolerance) of the month's energy, and the energy short beyond it
+  costs penaltyMultiple x the tariff.
 
 Solar and wind profiles are hourly. Each hour is split into four 15-minute values along the
 hour's trend (half the difference between the next and the previous hour), keeping the hour's
@@ -108,13 +113,18 @@ def _inputs(payload: dict) -> dict:
             if basis not in ("annual", "monthly", "block"):
                 raise DispatchError("compliance basis must be 'annual', 'monthly' or 'block'")
             cap, share = item.get("max"), item.get("excessTariffShare")
+            tol = float(item.get("tolerance") or 0)
+            if tol and (basis != "monthly" or not 0 <= tol < 1):
+                raise DispatchError("tolerance applies to monthly rules only, and is at least 0 and below 1")
             rules.append({"id": str(item.get("id") or f"rule{len(rules) + 1}"), "label": str(item.get("label") or ""),
                           "target": min(1.0, target), "hours": item.get("hours") or "all", "basis": basis,
                           "penalty": None if mult is None else max(0.0, float(mult)),
                           # Amendment-03: the most the PPA takes in the rule's blocks, and what power
                           # above it earns at most as a share of the tariff (as rtc_lp)
                           "max": None if cap is None or basis != "block" else min(1.0, max(target, float(cap))),
-                          "share": None if share is None else min(1.0, max(0.0, float(share)))})
+                          "share": None if share is None else min(1.0, max(0.0, float(share))),
+                          # SECI-FDRE-X: the month's shortfall up to this share is free (as rtc_lp)
+                          "tol": tol})
     if not rules:
         target = float(payload.get("dfrTarget") or 0)
         if target > 0:
@@ -141,7 +151,18 @@ def _inputs(payload: dict) -> dict:
             "escalation": float(item.get("escalation") or 0),
             "ramp": min(1.0, max(0.0, float(item["rampPerHour"]))) if item.get("rampPerHour") is not None else None,
         })
+    # SECI-FDRE-X: power bought within maxShare of the year's required energy, at the hourly price
+    # plus charges, escalating; and the hours a sale is allowed in (as rtc_lp)
+    purchase = payload.get("purchase") if isinstance(payload.get("purchase"), dict) else None
+    buy = None
+    if purchase and float(purchase.get("maxShare") or 0) > 0:
+        buy = {"share": min(1.0, float(purchase["maxShare"])),
+               "price": np.maximum(0.0, RLP._series(purchase.get("prices"), "purchase.prices")) + max(0.0, float(purchase.get("chargesRsPerKwh") or 0)),
+               "esc": float(purchase.get("escalation") or 0),
+               "cap": np.maximum(0.0, RLP._series(purchase.get("capMw"), "purchase.capMw")) if purchase.get("capMw") is not None else None}
+    sale_mask = RLP._series(payload["saleMask"], "saleMask") > 0.5 if sell and payload.get("saleMask") is not None else None
     return {
+        "buy": buy, "sale_mask": sale_mask,
         "plant": plant, "fin": fin, "bess": bess, "sell": sell, "rules": rules, "peak_mask": peak_mask, "solar_mask": solar_mask,
         "demand": RLP._series(ctx.get("demand"), "demand"),
         "solar_cf": RLP._series(ctx.get("solarCf"), "solarCf"),
@@ -221,7 +242,8 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
     lam = tariff * (1 + float(fin.get("tariffEscalation") or 0)) ** (year - 1)
 
     # ---- columns, each a block of BLOCKS: dir, ch, dis, u (SoC above the floor), [ex], [bio], [plants]
-    names = ["dir", "ch", "dis", "u"] + (["ex"] if inp["sell"] else []) + (["bio"] if BM > 0 else [])
+    buy = inp["buy"]
+    names = ["dir", "ch", "dis", "u"] + (["ex"] if inp["sell"] else []) + (["bio"] if BM > 0 else []) + (["buy"] if buy else [])
     pl_live = [pl for pl in inp["plants"] if float(sizes.get(f"{pl['id']}Mw") or 0) > 0]
     names += [f"pl:{pl['id']}" for pl in pl_live]
     col = {name: i * BLOCKS + np.arange(BLOCKS) for i, name in enumerate(names)}
@@ -288,6 +310,15 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
         cost[c] = pl["variable"] * (1 + pl["escalation"]) ** (year - 1) * DT
 
     gen_terms = [(col["bio"], -1.0)] if BM > 0 else []
+    if buy:
+        # bought power adds to the energy at the bus (it can be delivered or stored), within the
+        # year's share of the required energy (GWh, for scaling); its cost is the hour's price plus
+        # the charges, escalating
+        gen_terms.append((col["buy"], -1.0))
+        if buy["cap"] is not None:
+            hi[col["buy"]] = np.repeat(buy["cap"], BLOCKS_PER_HOUR) / poi
+        add_one(col["buy"], np.full(BLOCKS, DT * 1e-3), -np.inf, 1e-3 * buy["share"] * float(target.sum()) * DT)
+        cost[col["buy"]] = np.repeat(buy["price"], BLOCKS_PER_HOUR) * (1 + buy["esc"]) ** (year - 1) * DT
     gen_terms += [(col[f"pl:{pl['id']}"], -1.0) for pl in pl_live]
     green_terms = ([(col["bio"], -1.0)] if BM > 0 else []) + [(col[f"pl:{pl['id']}"], -1.0) for pl in pl_live if pl["green"]]
     # generation: dir + ch + ex <= solar + wind + dispatchable output
@@ -305,6 +336,10 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
             add_rows([(col["ex"], 1.0)] + green_terms, -np.inf, ren, BLOCKS)
         if inp["sale_cap"] is not None:
             hi[col["ex"]] = np.minimum(hi[col["ex"]], np.repeat(np.maximum(0.0, inp["sale_cap"]), BLOCKS_PER_HOUR) / poi)
+        if inp["sale_mask"] is not None:  # no sale where there is no connectivity for it (FDRE-X: the solar hours)
+            hi[col["ex"][~np.repeat(inp["sale_mask"], BLOCKS_PER_HOUR)]] = 0.0
+        if buy and not inp["solar_only"]:  # bought power is not resold
+            add_rows([(col["ex"], 1.0)] + [t for t in gen_terms if t[0] is not col["buy"]], -np.inf, ren, BLOCKS)
     # state of charge: u_b - u_(b-1) - eta*dt*ch + dt/eta*dis = 0, u_(-1) = (initSoc - minSoc) x E
     u0 = min(max(init_soc - min_soc, 0.0), max_soc - min_soc) * E * bf
     rhs = np.zeros(BLOCKS)
@@ -328,13 +363,17 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
             idx = b[mask]
             if idx.size == 0:
                 continue
-            floor_rows.append({"rule": rule["id"], "month": m, "mask": mask, "need": rule["target"] * dem[idx].sum() * DT})
+            floor_rows.append({"rule": rule["id"], "month": m, "mask": mask, "need": rule["target"] * (1 - rule.get("tol", 0.0)) * dem[idx].sum() * DT,
+                               # a monthly rule with a penalty (FDRE-X): the energy short beyond the free
+                               # tolerance costs penaltyMultiple x the tariff at the meter; a hard floor the
+                               # large penalty, so a month it cannot meet is reported rather than failing
+                               "price": rule["penalty"] * lam * poi if rule["penalty"] is not None and rule["basis"] == "monthly" else SHORTFALL_PENALTY * max(lam, 1.0)})
     n_short = len(floor_rows)
     short0 = n_col
     n_col += n_short
     lo = np.r_[lo, np.zeros(n_short)]
     hi = np.r_[hi, np.full(n_short, np.inf)]
-    cost = np.r_[cost, np.full(n_short, SHORTFALL_PENALTY * max(lam, 1.0))]
+    cost = np.r_[cost, np.array([fr["price"] for fr in floor_rows], float)]
     for k, fr in enumerate(floor_rows):
         idx = b[fr["mask"]]
         add_one(np.r_[col["dir"][idx], col["dis"][idx], short0 + k],
@@ -403,8 +442,9 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
     ex = out.get("ex", np.zeros(BLOCKS))
     biomass = out.get("bio", np.zeros(BLOCKS))
     pgen = {pl["id"]: out[f"pl:{pl['id']}"] for pl in pl_live}
+    bought = out.get("buy", np.zeros(BLOCKS))
     gen = ren + biomass + sum(pgen.values(), np.zeros(BLOCKS))
-    curtail = np.maximum(0.0, gen - direct - ch - ex)
+    curtail = np.maximum(0.0, gen + bought - direct - ch - ex)
     delivered = direct + dis
     poi = inp["poi"]
     # sales the buyer takes at a share of the tariff: the blocks where that beats the market
@@ -432,8 +472,15 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
         groups = [(m, mask) for m, mask in _rule_groups(rule, peak_blocks) if mask.any()]
         achieved = min(share(mask) for _, mask in groups) if groups else 1.0
         short = poi * sum(float(x[short0 + k]) for k, fr in enumerate(floor_rows) if fr["rule"] == rule["id"])
-        rules_out.append({"id": rule["id"], "label": rule["label"], "target": rule["target"], "achieved": achieved,
-                          "met": achieved >= rule["target"] - 1e-6, "shortfallMu": short / 1000})
+        tol = rule.get("tol", 0.0)
+        rule_out = {"id": rule["id"], "label": rule["label"], "target": rule["target"], "achieved": achieved,
+                    "met": achieved >= rule["target"] - 1e-6, "shortfallMu": short / 1000}
+        if tol or (rule["penalty"] is not None and rule["basis"] == "monthly"):
+            # FDRE-X: the worst month against its free share; the shortfall is the energy beyond it,
+            # penalised at penaltyMultiple x the tariff
+            rule_out.update({"tolerance": tol, "withinTolerance": achieved >= rule["target"] * (1 - tol) - 1e-6,
+                             "penaltyMultiple": rule["penalty"], "penalisedMu": short / 1000})
+        rules_out.append(rule_out)
 
     def plant_check(series: np.ndarray, mw: float) -> dict:
         step = np.abs(np.diff(series)) / mw if mw > 0 else np.zeros(1)
@@ -474,8 +521,17 @@ def _result(m: dict, x: np.ndarray, status: str, seconds: float) -> dict:
         "plants": checks,
         "simultaneousBlocks": int(((ch > 1e-6) & (dis > 1e-6)).sum()),
     }
+    if inp["buy"]:
+        price_buy = np.repeat(inp["buy"]["price"], BLOCKS_PER_HOUR) * (1 + inp["buy"]["esc"]) ** (year - 1)
+        summary["boughtMu"] = float(bought.sum() * DT * poi / 1000)  # at the meter, as rtc_lp reports it
+        summary["boughtShare"] = float(bought.sum() / dem.sum()) if dem.sum() > 0 else 0.0
+        summary["boughtCostCr"] = float((bought * price_buy).sum() * DT * 1e-4)  # MWh x Rs/kWh -> Rs crore
+    if any("penalisedMu" in r for r in rules_out):
+        summary["penalisedMu"] = float(sum(r.get("penalisedMu", 0.0) for r in rules_out))
     series = {"demand": dem * poi, "solar": sgen, "wind": wgen, "biomass": biomass, **pgen, "charge": ch, "discharge": dis * poi,
               "soc": soc, "direct": direct * poi, "delivered": delivered * poi, "sold": ex * poi, "curtailed": curtail}
+    if inp["buy"]:
+        series["bought"] = bought * poi
     if np.isfinite(share_lam).any() and price_b is not None:
         series["toBuyer"] = to_buyer * poi
     if poi < 1:
@@ -567,7 +623,9 @@ def year_csv(series: dict, year: int) -> str:
             ("biomass", "Biomass output MW")]
     cols += [(k, f"{k.capitalize()} output MW") for k in series if k not in
              ("demand", "solar", "wind", "biomass", "charge", "discharge", "soc", "direct", "delivered", "sold", "curtailed", "price", "evacLoss",
-              "floor", "floorShort", "toBuyer")]
+              "floor", "floorShort", "toBuyer", "bought")]
+    if "bought" in series:
+        cols.append(("bought", "Bought power (green market, bilateral) MW"))
     cols += [("charge", "Battery charging MW"), ("discharge", "Battery discharging MW"), ("soc", "Battery state of charge %"),
              ("direct", "Direct to PPA MW"), ("delivered", "Delivered to PPA MW"), ("sold", "Sold in market MW"),
              ("curtailed", "Curtailed MW")]
@@ -601,6 +659,9 @@ def summary_csv(summaries: list[dict]) -> str:
     head += [f"{rid} floor achieved %" for rid in rule_ids] + [f"{rid} floor met" for rid in rule_ids]
     head += [f"{rid} blocks at the floor %" for rid in rule_ids]
     head += ["Shortfall MU", "Solar MU", "Wind MU", "Sold MU", "Curtailed MU", "Battery charged MU", "Battery discharged MU", "Green share %"]
+    buying = bool(summaries) and "boughtMu" in summaries[0]
+    if buying:
+        head += ["Bought MU", "Bought % of the contracted energy", "Bought cost Rs crore"]
     for pid in plant_ids:
         head += [f"{pid} MU", f"{pid} lowest output % of MW", f"{pid} technical minimum %", f"{pid} largest 15-min change % of MW", f"{pid} ramp limit per block %"]
     w.writerow(head)
@@ -610,6 +671,8 @@ def summary_csv(summaries: list[dict]) -> str:
         row += [round(100 * r["hoursMet"], 2) if r.get("hoursMet") is not None else "" for r in s["rules"]]
         row += [round(s["shortfallMu"], 3), round(s["solarMu"], 2), round(s["windMu"], 2), round(s["soldMu"], 2), round(s["curtailedMu"], 2),
                 round(s["chargedMu"], 2), round(s["dischargedMu"], 2), round(100 * s["greenShare"], 2)]
+        if buying:
+            row += [round(s["boughtMu"], 3), round(100 * s["boughtShare"], 3), round(s["boughtCostCr"], 3)]
         for pid in plant_ids:
             c = s["plants"][pid]
             row += [round(c["mu"], 2), round(100 * c["minPct"], 2), round(100 * c["minLoad"], 2), round(100 * c["maxStepPct"], 2),
@@ -643,6 +706,12 @@ How it is computed
   When the power transformer and line losses are set, what is injected at the bus loses them on the
   way to the 220 kV billing meter: the contract, delivery, sales and battery discharge are given at
   the meter; generation, charging and curtailment at the bus.
+* SECI-FDRE-X: the contract is the buyer's four hours each day; power bought from the market adds
+  to the energy at the bus within the tender's share of the year's energy (never resold), priced at
+  the hour's price plus the charges; nothing is sold in the hours without connectivity for a sale;
+  each month needs (1 - the free tolerance) of its energy, and the energy short beyond it costs the
+  penalty multiple x the tariff ("Shortfall MU" is that energy; "met" in full and within the
+  tolerance are both in the request's rule).
 * Solar and wind profiles are hourly: each hour is split into four 15-minute values along the hour's
   trend, keeping the hour's energy. Demand and market prices take the hour's value in each block.
 * Days are numbered from 1 January of the profile year; PPA year N uses year N's degradation.

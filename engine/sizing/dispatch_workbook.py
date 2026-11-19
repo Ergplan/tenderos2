@@ -32,6 +32,7 @@ FIXED = [("demand", "Contracted supply")]
 GEN = [("solar", "Solar output"), ("wind", "Wind output"), ("biomass", "Biomass output")]
 AFTER = [
     ("charge", "Battery charging"), ("discharge", "Battery discharging"), ("soc", "Battery state of charge, end of hour"),
+    ("bought", "Bought power (green market, bilateral)"),
     ("direct", "Direct to PPA"), ("delivered", "Delivered to PPA"), ("sold", "Sold in market"), ("curtailed", "Curtailed"),
     ("evacLoss", "Power transformer and line losses"), ("floor", "Time-block floor"), ("floorShort", "Short of the floor"),
     ("price", "Market price"),
@@ -85,6 +86,7 @@ def write(path: Path, summaries: list[dict], hourly: dict[int, dict], *, sizes: 
             ("Plant", ", ".join(f"{k} {v:,.1f}" for k, v in sizes.items() if isinstance(v, (int, float)))),
             ("Reaches the meter", f"{poi:.4%} of what is injected at the 33 kV bus (33/220 kV transformer and 220 kV line)"),
             ("Supply floors", "; ".join(f"{r['label'] or r['id']}: {r['target']:.0%} ({r['basis']}, {r['hours']} hours"
+                                        + (f", {r['tol']:.0%} short free" if r.get("tol") else "")
                                         + (f", short at {r['penalty']:g} x tariff" if r.get("penalty") is not None else "") + ")" for r in rules) or "none"),
             ("Summary", "One row per PPA year: energy, each supply floor (achieved, met, blocks at the floor), shortfall, the plants' checks."),
             ("Monthly", "One row per year and month."),
@@ -105,6 +107,9 @@ def write(path: Path, summaries: list[dict], hourly: dict[int, dict], *, sizes: 
         cols += ["Shortfall MU", "Solar MU", "Wind MU", "Sold MU", "Curtailed MU", "Battery charged MU", "Battery discharged MU",
                  "Transformer and line losses MU", "Green share"]
         cols += [f"{pid} MU" for pid in plant_ids]
+        buying = bool(summaries) and "boughtMu" in summaries[0]
+        if buying:
+            cols += ["Bought MU", "Bought share of the contract", "Bought cost Rs crore"]
         ws.set_row(0, 45)
         ws.set_column(0, len(cols), 13)
         for j, c in enumerate(cols):
@@ -116,6 +121,8 @@ def write(path: Path, summaries: list[dict], hourly: dict[int, dict], *, sizes: 
             vals += [(s["shortfallMu"], num3), (s["solarMu"], num), (s["windMu"], num), (s["soldMu"], num), (s["curtailedMu"], num),
                      (s["chargedMu"], num), (s["dischargedMu"], num), (s.get("evacuationLossMu", 0.0), num3), (s["greenShare"], pct)]
             vals += [(s["plants"][pid]["mu"], num) for pid in plant_ids]
+            if buying:
+                vals += [(s["boughtMu"], num3), (s["boughtShare"], pct), (s["boughtCostCr"], num3)]
             for j, (v, f) in enumerate(vals):
                 if v is None:
                     ws.write_blank(i, j, None)

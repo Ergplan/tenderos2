@@ -69,6 +69,10 @@ export default function Dispatch15({ lp, start }) {
   const failedYears = years.filter((y) => !y.allMet);
   // a time-block floor with a penalty may fall short by design: the shortfall is paid, not a failure
   const priced = rules.length > 0 && rules.every((r) => r.basis === "block" && r.penaltyMultiple != null);
+  // SECI-FDRE-X: a monthly rule with a free share and a penalty beyond it; the power bought
+  const monthly = rules.length > 0 && rules.every((r) => r.tolerance != null && r.penaltyMultiple != null);
+  const buying = years.some((y) => y.boughtMu != null);
+  const penalisedYears = monthly ? years.filter((y) => (y.penalisedMu || 0) > 0.0005) : [];
   const worst = (pid, key, fn) => (years.length ? fn(...years.map((y) => y.plants[pid]?.[key] ?? 0)) : null);
 
   return (
@@ -99,6 +103,7 @@ export default function Dispatch15({ lp, start }) {
         hour's trend, keeping its energy. A time-block floor is checked in every 15-minute block on its own, a block short of it
         paid at its penalty multiple of the tariff. The Excel workbook has a summary by year, the months, and every year hour by
         hour (8,760 rows a year); the ZIP has one CSV per year at 15 minutes (35,040 rows) and the summary.
+        {monthly && " SECI-FDRE-X as in the sizing: the contract is the buyer's four hours; power bought from the market (within the tender's share of the year's energy, never resold) is priced at the hour's price plus the charges; nothing is sold in the hours without connectivity; each month needs its share less the free tolerance, and the energy short beyond it is paid at the penalty multiple of the tariff."}
       </p>
       {busy && (
         <div className="bid-progress" role="status" data-testid="bid-d15-progress">
@@ -112,7 +117,12 @@ export default function Dispatch15({ lp, start }) {
         <div className={`bid-mode ${failedYears.length ? "rules" : ""}`} data-testid="bid-d15-verdict">
           {failedYears.length ? <TriangleAlert size={14} /> : <CheckCircle2 size={14} />}
           <span>
-            {failedYears.length && priced
+            {monthly
+              ? (penalisedYears.length
+                ? `In 15-minute blocks the month's peak energy falls short beyond the free ${pf(rules[0].tolerance, 0)} in ${penalisedYears.length} of ${years.length} years: ${nf(penalisedYears.reduce((a, y) => a + y.penalisedMu, 0), 2)} MU in all, paid at ${rules[0].penaltyMultiple} × the tariff, as the sizing chose.`
+                : `Every month of all ${years.length} years is within the free ${pf(rules[0].tolerance, 0)} in 15-minute blocks: no penalty.`)
+                + (buying ? ` Power bought: ${nf(years[0].boughtMu, 2)} MU in year 1 (${pf(years[0].boughtShare, 2)} of the contracted energy, ₹${nf(years[0].boughtCostCr, 2)} crore); at most ${pf(Math.max(...years.map((y) => y.boughtShare || 0)), 2)} in a year.` : "")
+              : failedYears.length && priced
               ? `In 15-minute blocks the plant is short of the time-block floors in ${failedYears.length} of ${years.length} years: ${nf(failedYears.reduce((a, y) => a + y.shortfallMu, 0), 1)} MU in all, paid at ${rules[0].penaltyMultiple} × the tariff, as the sizing chose.${sizingShort(lp, years[0])}`
               : failedYears.length
               ? `In 15-minute blocks the plant misses a supply floor in ${failedYears.length} of ${years.length} years (years ${failedYears.map((y) => y.year).join(", ")}); shortfall ${nf(failedYears.reduce((a, y) => a + y.shortfallMu, 0), 1)} MU in all. Size again with more battery or a fixed larger biomass.`
@@ -126,7 +136,8 @@ export default function Dispatch15({ lp, start }) {
           <div className="bid-d15-row head">
             <span>Year</span>
             {rules.map((r) => <span key={r.id}>{r.label || r.id} ≥ {pf(r.target, 0)}</span>)}
-            <span>Shortfall</span>
+            <span>{monthly ? `Short beyond ${pf(rules[0].tolerance, 0)}` : "Shortfall"}</span>
+            {buying && <span>Bought</span>}
             {plants.map((pid) => <span key={pid}>{PLANT_TITLE[pid] || pid}: lowest · largest 15-min change</span>)}
             <span>Curtailed</span>
             <span>Sold</span>
@@ -136,8 +147,11 @@ export default function Dispatch15({ lp, start }) {
               <span>{y.year}</span>
               {y.rules.map((r) => (r.basis === "block"
                 ? <span key={r.id} className={r.met ? "ok" : r.penaltyMultiple != null ? "warn" : "bad"} title={`${nf(r.shortfallMu, 2)} MU short; lowest block ${pf(r.achieved, 1)}`}>{r.met ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {pf(r.hoursMet, 1)} of blocks</span>
+                : r.tolerance != null
+                ? <span key={r.id} className={r.met ? "ok" : r.withinTolerance ? "ok" : "warn"} title={`worst month ${pf(r.achieved, 1)} of its peak energy`}>{r.withinTolerance ? <CheckCircle2 size={12} /> : <XCircle size={12} />} worst month {pf(r.achieved, 1)}</span>
                 : <span key={r.id} className={r.met ? "ok" : "bad"}>{r.met ? <CheckCircle2 size={12} /> : <XCircle size={12} />} {pf(r.achieved, 1)}</span>))}
-              <span>{y.shortfallMu > 0.0005 ? `${nf(y.shortfallMu, 1)} MU` : "none"}</span>
+              <span>{y.shortfallMu > 0.0005 ? `${nf(y.shortfallMu, monthly ? 2 : 1)} MU` : "none"}</span>
+              {buying && <span>{nf(y.boughtMu || 0, 2)} MU · {pf(y.boughtShare || 0, 1)}</span>}
               {plants.map((pid) => <span key={pid}>{pf(y.plants[pid].minPct, 1)} · {pf(y.plants[pid].maxStepPct, 1)}</span>)}
               <span>{nf(y.curtailedMu, 0)} MU</span>
               <span>{nf(y.soldMu, 0)} MU</span>

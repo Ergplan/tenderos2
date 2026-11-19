@@ -310,7 +310,7 @@ export default function FdrexBidTab({ initialScenario = null }) {
         {step.id === "bid" && <BidInputs {...props} />}
         {step.id === "sources" && <SourcesStep {...props} startSizing={startWithTheatre} hourly={sizing.hourly} withFinance={false} />}
         {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={startWithTheatre} />}
-        {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={startWithTheatre} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} dispatch15={false} />}
+        {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={startWithTheatre} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} />}
         {step.id === "finance" && <FinanceStep {...props} traceRequest={traceAsk} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
         {step.id === "whatif" && <WhatIfTab embedded seed={whatIfSeed} seedKey={state.lp ? `${JSON.stringify(state.lp.sizes)}|${state.lp.tariff}|${JSON.stringify(state.fdrex)}` : ""} onBack={() => goto("finance")} />}
         {step.id === "forms" && <BidForms state={forms} setState={setForms} goto={goto} model={formsModel} index="9" />}

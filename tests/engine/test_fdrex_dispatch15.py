@@ -1,0 +1,104 @@
+"""SECI-FDRE-X in the 15-minute dispatch (engine/sizing/dispatch15.py): the sized plant dispatched in
+96 blocks a day with the sizing's FDRE-X rules: supply only in the buyer's four hours, power bought
+within 5% of the year's energy at the hourly price plus charges and never resold, no sale in the
+solar hours without connectivity for them, and the month's energy short beyond the free 10% at
+1.5 x the tariff."""
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from engine.sizing import dispatch15 as D
+from engine.sizing import rtc_lp as M
+from tests.engine.test_fdrex_lp import FOUR, NON_SOLAR, PRICE, X, _payload
+
+pytestmark = pytest.mark.skipif(M.highspy is None, reason="highspy not installed")
+
+FOUR_B = np.repeat(FOUR > 0.5, D.BLOCKS_PER_HOUR)
+NON_SOLAR_B = np.repeat(NON_SOLAR > 0.5, D.BLOCKS_PER_HOUR)
+# a plant a little short of the four hours every day: the battery cannot carry them all
+SIZES = {"solarMw": 120.0, "windMw": 60.0, "bessMw": 70.0, "bessMwh": 230.0}
+TARIFF = 6.0
+
+
+def _year(**kw):
+    payload = _payload(**kw)
+    inp = D._inputs(payload)
+    return D.dispatch_year(inp, SIZES, TARIFF, 1), inp
+
+
+@pytest.fixture(scope="module")
+def penalty():
+    return _year(penalty=1.5, tolerance=0.1, buy_share=0.05)
+
+
+def test_supply_only_in_the_four_hours(penalty):
+    res, _ = penalty
+    s = res["series"]
+    assert np.asarray(s["delivered"])[~FOUR_B].max() == pytest.approx(0, abs=0.01), "nothing delivered outside the buyer's hours"
+    assert res["summary"]["demandMu"] == pytest.approx(X * 4 * 365 / 1000, rel=1e-6), "4 MWh per MW a day"
+
+
+def test_purchases_within_five_percent_priced_and_not_resold(penalty):
+    res, inp = penalty
+    s, summ = res["series"], res["summary"]
+    bought = np.asarray(s["bought"])
+    assert bought.sum() > 0, "the plant buys power"
+    assert summ["boughtShare"] <= 0.05 + 1e-6, f"within 5%: {summ['boughtShare']:.4f}"
+    price = np.repeat(PRICE + 0.3, D.BLOCKS_PER_HOUR)
+    cost = float((bought / inp["poi"] * price).sum() * D.DT * 1e-4)
+    assert summ["boughtCostCr"] == pytest.approx(cost, rel=1e-6), "priced at the hour's price plus the charges"
+    sold = np.asarray(s["sold"])
+    gen = np.asarray(s["solar"]) + np.asarray(s["wind"])
+    assert (sold <= gen + 0.01).all(), "sales come from own RE only"
+
+
+def test_no_sale_in_the_solar_hours(penalty):
+    res, _ = penalty
+    sold = np.asarray(res["series"]["sold"])
+    assert sold.sum() > 0
+    assert sold[~NON_SOLAR_B].max() == pytest.approx(0, abs=0.01), "no sale without connectivity"
+
+
+def test_the_monthly_tolerance_and_the_penalty_beyond_it(penalty):
+    res, _ = penalty
+    s, summ = res["series"], res["summary"]
+    rule = summ["rules"][0]
+    assert rule["tolerance"] == 0.1 and rule["penaltyMultiple"] == 1.5
+    delivered, demand = np.asarray(s["delivered"]), np.asarray(s["demand"])
+    beyond = sum(max(0.0, 0.9 * demand[D.MONTH_OF_BLOCK == m].sum() - delivered[D.MONTH_OF_BLOCK == m].sum()) for m in range(12)) * D.DT / 1000
+    assert rule["penalisedMu"] == pytest.approx(beyond, abs=1e-3), "the penalised energy is what is short beyond 90% of each month"
+    assert summ["penalisedMu"] == pytest.approx(rule["penalisedMu"])
+    worst = min(delivered[D.MONTH_OF_BLOCK == m].sum() / demand[D.MONTH_OF_BLOCK == m].sum() for m in range(12))
+    assert rule["achieved"] == pytest.approx(worst, abs=1e-6)
+    assert rule["withinTolerance"] == (worst >= 0.9 - 1e-6)
+
+
+def test_meeting_every_month_in_full_buys_more_or_falls_short():
+    hard, _ = _year(buy_share=0.05)
+    soft, _ = _year(penalty=1.5, tolerance=0.1, buy_share=0.05)
+    h, s = hard["summary"], soft["summary"]
+    assert "tolerance" not in h["rules"][0], "a hard monthly rule has no free share"
+    assert h["deliveredMu"] >= s["deliveredMu"] - 1e-6, "the whole month is worth more than the free tenth"
+
+
+def test_without_purchases_or_the_sale_mask_nothing_changes_for_other_tenders():
+    res, inp = _year(penalty=1.5, tolerance=0.1, sale_mask=False)
+    assert inp["buy"] is None and inp["sale_mask"] is None
+    assert "bought" not in res["series"] and "boughtMu" not in res["summary"]
+    sold = np.asarray(res["series"]["sold"])
+    assert sold[~NON_SOLAR_B].sum() > 0, "with connectivity in the solar hours, they sell"
+
+
+def test_the_files_carry_the_bought_power(penalty, tmp_path):
+    res, inp = penalty
+    csv = D.year_csv(res["series"], 1).splitlines()
+    assert "Bought power (green market, bilateral) MW" in csv[0]
+    summ = D.summary_csv([res["summary"]]).splitlines()
+    assert "Bought MU" in summ[0] and len(summ) == 2
+
+
+def test_a_bad_tolerance_is_refused():
+    p = _payload(penalty=1.5, tolerance=1.2)
+    with pytest.raises(D.DispatchError):
+        D._inputs(p)
