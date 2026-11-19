@@ -98,31 +98,37 @@ def _field(page, label):
     return page.locator(".rtc-field", has=page.locator(".rtc-field-top span", has_text=re.compile(rf"^{re.escape(label)}$"))).first
 
 
-def _icon_for(page, box, testid, key_attr, dx):
-    """The paperclip (ev-dot, dx 34) or the send icon (ping-dot, dx 10) of a box: they sit at the
-    box's top-right corner and take clicks only while the box is under the mouse."""
+def _icon_for(page, box, testid, key_attr, dx=None):
+    """The paperclip (ev-dot) or the send icon (ping-dot) of a box: in the tools row of the box's
+    header (.fx-tools), beside its lock; only boxes whose value comes from another team have them."""
     box.scroll_into_view_if_needed()
-    box.hover()
-    page.wait_for_timeout(300)
-    key = page.evaluate("""([el, testid, attr, dx]) => { const r = el.getBoundingClientRect();
-        const dots = [...document.querySelectorAll(`[data-testid=${testid}]`)];
-        let best = null, d = 1e9;
-        for (const b of dots) { const q = b.getBoundingClientRect(); const dd = Math.abs(q.left + dx - r.right) + Math.abs(q.top + 10 - r.top); if (dd < d) { d = dd; best = b; } }
-        return best && d < 30 ? best.dataset[attr] : null; }""", [box.element_handle(), testid, key_attr, dx])
-    assert key, f"no {testid} at the box"
+    key = page.evaluate("""([el, testid, attr]) => {
+        const head = el.closest('.rtc-field')?.querySelector(':scope > .rtc-field-top') || el.closest('label');
+        const dot = head?.querySelector(`.fx-tools [data-testid=${testid}]`);
+        return dot ? dot.dataset[attr] : null; }""", [box.element_handle(), testid, key_attr])
+    assert key, f"no {testid} beside the box's lock"
     attr = "data-ev-key" if key_attr == "evKey" else "data-ping-key"
     return page.locator(f'[data-testid={testid}][{attr}="{key}"]')
 
 
+def _own_choice(page, box):
+    """A box the bid team fills itself: a lock in its header, no send icon or paperclip."""
+    box.scroll_into_view_if_needed()
+    tools = page.evaluate("""(el) => {
+        const head = el.closest('.rtc-field')?.querySelector(':scope > .rtc-field-top') || el.closest('label');
+        return head ? [head.querySelectorAll('.lock-btn').length, head.querySelectorAll('[data-testid=ping-dot], [data-testid=ev-dot]').length] : null; }""", box.element_handle())
+    assert tools and tools[0] >= 1 and tools[1] == 0, f"lock {tools and tools[0]}, send/paperclip {tools and tools[1]}"
+
+
 def _evidence_and_ping(page, box):
     """Open and close the box's evidence and its thread."""
-    _icon_for(page, box, "ev-dot", "evKey", 34).click()
+    _icon_for(page, box, "ev-dot", "evKey").click()
     pop = page.wait_for_selector("[data-testid=ev-pop]")
     assert "Attach" in pop.inner_text() and page.locator("[data-testid=ev-register]").count() == 1
     assert page.locator("[data-testid=ev-kind-note]").count() == 1 and page.locator("[data-testid=ev-add]").count() == 1
     page.keyboard.press("Escape")
     page.wait_for_function("() => !document.querySelector('[data-testid=ev-pop]')")
-    _icon_for(page, box, "ping-dot", "pingKey", 10).click()
+    _icon_for(page, box, "ping-dot", "pingKey").click()
     pop = page.wait_for_selector("[data-testid=ping-pop]")
     assert "Now in the box" in pop.inner_text() and page.locator("[data-testid=ping-text]").count() == 1
     assert page.locator("[data-testid=ping-send]").is_disabled(), "nothing typed: nothing to send"
@@ -262,7 +268,7 @@ def test_seci_steps():
         # the money at stake follows the installed capacity, so before a sizing the section says so
         money = page.locator(".rtc-section", has_text="Money at stake")
         assert page.locator("[data-testid=seci-money]").count() == 0 and "size the plant" in money.inner_text().lower()
-        _evidence_and_ping(page, mw)
+        _own_choice(page, mw)
         _shot(page, "seci-bid")
 
         # 04 Design
@@ -412,7 +418,8 @@ def test_what_if_tab():
         page.wait_for_selector("[data-testid=trace-explorer]")
         page.keyboard.press("Escape")
         assert page.locator("[data-testid=whatif-years] tbody tr").count() >= 10
-        box = _field(page, "Contracted capacity (bid)").locator("input")
+        _own_choice(page, _field(page, "Contracted capacity (bid)").locator("input"))
+        box = _field(page, "Interest rate").locator("input")
         _evidence_and_ping(page, box)
         page.click("[data-testid=whatif-reset]")
         page.wait_for_timeout(300)

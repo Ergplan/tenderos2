@@ -1,12 +1,14 @@
 "use client";
-// Team mode on the page: a send icon on every input box of the open tab (with the number of
-// messages when the box has a thread, highlighted when one is unread for you). Clicking it opens
+// Team mode on the page: a send icon in the header of each input box whose value usually comes from
+// another team (./fieldTools.js crossFunctional), beside its lock, and on any box that has a thread
+// (with the number of messages, highlighted when one is unread for you). Clicking it opens
 // the box's thread, Slack style: the messages, a composer that suggests teammates after @, and an
 // optional value the asker can put in the box with "Fill in".
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AtSign, CornerDownLeft, Send, X } from "lucide-react";
 import { allBoxes, boxInfo, currentStep, fillBox } from "./fields";
+import { useFieldHosts } from "./fieldTools";
 import { mentionAt, suggest } from "./mentions";
 import "./teamMode.css";
 
@@ -187,52 +189,13 @@ function ThreadPop({ team, tab, box, anchor, onClose, elFor }) {
  * opened, the box scrolled to and its thread shown; then onFocused().
  */
 export default function FieldPings({ tab, tabLabel, team, focus = null, onFocused = () => {} }) {
-  const [boxes, setBoxes] = useState([]);
+  const boxes = useFieldHosts(tab, tabLabel);
   const [open, setOpen] = useState(null); // { key, label, place, value, anchor }
   const [mode, setMode] = useState(readPingMode);
-  const [hot, setHot] = useState(null); // the key of the box under the mouse or with focus
-  const els = useRef(new Map());
-  const frame = useRef(0);
-
-  const scan = useCallback(() => {
-    cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(() => {
-      const list = allBoxes(tab, tabLabel);
-      els.current = new Map(list.map((b) => [b.key, b.el]));
-      setBoxes(list.map(({ el, ...b }) => {
-        const r = el.getBoundingClientRect();
-        return { ...b, tabLabel, x: r.right + window.scrollX, y: r.top + window.scrollY, visible: r.width > 0 && r.height > 0 };
-      }));
-    });
-  }, [tab, tabLabel]);
-
   useEffect(() => {
-    scan();
-    const main = document.querySelector("main");
-    let t = 0;
-    const later = () => { clearTimeout(t); t = setTimeout(scan, 200); };
-    const mo = main ? new MutationObserver(later) : null;
-    mo?.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "disabled"] });
-    window.addEventListener("resize", later);
-    document.addEventListener("scroll", scan, true);
     const onMode = () => setMode(readPingMode());
     window.addEventListener("tenderos-ping-mode", onMode);
-    return () => { mo?.disconnect(); clearTimeout(t); window.removeEventListener("resize", later); document.removeEventListener("scroll", scan, true); window.removeEventListener("tenderos-ping-mode", onMode); };
-  }, [scan]);
-
-  // the box under the mouse or with focus gets its icon at full strength
-  useEffect(() => {
-    const keyOf = (el) => [...els.current.entries()].find(([, v]) => v === el)?.[0] || null;
-    // off a box (and off the icons), no icon takes clicks, so one never covers a button above a box
-    const over = (e) => {
-      const el = e.target.closest?.("input, select, textarea");
-      if (el) setHot(keyOf(el));
-      else if (!e.target.closest?.(".ping-dot, .ping-pop")) setHot(keyOf(document.activeElement));
-    };
-    const fin = (e) => { const k = keyOf(e.target); if (k) setHot(k); };
-    document.addEventListener("mouseover", over);
-    document.addEventListener("focusin", fin);
-    return () => { document.removeEventListener("mouseover", over); document.removeEventListener("focusin", fin); };
+    return () => window.removeEventListener("tenderos-ping-mode", onMode);
   }, []);
 
   // "Open field" from the inbox: the step, then the box
@@ -266,26 +229,25 @@ export default function FieldPings({ tab, tabLabel, team, focus = null, onFocuse
   }, [focus, tab, tabLabel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const counts = team?.counts || {};
-  const shown = useMemo(() => boxes.filter((b) => b.visible && (mode === "always" || b.key === hot || counts[b.key] || open?.key === b.key)), [boxes, mode, hot, counts, open]);
   if (!team?.me || typeof document === "undefined") return null;
-  return createPortal(
+  const elFor = (k) => boxes.find((b) => b.key === k)?.el || allBoxes(tab, tabLabel).find((b) => b.key === k)?.el || null;
+  return (
     <>
-      <div className="ping-layer" aria-hidden={false}>
-        {shown.map((b) => {
-          const c = counts[b.key];
-          return (
-            <button key={b.key} type="button" className={`ping-dot ${c ? "has-thread" : ""} ${c?.unread ? "unread" : ""} ${b.key === hot || open?.key === b.key ? "hot" : ""}`}
-              style={{ left: b.x - 10, top: b.y - 10 }} title={c ? `${c.messages} message${c.messages === 1 ? "" : "s"} about ${b.label}` : `Ping a teammate about ${b.label}`}
-              data-testid="ping-dot" data-ping-key={b.key}
-              onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setOpen(open?.key === b.key ? null : { ...b, anchor: { x: r.right, y: r.bottom } }); }}>
-              <Send size={10} />
-              {c?.messages ? <span>{c.messages}</span> : null}
-            </button>
-          );
-        })}
-      </div>
-      {open && <ThreadPop key={open.key} team={team} tab={tab} box={open} anchor={open.anchor} onClose={() => setOpen(null)} elFor={(k) => els.current.get(k) || allBoxes(tab, tabLabel).find((b) => b.key === k)?.el || null} />}
-    </>,
-    document.body,
+      {boxes.filter((b) => b.team || counts[b.key] || open?.key === b.key).map((b) => {
+        const c = counts[b.key];
+        const title = c ? `${c.messages} message${c.messages === 1 ? "" : "s"} about ${b.label}` : `Ask ${b.team ? `the ${b.team} team` : "a teammate"} for ${b.label}`;
+        return createPortal(
+          <button key={b.key} type="button" className={`ping-dot ${c ? "has-thread" : ""} ${c?.unread ? "unread" : ""} ${mode === "hover" && !c ? "quiet" : ""} ${open?.key === b.key ? "hot" : ""}`}
+            title={title} aria-label={title} data-testid="ping-dot" data-ping-key={b.key} data-team={b.team || ""}
+            onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setOpen(open?.key === b.key ? null : { ...b, el: undefined, host: undefined, anchor: { x: r.right, y: r.bottom } }); }}>
+            <Send size={11} />
+            {c?.messages ? <span>{c.messages}</span> : null}
+          </button>,
+          b.host,
+          `ping-${b.key}`,
+        );
+      })}
+      {open && createPortal(<ThreadPop key={open.key} team={team} tab={tab} box={open} anchor={open.anchor} onClose={() => setOpen(null)} elFor={elFor} />, document.body)}
+    </>
   );
 }

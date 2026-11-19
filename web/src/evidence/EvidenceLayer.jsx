@@ -1,14 +1,16 @@
 "use client";
-// Evidence on every input (E-01, E-02): a paperclip beside every input box of the open tab, to the
-// left of team mode's send icon. Faint when the box has no evidence, solid with a count when it
+// Evidence on inputs (E-01, E-02): a paperclip in the header of each input box whose value usually
+// comes from another team (../team/fieldTools.js), after team mode's send icon and the lock, and on
+// any box that has evidence or a sign-off. Faint when the box has no evidence, solid with a count when it
 // has, a green tick when a super admin signed off the box at its current value, amber when the
 // sign-off is at an older value. Clicking it opens the box's evidence: the items (a file to
 // download, a link, a note; who and when), a form to attach more, and for a super admin the
 // sign-off. Boxes are found on the page the way team mode finds them (../team/fields.js).
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, Download, FileText, Link as LinkIcon, Paperclip, ShieldCheck, StickyNote, Trash2, X } from "lucide-react";
 import { allBoxes, boxInfo } from "../team/fields";
+import { useFieldHosts } from "../team/fieldTools";
 import { readPingMode } from "../team/FieldPings";
 import useEvidence from "./useEvidence";
 import "./evidence.css";
@@ -151,87 +153,43 @@ function EvidencePop({ tab, box, items, signoff, me, evidence, anchor, onClose, 
 /** The layer over the open tab: a paperclip at the top-right corner of every box, left of the send icon. */
 export default function EvidenceLayer({ tab, tabLabel, team }) {
   const evidence = useEvidence(tab, Boolean(team?.me));
-  const [boxes, setBoxes] = useState([]);
+  // the box's value sets its sign-off state (current or older value), so values are read too
+  const boxes = useFieldHosts(tab, tabLabel, { values: true });
   const [open, setOpen] = useState(null); // { key, label, place, value, anchor }
   const [mode, setMode] = useState(readPingMode);
-  const [hot, setHot] = useState(null);
-  const els = useRef(new Map());
-  const frame = useRef(0);
-
-  const scan = useCallback(() => {
-    cancelAnimationFrame(frame.current);
-    frame.current = requestAnimationFrame(() => {
-      const list = allBoxes(tab, tabLabel);
-      els.current = new Map(list.map((b) => [b.key, b.el]));
-      setBoxes(list.map(({ el, ...b }) => {
-        const r = el.getBoundingClientRect();
-        return { ...b, tabLabel, x: r.right + window.scrollX, y: r.top + window.scrollY, visible: r.width > 0 && r.height > 0 };
-      }));
-    });
-  }, [tab, tabLabel]);
-
   useEffect(() => {
-    scan();
-    const main = document.querySelector("main");
-    let t = 0;
-    const later = () => { clearTimeout(t); t = setTimeout(scan, 200); };
-    const mo = main ? new MutationObserver(later) : null;
-    mo?.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "open", "disabled"] });
-    window.addEventListener("resize", later);
-    document.addEventListener("scroll", scan, true);
-    // a value typed in a box changes its sign-off state (current or older value)
-    document.addEventListener("input", later, true);
-    document.addEventListener("change", later, true);
     const onMode = () => setMode(readPingMode());
     window.addEventListener("tenderos-ping-mode", onMode);
-    return () => {
-      mo?.disconnect(); clearTimeout(t); window.removeEventListener("resize", later); document.removeEventListener("scroll", scan, true);
-      document.removeEventListener("input", later, true); document.removeEventListener("change", later, true); window.removeEventListener("tenderos-ping-mode", onMode);
-    };
-  }, [scan]);
-
-  // the box under the mouse or with focus gets its icon at full strength and takes clicks
-  useEffect(() => {
-    const keyOf = (el) => [...els.current.entries()].find(([, v]) => v === el)?.[0] || null;
-    const over = (e) => {
-      const el = e.target.closest?.("input, select, textarea");
-      if (el && !el.closest(".ev-pop")) setHot(keyOf(el));
-      else if (!e.target.closest?.(".ev-dot, .ev-pop, .ping-dot, .ping-pop")) setHot(keyOf(document.activeElement));
-    };
-    const fin = (e) => { const k = keyOf(e.target); if (k) setHot(k); };
-    document.addEventListener("mouseover", over);
-    document.addEventListener("focusin", fin);
-    return () => { document.removeEventListener("mouseover", over); document.removeEventListener("focusin", fin); };
+    return () => window.removeEventListener("tenderos-ping-mode", onMode);
   }, []);
 
   const { counts, byKey, signoffs } = evidence;
-  const shown = useMemo(() => boxes.filter((b) => b.visible && (mode === "always" || b.key === hot || counts[b.key] || open?.key === b.key)), [boxes, mode, hot, counts, open]);
   if (!team?.me || typeof document === "undefined") return null;
-  const elFor = (k) => els.current.get(k) || allBoxes(tab, tabLabel).find((b) => b.key === k)?.el || null;
-  return createPortal(
+  const elFor = (k) => boxes.find((b) => b.key === k)?.el || allBoxes(tab, tabLabel).find((b) => b.key === k)?.el || null;
+  return (
     <>
-      <div className="ev-layer">
-        {shown.map((b) => {
-          const n = counts[b.key]?.items || 0;
-          const state = signState(signoffs[b.key], b.value);
-          const title = [n ? `${n} piece${n === 1 ? "" : "s"} of evidence for ${b.label}` : `Attach evidence for ${b.label}`,
-            state === "signed" ? "signed off at this value" : state === "stale" ? "signed off at an older value" : ""].filter(Boolean).join("; ");
-          return (
-            <button key={b.key} type="button" className={`ev-dot ${n ? "has" : ""} ${state} ${b.key === hot || open?.key === b.key ? "hot" : ""}`}
-              style={{ left: b.x - 34, top: b.y - 10 }} title={title} data-testid="ev-dot" data-ev-key={b.key} data-ev-count={n} data-ev-state={state || "none"}
-              onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setOpen(open?.key === b.key ? null : { ...b, anchor: { x: r.right, y: r.bottom } }); }}>
-              <Paperclip size={10} />
-              {n ? <span>{n}</span> : null}
-              {state && <i className="ev-tick" aria-hidden="true"><Check size={8} /></i>}
-            </button>
-          );
-        })}
-      </div>
-      {open && (
+      {boxes.filter((b) => b.team || counts[b.key] || signoffs[b.key] || open?.key === b.key).map((b) => {
+        const n = counts[b.key]?.items || 0;
+        const state = signState(signoffs[b.key], b.value);
+        const title = [n ? `${n} piece${n === 1 ? "" : "s"} of evidence for ${b.label}` : `Attach evidence for ${b.label}${b.team ? ` (from the ${b.team} team)` : ""}`,
+          state === "signed" ? "signed off at this value" : state === "stale" ? "signed off at an older value" : ""].filter(Boolean).join("; ");
+        return createPortal(
+          <button key={b.key} type="button" className={`ev-dot ${n ? "has" : ""} ${state} ${mode === "hover" && !n && !state ? "quiet" : ""} ${open?.key === b.key ? "hot" : ""}`}
+            title={title} aria-label={title} data-testid="ev-dot" data-ev-key={b.key} data-ev-count={n} data-ev-state={state || "none"}
+            onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setOpen(open?.key === b.key ? null : { ...b, el: undefined, host: undefined, anchor: { x: r.right, y: r.bottom } }); }}>
+            <Paperclip size={11} />
+            {n ? <span>{n}</span> : null}
+            {state && <i className="ev-tick" aria-hidden="true"><Check size={8} /></i>}
+          </button>,
+          b.host,
+          `ev-${b.key}`,
+        );
+      })}
+      {open && createPortal(
         <EvidencePop key={open.key} tab={tab} box={open} items={byKey[open.key] || []} signoff={signoffs[open.key] || null} me={team.me} evidence={evidence}
-          anchor={open.anchor} onClose={() => setOpen(null)} elFor={elFor} />
+          anchor={open.anchor} onClose={() => setOpen(null)} elFor={elFor} />,
+        document.body,
       )}
-    </>,
-    document.body,
+    </>
   );
 }

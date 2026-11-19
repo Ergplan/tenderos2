@@ -51,6 +51,7 @@ export default function AuthForm({ mode = "login", next = "/" }) {
         {setup && <label>Confirm password<input type="password" value={form.confirm} onChange={set("confirm")} required minLength={8} autoComplete="new-password" /></label>}
         {error && <div className="alert">{error}</div>}
         <button type="submit" className="primary full" disabled={busy}>{busy && <Loader2 className="spin" size={14} />} {setup ? "Create and sign in" : "Sign in"}</button>
+        <p className="note auth-beta" data-testid="auth-beta"><b>Beta version for demo.</b> Check every result independently before using it in a bid application; Joulewise shall not be held accountable for any mistakes in the results.</p>
       </form>
     </div>
   );

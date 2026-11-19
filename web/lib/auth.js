@@ -39,11 +39,11 @@ export async function currentUser() {
   const jar = await cookies();
   const session = await verifySession(jar.get(SESSION_COOKIE)?.value);
   if (!session) return null;
-  const { rows } = await query("SELECT id, email, name, role, session_epoch, tab_access, org, expires_at, disabled FROM users WHERE id = $1", [session.id]);
+  const { rows } = await query("SELECT id, email, name, role, session_epoch, tab_access, org, expires_at, disabled, created_at FROM users WHERE id = $1", [session.id]);
   const user = rows[0];
   if (!user || user.session_epoch !== session.epoch) return null;
   if (licenceProblem(user)) return null;
-  return { id: user.id, email: user.email, name: user.name, role: user.role, tab_access: user.tab_access, org: user.org || "", expires_at: user.expires_at, sid: session.sid, session_epoch: user.session_epoch };
+  return { id: user.id, email: user.email, name: user.name, role: user.role, tab_access: user.tab_access, org: user.org || "", expires_at: user.expires_at, created_at: user.created_at, sid: session.sid, session_epoch: user.session_epoch };
 }
 
 /** The signed-in user plus the dashboard tabs they may open and whom to contact for more. */

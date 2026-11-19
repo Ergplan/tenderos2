@@ -1810,3 +1810,29 @@ tr.selected td { background: var(--surface-3); color: var(--ink); font-weight: 6
 .licence-table .lib-actions .rtc-link { margin: 2px 10px 2px 0; }
 .licence-table td.lib-actions { white-space: normal; text-align: left; }
 .licence-table .lib-actions .rtc-link { display: inline-flex; white-space: nowrap; }
+
+/* the beta notice and the trial period over every screen (BetaBar in main.jsx) */
+.beta-bar { position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: -28px 0 22px; padding: 9px 14px; border: 1px solid color-mix(in srgb, var(--warn) 55%, transparent); border-top: 0; background: color-mix(in srgb, var(--warn) 12%, var(--bg, var(--surface))); font-size: 12.5px; line-height: 1.45; color: var(--ink); backdrop-filter: blur(6px); }
+.beta-chip { padding: 2px 8px; background: var(--warn); color: #1a1300; font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.beta-text { flex: 1 1 360px; }
+.beta-trial { margin-left: auto; padding: 2px 10px; border: 1px solid var(--line); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+.beta-trial.ending { border-color: var(--bad, #ff6b6b); color: var(--bad, #ff6b6b); }
+
+/* an input's tools in its header, beside its lock: lock, send to a teammate, attach evidence
+   (team/fieldTools.js, FieldLocks, FieldPings, EvidenceLayer) */
+.rtc-field-top:has(> .fx-tools) { justify-content: flex-start; }
+.rtc-field-top:has(> .fx-tools) > :first-child { margin-right: auto; }
+.fx-tools { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; vertical-align: middle; }
+.fx-tools:empty { display: none; }
+.fx-tools .fx-lock { order: 0; }
+.fx-tools .ping-dot { order: 1; }
+.fx-tools .ev-dot { order: 2; }
+.fx-tools .ping-dot, .fx-tools .ev-dot { position: relative; left: auto; top: auto; height: 22px; min-width: 22px; border-radius: 0; opacity: 0.8; pointer-events: auto; transform: none; }
+.fx-tools .ping-dot:hover, .fx-tools .ev-dot:hover, .fx-tools .hot { opacity: 1; transform: none; }
+.fx-tools .quiet { opacity: 0; }
+.rtc-field:hover .fx-tools .quiet, label:hover .fx-tools .quiet, .fx-tools .quiet:focus-visible { opacity: 0.8; }
+input[data-fx-locked], select[data-fx-locked] { opacity: 0.7; cursor: not-allowed; }
+/* the compact "assign to someone" icon under a box: shown when the box's field is under the mouse,
+   or once assigned (then it is a status chip instead) */
+.team-assign-btn.compact { opacity: 0; transition: opacity 0.12s; }
+*:hover > .team-assign > .team-assign-btn.compact, .team-assign-btn.compact:focus-visible, .team-assign:has(.team-pop) > .team-assign-btn.compact { opacity: 1; }

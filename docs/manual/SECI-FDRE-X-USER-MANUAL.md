@@ -10,6 +10,10 @@ the finance terms, the sizing and the financial model. The SECI RTC manual
 (`SECI-RTC-USER-MANUAL.md`) describes those shared screens; this manual covers what is this
 tender's own.
 
+Over every screen a bar reads **Beta version for demo**: check every result independently before
+using it in a bid application; Joulewise is not accountable for mistakes in the results. A demo
+licence also shows its trial period there (start and end dates, days left).
+
 ---
 
 ## What the tender asks
@@ -78,6 +82,12 @@ The four documents (RfS, standard PPA, standard PSA, Amendment-01) with what mat
 a link to every PDF. The schedule (dates from SECI's website are marked as such). The twelve rows
 of Amendment-01, each with the clause as it stood and "Deleted". How the bid goes, step by step,
 and the points worth raising with SECI.
+
+**Amended PPA & PSA: track changes** (the second view at the top of the step) shows the two
+agreements whole, page by page, with Amendment-01 applied: each deleted clause struck through in red
+and "Deleted." after it, tagged with the amendment, its date and the clause. *Amended text* hides
+what is struck; *Original* shows the agreement as printed; "go to one" jumps to each change; every
+page links to its PDF page.
 
 ## Step 02 · Bid conditions *(Tender / Legal)*
 

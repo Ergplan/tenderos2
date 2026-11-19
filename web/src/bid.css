@@ -139,7 +139,16 @@
 .bid-source-icon { display: grid; place-items: center; width: 30px; height: 30px; background: color-mix(in srgb, var(--chapter) 14%, transparent); color: var(--chapter); }
 .bid-source-body { display: grid; gap: 12px; }
 .bid-source > .rtc-note { margin: 0; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.bid-profile summary { cursor: pointer; color: var(--ink-2); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; padding: 6px 0; }
+/* the profile line opens the hourly chart: drawn as a button so it reads as one */
+.bid-profile summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; margin: 4px 0; padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--signal) 55%, var(--line)); background: color-mix(in srgb, var(--signal) 10%, var(--surface)); color: var(--ink); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.bid-profile summary::-webkit-details-marker { display: none; }
+.bid-profile summary::before { content: "▸"; color: var(--signal); font-size: 13px; transition: transform 0.15s; }
+.bid-profile[open] > summary::before { transform: rotate(90deg); }
+.bid-profile summary::after { content: "Open"; margin-left: 6px; padding: 1px 7px; background: var(--signal); color: var(--bg); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; }
+.bid-profile[open] > summary::after { content: "Close"; }
+.bid-profile.chart summary::after { content: "Show the hourly chart"; }
+.bid-profile.chart[open] > summary::after { content: "Hide the chart"; }
+.bid-profile summary:hover { border-color: var(--signal); background: color-mix(in srgb, var(--signal) 18%, var(--surface)); }
 .bid-console { margin-top: 12px; border: 1px solid var(--line); background: var(--sunken); }
 .bid-console-head { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); }
 .bid-console-head .rtc-note { margin-left: auto; }

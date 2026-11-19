@@ -1,7 +1,7 @@
-"""Browser end to end: evidence on every input (demo deployment, seats switched with View as).
+"""Browser end to end: evidence on inputs (demo deployment, seats switched with View as).
 
-The tender manager opens the What-if tab, clicks the paperclip on the "Contracted capacity (bid)"
-box and attaches a note and a link; the paperclip shows 2. The manager (a super admin) signs off the
+The tender manager opens the What-if tab, clicks the paperclip on the "Interest rate" box (a value
+from another team: the paperclips sit on those, after the send icon and the lock) and attaches a note and a link; the paperclip shows 2. The manager (a super admin) signs off the
 value: the paperclip turns green. Changing the box's value turns it amber ("signed off at an older
 value"). The note is removed, the tab's evidence register is downloaded as CSV and holds the link,
 and the demo is left as it was. SCREENSHOTS=<dir> keeps a picture of each step."""
@@ -20,7 +20,7 @@ pytestmark = [
     pytest.mark.skipif(not (URL and DEMO), reason="set TENDEROS_URL and TENDEROS_DEMO=1 (the seats are switched with View as)"),
 ]
 SHOTS = os.environ.get("SCREENSHOTS")
-LABEL = "Contracted capacity (bid)"
+LABEL = "Interest rate"
 
 
 def _shot(page, name):
@@ -28,21 +28,21 @@ def _shot(page, name):
         page.screenshot(path=os.path.join(SHOTS, f"{name}.png"))
 
 
+def _field(page):
+    return page.locator(".rtc-field", has=page.locator(".rtc-field-top > span", has_text=LABEL)).first
+
+
 def _box(page):
-    return page.locator(".rtc-field", has_text=LABEL).first.locator("input")
+    return _field(page).locator("input").first
 
 
 def _clip(page):
-    """The paperclip of the What-if box with LABEL: it sits 34 px left of the box's right edge, at its top."""
+    """The paperclip of the What-if box with LABEL: in the box's header, after its lock and send icon."""
     box = _box(page)
     box.scroll_into_view_if_needed()
-    box.hover()
-    key = page.evaluate("""(el) => { const r = el.getBoundingClientRect();
-        const dots = [...document.querySelectorAll('[data-testid=ev-dot]')];
-        let best = null, d = 1e9;
-        for (const b of dots) { const q = b.getBoundingClientRect(); const dd = Math.abs(q.left + 34 - r.right) + Math.abs(q.top + 10 - r.top); if (dd < d) { d = dd; best = b; } }
-        return best && d < 30 ? best.dataset.evKey : null; }""", box.element_handle())
-    assert key, f"no paperclip at the {LABEL} box"
+    clip = _field(page).locator(".rtc-field-top [data-testid=ev-dot]")
+    clip.wait_for()
+    key = clip.get_attribute("data-ev-key")
     return box, page.locator(f'[data-testid=ev-dot][data-ev-key="{key}"]')
 
 
@@ -72,8 +72,8 @@ def test_attach_evidence_sign_off_and_download_the_register(tmp_path):
         _close_inbox(page)
         page.click("aside.sidebar button:has-text('What-if analysis')")
         page.wait_for_selector("[data-testid=ev-dot]")
-        assert page.locator("[data-testid=ev-dot]").count() >= 10, "a paperclip on every box"
-        assert page.locator("[data-testid=ping-dot]").count() >= 10, "beside the send icons"
+        assert page.locator("[data-testid=ev-dot]").count() >= 6, "paperclips on the boxes other teams fill"
+        assert page.locator("[data-testid=ev-dot]").count() == page.locator("[data-testid=ping-dot]").count(), "each beside a send icon"
 
         # a note and a link on the box
         box, clip = _open(page)
@@ -109,7 +109,7 @@ def test_attach_evidence_sign_off_and_download_the_register(tmp_path):
         page.wait_for_function(f"() => document.querySelector('[data-testid=ev-dot][data-ev-key=\"{key}\"]')?.dataset.evState === 'signed'", timeout=10_000)
 
         # the value changes: amber, signed off at an older value
-        changed = "310" if before != "310" else "320"
+        changed = "9.1" if before != "9.1" else "9.2"
         box.fill(changed)
         page.wait_for_function(f"() => document.querySelector('[data-testid=ev-dot][data-ev-key=\"{key}\"]')?.dataset.evState === 'stale'", timeout=10_000)
         box, clip = _open(page)

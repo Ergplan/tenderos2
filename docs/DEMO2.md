@@ -124,7 +124,8 @@ less than more plant. Choose "Meet every block" to rule that out.
 
 ## Team mode
 
-Every input box of every tab has a send icon. It opens the box's thread, where you ping a teammate
+Each input box has a lock in its header; a box another team fills (a cost, a CUF, a lender's term)
+also has a send icon and a paperclip beside the lock. The send icon opens the box's thread, where you ping a teammate
 with `@name`. They see it under **Messages** (sidebar), open the field from there and reply, with a
 value if they have it. The asker puts the value in the box with **Fill in**. **Team setup**
 (sidebar) assigns each person:

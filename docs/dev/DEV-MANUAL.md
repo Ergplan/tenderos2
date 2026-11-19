@@ -33,9 +33,12 @@ One web app with seven sidebar tabs (`web/lib/tabs.js` `TAB_CATALOG`, `web/src/m
 
 Across the tabs:
 
-* **Team mode** (`docs/TEAM.md`): a send icon on every input box opens a thread with `@handle`
+* **Field tools** (`web/src/team/fieldTools.js`): a lock on every input box, and on the boxes another
+  team fills (costs, resource, finance terms, O&M, regulatory, market) a send icon and a paperclip,
+  in a row in the box's header.
+* **Team mode** (`docs/TEAM.md`): a box's send icon opens a thread with `@handle`
   mentions and a value to "Fill in"; assignments on a saved SECI bid; Team setup; Messages inbox.
-* **Evidence**: a paperclip on every input box holds files, links and notes, a super admin's
+* **Evidence**: a box's paperclip holds files, links and notes, a super admin's
   sign-off, and a CSV register.
 * **MCP connector** (`docs/MCP.md`): a remote MCP server at `/api/mcp/<MCP_TOKEN>` that lets Claude
   search the tender, size a bid, read financials, run What-if and explain the winning bid.
@@ -345,7 +348,7 @@ state (`docs/ARCHITECTURE.md`, "The bid agent"). `GET /api/seci/live` says wheth
 | --- | --- | --- |
 | A tab's inputs, step and results | React state in the tab component, saved to `localStorage` on change | Keys: `fdre.bid.v4` (Tender to Bid), `tenderos.seci.v1` (SECI), `fdre.rtc.v1` (Round the clock), `fdre.bess.v1` (BESS), `fdre.cfd.v1` (CfD; module `cfd` in the library), `tenderos-whatif` (What-if). The What-if step inside the SECI flow (`embedded`) does not write the key. `BidTab` and `SeciTab` also keep a module-level `sessionState`/`sessionView` so switching sidebar tabs does not reset the step |
 | Hour-by-hour dispatch of a sizing | Memory only (`keepDispatch`, `web/src/bid/model.js`) | A bid opened from a save shows yearly values until sized again; `sizingSeed` (the last design) is kept in state to start the next solve |
-| Per-browser conveniences | `localStorage` | `tenderos-theme` (day/night, `web/src/themeScript.js`), `tenderos.pingIcons` (send icons always or on hover, `web/src/team/FieldPings.jsx`) |
+| Per-browser conveniences | `localStorage` | `tenderos-theme` (day/night, `web/src/themeScript.js`), `tenderos.pingIcons` (send icons always or on hover, `web/src/team/FieldPings.jsx`), `tenderos.locks.<tab>` (the boxes locked with the general lock, `web/src/team/FieldLocks.jsx`) |
 | Saved scenarios and versions | `scenarios` (module `rtc`, `fdre`, `bess`, `seci`; `created_by`, `archived`) and `scenario_versions` (inputs and results as jsonb, one row per version) | Save: `POST /api/scenarios` (version 1) or `PUT /api/scenarios/[id]` (new version); open: `/?open=<id>&v=<n>` (`app/page.js` → `MODULE_TAB` in `main.jsx` picks the tab); restore and compare in `/scenarios`. The SECI tab keeps `linked = {id, name, version}` and accepting a team answer writes a new version with a note |
 | Tender readings | `tender_reads` | `POST /api/tenders` after each read; the start screen lists them; a built-in WBSEDCL reading is seeded |
 | Resource profiles | `resource_profiles` | Uploaded solar/wind profiles and the two seeded ones |

@@ -6,9 +6,18 @@ tender's super admin accepts the answer into the bid or returns it.
 
 ## Team mode: ping a teammate from any box
 
-Every input box of every tab carries a small send icon at its top-right corner. The icon is clickable
-while its box is under the mouse or has focus, so it never covers a button above the box. Click it
-and the box's thread opens, Slack style:
+Each input box has a row of tools in its header, beside its label: the **lock**, the **send icon**
+and the **paperclip**, in that order (`web/src/team/fieldTools.js`). The lock is on every box with a
+header: the model's own lock where the box has one (the optimiser's locks of the RTC, SECI and CfD
+inputs), or a lock that makes the box read-only until unlocked, kept per tab in the browser
+(`FieldLocks.jsx`, localStorage `tenderos.locks.<tab>`). The send icon and the paperclip sit only on
+boxes whose value usually comes from another team, by the box's label: costs (Procurement), CUF,
+losses, degradation and efficiency (Resource assessment), the lenders' and tax terms (Finance), O&M,
+connectivity and charges (Regulatory), market prices (Market); and on any box that already has a
+thread or evidence. The bid team's own choices (the bid size, switches, the model's structure) have
+the lock only. A cell of a year-by-year table has no tools.
+
+Click a box's send icon and its thread opens, Slack style:
 
 * the box's label, where it is (tab › step › section) and its value now;
 * the messages about it, each with who wrote it and when;
@@ -37,8 +46,8 @@ People are mentioned by **handle**: the name in lower case, words joined by dots
 * an **email**.
 
 A super admin edits a row and saves it, or adds a person. Everyone else sees the table read-only.
-"Who to ping for what" shows, tab by tab, who covers it. The send icons can show on every box (the
-default) or only on hover; this is a setting of the browser.
+"Who to ping for what" shows, tab by tab, who covers it. The send icons and paperclips can show on
+the cross-functional boxes (the default) or only on hover; this is a setting of the browser.
 
 On a demo, **View as** (in Messages and on Team setup) switches between the seats. Each demo seat
 has a title and the tabs it covers.
@@ -62,9 +71,9 @@ has a title and the tabs it covers.
   The Finance desk sees it unread, opens the field and replies with 320. The manager fills it in,
   and a title change is saved on Team setup.
 
-## Evidence on every input
+## Evidence on inputs
 
-Every input box also carries a small **paperclip**, left of the send icon (E-01 and E-02 in
+The cross-functional boxes also carry a small **paperclip**, after the send icon (E-01 and E-02 in
 `docs/enterprise/FEATURES.md`). It is faint while the box has no evidence and solid, with a count,
 when it has. Click it and the box's evidence opens:
 

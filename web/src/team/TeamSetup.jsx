@@ -154,7 +154,7 @@ export default function TeamSetup({ team }) {
           <div>
             <span className="rtc-index">Send icons on input boxes</span>
             <div className="seci-choice" role="radiogroup" data-testid="ping-mode">
-              {[["always", "On every box", "A faint send icon at the corner of every input box"], ["hover", "On hover", "Only on the box under the mouse, and on boxes with messages"]].map(([k, l, d]) => (
+              {[["always", "On cross-functional boxes", "A send icon and a paperclip beside the lock of each box whose value usually comes from another team (costs, resource, finance, O&M, regulatory, market)"], ["hover", "On hover", "Only on the box under the mouse, and on boxes with messages or evidence"]].map(([k, l, d]) => (
                 <button key={k} type="button" role="radio" aria-checked={mode === k} className={mode === k ? "active" : ""} onClick={() => setPing(k)}><strong>{l}</strong><small>{d}</small></button>
               ))}
             </div>

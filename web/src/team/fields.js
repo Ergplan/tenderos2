@@ -5,7 +5,16 @@
 import { threadKey } from "./mentions";
 
 const SKIP_TYPES = new Set(["hidden", "checkbox", "radio", "file", "range", "button", "submit", "reset", "color", "image"]);
-const text = (el) => (el ? String(el.textContent || "").replace(/\s+/g, " ").trim() : "");
+// an element's text without the tools row a box's header carries (lock, send, paperclip: ./fieldTools.js)
+const text = (el) => {
+  if (!el) return "";
+  let node = el;
+  if (el.querySelector?.(".fx-tools")) {
+    node = el.cloneNode(true);
+    for (const t of node.querySelectorAll(".fx-tools")) t.remove();
+  }
+  return String(node.textContent || "").replace(/\s+/g, " ").trim();
+};
 
 /** Whether an element is a box that can be pinged. */
 export function isBox(el) {

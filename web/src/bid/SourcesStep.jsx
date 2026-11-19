@@ -172,7 +172,7 @@ function SourceCard({ id, state, setState, terms, set, lockProps, isLocked, user
             <WindStudio studio={studio} farmMw={s.capacity.mw || null} onChange={saveStudio} onApply={applyStudio} onClose={() => setStudioOpen(false)} />
           )}
           {profile && (
-            <details className="bid-profile" open={Boolean(upload)}>
+            <details className="bid-profile chart" open={Boolean(upload)}>
               <summary>Profile on screen: CUF {nf(s.cuf * 100, 2)}%{upload ? ` · ${upload.name}` : " · typical shape"}</summary>
               <ProfileView cf={profile} raw={upload?.values || null} color={SOURCE_COLORS[id]} label={id === "solar" ? "Solar" : "Wind"} kind={id} name={upload?.name || null}
                 cufAt={state.losses ? POINTS[id][state.losses[`${id}FileAt`] ?? POINTS[id].length - 1] : null} degradation={id === "solar" ? (isNum(s.degradation) ? s.degradation : 0) : 0} years={terms?.years || state.fin?.years || 25} />

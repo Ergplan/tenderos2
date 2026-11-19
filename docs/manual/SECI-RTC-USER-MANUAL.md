@@ -25,12 +25,14 @@ when its step is complete.
 
 **Boxes.** An input box shows its label, the value with its unit, and a hint underneath. A grey
 hint "Industry benchmark … not from the tender" means the value was filled by **Fill up for me
-please** and is yours to replace. Two icons sit at a box's top-right corner when you hover:
+please** and is yours to replace. Beside the box's label sit its tools:
 
-* the **paperclip** — attach evidence (a note, a link or a file) and, for the super admin, sign the
-  value off (green tick; amber once the value changes);
-* the **send icon** — ping a colleague about this box (`@name`), who answers with a value you can
-  fill in with one click.
+* the **lock** — on every box: lock it so it is not changed by mistake (the optimiser's locks keep
+  their meaning: a locked size is not re-sized);
+* the **send icon** — on a box another team fills (a cost, a CUF, a lender's term): ping a colleague
+  about it (`@name`), who answers with a value you can fill in with one click;
+* the **paperclip** — on the same boxes: attach evidence (a note, a link or a file) and, for the
+  super admin, sign the value off (green tick; amber once the value changes).
 
 A small **lock** on a box (Financials and Round the clock) freezes it so a benchmark refill or a
 studio cannot overwrite it.
@@ -527,7 +529,7 @@ are comparable with this tender.
 Finance, Legal, Management, IT), title, the tabs they cover and email; everyone sees the table.
 *Who to ping for what* lists, by tab, the people who cover it.
 
-**Pings.** Hover any box, click its **send icon**, type `@` and a name (people who cover the tab
+**Pings.** On a box another team fills, click the **send icon** beside its lock, type `@` and a name (people who cover the tab
 come first), write the question, Send. The person sees it under **Messages** (unread badge),
 **Open field** takes them to the box, and they answer with a value; **Fill in** on your side puts
 the value in the box. Threads stay with the box.
@@ -537,7 +539,7 @@ a team for it; their answer (a value, a note, an uploaded file such as a signed 
 to the Team panel; **Accept** writes it into the bid as a new version, **Return** sends it back
 with a note. The **Outbox** shows the emails sent (the demo keeps them in-app).
 
-**Evidence and sign-off.** Hover a box, click the **paperclip**: attach a note, a link or a file
+**Evidence and sign-off.** On the same boxes, click the **paperclip**: attach a note, a link or a file
 (PDF, PNG, JPEG, Word, Excel), with the value at the time; the super admin **Sign off this value**
 (green tick; amber once the value changes, with the signed value shown). **Register (CSV)**
 downloads the tab's evidence register.

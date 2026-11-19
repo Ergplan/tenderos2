@@ -76,7 +76,10 @@ request. Every licence given or changed is in **Activity**.
 ## What a client sees
 
 * Its tabs; the others locked.
-* Its company and the licence's end under its name in the sidebar.
+* Its company and the licence's end under its name in the sidebar, and over every screen the bar
+  "Beta version for demo" with the disclaimer and the trial period: from the account's creation to
+  its end, with the days left (red in the last three days). Every account sees the disclaimer;
+  the sign-in page carries it too.
 * The library (Saved scenarios), tender readings and uploaded wind and solar profiles of its own
   workspace, and the built-in ones. A bid of another workspace is "not found", by list or by link.
 * No Team setup, Messages, Feedback or Change requests: the tender team spans the installation.

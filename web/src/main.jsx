@@ -24,6 +24,7 @@ import { authApi } from "./scenarios/client";
 import useTeamModeState from "./team/useTeamMode";
 import FieldPings from "./team/FieldPings";
 import EvidenceLayer from "./evidence/EvidenceLayer";
+import FieldLocks from "./team/FieldLocks";
 import Inbox from "./team/Inbox";
 import TeamSetup from "./team/TeamSetup";
 import FeedbackMode from "./feedback/FeedbackMode";
@@ -156,6 +157,30 @@ function Restricted({ label, contacts = [] }) {
   );
 }
 
+const fmtDay = (d) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+/**
+ * The bar over every screen: the beta notice and disclaimer, and for a demo licence the trial
+ * period (from the account's creation to its end date) with the days left.
+ */
+export function BetaBar({ user }) {
+  const end = user?.expires_at ? new Date(user.expires_at) : null;
+  const start = user?.created_at ? new Date(user.created_at) : null;
+  const left = end ? Math.max(0, Math.ceil((end.getTime() - Date.now()) / 86400000)) : null;
+  return (
+    <div className="beta-bar" role="note" data-testid="beta-bar">
+      <span className="beta-chip">Beta version for demo</span>
+      <span className="beta-text">Check every result independently before using it in a bid application. Joulewise shall not be held accountable for any mistakes in the results.</span>
+      {end && (
+        <span className={`beta-trial ${left <= 3 ? "ending" : ""}`} data-testid="trial-period">
+          Trial period: {start ? `${fmtDay(start)} – ` : "until "}{fmtDay(end)} · {left === 0 ? "ends today" : `${left} day${left === 1 ? "" : "s"} left`}
+        </span>
+      )}
+      {!end && user?.client && <span className="beta-trial" data-testid="trial-period">Trial period: no end date set</span>}
+    </div>
+  );
+}
+
 const MODULE_TAB = { rtc: "rtc", bess: "bessTender", seci: "seciRtc", cfd: "cfd", cfdOwnSolar: "cfdOwnSolar", fdrex: "fdrex" };
 
 export default function App({ user = null, initialScenario = null }) {
@@ -180,6 +205,7 @@ export default function App({ user = null, initialScenario = null }) {
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} allowed={allowed} team={team} onInbox={() => setInboxOpen((o) => !o)}
         feedbackOn={feedbackOn} onFeedback={() => setFeedbackOn((o) => !o)} openRequests={requests.counts.open || 0} />
       <main>
+        <BetaBar user={user} />
         {!canView && <Restricted label={TABS.find((t) => t[0] === activeTab)?.[2] || "This tab"} contacts={user?.adminContacts} />}
         {canView && activeTab === "tenderBid" && <BidTab user={user} openTab={(id) => { if (allowed.has(id)) setActiveTab(id); }} />}
         {canView && activeTab === "rtc" && <RtcTab user={user} initialScenario={opened("rtc")} />}
@@ -200,6 +226,7 @@ export default function App({ user = null, initialScenario = null }) {
         <FieldPings tab={activeTab} tabLabel={tabLabel} team={team} focus={focus} onFocused={(msg) => { setFocus(null); setNotice(msg || ""); }} />
       )}
       {canView && ALL_TAB_IDS.includes(activeTab) && <EvidenceLayer tab={activeTab} tabLabel={tabLabel} team={team} />}
+      {canView && ALL_TAB_IDS.includes(activeTab) && <FieldLocks key={activeTab} tab={activeTab} tabLabel={tabLabel} />}
       {inboxOpen && (
         <Inbox team={team} onClose={() => setInboxOpen(false)}
           onOpen={(n) => { setInboxOpen(false); if (allowed.has(n.tab)) { setActiveTab(n.tab); setFocus({ tab: n.tab, key: n.thread_key, step: n.step, place: n.place }); } else setNotice(`You have no access to ${n.place || n.tab}.`); }} />
