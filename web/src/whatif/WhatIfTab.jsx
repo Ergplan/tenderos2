@@ -106,6 +106,9 @@ function irrCurve(res) {
  * the case reloads from it when the sizing changes, and "Back to the sized bid" restores it.
  * embedded: inside another tab (no page hero, no browser storage).
  */
+
+// the tariff needed, rounded up to the paisa's tenth: rounding down would bid just under the target IRR
+const ceil3 = (v) => Math.ceil(v * 1000 - 1e-9) / 1000;
 export default function WhatIfTab({ seed = null, seedKey = "", embedded = false, onBack = null }) {
   const [state, setState] = useState(() => seed || defaultWhatIf());
   const [loaded, setLoaded] = useState(Boolean(embedded));
@@ -184,7 +187,7 @@ export default function WhatIfTab({ seed = null, seedKey = "", embedded = false,
               <span>Tariff for a {pf(state.fin.targetEquityIrr, 1)} equity IRR</span>
               <b>₹{nf(f.tariffNeeded, 3)}/kWh</b>
               <small>{state.fin.tariff >= f.tariffNeeded ? `your bid is ₹${nf(state.fin.tariff - f.tariffNeeded, 3)} above it` : `your bid is ₹${nf(f.tariffNeeded - state.fin.tariff, 3)} below it`}</small>
-              <button type="button" className="secondary" onClick={() => setIn("fin", { tariff: Number(f.tariffNeeded.toFixed(3)) })} data-testid="whatif-use-needed">Bid at this tariff</button>
+              <button type="button" className="secondary" onClick={() => setIn("fin", { tariff: ceil3(f.tariffNeeded) })} data-testid="whatif-use-needed">Bid at this tariff</button>
             </div>
           </div>
           <div className="rtc-grid rtc-grid-4" data-testid="whatif-returns">

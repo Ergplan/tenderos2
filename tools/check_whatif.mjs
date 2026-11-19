@@ -96,4 +96,7 @@ assert.ok(Math.abs(m.cells[m.keys.minDscr].value - r.finance.minDscr) < 1e-6);
 const p = profilesFor(base);
 assert.ok(Math.abs(E.mean(p.solarCf) - base.solarCuf) < 1e-6 && Math.abs(E.mean(p.windCf) - base.windCuf) < 1e-6);
 assert.ok(dispatchYear(base, p, E.yearFactors(1, { years: 25 }, E.DEFAULT_BESS)).deliveredMWh > 0);
+// "Bid at this tariff" rounds the tariff needed up to three decimals: the bid meets the target IRR
+const bidAt = Math.ceil(r.finance.tariffNeeded * 1000 - 1e-9) / 1000;
+assert.ok(runWhatIf({ ...base, fin: { ...base.fin, tariff: bidAt } }).finance.meetsTarget, `₹${bidAt} meets the target`);
 console.log(`What-if checks passed (${ms} ms a run; equity IRR ${(r.finance.equityIrr * 100).toFixed(2)}% at ₹${base.fin.tariff}, ₹${r.finance.tariffNeeded.toFixed(3)} for ${(base.fin.targetEquityIrr * 100).toFixed(0)}%; peak blocks met ${(y1.rules.peak.share * 100).toFixed(1)}%)`);

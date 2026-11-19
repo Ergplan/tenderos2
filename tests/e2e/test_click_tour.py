@@ -148,7 +148,7 @@ def test_sidebar_tabs_theme_and_zone():
             "BESS Tender": ("nav.story-rail", "BESS"),
             "CfD Bid": ("[data-testid=cfd-step-explain]", "What is a CfD"),
             "CfD Own Solar": ("[data-testid=cfd-step-explain]", "own solar"),
-            "FDRE-X Bid": ("[data-testid=cfd-step-explain]", "FDRE-X"),
+            "FDRE-X Bid": ("[data-testid=fdrex-title]", "FDRE-X"),
             "What-if analysis": ("[data-testid=whatif-verdict]", "What-if"),
             "New tenders": ("[data-testid=new-tenders]", "SECI"),
             "Recent tenders": ("[data-testid=seci-results]", "SECI"),
@@ -487,7 +487,7 @@ def test_bess_cfd_recent_team():
         assert "active" in page.locator("[data-testid=cfd-example-mw-100]").get_attribute("class")
         assert page.locator("[data-testid=cfd-answer]").count() == 1
         _step(page, "cfd", "documents")
-        assert page.locator("[data-testid^=cfd-doc-]").count() == 5 and page.locator("[data-testid^=cfd-change-]").count() >= 35
+        assert page.locator("[data-testid^=cfd-doc-]").count() == 6 and page.locator("[data-testid^=cfd-change-]").count() >= 35
         page.click("[data-testid=cfd-changes-amd3]")
         assert page.locator("[data-testid^=cfd-change-]").count() >= 20
         _step(page, "cfd", "conditions")
