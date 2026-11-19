@@ -4,6 +4,7 @@
 import { FINANCE_FIELDS, SOURCES, SOURCE_FIELDS, dispatchFor, lossFactorsOf, resourceProfiles } from "./model.js";
 import { cufPoint, genSource } from "../model/generation.js";
 import { LIVE_BESS_KEYS, LIVE_COST_KEYS, LIVE_FIN_KEYS, liveResults } from "../rtc/exportModel.js";
+import { DEFAULT_FINANCE } from "../rtc/engine.js";
 
 /**
  * What the Live model sheet (web/lib/liveModel.js) needs to rebuild the financial model as Excel
@@ -16,6 +17,12 @@ export function liveModelRequest({ state, lp, finance, costs, fin, bess, ops, df
   for (const s of SOURCES) for (const f of SOURCE_FIELDS[s.id]) sources[`${s.id}.${f.key}`] = sourceOf(`${s.id}.${f.key}`);
   for (const f of FINANCE_FIELDS) sources[`${f.section}.${f.key}`] = sourceOf(`${f.section}.${f.key}`);
   sources["market.sell"] = sourceOf("market.sell");
+  // the other financing inputs (refinancing, grace, reserves, …): the bidder's when changed from the model's default
+  for (const [k, v] of Object.entries(state.fin || {})) {
+    const key = `fin.${k}`;
+    if (key in sources || v === null || typeof v === "object") continue;
+    if (k in DEFAULT_FINANCE && v !== DEFAULT_FINANCE[k]) sources[key] = "Your input";
+  }
   // the generation build-up: the profiles the sizing dispatched, at the bidder's CUF, and their losses to the 33 kV bus
   const prof = resourceProfiles(state);
   const lf = lossFactorsOf(state);
