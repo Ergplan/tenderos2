@@ -1,6 +1,6 @@
 {
  "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
- "scannedAt": "2026-11-19T01:48:46",
+ "scannedAt": "2026-11-20T01:49:59",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -39,7 +39,7 @@
    "firstSeen": "2026-09-02",
    "status": "open",
    "lastAmendment": "2026-10-19",
-   "daysToBid": -13
+   "daysToBid": -14
   },
   {
    "source": "SECI",
@@ -58,62 +58,14 @@
    },
    "scheme": null,
    "ipp": true,
-   "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 19 Nov 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 24 Nov 2026, 10:00.",
+   "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 19 Nov 2026, 18:00, already closed. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 24 Nov 2026, 10:00.",
    "documents": 3,
    "amendments": [],
    "fingerprint": "fff0e4550b474506",
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 0
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000249",
-   "ref": "SECI/C&P/IPP/13/0002/26-27",
-   "title": "RfS for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) under CfD Mechanism from ISTS-Connected RE Projects (SECI-CfD-I)",
-   "url": "https://www.seci.co.in/tender-details/YmZ-",
-   "published": "2026-04-19",
-   "bidDeadline": "2026-11-20",
-   "bidOpen": "2026-11-26",
-   "category": "cfd",
-   "categoryLabel": "Contract for Difference (peak supply)",
-   "capacity": {
-    "mw": 500,
-    "mwh": 1000,
-    "hours": 2
-   },
-   "scheme": "SECI-CfD-I",
-   "ipp": true,
-   "summary": "Contract for Difference (peak supply), 500 MW / 1,000 MWh (SECI-CfD-I); for developers: a power-supply or tariff bid. Bids are due 20 Nov 2026, 18:00. Pre-bid meeting 4 May 2026, 11:30. Bids open 26 Nov 2026, 10:00.",
-   "documents": 9,
-   "amendments": [
-    {
-     "name": "Amendment-04-SECI-CfD-I",
-     "date": "2026-11-05"
-    },
-    {
-     "name": "Amendment-03-SECI-CfD-I",
-     "date": "2026-10-09"
-    },
-    {
-     "name": "Amendment-02-SECI-CfD-I",
-     "date": "2026-08-03"
-    },
-    {
-     "name": "Amendment-01-SECI-CfD-I",
-     "date": "2026-07-17"
-    },
-    {
-     "name": "Revised RfS for 1000 MWh assured Peak Supply under CfD Mechanism (CfD-I)",
-     "date": "2026-07-15"
-    }
-   ],
-   "fingerprint": "bd0ed35dbfda3732",
-   "firstSeen": "2026-04-19",
-   "status": "amended",
-   "lastAmendment": "2026-11-05",
-   "daysToBid": 1
+   "daysToBid": -1
   },
   {
    "source": "SECI",
@@ -143,7 +95,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -168,7 +120,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -193,7 +145,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -228,7 +180,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -262,11 +214,11 @@
      "date": "2026-09-10"
     }
    ],
-   "fingerprint": "fa5a4f786cfd3d66",
+   "fingerprint": "d28ffda45ded1ab0",
    "firstSeen": "2026-07-16",
    "status": "amended",
    "lastAmendment": "2026-11-18",
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -298,7 +250,55 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 6
+   "daysToBid": 5
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000249",
+   "ref": "SECI/C&P/IPP/13/0002/26-27",
+   "title": "RfS for assured Peak Supply of 1000 MWh (500 MW x 2 Hrs.) under CfD Mechanism from ISTS-Connected RE Projects (SECI-CfD-I)",
+   "url": "https://www.seci.co.in/tender-details/YmZ-",
+   "published": "2026-04-19",
+   "bidDeadline": "2026-11-30",
+   "bidOpen": "2026-12-03",
+   "category": "cfd",
+   "categoryLabel": "Contract for Difference (peak supply)",
+   "capacity": {
+    "mw": 500,
+    "mwh": 1000,
+    "hours": 2
+   },
+   "scheme": "SECI-CfD-I",
+   "ipp": true,
+   "summary": "Contract for Difference (peak supply), 500 MW / 1,000 MWh (SECI-CfD-I); for developers: a power-supply or tariff bid. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 4 May 2026, 11:30. Bids open 3 Dec 2026, 10:00.",
+   "documents": 9,
+   "amendments": [
+    {
+     "name": "Amendment-04-SECI-CfD-I",
+     "date": "2026-11-05"
+    },
+    {
+     "name": "Amendment-03-SECI-CfD-I",
+     "date": "2026-10-09"
+    },
+    {
+     "name": "Amendment-02-SECI-CfD-I",
+     "date": "2026-08-03"
+    },
+    {
+     "name": "Amendment-01-SECI-CfD-I",
+     "date": "2026-07-17"
+    },
+    {
+     "name": "Revised RfS for 1000 MWh assured Peak Supply under CfD Mechanism (CfD-I)",
+     "date": "2026-07-15"
+    }
+   ],
+   "fingerprint": "a6578ac54c2446ba",
+   "firstSeen": "2026-04-19",
+   "status": "open",
+   "lastAmendment": "2026-11-05",
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -332,7 +332,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 11
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -355,7 +355,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 11
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -378,7 +378,7 @@
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 11
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -410,7 +410,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 12
+   "daysToBid": 11
   },
   {
    "source": "SECI",
@@ -435,7 +435,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 12
+   "daysToBid": 11
   },
   {
    "source": "SECI",
@@ -460,7 +460,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 14
+   "daysToBid": 13
   },
   {
    "source": "SECI",
@@ -483,7 +483,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 25
+   "daysToBid": 24
   },
   {
    "source": "NHPC",
@@ -508,7 +508,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 26
+   "daysToBid": 25
   }
  ],
  "results": [
@@ -1047,6 +1047,15 @@
  ],
  "events": [
   {
+   "date": "2026-11-20",
+   "source": "SECI",
+   "id": "SECI000249",
+   "tender": "SECI-CfD-I",
+   "kind": "deadline moved",
+   "detail": "2026-11-20 → 2026-11-30",
+   "url": "https://www.seci.co.in/tender-details/YmZ-"
+  },
+  {
    "date": "2026-11-19",
    "source": "SECI",
    "id": "SECI000278",
@@ -1124,6 +1133,6 @@
   "ipp": 12,
   "seci": 16,
   "nhpc": 1,
-  "newToday": 2
+  "newToday": 1
  }
 }
