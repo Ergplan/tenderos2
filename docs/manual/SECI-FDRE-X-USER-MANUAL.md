@@ -161,7 +161,7 @@ Live model sheet, every cell a formula.
 tariff beside the auctions of the same product (₹8.50 in January 2025, ₹6.74, ₹6.27–6.28, and
 ₹5.99–6.00 in SECI-FDRE-IX, August 2026, each with a link to its result), and a bridge from the
 older benchmark inputs (₹9.02 on a 100 MW bid) to the market: the battery at ₹0.80 cr/MWh takes
-₹1.51 off, debt at 75% for 18 years ₹0.40, 8.5% interest ₹0.22, a 12% equity IRR ₹0.55 and
+₹1.51 off, debt at 75% for 18 years ₹0.40, 8.5% interest ₹0.22, a 12% equity IRR ₹0.54 and
 new-generation wind ₹0.55, down to ₹5.80. **Fill up for me please** fills the first three rows'
 inputs (about ₹7.11 at a 14% equity IRR); **Use the market case in this bid** puts the last row's
 inputs in your bid and opens Size. The last two steps are estimates, marked so: no winner has

@@ -117,7 +117,7 @@ the financial model:
 | + battery ₹0.80 cr/MWh (CTUIL's benchmark, October 2026) | ₹7.51 | −1.51 |
 | + debt 75% for 18 years (IREDA's norms): what the tab now fills in | ₹7.11 | −0.40 |
 | + debt at 8.5% | ₹6.89 | −0.22 |
-| + equity IRR 12% (an estimate) | ₹6.35 | −0.55 |
+| + equity IRR 12% (an estimate) | ₹6.35 | −0.54 |
 | + wind 37% CUF at ₹7.0 cr/MW (an estimate) | ₹5.80 | −0.55 |
 
 So the model is at the auctions' level on the inputs the winners appear to use, and above it on

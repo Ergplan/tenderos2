@@ -31,9 +31,10 @@ function bridgeChart(own) {
     { name: "Tariff", type: "bar", stack: "w", data: totals, itemStyle: { color: DATA_COLORS.muted }, label: { ...LABEL, position: "top", formatter: (p) => (p.value ? rs(p.value) : "") } },
     { name: "Takes off", type: "bar", stack: "w", data: down, itemStyle: { color: DATA_COLORS.surplus }, label: { ...LABEL, position: "top", formatter: (p) => (p.value ? `−${nf(p.value, 2)}` : "") } },
   ];
-  const marks = [{ yAxis: LATEST.high, name: `${LATEST.tender} ${rs(LATEST.high)}` }];
-  if (own) marks.push({ yAxis: +own.toFixed(2), name: `This bid ${rs(own)}` });
-  series[1].markLine = { symbol: "none", data: marks, label: { ...LABEL, formatter: (p) => p.name, position: "insideStartTop" }, lineStyle: { type: "dashed" } };
+  // the auction's label at the left, this bid's at the right: they do not run into each other when the two are close
+  const marks = [{ yAxis: LATEST.high, name: `${LATEST.tender} ${rs(LATEST.high)}`, label: { position: "insideStartTop" } }];
+  if (own) marks.push({ yAxis: +own.toFixed(2), name: `This bid ${rs(own)}`, label: { position: own >= LATEST.high ? "insideEndTop" : "insideEndBottom" } });
+  series[1].markLine = { symbol: "none", data: marks, label: { ...LABEL, formatter: (p) => p.name }, lineStyle: { type: "dashed" } };
   return {
     animation: false,
     grid: { left: 48, right: 24, top: 24, bottom: 40 },
