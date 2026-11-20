@@ -149,6 +149,12 @@ function inlinePieces(text, values) {
   return out;
 }
 
+// an instruction right after a blank, after its unit if it has one ("150 MW [Insert cumulative
+// Contracted Capacity proposed]"): [Insert …], [Enter …], [Date to be inserted …], (insert name of
+// the Bidder), (enter name of …); and the RfS's unclosed "[Insert last date of bid submission," up to
+// its comma. Kept short, so it never takes more than the note.
+const NOTE_AFTER = /^(\s*(?:MW|MWh|kWh|Cr\.?|Crore|crore|lakhs?|%)?)\s*(?:\[(?:insert|enter|date to be inserted|to be filled)[^\][\n]{0,120}\]|\((?:insert|enter)[^)(\n]{0,80}\)|\[(?:insert|enter)[^\][\n,]{0,80},(?![^[]*\]))/i;
+
 /** Text split into plain and value segments: [{ text, struck }, { key, text, missing, struck }]. */
 export function segments(text, values) {
   const out = [];
@@ -162,6 +168,15 @@ export function segments(text, values) {
       const v = filtered(values[m[1]], m[2]);
       out.push({ key: m[1], filter: m[2] || null, text: v ? String(v) : EMPTY, missing: !v, struck: piece.struck, alt });
       last = m.index + m[0].length;
+      // the RfS's note on what goes in the blank ("[Insert name of the Bidder]") is dropped once
+      // the blank is filled, and kept while it is empty, as guidance
+      if (v) {
+        const note = part.slice(last).match(NOTE_AFTER);
+        if (note) {
+          if (note[1].trim()) out.push({ text: note[1], struck: piece.struck, alt });
+          last += note[0].length;
+        }
+      }
     }
     if (last < part.length) out.push({ text: part.slice(last), struck: piece.struck, alt });
   });

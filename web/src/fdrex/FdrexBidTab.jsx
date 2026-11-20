@@ -7,7 +7,8 @@ import useTeam, { TeamContext } from "../team/useTeam";
 import TeamPanel from "../team/TeamPanel";
 import { applyAnswer } from "../team/apply";
 import { nf } from "../rtc/ui";
-import { loadMarketPrices, missingInputs } from "../bid/model";
+import { dsmFor, loadMarketPrices, missingInputs, modelInputs, opsFromLp } from "../bid/model";
+import * as E from "../rtc/engine";
 import useSizing from "../bid/useSizing";
 import SourcesStep from "../bid/SourcesStep";
 import SizeStep from "../bid/SizeStep";
@@ -219,7 +220,20 @@ export default function FdrexBidTab({ initialScenario = null }) {
 
   // the bid forms see the bid through formsView; their changes (forms, review, letters) come back as they are
   const forms = useMemo(() => formsView(state), [state]);
-  const formsModel = state.lp ? { bid: Math.ceil((state.lp.tariff || 0) * 100 - 1e-9) / 100 } : null;
+  // the tariff the target equity IRR needs, from the Financial model (as the Financial model step
+  // prices the sized plant), not HiGHS's screening tariff: the forms quote it and check against it
+  const formsModel = useMemo(() => {
+    if (!state.lp?.sizes) return null;
+    try {
+      const { costs, fin, bess } = modelInputs(state, terms);
+      const ops = opsFromLp(state.lp, fin, bess, dsmFor(state));
+      const annualTarget = terms.rules.find((r) => r.id === "annual")?.target ?? 0;
+      const f = E.runFinancialModel(null, state.lp.sizes, { costs, fin, bess, dfrTarget: annualTarget, tariffLocked: false, ops, solveBy: "npv" });
+      return Number.isFinite(f?.tariff) ? { bid: Math.ceil(f.tariff * 100 - 1e-9) / 100, screening: state.lp.tariff } : null;
+    } catch {
+      return null;
+    }
+  }, [state, terms]);
   const designMissing = missing.filter((m) => !m.startsWith("Financing"));
   const financeMissing = missing.filter((m) => m.startsWith("Financing"));
   const mw = state.bid.baseMw;

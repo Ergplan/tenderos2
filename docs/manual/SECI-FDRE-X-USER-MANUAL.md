@@ -176,7 +176,10 @@ The RfS's 23 formats, filled from the bid and the sized plant: the Covering Lett
 choice), the Power of Attorney and the Consortium Agreement where they apply, the EMD and PBG in
 each of the three instruments, the board resolutions, the financial requirement, the undertakings
 and disclosures, the financial bid, the cost estimate, and the annexures. Particulars are asked
-once and used everywhere. Each format opens as a letter and exports as a Word file.
+once and used everywhere. Each format opens as a letter and exports as a Word file. The tariff
+"Use" puts in the financial bid is the one the Financial model needs for your target equity IRR.
+Once a blank is filled, the RfS's note on it ("[Insert name of the Bidder]") is dropped from the
+letter; the net worth in words is written from the figure.
 
 ## The voice bid agent
 

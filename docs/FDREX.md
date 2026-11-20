@@ -30,6 +30,16 @@ The bid forms read the bid through `formsView`, and their changes come back thro
 `setForms`, which applies them to that view (so a format's review is fingerprinted on what the
 forms show) and drops the view's `inputs`.
 
+The tariff the forms quote ("Use") and check against is the one the Financial model needs for the
+target equity IRR (`formsModel` in `FdrexBidTab.jsx`, the same `runFinancialModel` as the Financial
+model step), rounded up to the paisa: not HiGHS's screening tariff, which takes tax as linear and
+on a bid that sells its surplus can sit well above it (₹7.163 against ₹6.501 on a 150 MW bid
+selling on IEX GDAM). In the letters, the RfS's note on a blank ("[Insert name of the Bidder]",
+"(enter name of the Promoter/Promoters)", "150 MW [Insert cumulative Contracted Capacity
+proposed]") goes once the blank is filled and stays while it is empty (`segments` in
+`web/src/seci/letters/index.js`, shared with the CfD letters); the net worth in words follows the
+figure in the particulars.
+
 The tab is `FdrexBidTab.jsx`; its state (the Tender to Bid state with `fdrex` settings), a saved
 bid read back and the view the bid forms read (`formsView`: the contracted MW, the Effective Date,
 the storage per MW and the sizes as the forms name them) are in `bidState.js`. This browser keeps

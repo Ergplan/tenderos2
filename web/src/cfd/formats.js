@@ -11,6 +11,7 @@
 import { RFS, TENDER } from "./terms.js";
 import { rfsAmounts } from "./model.js";
 import { FORM_FIELDS } from "./forms.js";
+import { rupeesInWords } from "../seci/letters/index.js";
 
 export const RFS_FILE = "/tenders/seci-cfd-i/RfS.pdf";
 
@@ -410,6 +411,10 @@ export function blankValue(state, format, field) {
   }
   const key = `${format.id}.${field.key}`;
   const v = f[key];
+  // the net worth in words follows the figure in the particulars (the words prevail on a mismatch)
+  if (field.key === "netWorthWords" && (v === undefined || v === null || v === "") && Number(f.netWorthCr) > 0) {
+    return { source: "model", key, value: `Rupees ${rupeesInWords(Number(f.netWorthCr) * 1e7)} only` };
+  }
   return { source: "own", key, value: v === undefined || v === null ? "" : field.kind === "date" ? fmtDate(v) : String(v) };
 }
 

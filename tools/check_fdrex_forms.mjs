@@ -15,7 +15,7 @@ import { FORMATS, RFS_FILE, TENDER, applies, blankValue, formatGroups, formatNam
 import { FORM_FIELDS, INSTRUMENTS, bidChecks, bidPackRequest, formIssues, termProv, visibleFields } from "../web/src/fdrex/forms.js";
 import { TEMPLATES, letterHtml, letterOf, lettersForBid, parseTemplate } from "../web/src/fdrex/letters/index.js";
 import { FILE_PREFIX, LETTERS_ROUTE } from "../web/src/fdrex/letters/export.js";
-import { inlineOf, tokensOf } from "../web/src/seci/letters/index.js";
+import { inlineOf, segments, tokensOf } from "../web/src/seci/letters/index.js";
 import { letterPayload } from "../web/src/seci/letters/export.js";
 import { defaultCfdState, keyDates, rfsAmounts } from "../web/src/fdrex/model.js";
 import { PACK } from "../web/src/fdrex/pack.js";
@@ -292,4 +292,26 @@ const deletions = TERMS.filter((t) => t.doc === "amd1" && termById[t.id.replace(
 assert.equal(deletions.length, PACK.changes.filter((c) => c.deleted).length, "the Conditions step shows the clause as issued under each of the amendment's deletions");
 
 if (skipped) console.log(skipped);
+// the RfS's note on a blank ("[Insert name of the Bidder]") goes once the blank is filled, stays while it is empty
+{
+  const t = "In consideration of the {{bidder}} [Insert name of the Bidder] (hereinafter referred to as 'Bidder')";
+  const filled = segments(t, { bidder: "Example Renewables Private Limited" }).map((x) => x.text).join("");
+  assert.equal(filled, "In consideration of the Example Renewables Private Limited (hereinafter referred to as 'Bidder')");
+  assert.match(segments(t, {}).map((x) => x.text).join(""), /\[Insert name of the Bidder\]/);
+  const read = (x, v) => segments(x, v).map((y) => y.text).join("");
+  // after a unit, in round brackets, and the RfS's unclosed bracket (cut at its comma, nothing more)
+  assert.equal(read("is {{mw}} MW [Insert cumulative Contracted Capacity proposed]. (Strike off)", { mw: "150" }), "is 150 MW. (Strike off)");
+  assert.equal(read("as on {{d}} [Insert last date of bid submission, M/s {{b}} (insert name of the Bidder) & any", { d: "01.12.2026", b: "X Ltd" }), "as on 01.12.2026 M/s X Ltd & any");
+  assert.equal(read("M/s {{p}} (enter name of the Promoter/Promoters) is", { p: "Y Ltd" }), "M/s Y Ltd is");
+  assert.equal(read("the {{b}} [Insert name of the Bidder] (hereinafter) [Where applicable, evidence]", { b: "X Ltd" }), "the X Ltd (hereinafter) [Where applicable, evidence]");
+  const bid = { ...defaultCfdState(), forms: { bidder: "Example Renewables Private Limited", address: "1 Example Road", rfsDate: "2026-10-07" } };
+  const left = Object.keys(TEMPLATES).flatMap((id) => {
+    const l = letterOf(bid, FORMATS.find((f) => f.id === id) || { id, fields: [] });
+    const text = l ? letterHtml(l).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ") : "";
+    return [{ names: (text.match(/Example Renewables Private Limited/g) || []).length, notes: (text.match(/Example Renewables Private Limited\s*\[Insert name of the Bidder\]/g) || []).length }];
+  });
+  assert.ok(left.reduce((a, x) => a + x.names, 0) > 20, "the bidder's name printed in the letters");
+  assert.equal(left.reduce((a, x) => a + x.notes, 0), 0, "a filled bidder's name still followed by its note");
+}
+
 console.log(`OK fdrex bid forms: ${FORMATS.length} formats and letters, ${FORMATS.reduce((a, f) => a + f.fields.length, 0)} blanks (${tokens} places in the letters), ${FORM_FIELDS.length} particulars, ${good.length} checks; ${rfsPages ? `${stretches} stretches of the letters' wording found on the RfS pages` : "wording not checked"}`);
