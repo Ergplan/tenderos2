@@ -11,7 +11,7 @@
 // term.
 import { readValue } from "../seci/agent.js";
 import { financeOf } from "../seci/voice.js";
-import { FDREX_BENCHMARKS } from "./marketCase.js";
+import { BRIDGE, FDREX_BENCHMARKS, LATEST, MARKET_CASE, NOT_VERIFIED, RESULTS, againstMarket, applyMarketCase } from "./marketCase.js";
 import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, missingInputs, modelInputs, opsFromLp, dsmFor } from "../bid/model.js";
 import { liveModelRequest } from "../bid/liveModelRequest.js";
 import { quotedReturns } from "../bid/quote.js";
@@ -199,6 +199,8 @@ function sizingFacts(lp, hourly = null) {
     year1: { suppliedPct: r(share(y1) * 100, 1), penalisedMu: r((y1.monthlyPenaltyMwh || 0) / 1000, 2), boughtMu: r((y1.purchaseMwh || 0) / 1000, 2),
       boughtPct: r(y1.demandMwh > 0 ? ((y1.purchaseMwh || 0) / y1.demandMwh) * 100 : 0, 2), boughtCostCr: r(y1.purchaseCostCr || 0, 2), soldMu: r((y1.exportMwh || 0) / 1000, 1), saleRevenueCr: r(y1.exportRevenueCr || 0, 1),
       saleMarket: lp.market ? `IEX ${lp.market}` : "no sale",
+      // the days met in full, which alone sell (a sale on a day left short is a breach)
+      ...(lp.perYear?.[0]?.saleDays !== undefined ? { daysMetInFullAndSelling: lp.perYear[0].saleDays, daysShortNotSelling: lp.perYear[0].shortDays } : {}),
       // the surplus nobody takes (the year-1 hourly dispatch on screen, when it is there)
       ...(hourly?.curtail ? { curtailedMu: r(hourly.curtail.reduce((a, v) => a + v, 0) / 1000, 1) } : {}) },
     worstYear: { year: worst.year ?? 1, suppliedPct: r(share(worst) * 100, 1), penalisedMu: r((worst.monthlyPenaltyMwh || 0) / 1000, 2) },
@@ -250,6 +252,8 @@ export const AGENT_TOOLS = [
   { type: "function", name: "stop_optimizer", description: "Stop a sizing that is running.", parameters: obj() },
   { type: "function", name: "get_results", description: "The sized plant: solar, wind and storage, the sizing tariff, the share of the buyer's energy supplied, the energy penalised beyond the free 10%, the power bought and its cost, the surplus sold, EMD, PBG, net worth, SECI's charges and the dates.", parameters: obj() },
   { type: "function", name: "get_financials", description: "The 25-year financial model of the sized plant: the tariff for the target equity IRR, equity IRR, project IRR, DSCR, project cost with SECI's charges, debt, the power bought, the PSM discount and the penalties over the term.", parameters: obj() },
+  { type: "function", name: "market_check", description: "This bid against the market: the tariffs the earlier auctions of the same product discovered (SECI-FDRE-VI, SJVN FDRE-4, SECI-FDRE-VII, SECI-FDRE-IX, each with its date and source), where this bid's tariff stands against the latest, and the bridge from the older benchmark inputs to the market case (battery price, debt terms, interest, equity IRR, wind), each step's tariff from this tab's own sizing. Use it when the user asks why the tariff is above the auction results, what the market is bidding, or what would bring the tariff down.", parameters: obj() },
+  { type: "function", name: "use_market_case", description: "Put the market case's inputs in the bid: battery Rs 0.80 crore per MWh, wind 37% CUF at Rs 7.0 crore per MW, debt 75% at 8.5% for 18 years, equity IRR 12%. It clears the sizing: run_optimizer after it. Only when the user asks for it; say first that the equity IRR and the wind figures are estimates, not any bidder's published numbers.", parameters: obj() },
   { type: "function", name: "check_tariff", description: "What a tariff the bidder may quote earns: equity and project IRR at that tariff against the target, with a warning when it is below the tariff the target needs. Records it as the tariff quoted in the bid forms when record is true.", parameters: obj({ tariff: { type: "number", description: "₹/kWh" }, record: { type: "boolean" } }, ["tariff", "record"]) },
   { type: "function", name: "what_if", description: "An instant what-if on the sized plant (a rule-based dispatch of every year and the full financial model, not the HiGHS optimum): change any of the sizes, the storage hours, the capex, the target equity IRR or the bid tariff, and get the tariff the target IRR needs, the IRRs at the bid tariff, the energy supplied, bought and penalised. Pass null for what stays as sized. show true opens the What-if step (it starts from the sized bid; the bidder moves the levers there).", parameters: obj({
     solarMw: num("Solar MWac, or null"), windMw: num("Wind MW, or null"), storageMw: num("Storage MW, or null"), storageHours: num("Storage hours (MWh per MW), or null"),
@@ -374,6 +378,25 @@ export function createToolRunner(ctx) {
         emdCr: r(money.emdRs / 1e7), pbgCr: r(money.pbgRs / 1e7), netWorthNeededCr: r(money.netWorthRs / 1e7), seciChargesCr: r(seciChargesCr(z, mw), 2),
         dates: keyDates(s.fdrex?.ppaDate) || "enter the PPA Effective Date for the dates",
       };
+    },
+    market_check: () => {
+      const st = ctx.getState();
+      const f = financeOf(st, ctx.getTerms());
+      const where = f ? againstMarket(f.tariff) : null;
+      return {
+        thisBid: f ? { tariff: r(f.tariff, 3), targetEquityIrrPct: r(st.fin.targetEquityIrr * 100), standing: where.words } : "not sized yet",
+        latestAuction: { tender: LATEST.tender, date: LATEST.auction, tariff: `Rs ${LATEST.low.toFixed(2)} to ${LATEST.high.toFixed(2)} per kWh`, note: LATEST.note, source: LATEST.source },
+        auctions: RESULTS.map((x) => ({ tender: x.tender, quantity: x.quantity, date: x.auction, tariff: x.low === x.high ? x.low : `${x.low} to ${x.high}`, note: x.note, source: x.source })),
+        bridgeOn100Mw: BRIDGE.map((b, i) => ({ step: b.step, tariff: b.tariff, change: i ? r(b.tariff - BRIDGE[i - 1].tariff, 2) : null, basis: b.basis, estimate: b.kind === "estimate" })),
+        whatThisTabFillsIn: "battery Rs 0.80 crore per MWh, debt 75% at 9% for 18 years, equity IRR 14%: the third step of the bridge",
+        marketCase: MARKET_CASE,
+        caveats: NOT_VERIFIED,
+      };
+    },
+    use_market_case: () => {
+      ctx.apply((st) => applyMarketCase(st));
+      ctx.goto("size");
+      return { ok: true, set: MARKET_CASE, next: "run_optimizer: the sizing was cleared" };
     },
     get_financials: () => {
       const s = ctx.getState();
@@ -527,7 +550,9 @@ The guided exercise:
 2. Ask exactly the question next_question returns, mentioning the current value and the benchmark. When the user answers, set_input with that key, confirm the value set, then next_question again. "Next", "keep it" or "same" keeps the current value: call next_question with keep set to that key. "Keep the rest" accepts all remaining values: keep_rest true. "Benchmark" sets the benchmark. For the key "fill", yes means use_benchmarks.
 Selling the surplus is the input market.sell (and market.source, the market), on the Bid inputs step: "yes" sells the energy the buyer's hours and the storage do not take, on IEX GDAM, DAM or RTM at its 15-minute prices; "no" curtails it. Say what the tender says with the pages: RfS 8.1.f allows the sale outside the buyer's hours, PPA 9.3 offers excess energy to SECI first (tender_lookup "excess").
 3. When next_question says everything is in, offer run_optimizer; when it returns, explain the plant (solar, wind, storage), the sizing tariff, the share of the buyer's energy supplied, the energy penalised beyond the free ${pct(TENDER.shortfallTolerance)}%, the power bought against the ${pct(TENDER.marketShare)}% limit, the surplus sold (and on which market) and the energy curtailed, EMD, PBG, net worth, SECI's charges and the dates (get_results).
-4. get_financials: the tariff for the target equity IRR, rounded up to the paisa for quoting, the equity and project IRR, the minimum DSCR, the power bought and the PSM discount if taken.
+4. get_financials: the tariff for the target equity IRR, rounded up to the paisa for quoting, the equity and project IRR, the minimum DSCR, the power bought and the PSM discount if taken. Then market_check, and say in one or two sentences where the tariff stands against the latest auction of the same product.
+If the user asks why the tariff is above the auction results, or what the market is bidding: market_check. Give the latest auction's tariff with its date, this bid's tariff, and the two or three bridge steps that explain most of the gap (the battery price first), naming which are estimates. The tariff is what the user's inputs need for the user's equity IRR; the winners' inputs are not public. Offer use_market_case to see the plant and tariff on the market case; it changes inputs, so only when they say yes.
+The surplus is sold only on the days the supply is met in full: a sale on a day left short is a breach under RfS 8.1.f, at 1.5 times that day's highest exchange rate. get_results gives the days met in full.
 5. Offer a what-if: what_if with what the user names (another size, capex, IRR or tariff); say the tariff it needs against the sized bid's and that it is an instant check, not the optimum; show true opens the What-if step.
 6. Ask what tariff they will quote; check_tariff with record true. If it is below the tariff the target needs, warn clearly and give the equity and project IRR at that tariff.
 7. review_bid_forms. Fill the particulars first (open_format "particulars"), then each RfS format the bid needs in order: open_format, read out its blanks still empty, set them as the user answers (the keys come from open_format), and ask the user to review it on screen; mark_format_reviewed only when they say it is reviewed.

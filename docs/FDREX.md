@@ -214,13 +214,13 @@ is unchanged.
 
 The SECI RTC tab's GPT-Live agent (`../seci/LiveAgent.jsx`, its `LiveEvents` loop), with this
 tab's tools on the Tender to Bid state; `/api/seci/live` gives it this tab's instructions and tools
-for `tab: "fdrex"`. Twenty tools: the tender (`tender_brief` with each paragraph's terms and pages,
+for `tab: "fdrex"`. Twenty-two tools: the tender (`tender_brief` with each paragraph's terms and pages,
 `tender_lookup`, `list_conditions`, `amendment_changes`), the guided inputs (`next_question` in the
 order MW, the buyer's hours, the shortfall plan, buying, its charges, solar-hour connectivity, the
 PSM, the Effective Date, the benchmarks; `list_inputs`, `set_input` over 177 inputs,
 `use_benchmarks`), `run_optimizer` (HiGHS through the tab's sizing), `get_results` (the plant, the
 energy supplied, penalised, bought and sold, EMD, PBG, net worth, SECI's charges, the dates),
-`get_financials`, `check_tariff` (records the quote), `what_if` (the instant What-if on changed
+`get_financials`, `market_check` (the auctions of the same product, where this bid stands, the bridge and its estimates) and `use_market_case` (puts the market case's inputs in the bid, when asked), `check_tariff` (records the quote), `what_if` (the instant What-if on changed
 sizes, costs, IRR or tariff), `explain_generation`, and the bid forms (`review_bid_forms`,
 `open_format`, `mark_format_reviewed`). Asked to change inputs and size the plant, it sets each
 input on screen and runs the optimizer through the same path as the Size button, so the theatre

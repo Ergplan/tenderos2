@@ -374,5 +374,7 @@ const FDREX_TOOL_WORDS = {
   ...TOOL_WORDS,
   list_conditions: (a) => (a.group ? `Listed the ${a.group} conditions` : "Listed the condition groups"),
   amendment_changes: () => "Read what Amendment-01 changed",
+  market_check: () => "Compared the bid with the auction results",
+  use_market_case: () => "Put the market case's inputs in the bid",
   what_if: (a, r) => (r?.ok ? `What-if: ₹${r.tariffNeeded}/kWh needed (${r.change >= 0 ? "+" : ""}${r.change} against the sized bid)` : `What-if: ${r?.error || ""}`),
 };

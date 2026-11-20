@@ -222,4 +222,21 @@ assert.equal(sent[1].type, "response.create");
   const r2 = await run2("get_results", {});
   assert.equal(r2.year1.curtailedMu, 36.5, "365 days × 100 MWh");
 }
+// ---- the market: the auctions of the same product, where this bid stands, the bridge, the market case
+res = await run("market_check", {});
+assert.equal(res.auctions.length, 4);
+assert.equal(res.latestAuction.tender, "SECI-FDRE-IX");
+assert.ok(/5\.99 to 6\.00/.test(res.latestAuction.tariff) && /seci\.co\.in/.test(res.latestAuction.source));
+assert.ok(res.thisBid.tariff > 0 && typeof res.thisBid.standing === "string", "the bid's tariff against the latest auction");
+assert.equal(res.bridgeOn100Mw.length, 6);
+assert.ok(res.bridgeOn100Mw[0].tariff > 9 && res.bridgeOn100Mw.at(-1).tariff < 6, "from the older benchmarks to the market case");
+assert.ok(res.bridgeOn100Mw.every((b, i) => i === 0 || b.change < 0), "each step takes the tariff down");
+assert.ok(res.bridgeOn100Mw.slice(-2).every((b) => b.estimate) && res.caveats.length >= 3, "the estimates are named");
+res = await run("use_market_case", {});
+assert.ok(res.ok && state.lp === null, "the market case clears the sizing");
+assert.equal(state.src.bess.capex, 0.8);
+assert.equal(state.src.wind.cuf, 0.37);
+assert.deepEqual([state.fin.debtFraction, state.fin.interestRate, state.fin.tenorYears, state.fin.targetEquityIrr], [0.75, 0.085, 18, 0.12]);
+assert.ok(!state.filled["fin.targetEquityIrr"] && !state.filled["bess.capex"], "the market case's values are the bidder's now, not benchmarks");
+
 console.log(`FDRE-X bid agent checks passed (${AGENT_TOOLS.length} tools, ${agentInputs(state).length} inputs; guided order ${order.slice(0, 11).join(" → ")})`);

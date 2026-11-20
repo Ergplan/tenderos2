@@ -165,7 +165,9 @@ older benchmark inputs (₹9.02 on a 100 MW bid) to the market: the battery at �
 new-generation wind ₹0.55, down to ₹5.80. **Fill up for me please** fills the first three rows'
 inputs (about ₹7.11 at a 14% equity IRR); **Use the market case in this bid** puts the last row's
 inputs in your bid and opens Size. The last two steps are estimates, marked so: no winner has
-published its inputs. Your own costs, CUF and return decide your bid.
+published its inputs. Your own costs, CUF and return decide your bid. The voice agent answers the
+same question ("why is our tariff above the auction?") from the same figures, and applies the
+market case when you ask it to.
 
 ## Step 08 · What-if *(Finance)*
 
