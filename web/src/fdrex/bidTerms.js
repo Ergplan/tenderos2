@@ -19,6 +19,7 @@
 // Plain JavaScript (no JSX), checked in Node by tools/check_fdrex_bid.mjs.
 import { costliestHours } from "../seci/peakPrices.js";
 import { DOCUMENTS, RFS, TENDER, docById, termById } from "./terms.js";
+import { FDREX_BENCHMARKS } from "./marketCase.js";
 
 const GST = 0.18;
 
@@ -166,6 +167,11 @@ export function fdrexTerms(settings = DEFAULT_SETTINGS, prices = null) {
     greenMin: null,
     solarMultiple: null,
     sale: "allowed", // outside the buyer's hours, the PPA first (PPA 4.4.1, RfS 8.4)
+    // a sale while the day's supply is unfulfilled is a breach, penalised at 1.5 x the day's highest
+    // exchange rate on the volume sold (RfS 8.1.f): the plant sells only on days it meets in full
+    saleOnMetDays: true,
+    // the benchmark inputs this tender fills in where they differ from Tender to Bid's (./marketCase.js)
+    benchmarks: FDREX_BENCHMARKS,
     site: null,
     years: TENDER.termYears,
     typicalSeed: null,

@@ -11,6 +11,7 @@
 // term.
 import { readValue } from "../seci/agent.js";
 import { financeOf } from "../seci/voice.js";
+import { FDREX_BENCHMARKS } from "./marketCase.js";
 import { BENCHMARKS, FINANCE_FIELDS, SOURCE_FIELDS, fillBenchmarks, missingInputs, modelInputs, opsFromLp, dsmFor } from "../bid/model.js";
 import { liveModelRequest } from "../bid/liveModelRequest.js";
 import { quotedReturns } from "../bid/quote.js";
@@ -82,14 +83,14 @@ export function agentInputs(state) {
       set: (s, v) => clear({ ...s, src: { ...s.src, [id]: { ...s.src[id], capacity: v === "auto" ? { mode: "optimise", mw: null } : { mode: "fixed", mw: v } } } }) });
     for (const f of SOURCE_FIELDS[id] || []) {
       add({ key: `${id}.${f.key}`, label: `${NAMES[id]} ${f.label}`, step: "sources", kind: f.options ? "choice" : "number", options: f.options || null,
-        unit: f.pct ? "%" : f.unit, pct: Boolean(f.pct), min: f.min, max: f.max, benchmark: BENCHMARKS[id]?.[f.key] ?? null,
+        unit: f.pct ? "%" : f.unit, pct: Boolean(f.pct), min: f.min, max: f.max, benchmark: FDREX_BENCHMARKS[id]?.[f.key] ?? BENCHMARKS[id]?.[f.key] ?? null,
         get: (s) => s.src[id][f.key],
         set: (s, v) => clear({ ...s, src: { ...s.src, [id]: { ...s.src[id], [f.key]: v } }, filled: { ...s.filled, [`${id}.${f.key}`]: false } }) });
     }
   }
   for (const f of FINANCE_FIELDS) {
     add({ key: `${f.section}.${f.key}`, label: f.label, step: f.section === "costs" ? "sources" : "financeInputs", kind: "number", unit: f.pct ? "%" : f.unit, pct: Boolean(f.pct), min: f.min, max: f.max,
-      benchmark: BENCHMARKS[f.section]?.[f.key] ?? null, get: (s) => s[f.section][f.key],
+      benchmark: FDREX_BENCHMARKS[f.section]?.[f.key] ?? BENCHMARKS[f.section]?.[f.key] ?? null, get: (s) => s[f.section][f.key],
       set: (s, v) => clear({ ...s, [f.section]: { ...s[f.section], [f.key]: v }, filled: { ...s.filled, [`${f.section}.${f.key}`]: false } }) });
   }
   add({ key: "market.sell", label: "Sell the surplus on the exchange outside the buyer's hours (on the Bid inputs step; PPA 9.3 offers excess energy to SECI first)", step: "bid", kind: "boolean",

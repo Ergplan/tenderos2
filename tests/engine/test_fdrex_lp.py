@@ -99,3 +99,60 @@ def test_dear_power_is_not_bought():
     # a hard monthly floor it can be, to cover the worst months instead of building plant for them)
     dear = M.solve(_payload(penalty=1.5, tolerance=0.1, buy_share=0.05, buy_price=np.full(M.HOURS, 50.0)))
     assert sum(row["purchaseMwh"] for row in dear["lifetime"]) == pytest.approx(0, abs=1.0)
+
+
+# ---- sales only on the days the supply is met in full (RfS 8.1.f), at the market price
+
+DEAR_NIGHT = np.where(HOUR >= 22, 12.0, PRICE)  # Rs/kWh: the late evening pays far more than the tariff
+DAY = np.arange(M.HOURS) // 24
+
+
+@pytest.fixture(scope="module")
+def met_days():
+    return M.solve(_payload(penalty=1.5, tolerance=0.1, buy_share=0.05, saleOnMetDays=True))
+
+
+def _dear(payload):
+    payload["ctx"]["surplusPrice"] = DEAR_NIGHT.tolist()
+    return payload
+
+
+@pytest.fixture(scope="module")
+def met_days_dear():
+    return M.solve(_dear(_payload(penalty=1.5, tolerance=0.1, buy_share=0.05, saleOnMetDays=True)))
+
+
+def _by_day(values):
+    return np.bincount(DAY, weights=np.asarray(values, float), minlength=365)
+
+
+@pytest.mark.parametrize("fixture", ["met_days", "met_days_dear"])
+def test_nothing_is_sold_on_a_day_left_short(fixture, request):
+    res = request.getfixturevalue(fixture)
+    h = res["hourly"]
+    need, got, sold = _by_day(h["demand"]), _by_day(np.minimum(_delivered(h), np.asarray(h["demand"]))), _by_day(h["export"])
+    short = got < need * (1 - 1e-4)  # the series are rounded to two decimals
+    assert sold.sum() > 0, "the plant sells its surplus"
+    assert sold[short].max(initial=0.0) == pytest.approx(0, abs=0.01), "no sale on a day the supply is short"
+    year1 = res["perYear"][0]
+    assert year1["saleDays"] + year1["shortDays"] == 365
+    assert year1["saleDays"] >= int((~short).sum()) - 1 and year1["saleDays"] == res["saleDays"][0]
+    assert res["saleOnMetDays"] is True
+
+
+def test_sales_on_met_days_earn_the_market_price_above_the_tariff(met_days_dear):
+    res = met_days_dear
+    h = res["hourly"]
+    ex = np.asarray(h["export"])
+    assert res["tariff"] < 12.0, "the late evening pays more than the tariff"
+    assert ex[HOUR >= 22].sum() > 0, "energy is sold in the dear hours"
+    revenue = M.RS_CR_PER_MWH_AT_1RS * float(ex @ DEAR_NIGHT) * res["evacuationEfficiency"]
+    assert res["lifetime"][0]["exportRevenueCr"] == pytest.approx(revenue, rel=0.02), "booked at the market price"
+    # with the sale worth at most the tariff (the rule off) the same prices cannot give a lower tariff
+    # than a design that may sell at 12 on the days it meets: the dear evening is worth building for
+    capped = M.solve(_dear(_payload(penalty=1.5, tolerance=0.1, buy_share=0.05)))
+    assert res["perYear"][0]["exportMu"] > 0 and capped["perYear"][0]["exportMu"] > 0
+
+
+def test_the_rule_is_off_unless_asked(hard):
+    assert "saleOnMetDays" not in hard and "saleDays" not in hard["perYear"][0]

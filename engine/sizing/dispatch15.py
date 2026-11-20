@@ -187,10 +187,26 @@ def _inputs(payload: dict) -> dict:
         "flat_price": float(fin.get("surplusPrice") or 0) if sell else 0.0,
         "sale_cap": RLP._series(ctx["surplusCapMw"], "surplusCapMw") if sell and ctx.get("surplusCapMw") is not None else None,
         "ppa_first": bool(payload.get("ppaFirst")) and sell,
+        # SECI-FDRE-X (RfS 8.1.f): nothing is sold on a day the supply is short; on a day met in full
+        # the surplus earns the market price (see dispatch_years)
+        "met_days": bool(payload.get("ppaFirst")) and sell and bool(payload.get("saleOnMetDays")),
+        # the days the sizing met in full, by modelled year (rtc_lp's saleDayMask): where the search starts
+        "day_masks": _day_masks(payload.get("saleDayMask")),
         "solar_only": sell and payload.get("exportSources") == "solar",
         "bio": bio, "plants": plants,
         "green_min": float(payload.get("greenShareMin") or 0),
     }
+
+
+def _day_masks(given: Any) -> dict[int, np.ndarray]:
+    """{ years: [...], masks: ["0101…" x 365, ...] } as { year: days met }; {} when absent or malformed."""
+    if not isinstance(given, dict):
+        return {}
+    out = {}
+    for year, mask in zip(given.get("years") or [], given.get("masks") or []):
+        if isinstance(mask, str) and len(mask) == 365 and set(mask) <= {"0", "1"}:
+            out[int(year)] = np.array([c == "1" for c in mask])
+    return out
 
 
 def _buy_price(buy: dict) -> np.ndarray:
@@ -446,7 +462,7 @@ def _build(inp: dict, sizes: dict, tariff: float, year: int) -> dict:
     return {"A": A, "cost": cost, "lo": lo, "hi": hi, "rlo": np.concatenate(rlo), "rhi": np.concatenate(rhi), "col": col,
             "short0": short0, "floor_rows": floor_rows, "block_cols": block_cols, "year": year, "dem": dem, "sgen": sgen, "wgen": wgen, "ren": ren,
             "eta": eta, "E": E, "bf": bf, "min_soc": min_soc, "BM": BM, "pl_live": pl_live, "peak_blocks": peak_blocks,
-            "solar_blocks": solar_blocks, "share_lam": share_b * lam,
+            "solar_blocks": solar_blocks, "share_lam": share_b * lam, "lam": lam,
             "price_b": price_b, "inp": inp, "sizes": sizes}
 
 
@@ -585,6 +601,20 @@ def _highs(m: dict, time_limit: float):
     return h
 
 
+def _add_day_rows(h, m: dict, day_rows: list) -> None:
+    """The day rows of met_days and their slack columns, after the model's own (off until used)."""
+    col = m["col"]
+    n_c, n_r = m["A"].shape[1], m["A"].shape[0]
+    day_of = np.arange(BLOCKS) // (24 * BLOCKS_PER_HOUR)
+    h.addCols(365, np.zeros(365), np.zeros(365), np.zeros(365), 0, np.zeros(365, dtype=np.int32), np.zeros(0, dtype=np.int32), np.zeros(0))
+    per = 2 * 24 * BLOCKS_PER_HOUR + 1
+    idx = np.concatenate([np.r_[col["dir"][day_of == d], col["dis"][day_of == d], n_c + d] for d in range(365)]).astype(np.int32)
+    h.addRows(365, np.full(365, -highspy.kHighsInf), np.full(365, highspy.kHighsInf), int(idx.size),
+              np.arange(365, dtype=np.int32) * per, idx, np.ones(idx.size))
+    day_rows.clear()
+    day_rows.append(np.arange(n_r, n_r + 365, dtype=np.int32))
+
+
 def dispatch_years(inp: dict, sizes: dict, tariff: float, years: list[int], on_year: Callable[[dict], None] | None = None,
                    time_limit: float = 600.0) -> list[dict]:
     """Dispatch the plant in 15-minute blocks for each year. The first year is solved from scratch
@@ -594,11 +624,15 @@ def dispatch_years(inp: dict, sizes: dict, tariff: float, years: list[int], on_y
         raise DispatchError("HiGHS (highspy) is not installed in the engine")
     out = []
     h = None
+    day_rows: list[np.ndarray] = []  # the rows that hold a day's supply in full (met_days), added once
     for year in years:
         m = _build(inp, sizes, tariff, year)
         t0 = time.perf_counter()
+        n_c, n_r = m["A"].shape[1], m["A"].shape[0]
         if h is None:
             h = _highs(m, time_limit)
+            if inp["met_days"]:
+                _add_day_rows(h, m, day_rows)
         else:
             n_col, n_row = m["A"].shape[1], m["A"].shape[0]
             cols = np.arange(n_col, dtype=np.int32)
@@ -606,14 +640,72 @@ def dispatch_years(inp: dict, sizes: dict, tariff: float, years: list[int], on_y
             h.changeColsBounds(n_col, cols, m["lo"], m["hi"])
             h.changeRowsBounds(n_row, np.arange(n_row, dtype=np.int32), m["rlo"], m["rhi"])
             h.setOptionValue("solver", "simplex")
-        h.run()
-        if h.getModelStatus() != highspy.HighsModelStatus.kOptimal and len(out):
-            h = _highs(m, time_limit)  # the warm start failed: solve this year from scratch
+        status = "Optimal"
+        x = None
+        if not inp["met_days"]:
             h.run()
-        status = h.modelStatusToString(h.getModelStatus())
-        if h.getModelStatus() != highspy.HighsModelStatus.kOptimal:
-            raise DispatchError(f"Year {year}: HiGHS stopped with status '{status}'")
-        res = _result(m, np.asarray(h.getSolution().col_value), status, time.perf_counter() - t0)
+            if h.getModelStatus() != highspy.HighsModelStatus.kOptimal and len(out):
+                h = _highs(m, time_limit)  # the warm start failed: solve this year from scratch
+                h.run()
+            status = h.modelStatusToString(h.getModelStatus())
+            if h.getModelStatus() != highspy.HighsModelStatus.kOptimal:
+                raise DispatchError(f"Year {year}: HiGHS stopped with status '{status}'")
+            x = np.asarray(h.getSolution().col_value)[:n_c]
+        sale_days = None
+        if inp["met_days"]:
+            # A row per day: the day's delivery plus a slack covers the day's need. The days to hold
+            # in full are the sizing's for the nearest modelled year (day_masks); without them, the
+            # days a solve with every day's slack priced at 10 x the tariff meets. Solved with those
+            # days' slack priced so, sales at the market price on those days alone: a day still
+            # short is released and the year solved again; so is a year in which five or more other
+            # days turn out met (they may sell too).
+            col, dem, lam_y = m["col"], m["dem"], m["lam"]
+            day_of = np.arange(BLOCKS) // (24 * BLOCKS_PER_HOUR)
+            need = np.bincount(day_of, weights=dem, minlength=365)
+            need_lo = need * (1 - 1e-6)
+            u_cols = np.arange(n_c, n_c + 365, dtype=np.int32)
+            ex = np.asarray(col["ex"], dtype=np.int32)
+            market = m["price_b"] * DT * inp["poi"]
+            worth = np.where(np.isfinite(m["share_lam"]), np.minimum(m["price_b"], m["share_lam"]) * DT * inp["poi"], market)
+            inf = np.full(365, highspy.kHighsInf)
+
+            def met_in(xx: np.ndarray) -> np.ndarray:
+                got = np.bincount(day_of, weights=np.minimum(xx[col["dir"]] + xx[col["dis"]], dem), minlength=365)
+                return got >= need_lo - 1e-6
+
+            def solve(days: np.ndarray, what: str) -> np.ndarray:
+                """The year with these days' supply held (their slack priced) and only they selling."""
+                h.changeColsBounds(365, u_cols, np.zeros(365), np.where(days, need, 0.0))
+                h.changeRowsBounds(365, day_rows[0], np.where(days, need_lo, -highspy.kHighsInf), inf)
+                h.changeColsBounds(int(ex.size), ex, np.zeros(ex.size), np.where(days[day_of], m["hi"][ex], 0.0))
+                h.run()
+                if h.getModelStatus() != highspy.HighsModelStatus.kOptimal:
+                    raise DispatchError(f"Year {year}: HiGHS stopped with status '{h.modelStatusToString(h.getModelStatus())}' ({what})")
+                return np.asarray(h.getSolution().col_value)[:n_c]
+
+            h.changeColsCost(int(ex.size), ex, -worth)
+            h.changeColsCost(365, u_cols, np.full(365, 10.0 * lam_y * DT * inp["poi"]))
+            masks = inp["day_masks"]
+            if masks:
+                days = masks[min(masks, key=lambda y: abs(y - year))].copy()
+            else:
+                # every day met if it can be (sales on every day for this solve only)
+                days = met_in(solve(np.ones(365, dtype=bool), "every day met if it can be"))
+            for attempt in range(8):
+                x = solve(days, "sales only on the days met")
+                met = met_in(x)
+                short = days & ~met
+                more = met & ~days if attempt < 2 else np.zeros(365, dtype=bool)
+                if not short.any() and more.sum() < 5:
+                    break
+                days = (days & ~short) | more
+            else:
+                raise DispatchError(f"Year {year}: the days met in full did not settle")
+            sale_days = days
+        res = _result(m, x, status, time.perf_counter() - t0)
+        if sale_days is not None:
+            res["summary"]["saleDays"] = int(sale_days.sum())
+            res["summary"]["shortDays"] = int(365 - sale_days.sum())
         out.append(res)
         if on_year:
             on_year(res)

@@ -228,3 +228,12 @@
 .win-scroll .win-table td:first-child { min-width: 280px; max-width: 460px; }
 .win-scroll .win-table td:last-child { min-width: 180px; }
 .win-scroll .win-table td:nth-child(n+2):nth-child(-n+6) { white-space: nowrap; }
+/* FDRE-X: the bid against the market (fdrex/MarketCheck.jsx) */
+.mkt-scroll { overflow-x: auto; margin-top: 10px; }
+.mkt-table td { line-height: 1.5; }
+.mkt-table td:nth-child(2), .mkt-table td:nth-child(3), .mkt-table td:nth-child(4) { white-space: nowrap; }
+.mkt-table tr.is-filled td { background: color-mix(in srgb, var(--signal) 7%, transparent); }
+.mkt-table a { color: var(--signal); text-decoration: none; white-space: nowrap; }
+.win-est { margin-left: 6px; padding: 0 5px; border: 1px solid var(--line); color: var(--muted); font-style: normal; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; }
+.win-notes { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.win-notes a { color: var(--signal); text-decoration: none; }

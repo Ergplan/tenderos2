@@ -27,6 +27,7 @@ import { PACK as TENDER_PACK } from "./pack.js";
 import ConditionsStep from "./ConditionsStep.jsx";
 import BidInputs from "./BidInputs.jsx";
 import BidForms from "./BidForms.jsx";
+import MarketCheck from "./MarketCheck.jsx";
 import { formIssues } from "./forms.js";
 import { formatsSummary } from "./formats.js";
 import OptimizerTheatre from "../rtc/Theatre";
@@ -229,7 +230,7 @@ export default function FdrexBidTab({ initialScenario = null }) {
       const ops = opsFromLp(state.lp, fin, bess, dsmFor(state));
       const annualTarget = terms.rules.find((r) => r.id === "annual")?.target ?? 0;
       const f = E.runFinancialModel(null, state.lp.sizes, { costs, fin, bess, dfrTarget: annualTarget, tariffLocked: false, ops, solveBy: "npv" });
-      return Number.isFinite(f?.tariff) ? { bid: Math.ceil(f.tariff * 100 - 1e-9) / 100, screening: state.lp.tariff } : null;
+      return Number.isFinite(f?.tariff) ? { bid: Math.ceil(f.tariff * 100 - 1e-9) / 100, tariff: f.tariff, screening: state.lp.tariff } : null;
     } catch {
       return null;
     }
@@ -328,6 +329,7 @@ export default function FdrexBidTab({ initialScenario = null }) {
         {step.id === "financeInputs" && <FinanceInputsStep {...props} startSizing={startWithTheatre} />}
         {step.id === "size" && <SizeStep {...props} run={sizing.run} startSizing={startWithTheatre} stopSizing={sizing.stopSizing} hourly={sizing.hourly} startDispatch15={sizing.startDispatch15} />}
         {step.id === "finance" && <FinanceStep {...props} traceRequest={traceAsk} quoteTariff={state.forms?.tariff ?? null} onQuoteTariff={(v) => setState((s) => ({ ...s, forms: { ...s.forms, tariff: v } }))} />}
+        {step.id === "finance" && <MarketCheck tariff={formsModel?.tariff ?? null} state={state} setState={setState} goto={goto} />}
         {step.id === "whatif" && <WhatIfTab embedded seed={whatIfSeed} seedKey={state.lp ? `${JSON.stringify(state.lp.sizes)}|${state.lp.tariff}|${JSON.stringify(state.fdrex)}` : ""} onBack={() => goto("finance")} />}
         {step.id === "forms" && <BidForms state={forms} setState={setForms} goto={goto} model={formsModel} index="9" />}
       </div>

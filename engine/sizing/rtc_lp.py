@@ -518,6 +518,14 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
     # diverting); sale revenue is still booked at the actual price. exportSources "solar": only
     # solar output may be sold (a tender that lets the mandated solar be scheduled in the market)
     ppa_first = bool(payload.get("ppaFirst")) and sell
+    # saleOnMetDays (SECI-FDRE-X): selling elsewhere while the day's supply is short is a breach,
+    # penalised at 1.5 x the day's highest exchange rate on the volume sold (RfS 8.1.f). So a day is
+    # either met in full, and its surplus is sold at the market price, or it may fall short and
+    # sells nothing. Which days are which is searched after the model is built (see "the days");
+    # sales are then worth the market price, not capped at the tariff: on a day met in full nothing
+    # sold could have gone to the PPA.
+    met_days_rule = ppa_first and bool(payload.get("saleOnMetDays"))
+    uncapped = met_days_rule
     # Optional purchases (SECI-FDRE-X: up to 5% of a year's energy from the green market or a
     # bilateral agreement, supplied directly or through the battery): an hourly column per modelled
     # year that adds to the energy at the bus, priced at the hourly price plus charges (Rs/kWh,
@@ -945,7 +953,7 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
         if market_w is None or market_w[yi] <= 0:
             return np.zeros(HOURS)
         unit = lam_now * energy_w[yi] / market_w[yi]  # the tariff, as a sale price
-        return np.where(np.isfinite(share_val), share_val, 0.995 if ppa_first else np.inf) * unit
+        return np.where(np.isfinite(share_val), share_val, 0.995 if ppa_first and not uncapped else np.inf) * unit
 
     def objective(tw: dict, lam_now: float = 0.0) -> tuple[np.ndarray, np.ndarray, float, np.ndarray]:
         """cost(x) (Rs cr, PV at the equity IRR) and energy(x) (Rs cr per Rs/kWh of tariff)."""
@@ -1154,60 +1162,198 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
     lower = -math.inf
     all_cols = np.arange(n_col, dtype=np.int32)
     stopped = None  # (iteration, status) when HiGHS stops an iteration after an earlier one solved
-    for it in range(1, int(payload.get("maxIterations") or 8) + 1):
-        if it > 1:
-            cost_vec, energy_vec, cost_const, energy_w = objective(tariff_weights(fin, taxed_in), lam)
-            h.changeColsCost(n_col, all_cols, cost_vec - lam * energy_vec)
-            if "solver" not in user_opts:
-                h.setOptionValue("solver", "simplex")
-                h.setOptionValue("simplex_strategy", 4)
-        note("highs", f"Dinkelbach iteration {it}: solving at λ ₹{lam:.4f}/kWh ({describe_timing(taxed_in)})")
-        if on_progress:
-            on_progress({"iteration": it, "lambda": lam})
-        t_it = time.perf_counter()
-        h.run()
-        status = h.getModelStatus()
-        status_text = h.modelStatusToString(status)
-        info = h.getInfo()
-        if status != highspy.HighsModelStatus.kOptimal:
-            note("highs", f"Iteration {it}: HiGHS stopped with status '{status_text}'")
-            if x is not None:
-                stopped = (it, status_text)
-                note("highs", f"The design is iteration {it - 1}'s, solved to optimality at λ ₹{iterations[-1]['lambda']:.4f}/kWh; "
-                              f"its tariff is within ₹{max(0.0, iterations[-1]['tariff'] - lower):.4f}/kWh of the proven lower bound")
-            if status == highspy.HighsModelStatus.kInfeasible:
-                note("highs", "No design within the size ranges meets the DFR in every modelled year: widen the ranges or lower the DFR")
-            break
-        x = np.asarray(h.getSolution().col_value)
-        cost = float(cost_vec @ x) + cost_const
-        energy = float(energy_vec @ x)
-        ratio = cost / energy if energy > 0 else math.inf
-        f_val = cost - lam * energy
-        # certificate: every feasible design has cost - λ·energy >= f_val, and energy between the
-        # DFR floor and full delivery, so no design can have a tariff below `lower`
-        e_bound = float(energy_w @ (floor_mwh if f_val <= 0 else cap_mwh))
-        lower = lam + f_val / e_bound if e_bound > 0 else -math.inf
-        z_old = taxed_in
-        dl, ex = yearly(x)
-        taxed_in = tax_timing(fin, reference_taxable(fin, costs, bess, sizes_of(x), dl, ex, ratio, yearly_biomass(x),
-                                                     yearly_export_revenue(x), plants, yearly_plants(x)))
-        timing_same = bool(np.array_equal(z_old, taxed_in))
-        z = sizes_of(x)
-        iterations.append({
-            "iteration": it, "lambda": lam, "tariff": ratio, "lowerBound": lower,
-            "simplexIterations": int(info.simplex_iteration_count), "ipmIterations": int(info.ipm_iteration_count),
-            "seconds": round(time.perf_counter() - t_it, 2), "sizes": z,
-        })
-        note("highs", f"Iteration {it} done in {time.perf_counter() - t_it:.1f} s ({info.simplex_iteration_count:,} simplex"
-                      f"{f' + {info.ipm_iteration_count} IPM' if info.ipm_iteration_count else ''} iterations): "
-                      f"{describe(z)} "
-                      f"→ tariff ₹{ratio:.4f}/kWh; proven lower bound ₹{lower:.4f}/kWh (gap ₹{ratio - lower:.4f})"
-                      f"{'' if timing_same else '; tax timing updated'}")
-        if on_progress:
-            on_progress({"iteration": it, "lambda": lam, "tariff": ratio, "lowerBound": lower, "sizes": z})
-        lam = ratio
-        if ratio - lower <= gap_tol and timing_same:
-            break
+    restart_ipm = False  # set by the days' search: each round starts with interior point
+
+    def dinkelbach(max_it: int, new_objective: bool = False, extra=None) -> None:
+        """Dinkelbach iterations from the current λ, each one HiGHS solve; new_objective: the
+        objective changed since the last solve (a new phase), so it is set before the first.
+        extra(λ, energy_w): further column costs to set before each solve (the days' slack)."""
+        nonlocal lam, taxed_in, x, lower, status_text, stopped, cost_vec, energy_vec, cost_const, energy_w
+        for k in range(1, max_it + 1):
+            it = len(iterations) + 1
+            if k > 1 or new_objective:
+                cost_vec, energy_vec, cost_const, energy_w = objective(tariff_weights(fin, taxed_in), lam)
+                h.changeColsCost(n_col, all_cols, cost_vec - lam * energy_vec)
+                if "solver" not in user_opts:
+                    # a new phase whose rows or bounds changed a lot: interior point again (from
+                    # scratch it is quicker than simplex from a basis far from the new optimum);
+                    # a changed objective alone: primal simplex from the last basis
+                    fresh = k == 1 and new_objective and restart_ipm
+                    h.setOptionValue("solver", "ipm" if fresh else "simplex")
+                    if not fresh:
+                        h.setOptionValue("simplex_strategy", 4)
+            if extra is not None:
+                extra(lam, energy_w)
+            note("highs", f"Dinkelbach iteration {it}: solving at λ ₹{lam:.4f}/kWh ({describe_timing(taxed_in)})")
+            if on_progress:
+                on_progress({"iteration": it, "lambda": lam})
+            t_it = time.perf_counter()
+            h.run()
+            status = h.getModelStatus()
+            status_text = h.modelStatusToString(status)
+            info = h.getInfo()
+            if status != highspy.HighsModelStatus.kOptimal:
+                note("highs", f"Iteration {it}: HiGHS stopped with status '{status_text}'")
+                if x is not None:
+                    stopped = (it, status_text)
+                    note("highs", f"The design is iteration {it - 1}'s, solved to optimality at λ ₹{iterations[-1]['lambda']:.4f}/kWh; "
+                                  f"its tariff is within ₹{max(0.0, iterations[-1]['tariff'] - lower):.4f}/kWh of the proven lower bound")
+                if status == highspy.HighsModelStatus.kInfeasible:
+                    note("highs", "No design within the size ranges meets the DFR in every modelled year: widen the ranges or lower the DFR")
+                break
+            x = np.asarray(h.getSolution().col_value)[:n_col]
+            cost = float(cost_vec @ x) + cost_const
+            energy = float(energy_vec @ x)
+            ratio = cost / energy if energy > 0 else math.inf
+            f_val = cost - lam * energy
+            # certificate: every feasible design has cost - λ·energy >= f_val, and energy between the
+            # DFR floor and full delivery, so no design can have a tariff below `lower`
+            e_bound = float(energy_w @ (floor_mwh if f_val <= 0 else cap_mwh))
+            lower = lam + f_val / e_bound if e_bound > 0 else -math.inf
+            z_old = taxed_in
+            dl, ex = yearly(x)
+            taxed_in = tax_timing(fin, reference_taxable(fin, costs, bess, sizes_of(x), dl, ex, ratio, yearly_biomass(x),
+                                                         yearly_export_revenue(x), plants, yearly_plants(x)))
+            timing_same = bool(np.array_equal(z_old, taxed_in))
+            z = sizes_of(x)
+            iterations.append({
+                "iteration": it, "lambda": lam, "tariff": ratio, "lowerBound": lower,
+                "simplexIterations": int(info.simplex_iteration_count), "ipmIterations": int(info.ipm_iteration_count),
+                "seconds": round(time.perf_counter() - t_it, 2), "sizes": z,
+            })
+            note("highs", f"Iteration {it} done in {time.perf_counter() - t_it:.1f} s ({info.simplex_iteration_count:,} simplex"
+                          f"{f' + {info.ipm_iteration_count} IPM' if info.ipm_iteration_count else ''} iterations): "
+                          f"{describe(z)} "
+                          f"→ tariff ₹{ratio:.4f}/kWh; proven lower bound ₹{lower:.4f}/kWh (gap ₹{ratio - lower:.4f})"
+                          f"{'' if timing_same else '; tax timing updated'}")
+            if on_progress:
+                on_progress({"iteration": it, "lambda": lam, "tariff": ratio, "lowerBound": lower, "sizes": z})
+            lam = ratio
+            if ratio - lower <= gap_tol and timing_same:
+                break
+
+    max_it = int(payload.get("maxIterations") or 8)
+    sale_days = None
+    kept_duals = None
+    if not met_days_rule:
+        dinkelbach(max_it)
+    else:
+        # ---- the days (saleOnMetDays). A row per day and modelled year: the day's delivery plus a
+        # slack u covers the day's need. A day is "met" (slack 0, may sell) or "released" (no row,
+        # sells nothing). The search:
+        #   1. every day met if it can be, the slack priced per MWh short (a stand-in for the sale a
+        #      short day gives up): the days still short are released;
+        #   2. solved with those days fixed: a valid design;
+        #   3. days the design meets anyway are let sell; days whose requirement costs more than
+        #      their sales earn are released, a batch at a time, kept only when the tariff falls.
+        day_of = np.arange(HOURS) // 24
+        n_rep = len(rep)
+        n_days = 365 * n_rep
+        need = np.concatenate([np.bincount(day_of, weights=demand_by_year[yi], minlength=365) for yi in range(n_rep)])
+        u0 = n_col
+        u_cols = np.arange(u0, u0 + n_days, dtype=np.int32)
+        h.addCols(n_days, np.zeros(n_days), np.zeros(n_days), need.copy(), 0,
+                  np.zeros(n_days, dtype=np.int32), np.zeros(0, dtype=np.int32), np.zeros(0))
+        r_start, r_idx = [], []
+        pos = 0
+        for yi in range(n_rep):
+            for d in range(365):
+                hrs = np.arange(d * 24, d * 24 + 24)
+                cols = np.concatenate([c[hrs] for c in deliver_cols[yi]] + [np.array([u0 + yi * 365 + d])])
+                r_start.append(pos)
+                r_idx.append(cols)
+                pos += cols.size
+        idx = np.concatenate(r_idx).astype(np.int32)
+        day_row0 = n_row
+        need_lo = need * (1 - 1e-6)
+        h.addRows(n_days, need_lo, np.full(n_days, highspy.kHighsInf), int(idx.size), np.array(r_start, dtype=np.int32), idx, np.ones(idx.size))
+        day_rows = np.arange(day_row0, day_row0 + n_days, dtype=np.int32)
+        year_of_day = np.repeat(np.arange(n_rep), 365)
+        ex_all = [np.asarray(ex_cols[yi], dtype=np.int32) for yi in range(n_rep)]
+        ex_hi = [col_hi[c].copy() for c in ex_all]
+
+        def apply(met: np.ndarray) -> None:
+            """met days: the row holds with no slack, sales allowed; the others: no row, no sale."""
+            h.changeColsBounds(n_days, u_cols, np.zeros(n_days), np.zeros(n_days))
+            h.changeRowsBounds(n_days, day_rows, np.where(met, need_lo, -highspy.kHighsInf), np.full(n_days, highspy.kHighsInf))
+            for yi in range(n_rep):
+                on = met[yi * 365:(yi + 1) * 365][day_of]
+                h.changeColsBounds(int(ex_all[yi].size), ex_all[yi], np.zeros(ex_all[yi].size), np.where(on, ex_hi[yi], 0.0))
+
+        def met_now(xx: np.ndarray) -> np.ndarray:
+            got = np.concatenate([np.bincount(day_of, weights=np.minimum(sum(xx[c] for c in deliver_cols[yi]), demand_by_year[yi]), minlength=365)
+                                  for yi in range(n_rep)])
+            return got >= need_lo - 1e-6
+
+        def said(met: np.ndarray) -> str:
+            return "; ".join(f"year {y}: {int(met[yi * 365:(yi + 1) * 365].sum())} days met in full and selling, "
+                             f"{365 - int(met[yi * 365:(yi + 1) * 365].sum())} short and not selling" for yi, y in enumerate(rep))
+
+        def snapshot() -> tuple:
+            dual = np.asarray(h.getSolution().row_dual).copy()
+            return (x.copy(), lam, lower, taxed_in, status_text, dual[day_rows], dual)
+
+        # 1. every day met if it can be: the slack costs slack_mult x the tariff per MWh short
+        # (10 x: from different prices of 6 and more the search ends within 0.1% of the same tariff;
+        # from a low price it starts with too few days met and stays there)
+        slack_mult = float(payload.get("shortDayPrice") or 10.0)
+
+        def slack_cost(lam_now: float, e_w: np.ndarray) -> None:
+            h.changeColsCost(n_days, u_cols, slack_mult * lam_now * e_w[year_of_day] * poi)
+
+        note("highs", "Sales only on days the supply is met in full (RfS 8.1.f), at the market price. "
+                      f"Step 1: every day met if it can be (a MWh short priced at {slack_mult:g} × the tariff)")
+        dinkelbach(min(max_it, 3), extra=slack_cost)
+        if x is None or stopped is not None:
+            raise LpInputError(f"HiGHS found no design: {status_text}. No design within the size ranges meets the supply "
+                               "rules in every modelled year; widen the size ranges or check the rules")
+        met = met_now(x)
+        dual1 = np.asarray(h.getSolution().row_dual)[day_rows].copy()
+        h.changeColsCost(n_days, u_cols, np.zeros(n_days))
+        restart_ipm = bool(payload.get("dayIpm", True))
+
+        # 2 and 3. From the days step 1 meets: let sell the days met anyway, release the days whose
+        # requirement costs more at the margin (the day row's dual, per MWh, on a share of the day's
+        # need) than their sales earn, at most a fifth of a year's days at a time. The first round
+        # gives the first valid design; a later round is kept only when the tariff falls.
+        share = float(payload.get("releaseShare") or 0.15)
+        rounds = int(payload.get("dayRounds") or 4)
+        base_x, base_met, base_dual = x.copy(), met.copy(), dual1
+        best = None
+        for rnd in range(1, rounds + 1):
+            mw = last_weights.get("market_w")
+            earn = np.concatenate([np.bincount(day_of, weights=base_x[ex_all[yi]] * sale_prices * poi * (mw[yi] if mw is not None else 0.0), minlength=365)
+                                   for yi in range(n_rep)])
+            more = met_now(base_x) & ~base_met
+            score = np.where(base_met, np.abs(base_dual) * need * share - earn, -np.inf)
+            released = np.zeros(n_days, dtype=bool)
+            for yi in range(n_rep):
+                sc = score[yi * 365:(yi + 1) * 365]
+                take = [int(i) for i in np.argsort(-sc)[:73] if sc[i] > 0]
+                released[yi * 365 + np.array(take, dtype=int)] = True
+            trial = (base_met | more) & ~released
+            changed = int(more.sum() + released.sum())
+            if best is not None and changed < max(4, round(n_days * float(payload.get("dayMinShare") or 0.03))):
+                break  # too few days would change to be worth another solve (under 0.1% of the tariff, measured)
+            apply(trial)
+            note("highs", f"Days, round {rnd}: {int(more.sum())} more days met anyway may sell, {int(released.sum())} dear days released: {said(trial)}")
+            dinkelbach(max_it, new_objective=True)
+            if x is None or stopped is not None:
+                stopped = None
+                break
+            if best is None or lam < best[2] - 1e-4:
+                best = (snapshot(), trial.copy(), lam)
+                base_x, base_met, base_dual = x.copy(), trial.copy(), best[0][5]
+            else:
+                note("highs", f"Round {rnd} did not lower the tariff (₹{lam:.4f} against ₹{best[2]:.4f}): kept the earlier days")
+                break
+        if best is None:
+            raise LpInputError(f"HiGHS found no design with sales only on days the supply is met: {status_text}")
+        # the kept design (the last trial may not be it) and its duals, read for the report below
+        (x, lam, lower, taxed_in, status_text, _, kept_duals), met, _ = best
+        stopped = None
+        sale_days = [met[yi * 365:(yi + 1) * 365] for yi in range(n_rep)]
+        note("highs", f"Days: {said(met)}; tariff ₹{lam:.4f}/kWh")
 
     # reporting: DFR per modelled year, curtailment and the DFR shadow price
     def rule_outcome(rule: dict, delivered: np.ndarray, dem: np.ndarray) -> dict:
@@ -1243,7 +1389,7 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
     if x is None:
         raise LpInputError(f"HiGHS found no design: {status_text}. No design within the size ranges meets the supply "
                            "rules in every modelled year; widen the size ranges or check the rules")
-    duals = np.asarray(h.getSolution().row_dual) if h.getSolution().dual_valid else None
+    duals = kept_duals if kept_duals is not None else (np.asarray(h.getSolution().row_dual) if h.getSolution().dual_valid else None)
     year_rows = []
     for yi, year in enumerate(rep):
         delivered = sum(x[c] for c in deliver_cols[yi])
@@ -1256,6 +1402,8 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
             "minMonthlyDfr": min(monthly_dfr),
             "deliveredMu": float(delivered.sum() * poi / 1000),
             "exportMu": float(x[base + 4 * HOURS + t].sum() * poi / 1000) if sell else 0.0,
+            # the days met in full, which alone may sell (saleOnMetDays)
+            **({"saleDays": int(sale_days[yi].sum()), "shortDays": int(365 - sale_days[yi].sum())} if sale_days is not None else {}),
         }
         if has_bio:
             row["biomassMu"] = float(x[bio_cols[yi]].sum() / 1000)
@@ -1313,6 +1461,10 @@ def solve(payload: dict, on_log=None, on_progress=None, log_limit: int = 1500) -
         "dfrPricePerPoint": dfr_price,
         "model": {"columns": n_col, "rows": n_row, "nonzeros": int(A.nnz), "mode": mode},
         "ppaFirst": ppa_first,
+        # saleDayMask: each modelled year's 365 days, "1" where the day is met in full and sells (the
+        # 15-minute dispatch starts from them)
+        **({"saleOnMetDays": True, "saleDays": [int(a.sum()) for a in sale_days],
+            "saleDayMask": ["".join("1" if v else "0" for v in a) for a in sale_days]} if sale_days is not None else {}),
         "exportSources": "solar" if solar_only else "all",
         "plants": [{"id": pl["id"], "green": pl["green"]} for pl in plants],
         "greenShareMin": green_min if non_green else None,

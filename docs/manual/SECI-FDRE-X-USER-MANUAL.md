@@ -135,7 +135,10 @@ and the finance team's detailed inputs, as on the SECI RTC tab.
 
 **Size the plant** runs HiGHS: hour by hour over the modelled years, the least 25-year tariff at
 your target equity IRR with the buyer's four hours supplied, the monthly rule held, bought power
-within 5% and nothing sold where there is no connectivity. A 100 MW bid takes about a minute.
+within 5% and nothing sold where there is no connectivity. The surplus is sold only on the days
+the supply is met in full (a sale on a short day is a breach, at 1.5 × that day's highest exchange
+rate), at the market's price; HiGHS chooses which days to meet in full and which to leave short
+within the free 10%. A 100 MW bid takes about two minutes.
 While it runs, the optimizer animation fills the screen: a tariff surface over solar × wind (from
 the instant What-if model, the best storage at each mix) builds up, the solver's log streams beside
 it, and HiGHS's optimum is marked when it is found. *Skip animation* goes straight to the result;
@@ -145,7 +148,7 @@ it, and HiGHS's optimum is marked when it is found. *Skip animation* goes straig
 * **The monthly rule** year by year: the worst month's share of its peak energy, marked within the
   free 10% or with the penalty paid beyond it.
 * **Tender conditions**: each condition checked on the plant, with its page.
-* A dispatch week and where the energy went.
+* A dispatch week and where the energy went, with the **days met in full, selling** out of 365.
 
 ## Step 07 · Financial model *(Finance)*
 
@@ -153,6 +156,16 @@ The tariff for your target equity IRR (the exact model on HiGHS's design), the r
 tariff you mean to quote, the project cost, the revenue and costs by year (the power bought, the
 PSM discount, the monthly penalty), and **Download the financial model**: the workbook with its
 Live model sheet, every cell a formula.
+
+**Against the market**, below it, answers "why is this above the auction results?". It shows your
+tariff beside the auctions of the same product (₹8.50 in January 2025, ₹6.74, ₹6.27–6.28, and
+₹5.99–6.00 in SECI-FDRE-IX, August 2026, each with a link to its result), and a bridge from the
+older benchmark inputs (₹9.02 on a 100 MW bid) to the market: the battery at ₹0.80 cr/MWh takes
+₹1.51 off, debt at 75% for 18 years ₹0.40, 8.5% interest ₹0.22, a 12% equity IRR ₹0.55 and
+new-generation wind ₹0.55, down to ₹5.80. **Fill up for me please** fills the first three rows'
+inputs (about ₹7.11 at a 14% equity IRR); **Use the market case in this bid** puts the last row's
+inputs in your bid and opens Size. The last two steps are estimates, marked so: no winner has
+published its inputs. Your own costs, CUF and return decide your bid.
 
 ## Step 08 · What-if *(Finance)*
 
@@ -165,9 +178,10 @@ surplus sold). The levers table ranks which input moves the tariff most, and how
 have to move to reach a tariff you name.
 
 The What-if runs an instant rule-based dispatch (the battery serves the buyer's hours; the power
-bought goes first to the months beyond the free 10%, cheapest hours first; the surplus is sold at
-the hourly IEX price outside the solar hours), not the optimizer, so the sized bid itself reads a
-little dearer here than in the Financial model (₹8.83 against ₹8.55 on the benchmark bid). Use it
+bought goes first to complete a day that is a little short and has surplus to sell, then to the
+months beyond the free 10%, cheapest hours first; the surplus is sold at the hourly IEX price
+outside the solar hours, on the days met in full), not the optimizer, so the sized bid itself reads a
+dearer here than in the Financial model (₹7.65 against ₹7.11 on the benchmark bid). Use it
 to compare cases; size again for the bid. *Back to the sized bid* restores the starting case.
 
 ## Step 09 · Bid forms *(Tender / Legal)*

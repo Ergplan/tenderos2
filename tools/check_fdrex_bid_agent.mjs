@@ -162,7 +162,7 @@ assert.ok(res.recorded && state.forms.tariff === fin.quoteRoundedUp);
 res = await run("what_if", { solarMw: null, windMw: null, storageMw: null, storageHours: null, solarCapex: null, windCapex: null, storageCapex: null, targetEquityIrrPct: null, tariff: null, show: false });
 assert.ok(res.ok && Math.abs(res.change) < 1e-9, "unchanged: the same tariff as sized");
 const asSized = res.tariffNeeded;
-res = await run("what_if", { solarMw: null, windMw: null, storageMw: null, storageHours: null, solarCapex: null, windCapex: null, storageCapex: 0.9, targetEquityIrrPct: null, tariff: null, show: true });
+res = await run("what_if", { solarMw: null, windMw: null, storageMw: null, storageHours: null, solarCapex: null, windCapex: null, storageCapex: 0.6, targetEquityIrrPct: null, tariff: null, show: true });
 assert.ok(res.tariffNeeded < asSized, "cheaper storage, a lower tariff");
 assert.equal(shown.at(-1), "whatif");
 res = await run("what_if", { solarMw: null, windMw: null, storageMw: null, storageHours: null, solarCapex: null, windCapex: null, storageCapex: null, targetEquityIrrPct: 12, tariff: null, show: false });

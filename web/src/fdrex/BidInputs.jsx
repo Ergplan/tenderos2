@@ -93,7 +93,7 @@ export default function BidInputs({ state, setState, terms }) {
             <div className="rtc-field-top"><span>Sell the surplus on the exchange</span></div>
             <YesNo value={Boolean(state.market?.sell)} testid="fdrex-sell-choice"
               onChange={(v) => setState((s) => ({ ...s, market: { ...s.market, sell: v, source: v && (!s.market?.source || s.market.source === "flat") ? "GDAM" : s.market?.source }, filled: { ...s.filled, "market.sell": false }, lp: null }))}
-              yes={`The energy the buyer's hours and the storage do not take is sold ${fx.dayInjection ? "at any hour" : "from 18:00 to 06:00 (no connectivity in the solar hours)"}, at the market's 15-minute price, within the connectivity; it assumes SECI does not take it under PPA 9.3`}
+              yes={`On days the supply is met in full, the energy the buyer's hours and the storage do not take is sold ${fx.dayInjection ? "at any hour" : "from 18:00 to 06:00 (no connectivity in the solar hours)"}, at the market's price, within the connectivity; it assumes SECI does not take it under PPA 9.3`}
               no="Nothing is sold: the surplus is curtailed (or offered to SECI under PPA 9.3, which pays the tariff only if the Buying Entity consents; not counted here)" />
           </div>
           {state.market?.sell && (
@@ -113,7 +113,7 @@ export default function BidInputs({ state, setState, terms }) {
           The RfS lets the plant sell outside the buyer's hours, on an exchange or to third parties, within its connectivity and without a NOC <Cite id="essOtherUse" compact />;
           selling while the day's supply is unmet is a breach, at 1.5 × the day's highest exchange rate <Cite id="thirdParty" compact /> <Cite id="thirdPartyPenalty" compact />.
           The PPA bars selling excess energy to anyone but SECI unless SECI refuses it <Cite id="excessFirstRefusal" compact />, and SECI buys it at the tariff only if the Buying Entity consents <Cite id="excess" compact />:
-          the two differ, so ask SECI in the pre-bid queries. The sizing and the 15-minute dispatch sell at the chosen market's prices, the PPA first in every hour.
+          the two differ, so ask SECI in the pre-bid queries. The sizing and the 15-minute dispatch sell only on the days the supply is met in full, at the chosen market's prices; on a day that falls short (within the free 10% of the month) nothing is sold.
         </p>
       </Section>
 

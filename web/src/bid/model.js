@@ -718,6 +718,9 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
   }
   // the hours a sale is allowed in (SECI-FDRE-X: connectivity for the non-solar hours only)
   if (selling && terms.saleMask) payload.saleMask = Array.from(terms.saleMask);
+  // SECI-FDRE-X (RfS 8.1.f): a sale while the day's supply is short is a breach, so the optimizer
+  // sells only on days it meets in full, and values those sales at the market price
+  if (selling && terms.saleOnMetDays) payload.saleOnMetDays = true;
   if (rules.some((r) => r.hours === "peak" || r.hours === "offpeak" || r.hours === "remaining")) payload.peakMask = Array.from(peakMask(terms.peak));
   else if (rules.some((r) => r.hours === "any") && terms.peak?.windows?.length) payload.peakMask = Array.from(anyMask(terms.peak));
   // SECI FDRE-RTC-V (Amendment-03): the Solar Hours, whose floor, cap and excess differ
@@ -729,6 +732,8 @@ export function lpPayload(state, terms, { solarCf, windCf }, prices = null) {
 export function dispatch15Request(payload, lp) {
   const { returnHourly, returnLifetime, returnDispatch, tariffGuess, timeLimitS, seed, ...rest } = payload;
   const sizes = Object.fromEntries(Object.entries(lp.sizes || {}).map(([k, v]) => [k, Math.max(0, Number(v) || 0)]));
+  // the days the sizing met in full, which alone sell (SECI-FDRE-X): the 15-minute dispatch starts from them
+  if (rest.saleOnMetDays && Array.isArray(lp.saleDayMask)) rest.saleDayMask = { years: lp.years, masks: lp.saleDayMask };
   return { payload: rest, sizes, tariff: lp.tariff };
 }
 
@@ -788,6 +793,8 @@ export function sizesAtMax(lp, state, terms) {
 /** Fill every empty input with the industry benchmark (values already entered are kept). */
 export function fillBenchmarks(state, terms) {
   const filled = { ...(state.filled || {}) };
+  // a tender's own benchmark where it has one (terms.benchmarks: SECI-FDRE-X's battery price and debt terms)
+  const bench = (section, key) => terms?.benchmarks?.[section]?.[key] ?? BENCHMARKS[section][key];
   const take = (path, current, value) => {
     if (current !== null && current !== undefined && current !== "") return current;
     filled[path] = true;
@@ -796,14 +803,14 @@ export function fillBenchmarks(state, terms) {
   const src = Object.fromEntries(SOURCE_IDS.map((id) => {
     const s = state.src[id];
     const next = { ...s, capacity: { ...s.capacity, mode: s.capacity.mode || "optimise" } };
-    for (const f of SOURCE_FIELDS[id]) next[f.key] = take(`${id}.${f.key}`, s[f.key], BENCHMARKS[id][f.key]);
+    for (const f of SOURCE_FIELDS[id]) next[f.key] = take(`${id}.${f.key}`, s[f.key], bench(id, f.key));
     return [id, next];
   }));
   const fin = { ...state.fin };
   const costs = { ...state.costs };
   for (const f of FINANCE_FIELDS) {
     const target = f.section === "fin" ? fin : costs;
-    target[f.key] = take(`${f.section}.${f.key}`, target[f.key], BENCHMARKS[f.section][f.key]);
+    target[f.key] = take(`${f.section}.${f.key}`, target[f.key], bench(f.section, f.key));
   }
   const market = { ...state.market };
   // market sale is left off: switch it on to sell what the tender allows

@@ -56,7 +56,7 @@ the bid under `tenderos.fdrex.bid.v2`; a bid saved by the earlier tab opens as a
 | The four hours | "The 4 costliest non-solar hours each day": each night, the 4 hours of 18:00–06:00 with the highest IEX DAM prices (`costliestHours` with the window as a parameter; most often 18:00–22:00, ₹7.98/kWh against ₹6.40 for the window); or "Evening 18:00–22:00". Until the prices load, the evening hours | RfS 8.1.a, PPA 4.4.1 |
 | Shortfall | One monthly rule on the month's peak energy. "Pay the penalty beyond 10%": up to 10% short free (its revenue lost), the energy short beyond it at 1.5 × the tariff (`basis: "monthly"`, `tolerance: 0.1`, `penaltyMultiple: 1.5`); "Meet every month in full": a hard floor | RfS 8.2 |
 | Bought power | Green market or bilateral, within 5% of each year's required energy, supplied directly or through the storage, at the hourly IEX GDAM price plus the charges to the meter (`purchase`); never resold | RfS 8.1.e |
-| Sale | The surplus sold outside the buyer's hours (the PPA first), when *Sell the surplus on the exchange* is Yes on Bid inputs (3.3.1), on IEX GDAM, DAM or RTM; without solar-hour connectivity nothing is sold from 06:00 to 18:00 (`saleMask`). The RfS allows the sale (8.1.f); the PPA offers excess energy to SECI first and SECI buys it at the tariff only if the Buying Entity consents (9.3): the step cites both and the sale assumes SECI does not take it | RfS 8.1.f, 7.2; PPA 9.3 |
+| Sale | The surplus sold outside the buyer's hours, when *Sell the surplus on the exchange* is Yes on Bid inputs (3.3.1), on IEX GDAM, DAM or RTM, **only on the days the supply is met in full** (`saleOnMetDays`): a sale "while the supply commitments under the PPA remains unfulfilled" is a breach, penalised at 1.5 × that day's highest exchange rate on the volume sold; without solar-hour connectivity nothing is sold from 06:00 to 18:00 (`saleMask`). The RfS allows the sale (8.1.f); the PPA offers excess energy to SECI first and SECI buys it at the tariff only if the Buying Entity consents (9.3): the step cites both and the sale assumes SECI does not take it | RfS 8.1.f, 7.2; PPA 9.3 |
 | PSM | ₹0.02/kWh off every bill when taken (`psmRsPerKwh`) | RfS 18.4 |
 | SECI's charges | Success Charges ₹1 lakh per MW of Installed Capacity (the RE in MW and the storage in MWh), the RfS cost and the bid fee, with GST, in the project cost (`otherCapexCr`, worked out on the sized plant) | RfS 18.1, Bid Information Sheet |
 | Sources | Solar, wind and the storage (mandatory); 50 to 600 MW; 25 years from the SCSD | RfS 3.1, 5.1, 20.2 |
@@ -73,6 +73,22 @@ The LP gained four things for this tender, each optional so the other tabs are u
   the year's required energy; with a sale, a row keeps the sale to own RE. Results: `purchaseMu`
   per modelled year, `purchaseMwh` and `purchaseCostCr` per year, `purchase` hour by hour.
 * **A sale mask** (`saleMask`): the export column is closed in the hours marked 0.
+* **Sales only on the days the supply is met** (`saleOnMetDays`, with `ppaFirst`): a day is either
+  met in full, and its surplus is sold at the market price, or it may fall short (within the month's
+  free 10%) and sells nothing. Which days are which is a choice of the design, so it is searched:
+  a row per day and modelled year (the day's delivery plus a slack covers the day's need); (1) every
+  day met if it can be, a MWh of slack priced at 10 × the tariff; (2) the days still short are
+  released (no row, no sale), and so are, a fifth of a year's days at a time, the days whose
+  requirement costs more at the margin (the row's dual on 15% of the day's need) than their sales
+  earn; (3) repeated from the new design while the tariff falls and more than 3% of the days would
+  change. Each round is one interior-point solve and a Dinkelbach step. Sales are then worth the
+  market price, not capped at the tariff (on a day met in full nothing sold could have gone to the
+  PPA): until 20.11.2026 the LP valued a sale at most at the tariff and sold on short days as well,
+  so it built too little for the dear evening hours and counted sales the RfS penalises. From
+  starting prices of 6, 10 and 30 × the tariff the search ends within 0.1% of the same tariff
+  (₹6.387 to ₹6.394 on a 150 MW bid); from a low price (1.2 ×) it starts with too few days met and
+  stays 11% dearer, hence the 10. A sizing takes about two minutes. Results: `saleOnMetDays`,
+  `saleDays` (per modelled year), and `saleDays` / `shortDays` in each year's row.
 * **Monthly rules with a penalty and a free tolerance** (`basis: "monthly"`, `penaltyMultiple`,
   `tolerance`): one column per month and modelled year for the energy short beyond the tolerance,
   in the row `delivered + short ≥ (1 − tolerance) × target × demand`, worth −penaltyMultiple × the
@@ -80,13 +96,36 @@ The LP gained four things for this tender, each optional so the other tabs are u
   and the yearly `monthlyPenaltyMwh`, also added to `blockShortfallMwh` so the finance charges it;
   a rule's outcome carries `tolerance`, `withinTolerance` and `penaltyMultiple`.
 
-On the benchmark inputs (solar ₹4.0 cr/MWac at 25%, wind ₹6.5 cr/MW at 33%, storage ₹1.2 cr/MWh,
-14% equity; the IEX year of 2 Nov 2025 to 18 Nov 2026), a 100 MW bid sizes in about a minute to
-14 MWac solar, 108 MW wind and 70 MW / 279 MWh of storage: wind blows at night when the four hours
-fall; the storage is under 4 MWh per MW because the free 10%, the bought 5% and the wind direct cover
-the rest. HiGHS's tariff ₹8.813/kWh; the financial model's ₹8.550/kWh (the LP takes tax as linear;
-the app prices the design exactly). With the earlier price year (Sep 2025 to Sep 2026) it was 21 MWac,
-89 MW and 74 MW / 297 MWh at ₹8.802: the dearer evenings of the new year earn more on the night sale.
+On the benchmark inputs this tab fills in (solar ₹4.0 cr/MWac at 25%, wind ₹6.5 cr/MW at 33%,
+storage ₹0.80 cr/MWh, debt 75% at 9% for 18 years, 14% equity; the IEX year of 2 Nov 2025 to
+18 Nov 2026), a 100 MW bid sizes in about two minutes to 10 MWac solar, 109 MW wind and
+79 MW / 316 MWh of storage: wind blows at night when the four hours fall; the storage is under
+4 MWh per MW because the free 10%, the bought 5% and the wind direct cover the rest. 260 days of
+year 1 are met in full and sell (96 MU on IEX GDAM); 105 fall short within the free 10% and sell
+nothing. HiGHS's tariff ₹6.954/kWh; the financial model's ₹7.111/kWh (the LP takes tax as linear;
+the app prices the design exactly, and the bid forms quote its figure).
+
+**Against the market** (`marketCase.js`, `MarketCheck.jsx`, on the Financial model step). The
+auctions of the same product discovered ₹8.50 (SECI-FDRE-VI, Jan 2025), ₹6.74 (SJVN FDRE-4, Oct
+2025), ₹6.27–6.28 (SECI-FDRE-VII, Feb 2026) and ₹5.99–6.00 (SECI-FDRE-IX, Aug 2026). The step shows
+the bid's tariff beside them, and a bridge on a 100 MW bid, each step a run of this sizing priced by
+the financial model:
+
+| Step (cumulative) | Tariff | Change |
+| --- | --- | --- |
+| The Tender to Bid benchmarks: battery ₹1.20 cr/MWh, debt 70% at 9% for 15 years, equity IRR 14%, wind 33% at ₹6.5 cr/MW | ₹9.02 | |
+| + battery ₹0.80 cr/MWh (CTUIL's benchmark, October 2026) | ₹7.51 | −1.51 |
+| + debt 75% for 18 years (IREDA's norms): what the tab now fills in | ₹7.11 | −0.40 |
+| + debt at 8.5% | ₹6.89 | −0.22 |
+| + equity IRR 12% (an estimate) | ₹6.35 | −0.55 |
+| + wind 37% CUF at ₹7.0 cr/MW (an estimate) | ₹5.80 | −0.55 |
+
+So the model is at the auctions' level on the inputs the winners appear to use, and above it on
+cautious ones; the battery price alone is ₹1.5. "Use the market case in this bid" puts the last
+row's inputs in the bid (`applyMarketCase`) and opens Size. `fdrexTerms().benchmarks`
+(`FDREX_BENCHMARKS`: battery ₹0.80 cr/MWh, debt 75% for 18 years) is what "Fill up for me please"
+fills in place of Tender to Bid's (`fillBenchmarks(state, terms)` reads `terms.benchmarks`). No
+winner has published its inputs: the last two steps are estimates and the step says so.
 
 ## The financial model
 
@@ -103,8 +142,8 @@ The workbook (`/api/bid/model`, `buildModelWorkbook`) is the Tender to Bid workb
 carries `chargingCostCr`, `pxFeesCr` and `otherCapexCr`, and the tender's names for those rows
 (`terms.workbookLabels`: "Power bought (green market, bilateral)", "PSM discount", "Monthly
 shortfall penalty", "SECI's charges …"); the operating-cost statement shows them when they are not
-nil. Recalculated in LibreOffice, the Live model agrees with the app (₹8.8021, equity IRR 14.00%,
-minimum DSCR 1.129 on the benchmark bid with the earlier price year).
+nil. Recalculated in LibreOffice, the Live model agreed with the app (₹8.8021, equity IRR 14.00%,
+minimum DSCR 1.129 on the benchmark bid of the earlier price year and sale rule).
 
 While HiGHS sizes the plant (from the Size, Design or Finance inputs step, or when the voice agent
 runs the optimizer), the tab shows the Round-the-Clock tab's optimizer theatre (`../rtc/Theatre.jsx`):
@@ -122,7 +161,11 @@ takes the sized plant and dispatches every PPA year in 96 blocks a day, one HiGH
 the sizing's FDRE-X rules: the contract only in the buyer's four hours; power bought (a column per
 block at the bus, the hour's GDAM price plus the charges, escalating) within 5% of the year's
 required energy and never resold; no sale where `saleMask` is 0; each month needs 90% of its
-energy, and the energy short beyond it costs 1.5 × the tariff (a hard plan: the whole month). The
+energy, and the energy short beyond it costs 1.5 × the tariff (a hard plan: the whole month).
+With `saleOnMetDays` each year is solved twice: first with a sale worth at most the tariff, which
+supplies the PPA as far as the plant can and so shows the days it meets in full; then with those
+days held in full and their surplus sold at the block's market price, the other days selling
+nothing (`saleDays`, `shortDays` in each year's summary). The
 panel gives each year's worst month against the free 10%, the energy penalised beyond it, the power
 bought and its share, curtailment and sales; the Excel workbook (Summary: *Bought MU*, *Bought share*,
 *Bought cost*; every year hour by hour with *Bought power*) and the ZIP of 15-minute CSV files carry
@@ -145,17 +188,24 @@ The step embeds the What-if tab seeded from the sized bid (`whatIfFromBid`, whic
 * the surplus is sold up to the connection where `saleMask` allows, at the hourly price of the
   bid's market; once a night's buyer's hours are over it is sold before it charges the battery
   (the day refills it from output that cannot be sold);
-* the power bought (GDAM + charges, escalating), within 5% of the year's energy: first each
+* the power bought (GDAM + charges, escalating), within 5% of the year's energy: first the days a
+  little short that have surplus to sell (buying the rest of the day's supply lets the day sell:
+  while the energy's tariff and the day's sales come to more than the power costs, the days that
+  gain most per MWh first); then each
   month's energy short beyond the free 10%, cheapest hours first, while it costs less than the
   tariff plus the penalty it saves; then any hour still short while it costs less than the tariff;
 * the month's energy short beyond 10% is the penalised energy, at 1.5 × the tariff (none in "meet
-  every month in full", where the check fails instead).
+  every month in full", where the check fails instead);
+* on a day still short after the power bought, nothing is sold (`saleOnMetDays`): what the dispatch
+  counted as sold that day is curtailed instead (`saleDays`, `shortDays`).
 
 The finance is the shared engine with the same rows as the Financial model: the power bought
 (`chargingCostCr`), the PSM discount (`pxFeesCr`), SECI's charges (`costs.otherCapexCr`) and the
-sale at hourly prices (`surplusRevenueCr`). On the benchmark plant (14 MWac solar, 108 MW wind,
-70 MW / 279 MWh) it needs ₹8.83/kWh against the Financial model's ₹8.55 on the same plant: about
-3% dearer, as a rule-based dispatch should be against the optimum. The screen shows the FDRE-X
+sale at hourly prices (`surplusRevenueCr`). On the benchmark plant (10 MWac solar, 109 MW wind,
+79 MW / 316 MWh) it needs ₹7.65/kWh against the Financial model's ₹7.11 on the same plant: about
+8% dearer, as a rule-based dispatch is against the optimum once a day one MWh short sells nothing
+(it meets 292 days against the optimiser's 260 by buying, and pays a penalty on 4.7 MU the
+optimiser avoids). The screen shows the FDRE-X
 plan (the buyer's hours, the shortfall plan, buying and its charges, solar-hour connectivity, the
 PSM), the FDRE-X checks and stats, and the power bought and the PSM discount by year; an RTC case
 is unchanged.

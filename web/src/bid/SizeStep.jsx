@@ -248,6 +248,10 @@ export default function SizeStep({ state, terms, run, startSizing, stopSizing, s
                 <Stat label={lp.market ? `Sold on IEX ${lp.market}` : "Sold in the market"} value={`${nf(mix.export / 1000, 0)} MU`}
                   detail={mix.export > 0 ? `₹${nf(lp.market ? mix.exportRevenueCr : (mix.export * (lp.flatPrice || 0)) / 1e4, 0)} cr · ₹${nf(lp.market ? (mix.exportRevenueCr * 1e4) / mix.export : lp.flatPrice, 2)}/kWh realised` : "nothing sold"} />
                 <Stat label="Curtailed" value={`${nf(mix.curtail / 1000, 0)} MU`} />
+                {lp.perYear?.[0]?.saleDays !== undefined && (
+                  <Stat label="Days met in full, selling" value={`${lp.perYear[0].saleDays} of 365`}
+                    detail={`${lp.perYear[0].shortDays} days fall short (within the free share) and sell nothing: a sale on a short day is a breach`} />
+                )}
               </div>
             )}
             <DispatchWeek hourly={hourly} peak={terms.peak} market={lp.market} peakAny={terms.peakAny} sizes={lp.sizes} rules={terms.rules || []} solarMask={terms.solar?.mask || null} />

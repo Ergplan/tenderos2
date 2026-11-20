@@ -259,6 +259,7 @@ function dispatchFdrexYear(input, prof, f, terms, { hourly = false, buy = null, 
   const H = hourly ? { delivered: new Float32Array(E.HOURS), floor: new Float32Array(E.HOURS), solar: new Float32Array(E.HOURS), wind: new Float32Array(E.HOURS), discharge: new Float32Array(E.HOURS), bought: new Float32Array(E.HOURS), charge: new Float32Array(E.HOURS), excess: new Float32Array(E.HOURS), curtail: new Float32Array(E.HOURS), soc: new Float32Array(E.HOURS), peak: new Uint8Array(E.HOURS) } : null;
   const t = { demand: 0, own: 0, excess: 0, curtail: 0, charge: 0, discharge: 0, solar: 0, wind: 0, injected: 0, saleRev: 0 };
   const short = new Float64Array(E.HOURS); // MWh at the meter still short in a buyer's hour
+  const soldAt = new Float64Array(E.HOURS); // MWh sold at the meter, by hour (undone below on a day left short)
   const md = new Float64Array(12);
   const mv = new Float64Array(12);
   for (let h = 0; h < E.HOURS; h += 1) {
@@ -298,6 +299,7 @@ function dispatchFdrexYear(input, prof, f, terms, { hourly = false, buy = null, 
     t.demand += floor;
     t.own += Math.min(own, floor);
     t.excess += sold;
+    soldAt[h] = sold;
     if (sellPrice) t.saleRev += sold * sellPrice[h] * 1e-4;
     t.curtail += cu;
     t.charge += ch;
@@ -329,6 +331,31 @@ function dispatchFdrexYear(input, prof, f, terms, { hourly = false, buy = null, 
     const take = (h, mwh) => { const q = Math.min(mwh, short[h] - bought[h], left); if (q > 0) { bought[h] += q; left -= q; buyCost += q * price(h) * 1e-4; } return q > 0 ? q : 0; };
     const hoursOf = Array.from({ length: 12 }, () => []);
     for (let h = 0; h < E.HOURS; h += 1) if (short[h] > 0) hoursOf[E.MONTH_OF_HOUR[h]].push(h);
+    // 0. a day a little short, with surplus to sell (before the penalty's energy: it gains more per MWh bought): buying the rest of its supply lets the day sell
+    // (nothing is sold on a day left short). Worth it while the energy's tariff and the day's sales
+    // come to more than the power costs; the days that gain most per MWh bought first.
+    if (terms.saleOnMetDays && sell) {
+      const flat = input.fin.surplusPrice || 0;
+      const days = [];
+      for (let d = 0; d < E.HOURS / 24; d += 1) {
+        let gap = 0;
+        let rev = 0;
+        let cost = 0;
+        const hrs = [];
+        for (let h = d * 24; h < d * 24 + 24; h += 1) {
+          if (short[h] > 0) { gap += short[h]; cost += short[h] * price(h); hrs.push(h); }
+          rev += soldAt[h] * (sellPrice ? sellPrice[h] : flat);
+        }
+        if (gap <= 1e-6 || rev <= 0) continue;
+        const gain = gap * tariff + rev - cost;
+        if (gain > 0) days.push({ gap, hrs, perMwh: gain / gap });
+      }
+      days.sort((a, z) => z.perMwh - a.perMwh);
+      for (const day of days) {
+        if (day.gap > left) continue;
+        for (const h of day.hrs) take(h, short[h]);
+      }
+    }
     // 1. each month's energy beyond the tolerance: it saves the penalty too (in full in "meet every month in full")
     const worth = hardRule ? Infinity : tariff * (1 + (rule.penaltyMultiple || 0));
     for (let m = 0; m < 12 && left > 0; m += 1) {
@@ -351,6 +378,27 @@ function dispatchFdrexYear(input, prof, f, terms, { hourly = false, buy = null, 
     boughtMWh += bought[h];
     mv[E.MONTH_OF_HOUR[h]] += bought[h];
     if (H) { H.bought[h] = bought[h]; H.delivered[h] += bought[h]; }
+  }
+  // a sale while the day's supply is short is a breach (RfS 8.1.f, 1.5 x the day's highest exchange
+  // rate on the volume): on a day still short after the power bought, nothing is sold; what was
+  // counted as sold is curtailed instead
+  let shortDays = 0;
+  if (terms.saleOnMetDays) {
+    for (let d = 0; d < E.HOURS / 24; d += 1) {
+      let gap = 0;
+      for (let h = d * 24; h < d * 24 + 24; h += 1) gap += short[h] - bought[h];
+      if (gap <= 1e-6) continue;
+      shortDays += 1;
+      for (let h = d * 24; h < d * 24 + 24; h += 1) {
+        const sold = soldAt[h];
+        if (!sold) continue;
+        t.excess -= sold;
+        if (sellPrice) t.saleRev -= sold * sellPrice[h] * 1e-4;
+        t.curtail += sold / poi;
+        t.injected -= sold / poi;
+        if (H) { H.excess[h] = 0; H.curtail[h] += sold / poi; }
+      }
+    }
   }
   const months = Array.from({ length: 12 }, (_, m) => {
     const share = md[m] > 0 ? mv[m] / md[m] : 1;
@@ -381,6 +429,7 @@ function dispatchFdrexYear(input, prof, f, terms, { hourly = false, buy = null, 
     // (in "meet every month in full" there is no penalty: the energy short only loses its revenue)
     blockShortfallMWh: hardRule ? 0 : penaltyMWh,
     shortMWh: t.demand - delivered,
+    ...(terms.saleOnMetDays ? { shortDays, saleDays: E.HOURS / 24 - shortDays } : {}),
     months,
     rules: { peak: { hours: countSupply(supply), met: countSupply(supply) - countShort(short, bought), shortMWh: t.demand - delivered, share: 1 - countShort(short, bought) / Math.max(1, countSupply(supply)) } },
     hourly: H,

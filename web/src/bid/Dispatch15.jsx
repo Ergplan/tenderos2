@@ -122,6 +122,7 @@ export default function Dispatch15({ lp, start }) {
                 ? `In 15-minute blocks the month's peak energy falls short beyond the free ${pf(rules[0].tolerance, 0)} in ${penalisedYears.length} of ${years.length} years: ${nf(penalisedYears.reduce((a, y) => a + y.penalisedMu, 0), 2)} MU in all, paid at ${rules[0].penaltyMultiple} × the tariff, as the sizing chose.`
                 : `Every month of all ${years.length} years is within the free ${pf(rules[0].tolerance, 0)} in 15-minute blocks: no penalty.`)
                 + (buying ? ` Power bought: ${nf(years[0].boughtMu, 2)} MU in year 1 (${pf(years[0].boughtShare, 2)} of the contracted energy, ₹${nf(years[0].boughtCostCr, 2)} crore); at most ${pf(Math.max(...years.map((y) => y.boughtShare || 0)), 2)} in a year.` : "")
+                + (years[0].saleDays !== undefined ? ` Surplus sold on the ${years[0].saleDays} days of year 1 met in full; nothing on the ${years[0].shortDays} short days (a sale then is a breach).` : "")
               : failedYears.length && priced
               ? `In 15-minute blocks the plant is short of the time-block floors in ${failedYears.length} of ${years.length} years: ${nf(failedYears.reduce((a, y) => a + y.shortfallMu, 0), 1)} MU in all, paid at ${rules[0].penaltyMultiple} × the tariff, as the sizing chose.${sizingShort(lp, years[0])}`
               : failedYears.length

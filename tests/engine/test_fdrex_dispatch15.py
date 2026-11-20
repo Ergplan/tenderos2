@@ -126,3 +126,42 @@ def test_fifteen_minute_prices_must_cover_the_year():
     payload["ctx"]["surplusPrice15"] = [3.0] * 8760
     with pytest.raises(D.DispatchError, match="35040"):
         D._inputs(payload)
+
+
+def test_nothing_is_sold_on_a_day_left_short_and_the_met_days_sell():
+    # a plant that carries the four hours on some days, not all
+    sizes = {"solarMw": 130.0, "windMw": 60.0, "bessMw": 80.0, "bessMwh": 300.0}
+    inp = D._inputs(_payload(penalty=1.5, tolerance=0.1, buy_share=0.05, saleOnMetDays=True))
+    res = D.dispatch_year(inp, sizes, TARIFF, 1)
+    s, summ = res["series"], res["summary"]
+    day = np.arange(D.BLOCKS) // (24 * D.BLOCKS_PER_HOUR)
+    need = np.bincount(day, weights=np.asarray(s["demand"]), minlength=365)
+    got = np.bincount(day, weights=np.minimum(np.asarray(s["delivered"]), np.asarray(s["demand"])), minlength=365)
+    sold = np.bincount(day, weights=np.asarray(s["sold"]), minlength=365)
+    short = got < need * (1 - 1e-4)  # the series are rounded to two decimals
+    assert short.any() and (~short).any(), "this plant meets some days and not others"
+    assert sold[short].max() == pytest.approx(0, abs=0.01), "no sale on a day the supply is short"
+    assert sold[~short].sum() > 0, "the days met in full sell their surplus"
+    assert summ["saleDays"] + summ["shortDays"] == 365 and summ["saleDays"] == int((~short).sum())
+    plain = D.dispatch_year(D._inputs(_payload(penalty=1.5, tolerance=0.1, buy_share=0.05)), sizes, TARIFF, 1)
+    assert "saleDays" not in plain["summary"], "the rule is off unless asked"
+    assert plain["summary"]["soldMu"] >= summ["soldMu"] - 1e-6, "without the rule the short days sell too"
+
+
+def test_the_sizings_days_are_where_the_dispatch_starts():
+    sizes = {"solarMw": 130.0, "windMw": 60.0, "bessMw": 80.0, "bessMwh": 300.0}
+    base = _payload(penalty=1.5, tolerance=0.1, buy_share=0.05, saleOnMetDays=True)
+    free = D.dispatch_year(D._inputs(base), sizes, TARIFF, 1)["summary"]
+    # told that every day is met in full (more than this plant can): the days still short are released
+    told = D.dispatch_year(D._inputs({**base, "saleDayMask": {"years": [1], "masks": ["1" * 365]}}), sizes, TARIFF, 1)
+    s, summ = told["series"], told["summary"]
+    day = np.arange(D.BLOCKS) // (24 * D.BLOCKS_PER_HOUR)
+    need = np.bincount(day, weights=np.asarray(s["demand"]), minlength=365)
+    got = np.bincount(day, weights=np.minimum(np.asarray(s["delivered"]), np.asarray(s["demand"])), minlength=365)
+    sold = np.bincount(day, weights=np.asarray(s["sold"]), minlength=365)
+    short = got < need * (1 - 1e-4)
+    assert 0 < summ["saleDays"] < 365 and short.any()
+    assert sold[short].max() == pytest.approx(0, abs=0.01), "no sale on a day the supply is short"
+    assert abs(summ["saleDays"] - free["saleDays"]) <= 0.15 * 365, "about the days the dispatch finds on its own"
+    assert D._day_masks({"years": [1], "masks": ["101"]}) == {}, "a mask that is not 365 days is ignored"
+    assert list(D._day_masks({"years": [1, 25], "masks": ["1" * 365, "0" * 365]})) == [1, 25]
