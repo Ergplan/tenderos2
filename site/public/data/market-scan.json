@@ -1,6 +1,6 @@
 {
  "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
- "scannedAt": "2026-11-20T01:49:59",
+ "scannedAt": "2026-11-21T01:49:45",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -39,33 +39,7 @@
    "firstSeen": "2026-09-02",
    "status": "open",
    "lastAmendment": "2026-10-19",
-   "daysToBid": -14
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000296",
-   "ref": "SECI/C&P/IPP/15/0013/26-27",
-   "title": "Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat",
-   "url": "https://www.seci.co.in/tender-details/Ymtx",
-   "published": "2026-10-28",
-   "bidDeadline": "2026-11-19",
-   "bidOpen": "2026-11-24",
-   "category": "bess",
-   "categoryLabel": "Battery storage (standalone BESS)",
-   "capacity": {
-    "mw": 4000,
-    "mwh": 16000
-   },
-   "scheme": null,
-   "ipp": true,
-   "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 19 Nov 2026, 18:00, already closed. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 24 Nov 2026, 10:00.",
-   "documents": 3,
-   "amendments": [],
-   "fingerprint": "fff0e4550b474506",
-   "firstSeen": "2026-10-28",
-   "status": "open",
-   "lastAmendment": null,
-   "daysToBid": -1
+   "daysToBid": -15
   },
   {
    "source": "SECI",
@@ -95,7 +69,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -120,7 +94,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -145,7 +119,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -180,7 +154,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -218,7 +192,7 @@
    "firstSeen": "2026-07-16",
    "status": "amended",
    "lastAmendment": "2026-11-18",
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -250,7 +224,33 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 5
+   "daysToBid": 4
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000296",
+   "ref": "SECI/C&P/IPP/15/0013/26-27",
+   "title": "Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat",
+   "url": "https://www.seci.co.in/tender-details/Ymtx",
+   "published": "2026-10-28",
+   "bidDeadline": "2026-11-27",
+   "bidOpen": "2026-12-02",
+   "category": "bess",
+   "categoryLabel": "Battery storage (standalone BESS)",
+   "capacity": {
+    "mw": 4000,
+    "mwh": 16000
+   },
+   "scheme": null,
+   "ipp": true,
+   "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 27 Nov 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 2 Dec 2026, 10:00.",
+   "documents": 3,
+   "amendments": [],
+   "fingerprint": "bddc31188a76831f",
+   "firstSeen": "2026-10-28",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -298,7 +298,7 @@
    "firstSeen": "2026-04-19",
    "status": "open",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 10
+   "daysToBid": 9
   },
   {
    "source": "SECI",
@@ -332,7 +332,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 10
+   "daysToBid": 9
   },
   {
    "source": "SECI",
@@ -355,7 +355,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 10
+   "daysToBid": 9
   },
   {
    "source": "SECI",
@@ -378,7 +378,7 @@
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 10
+   "daysToBid": 9
   },
   {
    "source": "SECI",
@@ -410,7 +410,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 11
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -435,7 +435,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 11
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -460,7 +460,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 13
+   "daysToBid": 12
   },
   {
    "source": "SECI",
@@ -483,7 +483,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 24
+   "daysToBid": 23
   },
   {
    "source": "NHPC",
@@ -508,7 +508,30 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 25
+   "daysToBid": 24
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000299",
+   "ref": "SECI/C&P/MI/00/07/2026-27",
+   "title": "Request for Selection of Collaboration Partner for Trading of Renewable Power available with SECI",
+   "url": "https://www.seci.co.in/tender-details/Ymt-",
+   "published": "2026-11-20",
+   "bidDeadline": "2026-12-18",
+   "bidOpen": "2026-12-23",
+   "category": "other",
+   "categoryLabel": "Other",
+   "capacity": {},
+   "scheme": null,
+   "ipp": true,
+   "summary": "Other; for developers: a power-supply or tariff bid. Bids are due 18 Dec 2026, 18:00. Pre-bid meeting 27 Nov 2026, 14:30. Bids open 23 Dec 2026, 10:00.",
+   "documents": 3,
+   "amendments": [],
+   "fingerprint": "7644a6be75b9a5a9",
+   "firstSeen": "2026-11-21",
+   "status": "new",
+   "lastAmendment": null,
+   "daysToBid": 27
   }
  ],
  "results": [
@@ -1047,6 +1070,24 @@
  ],
  "events": [
   {
+   "date": "2026-11-21",
+   "source": "SECI",
+   "id": "SECI000299",
+   "tender": "Request for Selection of Collaboration Partner for Trading of Renewabl…",
+   "kind": "new tender",
+   "detail": "Other; for developers: a power-supply or tariff bid.",
+   "url": "https://www.seci.co.in/tender-details/Ymt-"
+  },
+  {
+   "date": "2026-11-21",
+   "source": "SECI",
+   "id": "SECI000296",
+   "tender": "Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Sto…",
+   "kind": "deadline moved",
+   "detail": "2026-11-19 → 2026-11-27",
+   "url": "https://www.seci.co.in/tender-details/Ymtx"
+  },
+  {
    "date": "2026-11-20",
    "source": "SECI",
    "id": "SECI000249",
@@ -1129,10 +1170,10 @@
   }
  ],
  "counts": {
-  "tenders": 17,
-  "ipp": 12,
-  "seci": 16,
+  "tenders": 18,
+  "ipp": 13,
+  "seci": 17,
   "nhpc": 1,
-  "newToday": 1
+  "newToday": 2
  }
 }
