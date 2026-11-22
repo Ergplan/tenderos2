@@ -1,12 +1,14 @@
 {
- "scannedAt": "2026-11-21T01:49:45",
+ "scannedAt": "2026-11-22T01:54:15",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
   "https://www.nhpcindia.com/welcome/tender"
  ],
  "documentsOpened": 0,
- "errors": [],
+ "errors": [
+  "SECI: https://www.seci.co.in/tenders: curl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received"
+ ],
  "tenders": [
   {
    "source": "SECI",
@@ -507,7 +509,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 24
+   "daysToBid": 23
   },
   {
    "source": "SECI",
@@ -1173,6 +1175,6 @@
   "ipp": 13,
   "seci": 17,
   "nhpc": 1,
-  "newToday": 2
+  "newToday": 0
  }
 }
