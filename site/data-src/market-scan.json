@@ -1,47 +1,13 @@
 {
- "scannedAt": "2026-11-22T01:54:15",
+ "scannedAt": "2026-11-23T01:49:55",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
   "https://www.nhpcindia.com/welcome/tender"
  ],
  "documentsOpened": 0,
- "errors": [
-  "SECI: https://www.seci.co.in/tenders: curl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received\ncurl: (28) Operation timed out after 60002 milliseconds with 0 bytes received"
- ],
+ "errors": [],
  "tenders": [
-  {
-   "source": "SECI",
-   "id": "SECI000277",
-   "ref": "RfP No. SECI/C&P/MI/00/0002/26-27",
-   "title": "Selection of Tenant(s) for Renting out the Office space(s) of SECI, along with built-up facilities (Licensed Assets), at the NBCC Complex, East Kidwai Nagar, New Delhi",
-   "url": "https://www.seci.co.in/tender-details/YmVw",
-   "published": "2026-09-02",
-   "bidDeadline": "2026-11-06",
-   "bidOpen": "2026-11-06",
-   "category": "admin",
-   "categoryLabel": "Office, administration and other",
-   "capacity": {},
-   "scheme": null,
-   "ipp": false,
-   "summary": "Office, administration and other; for consultants and service providers. Bids are due 6 Nov 2026, 16:00, already closed. Pre-bid meeting 14 Sep 2026, 14:06. Bids open 6 Nov 2026, 16:30.",
-   "documents": 6,
-   "amendments": [
-    {
-     "name": "amendment-02",
-     "date": "2026-10-19"
-    },
-    {
-     "name": "Amendment-1 29092026R",
-     "date": "2026-09-29"
-    }
-   ],
-   "fingerprint": "6b4dca4b7e26bf85",
-   "firstSeen": "2026-09-02",
-   "status": "open",
-   "lastAmendment": "2026-10-19",
-   "daysToBid": -15
-  },
   {
    "source": "SECI",
    "id": "SECI000288",
@@ -70,7 +36,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 3
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -95,7 +61,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 3
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -120,7 +86,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 3
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -155,7 +121,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 4
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -193,7 +159,7 @@
    "firstSeen": "2026-07-16",
    "status": "amended",
    "lastAmendment": "2026-11-18",
-   "daysToBid": 4
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -225,7 +191,7 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 4
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -247,11 +213,11 @@
    "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 27 Nov 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 2 Dec 2026, 10:00.",
    "documents": 3,
    "amendments": [],
-   "fingerprint": "bddc31188a76831f",
+   "fingerprint": "563344115ea71bc0",
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 6
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -299,7 +265,7 @@
    "firstSeen": "2026-04-19",
    "status": "open",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 9
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -333,7 +299,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 9
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -356,7 +322,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 9
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -379,7 +345,7 @@
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 9
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -411,7 +377,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 10
+   "daysToBid": 8
   },
   {
    "source": "SECI",
@@ -436,7 +402,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 10
+   "daysToBid": 8
   },
   {
    "source": "SECI",
@@ -461,7 +427,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 12
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -484,7 +450,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 23
+   "daysToBid": 21
   },
   {
    "source": "NHPC",
@@ -509,7 +475,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 23
+   "daysToBid": 22
   },
   {
    "source": "SECI",
@@ -532,7 +498,7 @@
    "firstSeen": "2026-11-21",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 27
+   "daysToBid": 25
   }
  ],
  "results": [
@@ -1071,6 +1037,15 @@
  ],
  "events": [
   {
+   "date": "2026-11-23",
+   "source": "SECI",
+   "id": "SECI000277",
+   "tender": "Selection of Tenant(s) for Renting out the Office space(s) of SECI, al…",
+   "kind": "closed",
+   "detail": "no longer on the list of open tenders",
+   "url": "https://www.seci.co.in/tender-details/YmVw"
+  },
+  {
    "date": "2026-11-21",
    "source": "SECI",
    "id": "SECI000299",
@@ -1171,10 +1146,10 @@
   }
  ],
  "counts": {
-  "tenders": 18,
+  "tenders": 17,
   "ipp": 13,
-  "seci": 17,
+  "seci": 16,
   "nhpc": 1,
-  "newToday": 0
+  "newToday": 1
  }
 }

@@ -20,5 +20,5 @@ Key facts:
 ## Data
 - [SECI auction results, CSV](https://tenderos.joulewise.tech/data/seci-results.csv): one row per bidder in eight SECI e-reverse auctions (May 2025 – Aug 2026), awarded or not, with bid MW, awarded MW and final tariff, and the SECI notice
 - [SECI auction results, JSON](https://tenderos.joulewise.tech/data/seci-results.json)
-- [Open tenders at SECI and NHPC and what changed, JSON](https://tenderos.joulewise.tech/data/market-scan.json): scanned daily, last on 22 Nov 2026
+- [Open tenders at SECI and NHPC and what changed, JSON](https://tenderos.joulewise.tech/data/market-scan.json): scanned daily, last on 23 Nov 2026
 - [CfD-I demo numbers, JSON](https://tenderos.joulewise.tech/data/cfd-demo.json): the amendments with diffs, the design surface, a day's dispatch, the levers and tracks, the Pool, the bid review
