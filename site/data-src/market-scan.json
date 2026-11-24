@@ -1,5 +1,5 @@
 {
- "scannedAt": "2026-11-23T01:49:55",
+ "scannedAt": "2026-11-24T01:50:00",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -36,7 +36,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 1
+   "daysToBid": 0
   },
   {
    "source": "SECI",
@@ -61,7 +61,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 1
+   "daysToBid": 0
   },
   {
    "source": "SECI",
@@ -86,7 +86,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 1
+   "daysToBid": 0
   },
   {
    "source": "SECI",
@@ -121,7 +121,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 2
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -159,7 +159,7 @@
    "firstSeen": "2026-07-16",
    "status": "amended",
    "lastAmendment": "2026-11-18",
-   "daysToBid": 2
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -191,7 +191,7 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 2
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -217,7 +217,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -265,7 +265,7 @@
    "firstSeen": "2026-04-19",
    "status": "open",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -299,7 +299,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -322,7 +322,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -341,11 +341,11 @@
    "summary": "Battery storage (standalone BESS); for EPC contractors: build the plant for SECI. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 25 Nov 2026, 14:30. Bids open 1 Dec 2026, 10:00.",
    "documents": 1,
    "amendments": [],
-   "fingerprint": "e06e40ea9d9ba539",
+   "fingerprint": "3f1f3d11c39cb766",
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -377,7 +377,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -402,7 +402,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -427,7 +427,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 10
+   "daysToBid": 9
   },
   {
    "source": "SECI",
@@ -450,7 +450,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 21
+   "daysToBid": 20
   },
   {
    "source": "NHPC",
@@ -475,7 +475,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 22
+   "daysToBid": 21
   },
   {
    "source": "SECI",
@@ -498,7 +498,7 @@
    "firstSeen": "2026-11-21",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 25
+   "daysToBid": 24
   }
  ],
  "results": [
@@ -1150,6 +1150,6 @@
   "ipp": 13,
   "seci": 16,
   "nhpc": 1,
-  "newToday": 1
+  "newToday": 0
  }
 }
