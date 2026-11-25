@@ -180,5 +180,8 @@ Organization, Dataset, FAQPage); `robots.txt` and `sitemap.xml` are written by t
 To prove ownership to Google Search Console with its "HTML tag" method, put the code in
 `data-src/seo.json` as `{ "googleSiteVerification": "<code>" }` and rebuild: the build adds the
 `google-site-verification` meta tag. (A Domain property verified by a DNS TXT record on
-joulewise.tech needs nothing here and covers this subdomain.) Then submit
+joulewise.tech needs nothing here and covers this subdomain.) The DNS method for this subdomain
+alone is a TXT record on the host `tenderos`; that host then needs its own address record too (an
+ALIAS to the wildcard's target), because a record on the name stops the `*` wildcard covering it.
+Both are in the domain's DNS on Vercel since 25.11.2026. Then submit
 `https://tenderos.joulewise.tech/sitemap.xml` there and ask for the home page to be indexed.
