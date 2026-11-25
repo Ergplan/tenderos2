@@ -1,5 +1,5 @@
 {
- "scannedAt": "2026-11-24T01:50:00",
+ "scannedAt": "2026-11-25T01:49:24",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -24,7 +24,7 @@
    },
    "scheme": "SECI-Tranche-XXI",
    "ipp": true,
-   "summary": "Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 27 Nov 2026, 10:00.",
+   "summary": "Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00, already closed. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 27 Nov 2026, 10:00.",
    "documents": 6,
    "amendments": [
     {
@@ -36,7 +36,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 0
+   "daysToBid": -1
   },
   {
    "source": "SECI",
@@ -54,14 +54,14 @@
    },
    "scheme": "RTSPV T-XIII",
    "ipp": true,
-   "summary": "Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 30 Sep 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
+   "summary": "Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00, already closed. Pre-bid meeting 30 Sep 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
    "documents": 5,
    "amendments": [],
    "fingerprint": "875841506f88d4fe",
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 0
+   "daysToBid": -1
   },
   {
    "source": "SECI",
@@ -79,14 +79,14 @@
    },
    "scheme": "RTSPV-Tranche-XIV",
    "ipp": true,
-   "summary": "Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00. Pre-bid meeting 7 Oct 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
+   "summary": "Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00, already closed. Pre-bid meeting 7 Oct 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
    "documents": 4,
    "amendments": [],
    "fingerprint": "a86db47d6e2b3699",
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 0
+   "daysToBid": -1
   },
   {
    "source": "SECI",
@@ -121,7 +121,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 1
+   "daysToBid": 0
   },
   {
    "source": "SECI",
@@ -159,7 +159,7 @@
    "firstSeen": "2026-07-16",
    "status": "amended",
    "lastAmendment": "2026-11-18",
-   "daysToBid": 1
+   "daysToBid": 0
   },
   {
    "source": "SECI",
@@ -191,7 +191,7 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 1
+   "daysToBid": 0
   },
   {
    "source": "SECI",
@@ -217,7 +217,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 3
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -265,7 +265,7 @@
    "firstSeen": "2026-04-19",
    "status": "open",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -299,7 +299,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -322,7 +322,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -345,7 +345,7 @@
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -377,7 +377,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -402,7 +402,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -427,7 +427,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 9
+   "daysToBid": 8
   },
   {
    "source": "SECI",
@@ -450,7 +450,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 20
+   "daysToBid": 19
   },
   {
    "source": "NHPC",
@@ -475,7 +475,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 21
+   "daysToBid": 20
   },
   {
    "source": "SECI",
@@ -498,7 +498,7 @@
    "firstSeen": "2026-11-21",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 24
+   "daysToBid": 23
   }
  ],
  "results": [
