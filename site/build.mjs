@@ -335,7 +335,11 @@ const jsonLd = [
     publisher: { "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech" }, featureList: MODULES.map((m) => m[1]),
     offers: { "@type": "Offer", availability: "https://schema.org/InStock", url: `${SITE}/#demo`, description: "Licence with installation and annual maintenance (AMC); priced per engagement" } },
   { "@context": "https://schema.org", "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech", email: CONTACT_EMAIL, telephone: TEL, contactPoint: { "@type": "ContactPoint", telephone: TEL, contactType: "sales", areaServed: "IN" }, sameAs: ["https://www.linkedin.com/company/joulewiseadvisoryservices/"] },
-  { "@context": "https://schema.org", "@type": "Dataset", name: dataset.name, description: dataset.description, url: `${SITE}/#results`, creator: { "@type": "Organization", name: "jouleWise" }, isBasedOn: SECI_SITE, dateModified: BUILT, temporalCoverage: "2025-05/2026-08", spatialCoverage: "India",
+  { "@context": "https://schema.org", "@type": "Dataset", name: dataset.name, description: dataset.description, url: `${SITE}/#results`, identifier: `${SITE}/data/seci-results.json`,
+    // the fields Google's dataset check recommends (no licence is named: the rows are facts from SECI's public notices)
+    creator: { "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech" }, publisher: { "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech" },
+    keywords: ["SECI auction results", "renewable energy tariffs India", "FDRE", "round-the-clock renewable power", "solar with battery storage", "wind power auction", "e-reverse auction"],
+    isAccessibleForFree: true, inLanguage: "en", isBasedOn: SECI_SITE, dateModified: BUILT, temporalCoverage: "2025-05/2026-08", spatialCoverage: "India",
     distribution: [{ "@type": "DataDownload", encodingFormat: "text/csv", contentUrl: `${SITE}/data/seci-results.csv` }, { "@type": "DataDownload", encodingFormat: "application/json", contentUrl: `${SITE}/data/seci-results.json` }],
     variableMeasured: ["Tendered capacity (MW)", "Awarded capacity (MW)", "Discovered tariff (INR/kWh)", "Bidder"] },
   { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: FAQ.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })) },
