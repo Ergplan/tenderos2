@@ -169,3 +169,16 @@ respells a name for the voice only: SECI is said "seki"). `node site/voice.mjs` 
 the same OpenAI voice; the Hindi clips are `public/audio/<screen>-hi-<hash>.mp3`. The demo's
 language button (`#sim-lang`) switches the voice and the captions, and the choice is kept in the
 browser (`tos-lang`).
+
+## Search engines
+
+What a search result shows is set in `build.mjs`, apart from the page's own headline: `SEO_TITLE`
+(the product's category first, then the name) and `SEO_DESC` (about 160 characters). The page also
+carries a canonical link, `robots` meta, and structured data (WebSite, SoftwareApplication,
+Organization, Dataset, FAQPage); `robots.txt` and `sitemap.xml` are written by the build.
+
+To prove ownership to Google Search Console with its "HTML tag" method, put the code in
+`data-src/seo.json` as `{ "googleSiteVerification": "<code>" }` and rebuild: the build adds the
+`google-site-verification` meta tag. (A Domain property verified by a DNS TXT record on
+joulewise.tech needs nothing here and covers this subdomain.) Then submit
+`https://tenderos.joulewise.tech/sitemap.xml` there and ask for the home page to be indexed.

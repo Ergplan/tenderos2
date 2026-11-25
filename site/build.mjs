@@ -320,7 +320,17 @@ const CHAT = {
 };
 
 const desc = `TenderOS by jouleWise turns months of bid work into hours: it reads an Indian renewable energy tender and its amendments with page-level evidence, sizes solar, wind and battery with a HiGHS optimiser, prices the bid and builds the Excel model and bid pack, on your premises.`;
+// What a search result shows: the product's category first (what a buyer types), then the name;
+// the description under it within about 160 characters. The page's own headline is unchanged.
+const SEO_TITLE = "Renewable Energy Tender & Bid Optimisation Software | TenderOS";
+const SEO_DESC = "TenderOS by jouleWise analyses SECI tenders, tracks amendments, optimises solar, wind and BESS capacity, and builds financial models and compliant bid packs.";
+// Google Search Console's ownership code (its "HTML tag" method), when there is one: data-src/seo.json
+const SEO_FILE = join(HERE, "data-src/seo.json");
+const GOOGLE_VERIFICATION = existsSync(SEO_FILE) ? String(JSON.parse(readFileSync(SEO_FILE, "utf8")).googleSiteVerification || "").trim() : "";
 const jsonLd = [
+  // the site's name as a search result shows it
+  { "@context": "https://schema.org", "@type": "WebSite", name: "TenderOS", alternateName: ["TenderOS by jouleWise", "jouleWise TenderOS"], url: `${SITE}/`,
+    description: SEO_DESC, inLanguage: "en-IN", publisher: { "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech" } },
   { "@context": "https://schema.org", "@type": "SoftwareApplication", name: "TenderOS", applicationCategory: "BusinessApplication", operatingSystem: "Web, Docker (any cloud or on-premises)", url: SITE, image: `${SITE}/og.jpg`, description: desc,
     publisher: { "@type": "Organization", name: "jouleWise", url: "https://www.joulewise.tech" }, featureList: MODULES.map((m) => m[1]),
     offers: { "@type": "Offer", availability: "https://schema.org/InStock", url: `${SITE}/#demo`, description: "Licence with installation and annual maintenance (AMC); priced per engagement" } },
@@ -556,8 +566,8 @@ const page = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TenderOS: the platform every IPP was waiting for. Months of bid work, done in hours | jouleWise</title>
-<meta name="description" content="${esc(desc)}">
+<title>${esc(SEO_TITLE)}</title>
+<meta name="description" content="${esc(SEO_DESC)}">${GOOGLE_VERIFICATION ? `\n<meta name="google-site-verification" content="${esc(GOOGLE_VERIFICATION)}">` : ""}
 <link rel="canonical" href="${SITE}/">
 <meta name="robots" content="index, follow, max-image-preview:large">
 <meta name="theme-color" content="#141517" media="(prefers-color-scheme: dark)">
