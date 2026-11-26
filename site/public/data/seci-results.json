@@ -4,7 +4,7 @@
  "publisher": "jouleWise (TenderOS)",
  "source": "https://www.seci.co.in/tenders/results",
  "note": "Discovered tariffs, as SECI's result notices give them. SECI sells on to the buying utilities at the tariff plus its trading margin.",
- "updated": "2026-11-25",
+ "updated": "2026-11-26",
  "license": "Facts from SECI's public result notices; cite SECI and link the notice.",
  "auctions": [
   {

@@ -1,6 +1,6 @@
 {
  "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
- "scannedAt": "2026-11-25T01:49:24",
+ "scannedAt": "2026-11-26T01:48:50",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -9,36 +9,6 @@
  "documentsOpened": 0,
  "errors": [],
  "tenders": [
-  {
-   "source": "SECI",
-   "id": "SECI000288",
-   "ref": "SECI/C&P/IPP/12/0011/26-27",
-   "title": "RfS for 1200 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XXI)",
-   "url": "https://www.seci.co.in/tender-details/Ymp_",
-   "published": "2026-10-07",
-   "bidDeadline": "2026-11-24",
-   "bidOpen": "2026-11-27",
-   "category": "wind",
-   "categoryLabel": "Wind power",
-   "capacity": {
-    "mw": 1200
-   },
-   "scheme": "SECI-Tranche-XXI",
-   "ipp": true,
-   "summary": "Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00, already closed. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 27 Nov 2026, 10:00.",
-   "documents": 6,
-   "amendments": [
-    {
-     "name": "Amendment-01 Wind-Tranche-XXI",
-     "date": "2026-10-28"
-    }
-   ],
-   "fingerprint": "f956cf86dceb06ce",
-   "firstSeen": "2026-10-07",
-   "status": "open",
-   "lastAmendment": "2026-10-28",
-   "daysToBid": -1
-  },
   {
    "source": "SECI",
    "id": "SECI000281",
@@ -62,7 +32,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": -1
+   "daysToBid": -2
   },
   {
    "source": "SECI",
@@ -87,7 +57,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": -1
+   "daysToBid": -2
   },
   {
    "source": "SECI",
@@ -106,7 +76,7 @@
    },
    "scheme": "SECI-ESS-IV",
    "ipp": true,
-   "summary": "Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 9 Oct 2026, 16:00. Bids open 30 Nov 2026, 10:00.",
+   "summary": "Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00, already closed. Pre-bid meeting 9 Oct 2026, 16:00. Bids open 30 Nov 2026, 10:00.",
    "documents": 7,
    "amendments": [
     {
@@ -122,77 +92,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": "2026-11-03",
-   "daysToBid": 0
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000263",
-   "ref": "SECI/C&P/OP/11/0003/26-27",
-   "title": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wind)",
-   "url": "https://www.seci.co.in/tender-details/YmR0",
-   "published": "2026-07-16",
-   "bidDeadline": "2026-11-25",
-   "bidOpen": "2026-11-26",
-   "category": "wind",
-   "categoryLabel": "Wind power",
-   "capacity": {
-    "mw": 45.6
-   },
-   "scheme": null,
-   "ipp": false,
-   "summary": "Wind power, 45.6 MW; for EPC contractors: build the plant for SECI. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 3 Aug 2026, 15:30. Bids open 26 Nov 2026, 10:30.",
-   "documents": 10,
-   "amendments": [
-    {
-     "name": "amended 3 Wind 18112026R",
-     "date": "2026-11-18"
-    },
-    {
-     "name": "amendment-2 28092026",
-     "date": "2026-09-28"
-    },
-    {
-     "name": "Amendment-1 Clarification-1 dwgFile KML File SA-A SA-B SA-C",
-     "date": "2026-09-10"
-    }
-   ],
-   "fingerprint": "d28ffda45ded1ab0",
-   "firstSeen": "2026-07-16",
-   "status": "amended",
-   "lastAmendment": "2026-11-18",
-   "daysToBid": 0
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000282",
-   "ref": "SECI/C&P/MI/00/06/2026-27",
-   "title": "RfS for Green Ammonia (Mode-2A-Tranche-II)",
-   "url": "https://www.seci.co.in/tender-details/Ymp1",
-   "published": "2026-09-24",
-   "bidDeadline": "2026-11-25",
-   "bidOpen": "2026-11-30",
-   "category": "hydrogen",
-   "categoryLabel": "Green hydrogen and ammonia",
-   "capacity": {},
-   "scheme": "Mode-2A-Tranche-II",
-   "ipp": true,
-   "summary": "Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 30 Nov 2026, 10:00.",
-   "documents": 7,
-   "amendments": [
-    {
-     "name": "Amendment-01",
-     "date": "2026-10-28"
-    },
-    {
-     "name": "Clarification-01",
-     "date": "2026-10-28"
-    }
-   ],
-   "fingerprint": "6083100f21363264",
-   "firstSeen": "2026-09-24",
-   "status": "open",
-   "lastAmendment": "2026-10-28",
-   "daysToBid": 0
+   "daysToBid": -1
   },
   {
    "source": "SECI",
@@ -218,7 +118,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 2
+   "daysToBid": 1
   },
   {
    "source": "SECI",
@@ -266,7 +166,7 @@
    "firstSeen": "2026-04-19",
    "status": "open",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -300,7 +200,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -323,7 +223,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -346,39 +246,45 @@
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 5
+   "daysToBid": 4
   },
   {
    "source": "SECI",
-   "id": "SECI000289",
-   "ref": "SECI/C&P/IPP/13/0012/26-27",
-   "title": "RfS for Assured Peak Supply of 4800 MWh (1200 MW x 4 Hrs.) from ISTS-Connected RE Projects in India (SECI-FDRE-X)",
-   "url": "https://www.seci.co.in/tender-details/Ymp-",
-   "published": "2026-10-07",
+   "id": "SECI000263",
+   "ref": "SECI/C&P/OP/11/0003/26-27",
+   "title": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wind)",
+   "url": "https://www.seci.co.in/tender-details/YmR0",
+   "published": "2026-07-16",
    "bidDeadline": "2026-12-01",
-   "bidOpen": "2026-12-04",
-   "category": "peak",
-   "categoryLabel": "Assured peak supply (FDRE)",
+   "bidOpen": "2026-12-02",
+   "category": "wind",
+   "categoryLabel": "Wind power",
    "capacity": {
-    "mw": 1200,
-    "mwh": 4800,
-    "hours": 4
+    "mw": 45.6
    },
-   "scheme": "SECI-FDRE-X",
-   "ipp": true,
-   "summary": "Assured peak supply (FDRE), 1,200 MW / 4,800 MWh (SECI-FDRE-X); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 4 Dec 2026, 10:00.",
-   "documents": 6,
+   "scheme": null,
+   "ipp": false,
+   "summary": "Wind power, 45.6 MW; for EPC contractors: build the plant for SECI. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 3 Aug 2026, 15:30. Bids open 2 Dec 2026, 10:00.",
+   "documents": 11,
    "amendments": [
     {
-     "name": "Amendment-01-SECI-FDRE-X",
-     "date": "2026-10-29"
+     "name": "amended 3 Wind 18112026R",
+     "date": "2026-11-18"
+    },
+    {
+     "name": "amendment-2 28092026",
+     "date": "2026-09-28"
+    },
+    {
+     "name": "Amendment-1 Clarification-1 dwgFile KML File SA-A SA-B SA-C",
+     "date": "2026-09-10"
     }
    ],
-   "fingerprint": "b2418eda0cf06db6",
-   "firstSeen": "2026-10-07",
-   "status": "open",
-   "lastAmendment": "2026-10-29",
-   "daysToBid": 6
+   "fingerprint": "bf5b0307b99758bc",
+   "firstSeen": "2026-07-16",
+   "status": "amended",
+   "lastAmendment": "2026-11-18",
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -403,7 +309,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -428,7 +334,105 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
+   "daysToBid": 7
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000288",
+   "ref": "SECI/C&P/IPP/12/0011/26-27",
+   "title": "RfS for 1200 MW ISTS-Connected Wind Power Projects in India (SECI-Tranche-XXI)",
+   "url": "https://www.seci.co.in/tender-details/Ymp_",
+   "published": "2026-10-07",
+   "bidDeadline": "2026-12-04",
+   "bidOpen": "2026-12-09",
+   "category": "wind",
+   "categoryLabel": "Wind power",
+   "capacity": {
+    "mw": 1200
+   },
+   "scheme": "SECI-Tranche-XXI",
+   "ipp": true,
+   "summary": "Wind power, 1,200 MW (SECI-Tranche-XXI); for developers: a power-supply or tariff bid. Bids are due 4 Dec 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 9 Dec 2026, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Amendment-02 Wind-Tranche-XXI",
+     "date": "2026-11-25"
+    },
+    {
+     "name": "Amendment-01 Wind-Tranche-XXI",
+     "date": "2026-10-28"
+    }
+   ],
+   "fingerprint": "04ffc9172cca1095",
+   "firstSeen": "2026-10-07",
+   "status": "amended",
+   "lastAmendment": "2026-11-25",
    "daysToBid": 8
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000282",
+   "ref": "SECI/C&P/MI/00/06/2026-27",
+   "title": "RfS for Green Ammonia (Mode-2A-Tranche-II)",
+   "url": "https://www.seci.co.in/tender-details/Ymp1",
+   "published": "2026-09-24",
+   "bidDeadline": "2026-12-07",
+   "bidOpen": "2026-12-10",
+   "category": "hydrogen",
+   "categoryLabel": "Green hydrogen and ammonia",
+   "capacity": {},
+   "scheme": "Mode-2A-Tranche-II",
+   "ipp": true,
+   "summary": "Green hydrogen and ammonia (Mode-2A-Tranche-II); for developers: a power-supply or tariff bid. Bids are due 7 Dec 2026, 18:00. Pre-bid meeting 12 Oct 2026, 14:30. Bids open 10 Dec 2026, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Amendment-01",
+     "date": "2026-10-28"
+    },
+    {
+     "name": "Clarification-01",
+     "date": "2026-10-28"
+    }
+   ],
+   "fingerprint": "bbde2deac4ce19cd",
+   "firstSeen": "2026-09-24",
+   "status": "open",
+   "lastAmendment": "2026-10-28",
+   "daysToBid": 11
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000289",
+   "ref": "SECI/C&P/IPP/13/0012/26-27",
+   "title": "RfS for Assured Peak Supply of 4800 MWh (1200 MW x 4 Hrs.) from ISTS-Connected RE Projects in India (SECI-FDRE-X)",
+   "url": "https://www.seci.co.in/tender-details/Ymp-",
+   "published": "2026-10-07",
+   "bidDeadline": "2026-12-08",
+   "bidOpen": "2026-12-11",
+   "category": "peak",
+   "categoryLabel": "Assured peak supply (FDRE)",
+   "capacity": {
+    "mw": 1200,
+    "mwh": 4800,
+    "hours": 4
+   },
+   "scheme": "SECI-FDRE-X",
+   "ipp": true,
+   "summary": "Assured peak supply (FDRE), 1,200 MW / 4,800 MWh (SECI-FDRE-X); for developers: a power-supply or tariff bid. Bids are due 8 Dec 2026, 18:00. Pre-bid meeting 14 Oct 2026, 11:00. Bids open 11 Dec 2026, 10:00.",
+   "documents": 6,
+   "amendments": [
+    {
+     "name": "Amendment-01-SECI-FDRE-X",
+     "date": "2026-10-29"
+    }
+   ],
+   "fingerprint": "600bb0ca18aa6c1e",
+   "firstSeen": "2026-10-07",
+   "status": "open",
+   "lastAmendment": "2026-10-29",
+   "daysToBid": 12
   },
   {
    "source": "SECI",
@@ -451,7 +455,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 19
+   "daysToBid": 18
   },
   {
    "source": "NHPC",
@@ -476,7 +480,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 20
+   "daysToBid": 19
   },
   {
    "source": "SECI",
@@ -499,7 +503,7 @@
    "firstSeen": "2026-11-21",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 23
+   "daysToBid": 22
   }
  ],
  "results": [
@@ -1038,6 +1042,51 @@
  ],
  "events": [
   {
+   "date": "2026-11-26",
+   "source": "SECI",
+   "id": "SECI000289",
+   "tender": "SECI-FDRE-X",
+   "kind": "deadline moved",
+   "detail": "2026-12-01 → 2026-12-08",
+   "url": "https://www.seci.co.in/tender-details/Ymp-"
+  },
+  {
+   "date": "2026-11-26",
+   "source": "SECI",
+   "id": "SECI000282",
+   "tender": "Mode-2A-Tranche-II",
+   "kind": "deadline moved",
+   "detail": "2026-11-25 → 2026-12-07",
+   "url": "https://www.seci.co.in/tender-details/Ymp1"
+  },
+  {
+   "date": "2026-11-26",
+   "source": "SECI",
+   "id": "SECI000288",
+   "tender": "SECI-Tranche-XXI",
+   "kind": "deadline moved",
+   "detail": "2026-11-24 → 2026-12-04",
+   "url": "https://www.seci.co.in/tender-details/Ymp_"
+  },
+  {
+   "date": "2026-11-26",
+   "source": "SECI",
+   "id": "SECI000263",
+   "tender": "Setting up of grid-connected 45.6 MW Wind Power Project (Package 2: Wi…",
+   "kind": "deadline moved",
+   "detail": "2026-11-25 → 2026-12-01",
+   "url": "https://www.seci.co.in/tender-details/YmR0"
+  },
+  {
+   "date": "2026-11-25",
+   "source": "SECI",
+   "id": "SECI000288",
+   "tender": "SECI-Tranche-XXI",
+   "kind": "amendment",
+   "detail": "Amendment-02 Wind-Tranche-XXI",
+   "url": "https://www.seci.co.in/tender-details/Ymp_"
+  },
+  {
    "date": "2026-11-23",
    "source": "SECI",
    "id": "SECI000277",
@@ -1151,6 +1200,6 @@
   "ipp": 13,
   "seci": 16,
   "nhpc": 1,
-  "newToday": 0
+  "newToday": 4
  }
 }
