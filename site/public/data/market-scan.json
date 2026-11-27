@@ -1,6 +1,6 @@
 {
  "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
- "scannedAt": "2026-11-26T01:48:50",
+ "scannedAt": "2026-11-27T01:49:27",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -9,117 +9,6 @@
  "documentsOpened": 0,
  "errors": [],
  "tenders": [
-  {
-   "source": "SECI",
-   "id": "SECI000281",
-   "ref": "SECI/C&P/IPP/11/0008/26-27",
-   "title": "RfS for setting up of 4083.75 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode at Constituent Colleges/Institutions of Central Agricultural University (CAU), Imphal - North Eastern Region (RTSPV T-XIII)",
-   "url": "https://www.seci.co.in/tender-details/Ymp2",
-   "published": "2026-09-18",
-   "bidDeadline": "2026-11-24",
-   "bidOpen": "2026-11-27",
-   "category": "rooftop",
-   "categoryLabel": "Rooftop solar (RESCO)",
-   "capacity": {
-    "kw": 4083.75
-   },
-   "scheme": "RTSPV T-XIII",
-   "ipp": true,
-   "summary": "Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00, already closed. Pre-bid meeting 30 Sep 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
-   "documents": 5,
-   "amendments": [],
-   "fingerprint": "875841506f88d4fe",
-   "firstSeen": "2026-09-18",
-   "status": "open",
-   "lastAmendment": null,
-   "daysToBid": -2
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000285",
-   "ref": "SECI/C&P/IPP/11/0009/26-27",
-   "title": "Request for Selection (RfS Document) of Solar Power Developers for Setting up of 11,159 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode through Tariff-Based Competitive Bidding (RTSPV-Tranche-XIV)",
-   "url": "https://www.seci.co.in/tender-details/Ympy",
-   "published": "2026-10-01",
-   "bidDeadline": "2026-11-24",
-   "bidOpen": "2026-11-27",
-   "category": "rooftop",
-   "categoryLabel": "Rooftop solar (RESCO)",
-   "capacity": {
-    "kw": 11159
-   },
-   "scheme": "RTSPV-Tranche-XIV",
-   "ipp": true,
-   "summary": "Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid. Bids are due 24 Nov 2026, 18:00, already closed. Pre-bid meeting 7 Oct 2026, 14:30. Bids open 27 Nov 2026, 10:00.",
-   "documents": 4,
-   "amendments": [],
-   "fingerprint": "a86db47d6e2b3699",
-   "firstSeen": "2026-10-01",
-   "status": "open",
-   "lastAmendment": null,
-   "daysToBid": -2
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000286",
-   "ref": "SECI/C&P/IPP/15/0010/26-27",
-   "title": "RfS for Supply of Energy from 800 MW/ 3200 MWh Standalone Battery Energy Storage Systems in India (SECI-ESS-IV)",
-   "url": "https://www.seci.co.in/tender-details/Ympx",
-   "published": "2026-10-01",
-   "bidDeadline": "2026-11-25",
-   "bidOpen": "2026-11-30",
-   "category": "bess",
-   "categoryLabel": "Battery storage (standalone BESS)",
-   "capacity": {
-    "mw": 800,
-    "mwh": 3200
-   },
-   "scheme": "SECI-ESS-IV",
-   "ipp": true,
-   "summary": "Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid. Bids are due 25 Nov 2026, 18:00, already closed. Pre-bid meeting 9 Oct 2026, 16:00. Bids open 30 Nov 2026, 10:00.",
-   "documents": 7,
-   "amendments": [
-    {
-     "name": "Amendment-02-SECI-ESS-IV",
-     "date": "2026-11-03"
-    },
-    {
-     "name": "Amendment-01-SECI-ESS-IV",
-     "date": "2026-10-31"
-    }
-   ],
-   "fingerprint": "77c97b8a89f45da5",
-   "firstSeen": "2026-10-01",
-   "status": "open",
-   "lastAmendment": "2026-11-03",
-   "daysToBid": -1
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000296",
-   "ref": "SECI/C&P/IPP/15/0013/26-27",
-   "title": "Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat",
-   "url": "https://www.seci.co.in/tender-details/Ymtx",
-   "published": "2026-10-28",
-   "bidDeadline": "2026-11-27",
-   "bidOpen": "2026-12-02",
-   "category": "bess",
-   "categoryLabel": "Battery storage (standalone BESS)",
-   "capacity": {
-    "mw": 4000,
-    "mwh": 16000
-   },
-   "scheme": null,
-   "ipp": true,
-   "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 27 Nov 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 2 Dec 2026, 10:00.",
-   "documents": 3,
-   "amendments": [],
-   "fingerprint": "563344115ea71bc0",
-   "firstSeen": "2026-10-28",
-   "status": "open",
-   "lastAmendment": null,
-   "daysToBid": 1
-  },
   {
    "source": "SECI",
    "id": "SECI000249",
@@ -166,41 +55,7 @@
    "firstSeen": "2026-04-19",
    "status": "open",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 4
-  },
-  {
-   "source": "SECI",
-   "id": "SECI000278",
-   "ref": "SECI/C&P/IPP/15/0009/26-27",
-   "title": "700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&I-1)",
-   "url": "https://www.seci.co.in/tender-details/YmV_",
-   "published": "2026-09-03",
-   "bidDeadline": "2026-11-30",
-   "bidOpen": "2026-12-03",
-   "category": "solar",
-   "categoryLabel": "Solar power",
-   "capacity": {
-    "mw": 700
-   },
-   "scheme": "C&I-1",
-   "ipp": true,
-   "summary": "Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 3 Dec 2026, 10:00.",
-   "documents": 7,
-   "amendments": [
-    {
-     "name": "Pre Bid Clarifications1",
-     "date": "2026-10-13"
-    },
-    {
-     "name": "Amendment 011",
-     "date": "2026-10-13"
-    }
-   ],
-   "fingerprint": "4916d6522729c35b",
-   "firstSeen": "2026-09-03",
-   "status": "open",
-   "lastAmendment": "2026-10-13",
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -223,7 +78,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -240,13 +95,13 @@
    "scheme": null,
    "ipp": false,
    "summary": "Battery storage (standalone BESS); for EPC contractors: build the plant for SECI. Bids are due 30 Nov 2026, 18:00. Pre-bid meeting 25 Nov 2026, 14:30. Bids open 1 Dec 2026, 10:00.",
-   "documents": 1,
+   "documents": 2,
    "amendments": [],
-   "fingerprint": "3f1f3d11c39cb766",
+   "fingerprint": "2c429635fdd8155b",
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -284,7 +139,57 @@
    "firstSeen": "2026-07-16",
    "status": "amended",
    "lastAmendment": "2026-11-18",
-   "daysToBid": 5
+   "daysToBid": 4
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000281",
+   "ref": "SECI/C&P/IPP/11/0008/26-27",
+   "title": "RfS for setting up of 4083.75 kW Grid-Connected Rooftop Solar PV Projects under RESCO mode at Constituent Colleges/Institutions of Central Agricultural University (CAU), Imphal - North Eastern Region (RTSPV T-XIII)",
+   "url": "https://www.seci.co.in/tender-details/Ymp2",
+   "published": "2026-09-18",
+   "bidDeadline": "2026-12-01",
+   "bidOpen": "2026-12-04",
+   "category": "rooftop",
+   "categoryLabel": "Rooftop solar (RESCO)",
+   "capacity": {
+    "kw": 4083.75
+   },
+   "scheme": "RTSPV T-XIII",
+   "ipp": true,
+   "summary": "Rooftop solar (RESCO), 4,083.75 kW (RTSPV T-XIII); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 30 Sep 2026, 14:30. Bids open 4 Dec 2026, 10:00.",
+   "documents": 5,
+   "amendments": [],
+   "fingerprint": "c55c830443f2dc25",
+   "firstSeen": "2026-09-18",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 4
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000285",
+   "ref": "SECI/C&P/IPP/11/0009/26-27",
+   "title": "Request for Selection (RfS Document) of Solar Power Developers for Setting up of 11,159 kW Grid-Connected Rooftop Solar PV Projects under RESCO Mode through Tariff-Based Competitive Bidding (RTSPV-Tranche-XIV)",
+   "url": "https://www.seci.co.in/tender-details/Ympy",
+   "published": "2026-10-01",
+   "bidDeadline": "2026-12-01",
+   "bidOpen": "2026-12-04",
+   "category": "rooftop",
+   "categoryLabel": "Rooftop solar (RESCO)",
+   "capacity": {
+    "kw": 11159
+   },
+   "scheme": "RTSPV-Tranche-XIV",
+   "ipp": true,
+   "summary": "Rooftop solar (RESCO), 11,159 kW (RTSPV-Tranche-XIV); for developers: a power-supply or tariff bid. Bids are due 1 Dec 2026, 18:00. Pre-bid meeting 7 Oct 2026, 14:30. Bids open 4 Dec 2026, 10:00.",
+   "documents": 4,
+   "amendments": [],
+   "fingerprint": "31670c7f5dfa6b77",
+   "firstSeen": "2026-10-01",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 4
   },
   {
    "source": "SECI",
@@ -309,7 +214,46 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 5
+   "daysToBid": 4
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000286",
+   "ref": "SECI/C&P/IPP/15/0010/26-27",
+   "title": "RfS for Supply of Energy from 800 MW/ 3200 MWh Standalone Battery Energy Storage Systems in India (SECI-ESS-IV)",
+   "url": "https://www.seci.co.in/tender-details/Ympx",
+   "published": "2026-10-01",
+   "bidDeadline": "2026-12-03",
+   "bidOpen": "2026-12-08",
+   "category": "bess",
+   "categoryLabel": "Battery storage (standalone BESS)",
+   "capacity": {
+    "mw": 800,
+    "mwh": 3200
+   },
+   "scheme": "SECI-ESS-IV",
+   "ipp": true,
+   "summary": "Battery storage (standalone BESS), 800 MW / 3,200 MWh (SECI-ESS-IV); for developers: a power-supply or tariff bid. Bids are due 3 Dec 2026, 18:00. Pre-bid meeting 9 Oct 2026, 16:00. Bids open 8 Dec 2026, 10:00.",
+   "documents": 8,
+   "amendments": [
+    {
+     "name": "Amendment-03-SECI-ESS-IV",
+     "date": "2026-11-26"
+    },
+    {
+     "name": "Amendment-02-SECI-ESS-IV",
+     "date": "2026-11-03"
+    },
+    {
+     "name": "Amendment-01-SECI-ESS-IV",
+     "date": "2026-10-31"
+    }
+   ],
+   "fingerprint": "cb837361e4605f6f",
+   "firstSeen": "2026-10-01",
+   "status": "amended",
+   "lastAmendment": "2026-11-26",
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -334,7 +278,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -368,7 +312,7 @@
    "firstSeen": "2026-10-07",
    "status": "amended",
    "lastAmendment": "2026-11-25",
-   "daysToBid": 8
+   "daysToBid": 7
   },
   {
    "source": "SECI",
@@ -400,7 +344,7 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 11
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -432,7 +376,33 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 12
+   "daysToBid": 11
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000296",
+   "ref": "SECI/C&P/IPP/15/0013/26-27",
+   "title": "Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Storage Systems in Rajasthan and Gujarat",
+   "url": "https://www.seci.co.in/tender-details/Ymtx",
+   "published": "2026-10-28",
+   "bidDeadline": "2026-12-11",
+   "bidOpen": "2026-12-16",
+   "category": "bess",
+   "categoryLabel": "Battery storage (standalone BESS)",
+   "capacity": {
+    "mw": 4000,
+    "mwh": 16000
+   },
+   "scheme": null,
+   "ipp": true,
+   "summary": "Battery storage (standalone BESS), 4,000 MW / 16,000 MWh; for developers: a power-supply or tariff bid. Bids are due 11 Dec 2026, 18:00. Pre-bid meeting 6 Nov 2026, 14:30. Bids open 16 Dec 2026, 10:00.",
+   "documents": 3,
+   "amendments": [],
+   "fingerprint": "0957f2558a1f4e9c",
+   "firstSeen": "2026-10-28",
+   "status": "open",
+   "lastAmendment": null,
+   "daysToBid": 14
   },
   {
    "source": "SECI",
@@ -455,7 +425,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 18
+   "daysToBid": 17
   },
   {
    "source": "NHPC",
@@ -480,7 +450,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 19
+   "daysToBid": 18
   },
   {
    "source": "SECI",
@@ -503,7 +473,41 @@
    "firstSeen": "2026-11-21",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 22
+   "daysToBid": 21
+  },
+  {
+   "source": "SECI",
+   "id": "SECI000278",
+   "ref": "SECI/C&P/IPP/15/0009/26-27",
+   "title": "700 MW ISTS-Connected Solar PV Power Projects in India under TBCB (C&I-1)",
+   "url": "https://www.seci.co.in/tender-details/YmV_",
+   "published": "2026-09-03",
+   "bidDeadline": "2026-12-31",
+   "bidOpen": "2027-01-05",
+   "category": "solar",
+   "categoryLabel": "Solar power",
+   "capacity": {
+    "mw": 700
+   },
+   "scheme": "C&I-1",
+   "ipp": true,
+   "summary": "Solar power, 700 MW (C&I-1); for developers: a power-supply or tariff bid. Bids are due 31 Dec 2026, 18:00. Pre-bid meeting 14 Sep 2026, 14:30. Bids open 5 Jan 2027, 10:00.",
+   "documents": 7,
+   "amendments": [
+    {
+     "name": "Pre Bid Clarifications1",
+     "date": "2026-10-13"
+    },
+    {
+     "name": "Amendment 011",
+     "date": "2026-10-13"
+    }
+   ],
+   "fingerprint": "fe11183205e2f0d9",
+   "firstSeen": "2026-09-03",
+   "status": "open",
+   "lastAmendment": "2026-10-13",
+   "daysToBid": 34
   }
  ],
  "results": [
@@ -1042,6 +1046,60 @@
  ],
  "events": [
   {
+   "date": "2026-11-27",
+   "source": "SECI",
+   "id": "SECI000278",
+   "tender": "C&I-1",
+   "kind": "deadline moved",
+   "detail": "2026-11-30 → 2026-12-31",
+   "url": "https://www.seci.co.in/tender-details/YmV_"
+  },
+  {
+   "date": "2026-11-27",
+   "source": "SECI",
+   "id": "SECI000296",
+   "tender": "Supply of Energy from 4000 MW/ 16000 MWh Standalone Battery Energy Sto…",
+   "kind": "deadline moved",
+   "detail": "2026-11-27 → 2026-12-11",
+   "url": "https://www.seci.co.in/tender-details/Ymtx"
+  },
+  {
+   "date": "2026-11-27",
+   "source": "SECI",
+   "id": "SECI000286",
+   "tender": "SECI-ESS-IV",
+   "kind": "deadline moved",
+   "detail": "2026-11-25 → 2026-12-03",
+   "url": "https://www.seci.co.in/tender-details/Ympx"
+  },
+  {
+   "date": "2026-11-27",
+   "source": "SECI",
+   "id": "SECI000281",
+   "tender": "RTSPV T-XIII",
+   "kind": "deadline moved",
+   "detail": "2026-11-24 → 2026-12-01",
+   "url": "https://www.seci.co.in/tender-details/Ymp2"
+  },
+  {
+   "date": "2026-11-27",
+   "source": "SECI",
+   "id": "SECI000285",
+   "tender": "RTSPV-Tranche-XIV",
+   "kind": "deadline moved",
+   "detail": "2026-11-24 → 2026-12-01",
+   "url": "https://www.seci.co.in/tender-details/Ympy"
+  },
+  {
+   "date": "2026-11-26",
+   "source": "SECI",
+   "id": "SECI000286",
+   "tender": "SECI-ESS-IV",
+   "kind": "amendment",
+   "detail": "Amendment-03-SECI-ESS-IV",
+   "url": "https://www.seci.co.in/tender-details/Ympx"
+  },
+  {
    "date": "2026-11-26",
    "source": "SECI",
    "id": "SECI000289",
@@ -1200,6 +1258,6 @@
   "ipp": 13,
   "seci": 16,
   "nhpc": 1,
-  "newToday": 4
+  "newToday": 5
  }
 }
