@@ -1,6 +1,6 @@
 {
  "note": "Open tenders at SECI and NHPC and what changed, read daily from their public tender lists and details pages without opening any document.",
- "scannedAt": "2026-11-27T01:49:27",
+ "scannedAt": "2026-11-28T01:48:46",
  "sources": [
   "https://www.seci.co.in/tenders",
   "https://www.seci.co.in/tenders/results",
@@ -55,7 +55,7 @@
    "firstSeen": "2026-04-19",
    "status": "open",
    "lastAmendment": "2026-11-05",
-   "daysToBid": 3
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -78,7 +78,7 @@
    "firstSeen": "2026-09-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 3
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -101,7 +101,7 @@
    "firstSeen": "2026-11-18",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 3
+   "daysToBid": 2
   },
   {
    "source": "SECI",
@@ -139,7 +139,7 @@
    "firstSeen": "2026-07-16",
    "status": "amended",
    "lastAmendment": "2026-11-18",
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -164,7 +164,7 @@
    "firstSeen": "2026-09-18",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -189,7 +189,7 @@
    "firstSeen": "2026-10-01",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -214,7 +214,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 4
+   "daysToBid": 3
   },
   {
    "source": "SECI",
@@ -253,7 +253,7 @@
    "firstSeen": "2026-10-01",
    "status": "amended",
    "lastAmendment": "2026-11-26",
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -278,7 +278,7 @@
    "firstSeen": "2026-09-30",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 6
+   "daysToBid": 5
   },
   {
    "source": "SECI",
@@ -312,7 +312,7 @@
    "firstSeen": "2026-10-07",
    "status": "amended",
    "lastAmendment": "2026-11-25",
-   "daysToBid": 7
+   "daysToBid": 6
   },
   {
    "source": "SECI",
@@ -344,7 +344,7 @@
    "firstSeen": "2026-09-24",
    "status": "open",
    "lastAmendment": "2026-10-28",
-   "daysToBid": 10
+   "daysToBid": 9
   },
   {
    "source": "SECI",
@@ -376,7 +376,7 @@
    "firstSeen": "2026-10-07",
    "status": "open",
    "lastAmendment": "2026-10-29",
-   "daysToBid": 11
+   "daysToBid": 10
   },
   {
    "source": "SECI",
@@ -402,7 +402,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 14
+   "daysToBid": 13
   },
   {
    "source": "SECI",
@@ -425,7 +425,7 @@
    "firstSeen": "2026-10-28",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 17
+   "daysToBid": 16
   },
   {
    "source": "NHPC",
@@ -450,7 +450,7 @@
    "firstSeen": "2026-11-04",
    "status": "open",
    "lastAmendment": null,
-   "daysToBid": 18
+   "daysToBid": 17
   },
   {
    "source": "SECI",
@@ -473,7 +473,7 @@
    "firstSeen": "2026-11-21",
    "status": "new",
    "lastAmendment": null,
-   "daysToBid": 21
+   "daysToBid": 20
   },
   {
    "source": "SECI",
@@ -507,7 +507,7 @@
    "firstSeen": "2026-09-03",
    "status": "open",
    "lastAmendment": "2026-10-13",
-   "daysToBid": 34
+   "daysToBid": 33
   }
  ],
  "results": [
@@ -1258,6 +1258,6 @@
   "ipp": 13,
   "seci": 16,
   "nhpc": 1,
-  "newToday": 5
+  "newToday": 0
  }
 }
